@@ -2761,8 +2761,13 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
     switch (activeTab) {
       case "dashboard":
         if (role === "CEO") return <CEODashboard onTab={setActiveTab} />;
+        if (role === "Administrator") return <CEODashboard onTab={setActiveTab} />;
         if (role === "Vendor") return <VendorDashboard user={currentUser} />;
         if (role === "Client") return <ClientDashboard user={currentUser} />;
+        if (role === "Finance Manager") return <FinanceDashboard user={currentUser} onTab={setActiveTab} />;
+        if (role === "Sales & Marketing") return <CRMDashboardSM user={currentUser} />;
+        if (role === "Strategy & Events Lead") return <StrategyOverviewView />;
+        if (role === "Vendor Manager") return <StaffDashboard user={currentUser} />;
         return <StaffDashboard user={currentUser} />;
       case "events": return <EventsView />;
       case "tasks": return <TasksView userRole={currentUser.role} />;

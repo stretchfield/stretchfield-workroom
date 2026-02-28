@@ -1801,7 +1801,7 @@ const CRMView = ({ user }) => {
 
   const load = async () => {
     const [l, a, p, m] = await Promise.all([
-      supabase.from("leads").select("*").order("created_at", { ascending: false }),
+      ["CEO", "Administrator"].includes(user?.role) ? supabase.from("leads").select("*").order("created_at", { ascending: false }) : supabase.from("leads").select("*").or("assigned_to.eq." + user.id + ",created_by.eq." + user.id).order("created_at", { ascending: false }),
       supabase.from("crm_activities").select("*").order("created_at", { ascending: false }),
       supabase.from("proposals").select("*").order("created_at", { ascending: false }),
       supabase.from('profiles').select('*').not('role', 'in', '("Client","Vendor")'),

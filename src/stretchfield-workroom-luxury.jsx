@@ -421,12 +421,22 @@ const CEODashboard = ({ onTab }) => {
   const [invoices, setInvoices] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [vendors, setVendors] = useState([]);
+  const [leads, setLeads] = useState([]);
+  const [targets, setTargets] = useState([]);
+  const [feedback, setFeedback] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [rffs, setRffs] = useState([]);
 
   useEffect(() => {
     supabase.from('projects').select('*').order('created_at', { ascending: false }).then(({ data }) => setEvents(data || []));
     supabase.from('invoices').select('*').order('created_at', { ascending: false }).then(({ data }) => setInvoices(data || []));
     supabase.from('tasks').select('*').then(({ data }) => setTasks(data || []));
-    supabase.from('rffs').select('vendor').then(({ data }) => {
+    supabase.from('clients').select('*').then(({ data }) => setClients(data || []));
+    supabase.from('feedback').select('*').order('created_at', { ascending: false }).then(({ data }) => setFeedback(data || []));
+    supabase.from('leads').select('*').then(({ data }) => setLeads(data || []));
+    supabase.from('sales_targets').select('*').then(({ data }) => setTargets(data || []));
+    supabase.from('rffs').select('*').then(({ data }) => {
+      setRffs(data || []);
       const unique = [...new Set((data || []).map(r => r.vendor).filter(Boolean))];
       setVendors(unique);
     });
@@ -434,23 +444,77 @@ const CEODashboard = ({ onTab }) => {
 
   const pendingInvoices = invoices.filter(i => i.status === 'pending');
   const openTasks = tasks.filter(t => t.status !== 'completed');
+  const wonLeads = leads.filter(l => l.status === 'won');
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const mtdRevenue = wonLeads.filter(l => l.closed_date && new Date(l.closed_date) >= startOfMonth).reduce((a, l) => a + (l.value || 0), 0);
+  const ytdRevenue = wonLeads.filter(l => l.closed_date && new Date(l.closed_date) >= startOfYear).reduce((a, l) => a + (l.value || 0), 0);
+  const totalRevenue = wonLeads.reduce((a, l) => a + (l.value || 0), 0);
+  const closingPct = leads.length ? Math.round((wonLeads.length / leads.length) * 100) : 0;
+  const avgCycle = wonLeads.filter(l => l.sales_cycle_days).length
+    ? Math.round(wonLeads.filter(l => l.sales_cycle_days).reduce((a, l) => a + l.sales_cycle_days, 0) / wonLeads.filter(l => l.sales_cycle_days).length) : 0;
+  const pendingRffs = rffs.filter(r => r.status === 'pending' && r.approved);
+  const wonLeadsAwaitingApproval = leads.filter(l => l.status === 'won' && !l.approved);
+  const avgRating = feedback.length ? (feedback.reduce((a, f) => a + f.rating, 0) / feedback.length).toFixed(1) : null;
 
   return (
     <div>
       <PageHeader title="Executive Overview" subtitle="Live company performance snapshot" />
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 32 }}>
-        <Stat icon="📁" label="Active Events" value={events.filter(e => e.status === 'active').length} sub={`${events.length} total`} color={T.cyan} />
-        <Stat icon="🧾" label="Pending Invoices" value={pendingInvoices.length} sub={`GHS ${pendingInvoices.reduce((a, i) => a + (i.amount || 0), 0).toLocaleString()}`} color={T.amber} />
-        <Stat icon="🤝" label="Active Vendors" value={vendors.length} color={T.blue} />
+
+      {/* Alerts */}
+      {(wonLeadsAwaitingApproval.length > 0 || pendingInvoices.length > 0) && (
+        <div style={{ marginBottom: 24 }}>
+          {wonLeadsAwaitingApproval.length > 0 && (
+            <div onClick={() => onTab('crm')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: T.amber + '15', border: '1px solid ' + T.amber + '44', borderRadius: 8, marginBottom: 8, cursor: 'pointer' }}>
+              <span style={{ fontSize: 18 }}>🔔</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>{wonLeadsAwaitingApproval.length} Won Lead{wonLeadsAwaitingApproval.length > 1 ? 's' : ''} Awaiting Approval</div>
+                <div style={{ color: T.textMuted, fontSize: 12 }}>{wonLeadsAwaitingApproval.map(l => l.company).join(', ')}</div>
+              </div>
+              <span style={{ color: T.amber, fontSize: 12 }}>Review →</span>
+            </div>
+          )}
+          {pendingInvoices.length > 0 && (
+            <div onClick={() => onTab('invoices')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: T.magenta + '15', border: '1px solid ' + T.magenta + '44', borderRadius: 8, cursor: 'pointer' }}>
+              <span style={{ fontSize: 18 }}>🧾</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ color: T.magenta, fontWeight: 700, fontSize: 13 }}>{pendingInvoices.length} Invoice{pendingInvoices.length > 1 ? 's' : ''} Pending</div>
+                <div style={{ color: T.textMuted, fontSize: 12 }}>GHS {pendingInvoices.reduce((a, i) => a + (i.amount || 0), 0).toLocaleString()} outstanding</div>
+              </div>
+              <span style={{ color: T.magenta, fontSize: 12 }}>Review →</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Top Stats Row */}
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 24 }}>
+        <Stat icon="📁" label="Active Events" value={events.filter(e => e.status === 'active').length} sub={events.length + ' total'} color={T.cyan} />
+        <Stat icon="👥" label="Clients" value={clients.length} color={T.blue} />
+        <Stat icon="🤝" label="Vendors" value={vendors.length} color={T.teal} />
         <Stat icon="✅" label="Open Tasks" value={openTasks.length} color={T.magenta} />
+        <Stat icon="📋" label="Pending RFFs" value={pendingRffs.length} color={T.amber} />
+        {avgRating && <Stat icon="⭐" label="Client Rating" value={avgRating + '/5'} color={T.cyan} />}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      {/* CRM Revenue Row */}
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 28 }}>
+        <Stat icon="💰" label="MTD Revenue" value={'GHS ' + mtdRevenue.toLocaleString()} color={T.teal} />
+        <Stat icon="📅" label="YTD Revenue" value={'GHS ' + ytdRevenue.toLocaleString()} color={T.cyan} />
+        <Stat icon="🏆" label="Total Won" value={'GHS ' + totalRevenue.toLocaleString()} sub={wonLeads.length + ' deals'} color={T.amber} />
+        <Stat icon="📊" label="Closing %" value={closingPct + '%'} color={T.blue} />
+        <Stat icon="⏱" label="Avg Sales Cycle" value={avgCycle + ' days'} color={T.magenta} />
+      </div>
+
+      {/* Main Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+        {/* Event Progress */}
         <Card>
-          <SectionHeader title="Event Progress" actionLabel="View All" action={() => onTab('projects')} />
+          <SectionHeader title="Event Progress" actionLabel="View All" action={() => onTab('events')} />
           {events.length === 0 ? (
             <div style={{ color: T.textMuted, fontSize: 13, padding: '20px 0', textAlign: 'center' }}>No events yet.</div>
-          ) : events.slice(0, 4).map((e, i) => (
+          ) : events.filter(e => e.status === 'active').slice(0, 4).map(e => (
             <div key={e.id} style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                 <div>
@@ -464,24 +528,104 @@ const CEODashboard = ({ onTab }) => {
           ))}
         </Card>
 
+        {/* CRM Pipeline */}
+        <Card>
+          <SectionHeader title="CRM Pipeline" actionLabel="View All" action={() => onTab('crm')} />
+          {leads.length === 0 ? (
+            <div style={{ color: T.textMuted, fontSize: 13, padding: '20px 0', textAlign: 'center' }}>No leads yet.</div>
+          ) : (
+            <div>
+              {['new','contacted','qualified','proposal','won','lost'].map(s => {
+                const count = leads.filter(l => l.status === s).length;
+                const val = leads.filter(l => l.status === s).reduce((a, l) => a + (l.value || 0), 0);
+                if (!count) return null;
+                const colors = { new: T.cyan, contacted: T.blue, qualified: T.amber, proposal: T.magenta, won: T.teal, lost: '#F43F5E' };
+                return (
+                  <div key={s} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid ' + T.border }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: colors[s] }} />
+                      <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{s.charAt(0).toUpperCase() + s.slice(1)}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 16 }}>
+                      <div style={{ color: T.textMuted, fontSize: 12 }}>{count} deals</div>
+                      <div style={{ color: colors[s], fontWeight: 700, fontSize: 12, minWidth: 90, textAlign: 'right' }}>GHS {val.toLocaleString()}</div>
+                    </div>
+                  </div>
+                );
+              })}
+              <div style={{ marginTop: 12, padding: '10px 0', display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ color: T.textMuted, fontSize: 12 }}>Total Pipeline</div>
+                <div style={{ color: T.amber, fontWeight: 700 }}>GHS {leads.filter(l => !['won','lost'].includes(l.status)).reduce((a, l) => a + (l.value || 0), 0).toLocaleString()}</div>
+              </div>
+            </div>
+          )}
+        </Card>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+        {/* Recent Invoices */}
         <Card>
           <SectionHeader title="Recent Invoices" actionLabel="View All" action={() => onTab('invoices')} />
           {invoices.length === 0 ? (
             <div style={{ color: T.textMuted, fontSize: 13, padding: '20px 0', textAlign: 'center' }}>No invoices yet.</div>
           ) : invoices.slice(0, 4).map((inv, i) => (
-            <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: i < 3 ? `1px solid ${T.border}` : 'none' }}>
+            <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i < 3 ? '1px solid ' + T.border : 'none' }}>
               <div>
                 <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{inv.vendor || 'Vendor'}</div>
                 <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{inv.event_name} · {inv.date}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ color: T.textPrimary, fontSize: 15, fontWeight: 700 }}>GHS {(inv.amount || 0).toLocaleString()}</div>
+                <div style={{ color: T.textPrimary, fontSize: 14, fontWeight: 700 }}>GHS {(inv.amount || 0).toLocaleString()}</div>
                 <Badge status={inv.status} />
               </div>
             </div>
           ))}
         </Card>
+
+        {/* Client Feedback */}
+        <Card>
+          <SectionHeader title="Latest Client Feedback" actionLabel="View All" action={() => onTab('feedback')} />
+          {feedback.length === 0 ? (
+            <div style={{ color: T.textMuted, fontSize: 13, padding: '20px 0', textAlign: 'center' }}>No feedback yet.</div>
+          ) : feedback.slice(0, 4).map((f, i) => (
+            <div key={f.id} style={{ padding: '10px 0', borderBottom: i < 3 ? '1px solid ' + T.border : 'none' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{f.client_name}</div>
+                <div style={{ color: '#F59E0B', fontSize: 13 }}>{'★'.repeat(f.rating)}{'☆'.repeat(5 - f.rating)}</div>
+              </div>
+              <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 4 }}>📁 {f.event_name}</div>
+              <div style={{ color: T.textSecondary, fontSize: 12, fontStyle: 'italic' }}>"{f.summary}"</div>
+            </div>
+          ))}
+        </Card>
       </div>
+
+      {/* Sales Targets Progress */}
+      {targets.length > 0 && (
+        <Card>
+          <SectionHeader title="Sales Targets" actionLabel="View All" action={() => onTab('crm-insights')} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+            {targets.map(t => {
+              const repWon = wonLeads.filter(l => l.assigned_to === t.rep_id || l.created_by === t.rep_id);
+              const repRevenue = repWon.reduce((a, l) => a + (l.value || 0), 0);
+              const pct = Math.min(100, Math.round((repRevenue / t.target_amount) * 100));
+              return (
+                <div key={t.id} style={{ padding: '14px', background: T.bg, borderRadius: 8, border: '1px solid ' + T.border }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{t.rep_name}</div>
+                    <span style={{ color: pct >= 100 ? T.teal : T.amber, fontSize: 12, fontWeight: 700 }}>{pct}%</span>
+                  </div>
+                  <ProgressBar value={pct} color={pct >= 100 ? T.teal : pct >= 60 ? T.cyan : T.amber} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+                    <div style={{ color: T.teal, fontSize: 12, fontWeight: 600 }}>GHS {repRevenue.toLocaleString()}</div>
+                    <div style={{ color: T.textMuted, fontSize: 11 }}>of GHS {t.target_amount.toLocaleString()}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
     </div>
   );
 };

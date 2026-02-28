@@ -297,7 +297,7 @@ const getNavItems = (role) => {
     base.push({ id: "events", label: "Events", icon: "▪" });
   }
   if (["CEO","Administrator","Sales & Marketing"].includes(role)) {
-    base.push({ id: "crm", label: "CRM", icon: "▪" }, { id: "sm-tasks", label: "S&M Tasks", icon: "▪" });
+    base.push({ id: "crm", label: "CRM", icon: "▪" }, { id: "crm-insights", label: "CRM Insights", icon: "▪" }, { id: "sm-tasks", label: "S&M Tasks", icon: "▪" });
   }
   if (["Strategy & Events Lead"].includes(role)) {
     base.push({ id: "strategy-overview", label: "Client Overview", icon: "▪" }, { id: "feedback-summary", label: "Feedback", icon: "▪" });
@@ -2478,6 +2478,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "clients": return <ClientsView user={currentUser} />;
       case "users": return <UsersView user={currentUser} />;
       case "crm": return <CRMView user={currentUser} />;
+      case "crm-insights": return ["CEO","Administrator"].includes(currentUser.role) ? <CRMDashboardCEO user={currentUser} /> : <CRMDashboardSM user={currentUser} />;
       case "sm-tasks": return <SMTasksView user={currentUser} />;
       case "strategy-overview": return <StrategyOverviewView />;
       case "feedback-summary": return <FeedbackView userRole={currentUser.role} />;
@@ -2595,3 +2596,286 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
     </div>
   );
 }
+
+const CRMDashboardCEO = ({ user }) => {
+  const [leads, setLeads] = useState([]);
+  const [targets, setTargets] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [form, setForm] = useState({ rep_id: "", rep_name: "", target_amount: "", period: "monthly", start_date: "", end_date: "" });
+  const [saving, setSaving] = useState(false);
+
+  const load = async () => {
+    const [l, t, m] = await Promise.all([
+      supabase.from("leads").select("*"),
+      supabase.from("sales_targets").select("*").order("created_at", { ascending: false }),
+      supabase.from("profiles").select("*").in("role", ["CEO", "Administrator", "Sales & Marketing"]),
+    ]);
+    setLeads(l.data || []);
+    setTargets(t.data || []);
+    setMembers(m.data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const wonLeads = leads.filter(l => l.status === "won");
+  const totalRevenue = wonLeads.reduce((a, l) => a + (l.value || 0), 0);
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const ytdRevenue = wonLeads.filter(l => l.closed_date && new Date(l.closed_date) >= startOfYear).reduce((a, l) => a + (l.value || 0), 0);
+  const avgCycle = wonLeads.filter(l => l.sales_cycle_days).length
+    ? Math.round(wonLeads.filter(l => l.sales_cycle_days).reduce((a, l) => a + l.sales_cycle_days, 0) / wonLeads.filter(l => l.sales_cycle_days).length) : 0;
+  const closingPct = leads.length ? Math.round((wonLeads.length / leads.length) * 100) : 0;
+
+  const repStats = members.map(m => {
+    const repLeads = leads.filter(l => l.assigned_to === m.id || l.created_by === m.id);
+    const repWon = repLeads.filter(l => l.status === "won");
+    const repRevenue = repWon.reduce((a, l) => a + (l.value || 0), 0);
+    const repTarget = targets.find(t => t.rep_id === m.id);
+    const repCycle = repWon.filter(l => l.sales_cycle_days).length
+      ? Math.round(repWon.filter(l => l.sales_cycle_days).reduce((a, l) => a + l.sales_cycle_days, 0) / repWon.filter(l => l.sales_cycle_days).length) : 0;
+    return { ...m, repLeads, repWon, repRevenue, repTarget, repCycle, closingPct: repLeads.length ? Math.round((repWon.length / repLeads.length) * 100) : 0 };
+  }).sort((a, b) => b.repRevenue - a.repRevenue);
+
+  const clientEarnings = wonLeads.reduce((acc, l) => { acc[l.company] = (acc[l.company] || 0) + (l.value || 0); return acc; }, {});
+
+  const handleCreateTarget = async () => {
+    if (!form.rep_id || !form.target_amount) return;
+    setSaving(true);
+    await supabase.from("sales_targets").insert({
+      rep_id: form.rep_id, rep_name: form.rep_name,
+      target_amount: parseFloat(form.target_amount),
+      period: form.period, start_date: form.start_date || null,
+      end_date: form.end_date || null, created_by: user.id,
+    });
+    setModal(false);
+    setForm({ rep_id: "", rep_name: "", target_amount: "", period: "monthly", start_date: "", end_date: "" });
+    setSaving(false);
+    load();
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+        <PageHeader title="CRM Insights" subtitle="Team performance and revenue overview" />
+        <Btn onClick={() => setModal(true)}>+ Set Target</Btn>
+      </div>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 32 }}>
+        <Stat icon="💰" label="Total Revenue" value={"GH₵" + totalRevenue.toLocaleString()} color={T.teal} />
+        <Stat icon="📅" label="YTD Revenue" value={"GH₵" + ytdRevenue.toLocaleString()} color={T.cyan} />
+        <Stat icon="📊" label="Closing %" value={closingPct + "%"} color={T.blue} />
+        <Stat icon="⏱" label="Avg Cycle" value={avgCycle + " days"} color={T.amber} />
+        <Stat icon="🏆" label="Deals Won" value={wonLeads.length} sub={"of " + leads.length + " total"} color={T.magenta} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
+        <Card>
+          <SectionHeader title="Rep Performance vs Target" />
+          {repStats.length === 0 ? <div style={{ color: T.textMuted, fontSize: 13 }}>No reps yet.</div>
+          : repStats.map((rep, i) => {
+            const target = rep.repTarget ? rep.repTarget.target_amount : 0;
+            const pct = target ? Math.min(100, Math.round((rep.repRevenue / target) * 100)) : 0;
+            return (
+              <div key={rep.id} style={{ marginBottom: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <div>
+                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{i === 0 && <span style={{ color: T.amber }}>🏆 </span>}{rep.name}</div>
+                    <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{rep.repWon.length} deals · {rep.closingPct}% close · {rep.repCycle}d cycle</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ color: T.teal, fontWeight: 700, fontSize: 13 }}>GH₵{rep.repRevenue.toLocaleString()}</div>
+                    {target > 0 && <div style={{ color: T.textMuted, fontSize: 11 }}>of GH₵{target.toLocaleString()}</div>}
+                  </div>
+                </div>
+                {target > 0 && <><ProgressBar value={pct} color={pct >= 100 ? T.teal : pct >= 60 ? T.cyan : T.amber} /><div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>{pct}% of target</div></>}
+              </div>
+            );
+          })}
+        </Card>
+        <Card>
+          <SectionHeader title="Revenue by Client" />
+          {Object.keys(clientEarnings).length === 0 ? <div style={{ color: T.textMuted, fontSize: 13 }}>No won deals yet.</div>
+          : Object.entries(clientEarnings).sort((a,b) => b[1]-a[1]).map(([company, amount]) => (
+            <div key={company} style={{ marginBottom: 14 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{company}</div>
+                <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>GH₵{amount.toLocaleString()}</div>
+              </div>
+              <ProgressBar value={Math.round((amount / totalRevenue) * 100)} color={T.blue} />
+            </div>
+          ))}
+        </Card>
+      </div>
+      <Card>
+        <SectionHeader title="Sales Targets" actionLabel="+ Set Target" action={() => setModal(true)} />
+        {targets.length === 0 ? <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0" }}>No targets set yet.</div>
+        : targets.map(t => {
+          const rep = repStats.find(r => r.id === t.rep_id);
+          const pct = rep ? Math.min(100, Math.round(((rep.repRevenue || 0) / t.target_amount) * 100)) : 0;
+          return (
+            <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px solid " + T.border }}>
+              <div>
+                <div style={{ color: T.textPrimary, fontWeight: 600, fontSize: 13 }}>{t.rep_name}</div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{t.period} · {t.start_date} to {t.end_date}</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ color: T.amber, fontWeight: 700 }}>GH₵{t.target_amount.toLocaleString()}</div>
+                <div style={{ color: pct >= 100 ? T.teal : T.textMuted, fontSize: 11, marginTop: 2 }}>{pct}% achieved</div>
+              </div>
+            </div>
+          );
+        })}
+      </Card>
+      {modal && (
+        <Modal title="Set Sales Target" onClose={() => setModal(false)}>
+          <Select label="Sales Rep" options={[{ value: "", label: "Select rep..." }, ...members.map(m => ({ value: m.id, label: m.name + " — " + m.role }))]}
+            value={form.rep_id} onChange={v => { const m = members.find(x => x.id === v); setForm({ ...form, rep_id: v, rep_name: m ? m.name : "" }); }} />
+          <Input label="Target Amount (GH₵)" type="number" placeholder="0" value={form.target_amount} onChange={v => setForm({ ...form, target_amount: v })} />
+          <Select label="Period" options={[{ value: "monthly", label: "Monthly" }, { value: "quarterly", label: "Quarterly" }, { value: "yearly", label: "Yearly" }]}
+            value={form.period} onChange={v => setForm({ ...form, period: v })} />
+          <Input label="Start Date" type="date" value={form.start_date} onChange={v => setForm({ ...form, start_date: v })} />
+          <Input label="End Date" type="date" value={form.end_date} onChange={v => setForm({ ...form, end_date: v })} />
+          <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+            <Btn onClick={handleCreateTarget} disabled={saving}>{saving ? "Saving..." : "Set Target"}</Btn>
+            <Btn variant="ghost" onClick={() => setModal(false)}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+const CRMDashboardSM = ({ user }) => {
+  const [leads, setLeads] = useState([]);
+  const [target, setTarget] = useState(null);
+  const [period, setPeriod] = useState("mtd");
+
+  const load = async () => {
+    const [l, t] = await Promise.all([
+      supabase.from("leads").select("*").or("assigned_to.eq." + user.id + ",created_by.eq." + user.id),
+      supabase.from("sales_targets").select("*").eq("rep_id", user.id).order("created_at", { ascending: false }).limit(1),
+    ]);
+    setLeads(l.data || []);
+    setTarget(t.data && t.data[0] ? t.data[0] : null);
+  };
+
+  useEffect(() => { load(); }, [user.id]);
+
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+
+  const filterByPeriod = (arr, p) => arr.filter(l => {
+    if (!l.closed_date) return false;
+    const d = new Date(l.closed_date);
+    if (p === "mtd") return d >= startOfMonth;
+    if (p === "ytd") return d >= startOfYear;
+    return true;
+  });
+
+  const wonLeads = leads.filter(l => l.status === "won");
+  const periodRevenue = filterByPeriod(wonLeads, period).reduce((a, l) => a + (l.value || 0), 0);
+  const ytdRevenue = filterByPeriod(wonLeads, "ytd").reduce((a, l) => a + (l.value || 0), 0);
+  const totalRevenue = wonLeads.reduce((a, l) => a + (l.value || 0), 0);
+  const pipelineValue = leads.filter(l => !["won","lost"].includes(l.status)).reduce((a, l) => a + (l.value || 0), 0);
+  const targetAmount = target ? target.target_amount : 0;
+  const targetPct = targetAmount ? Math.min(100, Math.round((periodRevenue / targetAmount) * 100)) : 0;
+  const ytdTargetPct = targetAmount ? Math.min(100, Math.round((ytdRevenue / targetAmount) * 100)) : 0;
+  const avgCycle = wonLeads.filter(l => l.sales_cycle_days).length
+    ? Math.round(wonLeads.filter(l => l.sales_cycle_days).reduce((a, l) => a + l.sales_cycle_days, 0) / wonLeads.filter(l => l.sales_cycle_days).length) : 0;
+  const closingPct = leads.length ? Math.round((wonLeads.length / leads.length) * 100) : 0;
+  const clientSpread = wonLeads.reduce((acc, l) => { acc[l.company] = (acc[l.company] || 0) + (l.value || 0); return acc; }, {});
+  const periodLabel = period === "mtd" ? "Month to Date" : period === "ytd" ? "Year to Date" : "All Time";
+
+  return (
+    <div>
+      <PageHeader title="My CRM Insights" subtitle={"Performance overview for " + user.name} />
+      <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+        {[["mtd","MTD"],["ytd","YTD"],["all","All Time"]].map(([val, label]) => (
+          <button key={val} onClick={() => setPeriod(val)} style={{
+            padding: "7px 18px", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: 600,
+            border: "1px solid " + (period === val ? T.cyan : T.border),
+            background: period === val ? T.cyan + "20" : "none",
+            color: period === val ? T.cyan : T.textMuted,
+          }}>{label}</button>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
+        <Stat icon="💰" label={periodLabel + " Revenue"} value={"GH₵" + periodRevenue.toLocaleString()} color={T.teal} />
+        <Stat icon="📅" label="YTD Revenue" value={"GH₵" + ytdRevenue.toLocaleString()} color={T.cyan} />
+        <Stat icon="🎯" label="Pipeline" value={"GH₵" + pipelineValue.toLocaleString()} color={T.amber} />
+        <Stat icon="📊" label="Close Rate" value={closingPct + "%"} color={T.magenta} />
+        <Stat icon="⏱" label="Avg Cycle" value={avgCycle + " days"} color={T.blue} />
+      </div>
+      <Card style={{ marginBottom: 20 }}>
+        <SectionHeader title={"Target Tracking — " + periodLabel} />
+        {!target ? (
+          <div style={{ color: T.textMuted, fontSize: 13, padding: "12px 0" }}>No target set. Ask your CEO to set a target.</div>
+        ) : (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+              <div>
+                <div style={{ color: T.textSecondary, fontSize: 13 }}>{target.period.charAt(0).toUpperCase() + target.period.slice(1)} Target</div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{target.start_date} to {target.end_date}</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ color: T.teal, fontWeight: 800, fontSize: 22 }}>GH₵{periodRevenue.toLocaleString()}</div>
+                <div style={{ color: T.textMuted, fontSize: 12 }}>of GH₵{targetAmount.toLocaleString()} target</div>
+              </div>
+            </div>
+            <ProgressBar value={targetPct} height={14} color={targetPct >= 100 ? T.teal : targetPct >= 60 ? T.cyan : T.amber} />
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
+              <div style={{ color: targetPct >= 100 ? T.teal : T.amber, fontSize: 14, fontWeight: 700 }}>{targetPct}% of target</div>
+              <div style={{ color: T.textMuted, fontSize: 12 }}>{targetAmount - periodRevenue > 0 ? "GH₵" + (targetAmount - periodRevenue).toLocaleString() + " to go" : "🎉 Target exceeded!"}</div>
+            </div>
+            <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid " + T.border }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <div style={{ color: T.textSecondary, fontSize: 13, fontWeight: 600 }}>Year to Date</div>
+                <div style={{ color: T.cyan, fontWeight: 700 }}>GH₵{ytdRevenue.toLocaleString()} <span style={{ color: T.textMuted, fontWeight: 400, fontSize: 12 }}>({ytdTargetPct}%)</span></div>
+              </div>
+              <ProgressBar value={ytdTargetPct} height={8} color={T.blue} />
+            </div>
+          </div>
+        )}
+      </Card>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+        <Card>
+          <SectionHeader title="Pipeline by Stage" />
+          {["new","contacted","qualified","proposal","won","lost"].map(s => {
+            const count = leads.filter(l => l.status === s).length;
+            const val = leads.filter(l => l.status === s).reduce((a, l) => a + (l.value || 0), 0);
+            if (!count) return null;
+            const colors = { new: T.cyan, contacted: T.blue, qualified: T.amber, proposal: T.magenta, won: T.teal, lost: "#F43F5E" };
+            return (
+              <div key={s} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: "1px solid " + T.border }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: colors[s] }} />
+                  <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{s.charAt(0).toUpperCase() + s.slice(1)}</div>
+                </div>
+                <div style={{ display: "flex", gap: 16 }}>
+                  <div style={{ color: T.textMuted, fontSize: 12 }}>{count} deals</div>
+                  <div style={{ color: colors[s], fontWeight: 700, fontSize: 12, minWidth: 80, textAlign: "right" }}>GH₵{val.toLocaleString()}</div>
+                </div>
+              </div>
+            );
+          })}
+        </Card>
+        <Card>
+          <SectionHeader title="Business Spread by Client" />
+          {Object.keys(clientSpread).length === 0 ? <div style={{ color: T.textMuted, fontSize: 13 }}>No won deals yet.</div>
+          : Object.entries(clientSpread).sort((a,b) => b[1]-a[1]).map(([company, amount]) => (
+            <div key={company} style={{ marginBottom: 14 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{company}</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ color: T.textMuted, fontSize: 11 }}>{totalRevenue ? Math.round((amount / totalRevenue) * 100) : 0}%</div>
+                  <div style={{ color: T.amber, fontWeight: 700, fontSize: 12 }}>GH₵{amount.toLocaleString()}</div>
+                </div>
+              </div>
+              <ProgressBar value={totalRevenue ? Math.round((amount / totalRevenue) * 100) : 0} color={T.blue} />
+            </div>
+          ))}
+        </Card>
+      </div>
+    </div>
+  );
+};

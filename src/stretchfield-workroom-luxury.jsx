@@ -2048,24 +2048,25 @@ const CRMView = ({ user }) => {
       }).select().single();
       clientId = newClient?.id;
       clientEmail = clientForm.email;
+    }
 
-      // Create portal login if requested
-      if (createLogin && loginPassword && clientEmail) {
-        const { data: authData } = await supabase.auth.signUp({
+    // Create portal login if requested (for both new and existing clients without login)
+    if (createLogin && loginPassword && clientEmail) {
+      const { data: authData } = await supabase.auth.signUp({
+        email: clientEmail,
+        password: loginPassword,
+      });
+      if (authData?.user) {
+        const name = matchedClient ? (matchedClient.name || matchedClient.company) : (clientForm.name || clientForm.company);
+        const initials = name.split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase();
+        await supabase.from("profiles").insert({
+          id: authData.user.id,
+          name,
           email: clientEmail,
-          password: loginPassword,
+          role: "Client",
+          avatar: initials,
         });
-        if (authData?.user) {
-          const initials = (clientForm.name || clientForm.company).split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase();
-          await supabase.from("profiles").insert({
-            id: authData.user.id,
-            name: clientForm.name || clientForm.company,
-            email: clientEmail,
-            role: "Client",
-            avatar: initials,
-          });
-          await supabase.from("clients").update({ profile_id: authData.user.id }).eq("id", clientId);
-        }
+        await supabase.from("clients").update({ profile_id: authData.user.id }).eq("id", clientId);
       }
     }
 
@@ -2271,7 +2272,17 @@ const CRMView = ({ user }) => {
           {matchedClient ? (
             <div style={{ padding: "12px 16px", background: T.cyan + "15", borderRadius: 8, border: "1px solid " + T.cyan + "33", marginBottom: 16 }}>
               <div style={{ color: T.cyan, fontWeight: 700, fontSize: 13 }}>✓ Existing Client Found</div>
-              <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 4 }}>{matchedClient.company || matchedClient.name} — a new event will be created for this client.</div>
+              <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 4 }}>{matchedClient.company || matchedClient.name}</div>
+              {!matchedClient.profile_id && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0" }}>
+                    <input type="checkbox" id="createLogin" checked={createLogin} onChange={e => setCreateLogin(e.target.checked)} style={{ accentColor: T.cyan, width: 16, height: 16 }} />
+                    <label htmlFor="createLogin" style={{ color: T.textSecondary, fontSize: 13, cursor: "pointer" }}>Create client portal login</label>
+                  </div>
+                  {createLogin && <Input label="Portal Password" type="password" placeholder="Set password for client" value={loginPassword} onChange={v => setLoginPassword(v)} />}
+                </div>
+              )}
+              {matchedClient.profile_id && <div style={{ color: T.teal, fontSize: 12, marginTop: 6 }}>✓ Portal login already active</div>}
             </div>
           ) : (
             <div style={{ marginBottom: 4 }}>
@@ -2284,9 +2295,7 @@ const CRMView = ({ user }) => {
                 <input type="checkbox" id="createLogin" checked={createLogin} onChange={e => setCreateLogin(e.target.checked)} style={{ accentColor: T.cyan, width: 16, height: 16 }} />
                 <label htmlFor="createLogin" style={{ color: T.textSecondary, fontSize: 13, cursor: "pointer" }}>Create client portal login</label>
               </div>
-              {createLogin && (
-                <Input label="Portal Password" type="password" placeholder="Set password for client" value={loginPassword} onChange={v => setLoginPassword(v)} />
-              )}
+              {createLogin && <Input label="Portal Password" type="password" placeholder="Set password for client" value={loginPassword} onChange={v => setLoginPassword(v)} />}
             </div>
           )}
           <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12, marginTop: 8 }}>Event to Create</div>

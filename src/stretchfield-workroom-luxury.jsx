@@ -290,7 +290,7 @@ const Btn = ({ children, onClick, variant = "primary", small }) => {
 // ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 const getNavItems = (role) => {
   const base = [{ id: "dashboard", label: "Dashboard", icon: "▪" }];
-  if (["CEO","Administrator","Vendor Manager","Strategy & Events Lead"].includes(role)) {
+  if (["CEO","Administrator","Vendor Manager","Strategy & Events Lead","Finance Manager"].includes(role)) {
     base.push({ id: "events", label: "Events", icon: "▪" }, { id: "tasks", label: "Event Tasks", icon: "▪" });
   }
   if (["Sales & Marketing"].includes(role)) {
@@ -2774,6 +2774,10 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "sm-tasks": return <SMTasksView user={currentUser} />;
       case "strategy-overview": return <StrategyOverviewView />;
       case "feedback-summary": return <FeedbackView userRole={currentUser.role} />;
+      case "finance": return <FinanceDashboard user={currentUser} onTab={setActiveTab} />;
+      case "budgets": return <BudgetView user={currentUser} />;
+      case "expenses": return <ExpenseView user={currentUser} />;
+      case "finance-reports": return <FinanceReportsView user={currentUser} />;
       case "feedback": return <FeedbackView userRole={currentUser.role} />;
       case "notifications": return <NotificationsView user={currentUser} />;
       case "rffs": return <VendorRFFsView user={currentUser} />;
@@ -3168,6 +3172,520 @@ const CRMDashboardSM = ({ user }) => {
           ))}
         </Card>
       </div>
+    </div>
+  );
+};
+
+// ─── FINANCE DASHBOARD ────────────────────────────────────────────────────────
+const FinanceDashboard = ({ user, onTab }) => {
+  const [invoices, setInvoices] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [budgets, setBudgets] = useState([]);
+  const [leads, setLeads] = useState([]);
+  const [events, setEvents] = useState([]);
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from("invoices").select("*").order("created_at", { ascending: false }),
+      supabase.from("expenses").select("*").order("created_at", { ascending: false }),
+      supabase.from("budgets").select("*"),
+      supabase.from("leads").select("*").eq("status", "won"),
+      supabase.from("projects").select("*"),
+    ]).then(([inv, exp, bud, l, ev]) => {
+      setInvoices(inv.data || []);
+      setExpenses(exp.data || []);
+      setBudgets(bud.data || []);
+      setLeads(l.data || []);
+      setEvents(ev.data || []);
+    });
+  }, []);
+
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+
+  const totalRevenue = leads.reduce((a, l) => a + (l.value || 0), 0);
+  const mtdRevenue = leads.filter(l => l.closed_date && new Date(l.closed_date) >= startOfMonth).reduce((a, l) => a + (l.value || 0), 0);
+  const ytdRevenue = leads.filter(l => l.closed_date && new Date(l.closed_date) >= startOfYear).reduce((a, l) => a + (l.value || 0), 0);
+
+  const totalExpenses = expenses.reduce((a, e) => a + (e.amount || 0), 0);
+  const mtdExpenses = expenses.filter(e => e.date && new Date(e.date) >= startOfMonth).reduce((a, e) => a + (e.amount || 0), 0);
+  const ytdExpenses = expenses.filter(e => e.date && new Date(e.date) >= startOfYear).reduce((a, e) => a + (e.amount || 0), 0);
+
+  const totalInvoiced = invoices.reduce((a, i) => a + (i.amount || 0), 0);
+  const pendingInvoices = invoices.filter(i => i.status === "pending");
+  const paidInvoices = invoices.filter(i => i.status === "paid");
+  const totalPaid = paidInvoices.reduce((a, i) => a + (i.amount || 0), 0);
+  const totalPending = pendingInvoices.reduce((a, i) => a + (i.amount || 0), 0);
+
+  const grossProfit = totalRevenue - totalExpenses;
+  const profitMargin = totalRevenue ? Math.round((grossProfit / totalRevenue) * 100) : 0;
+
+  const expensesByCategory = expenses.reduce((acc, e) => {
+    acc[e.category] = (acc[e.category] || 0) + (e.amount || 0);
+    return acc;
+  }, {});
+
+  const eventBudgetSummary = events.map(ev => {
+    const budget = budgets.find(b => b.project_id === ev.id);
+    const spent = expenses.filter(e => e.project_id === ev.id).reduce((a, e) => a + (e.amount || 0), 0);
+    const invoiced = invoices.filter(i => i.project_id === ev.id).reduce((a, i) => a + (i.amount || 0), 0);
+    return { ...ev, budget: budget?.total_budget || 0, spent, invoiced };
+  }).filter(e => e.budget > 0 || e.spent > 0).slice(0, 5);
+
+  return (
+    <div>
+      <PageHeader title="Finance Overview" subtitle="Company financial health at a glance" />
+
+      {/* Alerts */}
+      {pendingInvoices.length > 0 && (
+        <div onClick={() => onTab("invoices")} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: T.amber + "15", border: "1px solid " + T.amber + "44", borderRadius: 8, marginBottom: 20, cursor: "pointer" }}>
+          <span style={{ fontSize: 18 }}>🧾</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>{pendingInvoices.length} Pending Invoice{pendingInvoices.length > 1 ? "s" : ""}</div>
+            <div style={{ color: T.textMuted, fontSize: 12 }}>GHS {totalPending.toLocaleString()} outstanding</div>
+          </div>
+          <span style={{ color: T.amber, fontSize: 12 }}>Review →</span>
+        </div>
+      )}
+
+      {/* Revenue Stats */}
+      <div style={{ marginBottom: 8, color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Revenue</div>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
+        <Stat icon="💰" label="MTD Revenue" value={"GHS " + mtdRevenue.toLocaleString()} color={T.teal} />
+        <Stat icon="📅" label="YTD Revenue" value={"GHS " + ytdRevenue.toLocaleString()} color={T.cyan} />
+        <Stat icon="🏆" label="Total Revenue" value={"GHS " + totalRevenue.toLocaleString()} color={T.blue} />
+      </div>
+
+      {/* Expense Stats */}
+      <div style={{ marginBottom: 8, color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Expenses & Invoices</div>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
+        <Stat icon="📤" label="MTD Expenses" value={"GHS " + mtdExpenses.toLocaleString()} color={T.amber} />
+        <Stat icon="📤" label="YTD Expenses" value={"GHS " + ytdExpenses.toLocaleString()} color={T.magenta} />
+        <Stat icon="🧾" label="Total Invoiced" value={"GHS " + totalInvoiced.toLocaleString()} color={T.amber} />
+        <Stat icon="✅" label="Paid Invoices" value={"GHS " + totalPaid.toLocaleString()} color={T.teal} />
+        <Stat icon="⏳" label="Outstanding" value={"GHS " + totalPending.toLocaleString()} color={T.magenta} />
+      </div>
+
+      {/* Profit */}
+      <div style={{ marginBottom: 8, color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Profitability</div>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 28 }}>
+        <Stat icon="📊" label="Gross Profit" value={"GHS " + grossProfit.toLocaleString()} color={grossProfit >= 0 ? T.teal : "#F43F5E"} />
+        <Stat icon="📈" label="Profit Margin" value={profitMargin + "%"} color={profitMargin >= 30 ? T.teal : profitMargin >= 10 ? T.amber : "#F43F5E"} />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+        {/* Expense by Category */}
+        <Card>
+          <SectionHeader title="Expenses by Category" actionLabel="View All" action={() => onTab("expenses")} />
+          {Object.keys(expensesByCategory).length === 0 ? (
+            <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No expenses yet.</div>
+          ) : Object.entries(expensesByCategory).sort((a,b) => b[1]-a[1]).map(([cat, amt]) => (
+            <div key={cat} style={{ marginBottom: 14 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{cat}</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ color: T.textMuted, fontSize: 11 }}>{totalExpenses ? Math.round((amt / totalExpenses) * 100) : 0}%</div>
+                  <div style={{ color: T.amber, fontWeight: 700, fontSize: 12 }}>GHS {amt.toLocaleString()}</div>
+                </div>
+              </div>
+              <ProgressBar value={totalExpenses ? Math.round((amt / totalExpenses) * 100) : 0} color={T.amber} />
+            </div>
+          ))}
+        </Card>
+
+        {/* Event Budget vs Spend */}
+        <Card>
+          <SectionHeader title="Budget vs Spend per Event" actionLabel="Manage" action={() => onTab("budgets")} />
+          {eventBudgetSummary.length === 0 ? (
+            <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No budgets set yet.</div>
+          ) : eventBudgetSummary.map(ev => {
+            const pct = ev.budget ? Math.min(100, Math.round((ev.spent / ev.budget) * 100)) : 0;
+            return (
+              <div key={ev.id} style={{ marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                  <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{ev.name}</div>
+                  <div style={{ color: pct >= 90 ? "#F43F5E" : pct >= 70 ? T.amber : T.teal, fontWeight: 700, fontSize: 12 }}>{pct}%</div>
+                </div>
+                <ProgressBar value={pct} color={pct >= 90 ? "#F43F5E" : pct >= 70 ? T.amber : T.teal} />
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                  <div style={{ color: T.textMuted, fontSize: 11 }}>Spent: GHS {ev.spent.toLocaleString()}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11 }}>Budget: GHS {ev.budget.toLocaleString()}</div>
+                </div>
+              </div>
+            );
+          })}
+        </Card>
+      </div>
+
+      {/* Recent Expenses */}
+      <Card>
+        <SectionHeader title="Recent Expenses" actionLabel="View All" action={() => onTab("expenses")} />
+        {expenses.length === 0 ? (
+          <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No expenses logged yet.</div>
+        ) : expenses.slice(0, 5).map((e, i) => (
+          <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < 4 ? "1px solid " + T.border : "none" }}>
+            <div>
+              <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{e.description}</div>
+              <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{e.category} · {e.event_name} · {e.date}</div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>GHS {(e.amount || 0).toLocaleString()}</div>
+              {e.vendor && <div style={{ color: T.textMuted, fontSize: 11 }}>{e.vendor}</div>}
+            </div>
+          </div>
+        ))}
+      </Card>
+    </div>
+  );
+};
+
+// ─── BUDGET MANAGER ───────────────────────────────────────────────────────────
+const BudgetView = ({ user }) => {
+  const [budgets, setBudgets] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [form, setForm] = useState({ project_id: "", event_name: "", total_budget: "", notes: "" });
+  const [saving, setSaving] = useState(false);
+  const canEdit = ["CEO", "Administrator", "Finance Manager"].includes(user?.role);
+
+  const load = async () => {
+    const [b, ev, ex, inv] = await Promise.all([
+      supabase.from("budgets").select("*"),
+      supabase.from("projects").select("*").order("created_at", { ascending: false }),
+      supabase.from("expenses").select("*"),
+      supabase.from("invoices").select("*"),
+    ]);
+    setBudgets(b.data || []);
+    setEvents(ev.data || []);
+    setExpenses(ex.data || []);
+    setInvoices(inv.data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleCreate = async () => {
+    if (!form.project_id || !form.total_budget) return;
+    setSaving(true);
+    await supabase.from("budgets").insert({
+      project_id: form.project_id, event_name: form.event_name,
+      total_budget: parseFloat(form.total_budget), notes: form.notes,
+      created_by: user.id,
+    });
+    setModal(false);
+    setForm({ project_id: "", event_name: "", total_budget: "", notes: "" });
+    setSaving(false);
+    load();
+  };
+
+  const eventsWithBudget = events.map(ev => {
+    const budget = budgets.find(b => b.project_id === ev.id);
+    const spent = expenses.filter(e => e.project_id === ev.id).reduce((a, e) => a + (e.amount || 0), 0);
+    const invoiced = invoices.filter(i => i.project_id === ev.id).reduce((a, i) => a + (i.amount || 0), 0);
+    const remaining = (budget?.total_budget || 0) - spent - invoiced;
+    const pct = budget ? Math.min(100, Math.round(((spent + invoiced) / budget.total_budget) * 100)) : 0;
+    return { ...ev, budget, spent, invoiced, remaining, pct };
+  });
+
+  const totalBudget = budgets.reduce((a, b) => a + (b.total_budget || 0), 0);
+  const totalSpent = expenses.reduce((a, e) => a + (e.amount || 0), 0);
+  const totalInvoiced = invoices.reduce((a, i) => a + (i.amount || 0), 0);
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+        <PageHeader title="Budget Management" subtitle="Event budgets vs actual spend" />
+        {canEdit && <Btn onClick={() => setModal(true)}>+ Set Budget</Btn>}
+      </div>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
+        <Stat icon="🎯" label="Total Budgeted" value={"GHS " + totalBudget.toLocaleString()} color={T.cyan} />
+        <Stat icon="📤" label="Total Expenses" value={"GHS " + totalSpent.toLocaleString()} color={T.amber} />
+        <Stat icon="🧾" label="Total Invoiced" value={"GHS " + totalInvoiced.toLocaleString()} color={T.magenta} />
+        <Stat icon="💰" label="Remaining" value={"GHS " + (totalBudget - totalSpent - totalInvoiced).toLocaleString()} color={T.teal} />
+      </div>
+      {eventsWithBudget.filter(e => e.budget).map(ev => (
+        <Card key={ev.id} style={{ marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+            <div>
+              <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{ev.name}</div>
+              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{ev.phase} · Due {ev.deadline}</div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ color: ev.pct >= 90 ? "#F43F5E" : ev.pct >= 70 ? T.amber : T.teal, fontWeight: 800, fontSize: 18 }}>{ev.pct}%</div>
+              <div style={{ color: T.textMuted, fontSize: 11 }}>of budget used</div>
+            </div>
+          </div>
+          <ProgressBar value={ev.pct} height={10} color={ev.pct >= 90 ? "#F43F5E" : ev.pct >= 70 ? T.amber : T.teal} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginTop: 14 }}>
+            {[["🎯 Budget", ev.budget.total_budget, T.cyan], ["📤 Expenses", ev.spent, T.amber], ["🧾 Invoiced", ev.invoiced, T.magenta], ["💰 Remaining", ev.remaining, ev.remaining < 0 ? "#F43F5E" : T.teal]].map(([label, val, color]) => (
+              <div key={label} style={{ padding: "10px", background: T.bg, borderRadius: 8, border: "1px solid " + T.border }}>
+                <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 4 }}>{label}</div>
+                <div style={{ color, fontWeight: 700, fontSize: 13 }}>GHS {(val || 0).toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+          {ev.budget.notes && <div style={{ color: T.textMuted, fontSize: 12, marginTop: 10, fontStyle: "italic" }}>{ev.budget.notes}</div>}
+        </Card>
+      ))}
+      {eventsWithBudget.filter(e => !e.budget).length > 0 && (
+        <Card style={{ marginTop: 8 }}>
+          <div style={{ color: T.textMuted, fontSize: 12, fontWeight: 600, marginBottom: 12 }}>Events without budgets</div>
+          {eventsWithBudget.filter(e => !e.budget).map(ev => (
+            <div key={ev.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid " + T.border }}>
+              <div style={{ color: T.textSecondary, fontSize: 13 }}>{ev.name}</div>
+              {canEdit && <button onClick={() => { setForm({ project_id: ev.id, event_name: ev.name, total_budget: "", notes: "" }); setModal(true); }} style={{ background: "none", border: "1px solid " + T.cyan, color: T.cyan, padding: "4px 12px", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>+ Set Budget</button>}
+            </div>
+          ))}
+        </Card>
+      )}
+      {modal && (
+        <Modal title="Set Event Budget" onClose={() => setModal(false)}>
+          <Select label="Event" options={[{ value: "", label: "Select event..." }, ...events.map(e => ({ value: e.id, label: e.name }))]}
+            value={form.project_id} onChange={v => { const e = events.find(x => x.id === v); setForm({ ...form, project_id: v, event_name: e ? e.name : "" }); }} />
+          <Input label="Total Budget (GHS)" type="number" placeholder="0" value={form.total_budget} onChange={v => setForm({ ...form, total_budget: v })} />
+          <Input label="Notes" placeholder="Budget notes..." value={form.notes} onChange={v => setForm({ ...form, notes: v })} />
+          <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+            <Btn onClick={handleCreate} disabled={saving}>{saving ? "Saving..." : "Set Budget"}</Btn>
+            <Btn variant="ghost" onClick={() => setModal(false)}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+// ─── EXPENSE TRACKER ──────────────────────────────────────────────────────────
+const ExpenseView = ({ user }) => {
+  const [expenses, setExpenses] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [form, setForm] = useState({ project_id: "", event_name: "", category: "", description: "", amount: "", date: "", vendor: "" });
+  const [saving, setSaving] = useState(false);
+  const [filter, setFilter] = useState("all");
+  const canEdit = ["CEO", "Administrator", "Finance Manager"].includes(user?.role);
+  const canApprove = ["CEO", "Administrator"].includes(user?.role);
+
+  const categories = ["Venue", "Catering", "Equipment", "Staffing", "Marketing", "Transport", "Accommodation", "Decor", "Technology", "Miscellaneous"];
+
+  const load = async () => {
+    const [ex, ev] = await Promise.all([
+      supabase.from("expenses").select("*").order("created_at", { ascending: false }),
+      supabase.from("projects").select("*"),
+    ]);
+    setExpenses(ex.data || []);
+    setEvents(ev.data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleCreate = async () => {
+    if (!form.description || !form.amount) return;
+    setSaving(true);
+    let receipt_url = "", receipt_name = "";
+    if (receiptFile) {
+      const ext = receiptFile.name.split(".").pop();
+      const filename = "receipt_" + Date.now() + "." + ext;
+      const { error: uploadErr } = await supabase.storage.from("rffs").upload(filename, receiptFile);
+      if (!uploadErr) {
+        const { data: urlData } = supabase.storage.from("rffs").getPublicUrl(filename);
+        receipt_url = urlData.publicUrl;
+        receipt_name = receiptFile.name;
+      }
+    }
+    await supabase.from("expenses").insert({
+      project_id: form.project_id || null, event_name: form.event_name,
+      category: form.category, description: form.description,
+      amount: parseFloat(form.amount), date: form.date || new Date().toISOString().split("T")[0],
+      vendor: form.vendor, receipt_url, receipt_name,
+      created_by: user.id, approved: false,
+    });
+    setModal(false);
+    setForm({ project_id: "", event_name: "", category: "", description: "", amount: "", date: "", vendor: "" });
+    setReceiptFile(null);
+    setSaving(false);
+    load();
+  };
+
+  const filtered = filter === "all" ? expenses : expenses.filter(e => e.category === filter);
+  const total = filtered.reduce((a, e) => a + (e.amount || 0), 0);
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+        <PageHeader title="Expense Tracker" subtitle="Log and manage company expenses" />
+        {canEdit && <Btn onClick={() => setModal(true)}>+ Log Expense</Btn>}
+      </div>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
+        <Stat icon="📤" label="Total Expenses" value={"GHS " + total.toLocaleString()} color={T.amber} />
+        <Stat icon="✅" label="Approved" value={filtered.filter(e => e.approved).length} color={T.teal} />
+        <Stat icon="⏳" label="Pending Approval" value={filtered.filter(e => !e.approved).length} color={T.magenta} />
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
+        <button onClick={() => setFilter("all")} style={{ padding: "6px 14px", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: 600, border: "1px solid " + (filter === "all" ? T.cyan : T.border), background: filter === "all" ? T.cyan + "20" : "none", color: filter === "all" ? T.cyan : T.textMuted }}>All</button>
+        {categories.map(c => expenses.some(e => e.category === c) && (
+          <button key={c} onClick={() => setFilter(c)} style={{ padding: "6px 14px", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: 600, border: "1px solid " + (filter === c ? T.cyan : T.border), background: filter === c ? T.cyan + "20" : "none", color: filter === c ? T.cyan : T.textMuted }}>{c}</button>
+        ))}
+      </div>
+      {filtered.length === 0 ? (
+        <Card style={{ textAlign: "center", padding: 60 }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>📤</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No expenses yet</div>
+        </Card>
+      ) : filtered.map(e => (
+        <Card key={e.id} style={{ marginBottom: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{e.description}</div>
+              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>
+                {e.category && <span style={{ background: T.cyan + "20", color: T.cyan, padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600, marginRight: 8 }}>{e.category}</span>}
+                {e.event_name && <span>📁 {e.event_name} · </span>}
+                {e.vendor && <span>🏢 {e.vendor} · </span>}
+                {e.date}
+              </div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ color: T.amber, fontWeight: 800, fontSize: 16 }}>GHS {(e.amount || 0).toLocaleString()}</div>
+              <div style={{ marginTop: 4 }}>
+                {e.approved
+                  ? <span style={{ color: T.teal, fontSize: 11, fontWeight: 600 }}>✓ Approved</span>
+                  : canApprove
+                    ? <button onClick={async () => { await supabase.from("expenses").update({ approved: true, approved_by: user.id }).eq("id", e.id); load(); }} style={{ background: T.teal + "20", border: "1px solid " + T.teal, color: T.teal, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>✓ Approve</button>
+                    : <span style={{ color: T.amber, fontSize: 11, fontWeight: 600 }}>⏳ Pending</span>
+                }
+              </div>
+            </div>
+          </div>
+          {e.receipt_url && (
+            <div style={{ marginTop: 10 }}>
+              <a href={e.receipt_url} target="_blank" rel="noopener noreferrer" style={{ color: T.cyan, fontSize: 12, fontWeight: 600, textDecoration: "none" }}>📎 {e.receipt_name || "View Receipt"}</a>
+            </div>
+          )}
+        </Card>
+      ))}
+      {modal && (
+        <Modal title="Log Expense" onClose={() => setModal(false)}>
+          <Input label="Description" placeholder="What was this expense for?" value={form.description} onChange={v => setForm({ ...form, description: v })} />
+          <Input label="Amount (GHS)" type="number" placeholder="0" value={form.amount} onChange={v => setForm({ ...form, amount: v })} />
+          <Select label="Category" options={[{ value: "", label: "Select category..." }, ...categories.map(c => ({ value: c, label: c }))]}
+            value={form.category} onChange={v => setForm({ ...form, category: v })} />
+          <Select label="Event (optional)" options={[{ value: "", label: "Not event specific" }, ...events.map(e => ({ value: e.id, label: e.name }))]}
+            value={form.project_id} onChange={v => { const e = events.find(x => x.id === v); setForm({ ...form, project_id: v, event_name: e ? e.name : "" }); }} />
+          <Input label="Vendor / Supplier" placeholder="Who was paid?" value={form.vendor} onChange={v => setForm({ ...form, vendor: v })} />
+          <Input label="Date" type="date" value={form.date} onChange={v => setForm({ ...form, date: v })} />
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Receipt (optional)</div>
+            <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setReceiptFile(e.target.files[0])} style={{ width: "100%", padding: "10px", background: T.bg, border: "1px solid " + T.border, borderRadius: 6, color: T.textSecondary, fontSize: 13, cursor: "pointer" }} />
+            {receiptFile && <div style={{ color: T.cyan, fontSize: 12, marginTop: 6 }}>✓ {receiptFile.name}</div>}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <Btn onClick={handleCreate} disabled={saving}>{saving ? "Saving..." : "Log Expense"}</Btn>
+            <Btn variant="ghost" onClick={() => setModal(false)}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+// ─── FINANCIAL REPORTS ────────────────────────────────────────────────────────
+const FinanceReportsView = ({ user }) => {
+  const [invoices, setInvoices] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [leads, setLeads] = useState([]);
+  const [period, setPeriod] = useState("mtd");
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from("invoices").select("*"),
+      supabase.from("expenses").select("*"),
+      supabase.from("leads").select("*").eq("status", "won"),
+    ]).then(([inv, exp, l]) => {
+      setInvoices(inv.data || []);
+      setExpenses(exp.data || []);
+      setLeads(l.data || []);
+    });
+  }, []);
+
+  const now = new Date();
+  const ranges = {
+    mtd: new Date(now.getFullYear(), now.getMonth(), 1),
+    ytd: new Date(now.getFullYear(), 0, 1),
+    all: new Date(0),
+  };
+  const start = ranges[period];
+
+  const periodRevenue = leads.filter(l => l.closed_date && new Date(l.closed_date) >= start).reduce((a, l) => a + (l.value || 0), 0);
+  const periodExpenses = expenses.filter(e => e.date && new Date(e.date) >= start).reduce((a, e) => a + (e.amount || 0), 0);
+  const periodInvoiced = invoices.filter(i => i.created_at && new Date(i.created_at) >= start).reduce((a, i) => a + (i.amount || 0), 0);
+  const periodPaid = invoices.filter(i => i.status === "paid" && i.created_at && new Date(i.created_at) >= start).reduce((a, i) => a + (i.amount || 0), 0);
+  const grossProfit = periodRevenue - periodExpenses;
+  const margin = periodRevenue ? Math.round((grossProfit / periodRevenue) * 100) : 0;
+
+  const monthlyData = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+    const next = new Date(now.getFullYear(), now.getMonth() - (5 - i) + 1, 1);
+    const label = d.toLocaleString("default", { month: "short" });
+    const rev = leads.filter(l => l.closed_date && new Date(l.closed_date) >= d && new Date(l.closed_date) < next).reduce((a, l) => a + (l.value || 0), 0);
+    const exp = expenses.filter(e => e.date && new Date(e.date) >= d && new Date(e.date) < next).reduce((a, e) => a + (e.amount || 0), 0);
+    return { label, rev, exp, profit: rev - exp };
+  });
+
+  const maxVal = Math.max(...monthlyData.map(m => Math.max(m.rev, m.exp)), 1);
+
+  return (
+    <div>
+      <PageHeader title="Financial Reports" subtitle="P&L and cash flow analysis" />
+      <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+        {[["mtd","MTD"],["ytd","YTD"],["all","All Time"]].map(([val, label]) => (
+          <button key={val} onClick={() => setPeriod(val)} style={{ padding: "7px 18px", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: 600, border: "1px solid " + (period === val ? T.cyan : T.border), background: period === val ? T.cyan + "20" : "none", color: period === val ? T.cyan : T.textMuted }}>{label}</button>
+        ))}
+      </div>
+
+      {/* P&L Summary */}
+      <Card style={{ marginBottom: 20 }}>
+        <SectionHeader title="P&L Summary" />
+        {[
+          ["Revenue (Won Deals)", periodRevenue, T.teal],
+          ["Total Expenses", periodExpenses, T.amber],
+          ["Total Invoiced", periodInvoiced, T.blue],
+          ["Invoices Paid", periodPaid, T.cyan],
+        ].map(([label, val, color]) => (
+          <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px solid " + T.border }}>
+            <div style={{ color: T.textSecondary, fontSize: 14 }}>{label}</div>
+            <div style={{ color, fontWeight: 700, fontSize: 15 }}>GHS {val.toLocaleString()}</div>
+          </div>
+        ))}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0" }}>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>Gross Profit</div>
+          <div style={{ color: grossProfit >= 0 ? T.teal : "#F43F5E", fontWeight: 800, fontSize: 18 }}>GHS {grossProfit.toLocaleString()}</div>
+        </div>
+        <div style={{ padding: "12px 16px", background: (grossProfit >= 0 ? T.teal : "#F43F5E") + "15", borderRadius: 8, border: "1px solid " + (grossProfit >= 0 ? T.teal : "#F43F5E") + "33" }}>
+          <div style={{ color: grossProfit >= 0 ? T.teal : "#F43F5E", fontWeight: 700, fontSize: 14 }}>Profit Margin: {margin}%</div>
+        </div>
+      </Card>
+
+      {/* 6-Month Chart */}
+      <Card>
+        <SectionHeader title="6-Month Revenue vs Expenses" />
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 12, height: 160, padding: "10px 0" }}>
+          {monthlyData.map(m => (
+            <div key={m.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+              <div style={{ width: "100%", display: "flex", gap: 3, alignItems: "flex-end", height: 120 }}>
+                <div style={{ flex: 1, background: T.teal + "80", borderRadius: "3px 3px 0 0", height: Math.max(4, (m.rev / maxVal) * 120) + "px", transition: "height 0.3s" }} title={"Revenue: GHS " + m.rev.toLocaleString()} />
+                <div style={{ flex: 1, background: T.amber + "80", borderRadius: "3px 3px 0 0", height: Math.max(4, (m.exp / maxVal) * 120) + "px", transition: "height 0.3s" }} title={"Expenses: GHS " + m.exp.toLocaleString()} />
+              </div>
+              <div style={{ color: T.textMuted, fontSize: 11, textAlign: "center" }}>{m.label}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 20, justifyContent: "center", marginTop: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}><div style={{ width: 12, height: 12, borderRadius: 2, background: T.teal + "80" }} /><span style={{ color: T.textMuted, fontSize: 12 }}>Revenue</span></div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}><div style={{ width: 12, height: 12, borderRadius: 2, background: T.amber + "80" }} /><span style={{ color: T.textMuted, fontSize: 12 }}>Expenses</span></div>
+        </div>
+      </Card>
     </div>
   );
 };

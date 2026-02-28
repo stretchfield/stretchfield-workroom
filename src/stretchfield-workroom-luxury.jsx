@@ -1411,7 +1411,10 @@ const UsersView = ({ user }) => {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Remove this user?')) return;
-    await supabase.rpc('delete_user_completely', { user_id: id });
+    // Delete profile first
+    await supabase.from('profiles').delete().eq('id', id);
+    // Delete from auth using admin client
+    await supabase.auth.admin.deleteUser(id);
     setUsers(prev => prev.filter(u => u.id !== id));
   };
 

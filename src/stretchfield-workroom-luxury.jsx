@@ -440,7 +440,7 @@ const CEODashboard = ({ onTab }) => {
       <PageHeader title="Executive Overview" subtitle="Live company performance snapshot" />
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 32 }}>
         <Stat icon="📁" label="Active Events" value={events.filter(e => e.status === 'active').length} sub={`${events.length} total`} color={T.cyan} />
-        <Stat icon="🧾" label="Pending Invoices" value={pendingInvoices.length} sub={`GH₵${pendingInvoices.reduce((a, i) => a + (i.amount || 0), 0).toLocaleString()}`} color={T.amber} />
+        <Stat icon="🧾" label="Pending Invoices" value={pendingInvoices.length} sub={`GHS ${pendingInvoices.reduce((a, i) => a + (i.amount || 0), 0).toLocaleString()}`} color={T.amber} />
         <Stat icon="🤝" label="Active Vendors" value={vendors.length} color={T.blue} />
         <Stat icon="✅" label="Open Tasks" value={openTasks.length} color={T.magenta} />
       </div>
@@ -475,7 +475,7 @@ const CEODashboard = ({ onTab }) => {
                 <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{inv.event_name} · {inv.date}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ color: T.textPrimary, fontSize: 15, fontWeight: 700 }}>GH₵{(inv.amount || 0).toLocaleString()}</div>
+                <div style={{ color: T.textPrimary, fontSize: 15, fontWeight: 700 }}>GHS {(inv.amount || 0).toLocaleString()}</div>
                 <Badge status={inv.status} />
               </div>
             </div>
@@ -1152,7 +1152,7 @@ const VendorsView = ({ user }) => {
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <div>
                               <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{r.vendor || 'Vendor'}</div>
-                              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Amount: <span style={{ color: T.amber, fontWeight: 700 }}>GH₵{(r.amount || 0).toLocaleString()}</span></div>
+                              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Amount: <span style={{ color: T.amber, fontWeight: 700 }}>GHS {(r.amount || 0).toLocaleString()}</span></div>
                             </div>
                             <Badge status={r.status} />
                           </div>
@@ -1253,7 +1253,7 @@ const InvoicesView = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
             <div>
               <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{inv.vendor}</div>
-              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>GH₵{(inv.amount || 0).toLocaleString()} · {inv.date}</div>
+              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>GHS {(inv.amount || 0).toLocaleString()} · {inv.date}</div>
             </div>
             <Badge status={inv.status} />
           </div>
@@ -1351,7 +1351,7 @@ const VendorRFFsView = ({ user }) => {
           <div style={{ color: T.textSecondary, fontSize: 13, marginBottom: 16, padding: '10px 14px', background: T.cyan + '10', borderRadius: 8, border: `1px solid ${T.cyan}22` }}>
             Client: <strong style={{ color: T.cyan }}>{quoteModal.client_name}</strong> · Event: <strong style={{ color: T.textPrimary }}>{quoteModal.event_name}</strong>
           </div>
-          <Input label="Quote Amount (GH₵)" type="number" placeholder="e.g. 5000" value={quoteAmount} onChange={v => setQuoteAmount(v)} />
+          <Input label="Quote Amount (GHS )" type="number" placeholder="e.g. 5000" value={quoteAmount} onChange={v => setQuoteAmount(v)} />
           <div style={{ marginBottom: 16 }}>
             <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Attach Invoice / Quotation Document</div>
             <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx" onChange={e => setQuoteFile(e.target.files[0])} style={{
@@ -1671,7 +1671,7 @@ const VendorQuotesView = ({ user }) => {
                 <div>
                   <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{q.title}</div>
                   <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>🏢 {q.client_name} · Due {q.deadline}</div>
-                  <div style={{ color: T.amber, fontWeight: 700, fontSize: 14, marginTop: 6 }}>GH₵{(q.amount || 0).toLocaleString()}</div>
+                  <div style={{ color: T.amber, fontWeight: 700, fontSize: 14, marginTop: 6 }}>GHS {(q.amount || 0).toLocaleString()}</div>
                 </div>
                 <Badge status={q.status} />
               </div>
@@ -1877,8 +1877,8 @@ const CRMView = ({ user }) => {
       </div>
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
         <Stat icon="🎯" label="Total Leads" value={leads.length} color={T.cyan} />
-        <Stat icon="💰" label="Pipeline" value={"GH₵" + pipelineValue.toLocaleString()} color={T.amber} />
-        <Stat icon="🏆" label="Won" value={leads.filter(l => l.status === "won").length} sub={"GH₵" + totalValue.toLocaleString()} color={T.teal} />
+        <Stat icon="💰" label="Pipeline" value={"GHS " + pipelineValue.toLocaleString()} color={T.amber} />
+        <Stat icon="🏆" label="Won" value={leads.filter(l => l.status === "won").length} sub={"GHS " + totalValue.toLocaleString()} color={T.teal} />
         <Stat icon="📄" label="Proposals" value={proposals.length} color={T.magenta} />
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
@@ -1908,7 +1908,7 @@ const CRMView = ({ user }) => {
                 </div>
                 <span style={{ background: (statusColors[lead.status] || T.cyan) + "22", color: statusColors[lead.status] || T.cyan, padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700 }}>{lead.status}</span>
               </div>
-              <div style={{ color: T.amber, fontWeight: 700, fontSize: 14, marginBottom: 8 }}>GH₵{(lead.value || 0).toLocaleString()}</div>
+              <div style={{ color: T.amber, fontWeight: 700, fontSize: 14, marginBottom: 8 }}>GHS {(lead.value || 0).toLocaleString()}</div>
               <div style={{ display: "flex", gap: 10, color: T.textMuted, fontSize: 12 }}>
                 <span>📞 {activities.filter(a => a.lead_id === lead.id).length} activities</span>
                 <span>📄 {proposals.filter(p => p.lead_id === lead.id).length} proposals</span>
@@ -1963,7 +1963,7 @@ const CRMView = ({ user }) => {
                           <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{p.title}</div>
                           <span style={{ background: p.status === "approved" ? T.teal + "22" : T.amber + "22", color: p.status === "approved" ? T.teal : T.amber, padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700 }}>{p.status}</span>
                         </div>
-                        <div style={{ color: T.amber, fontWeight: 700, fontSize: 13, marginTop: 4 }}>GH₵{(p.amount || 0).toLocaleString()}</div>
+                        <div style={{ color: T.amber, fontWeight: 700, fontSize: 13, marginTop: 4 }}>GHS {(p.amount || 0).toLocaleString()}</div>
                         <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
                           {p.document_url && <a href={p.document_url} target="_blank" rel="noopener noreferrer" style={{ color: T.cyan, fontSize: 12, fontWeight: 600, textDecoration: "none" }}>📄 View</a>}
                           {canApprove && p.status === "draft" && (
@@ -1985,7 +1985,7 @@ const CRMView = ({ user }) => {
           <Input label="Contact Person" placeholder="Full name" value={form.contact_name} onChange={v => setForm({ ...form, contact_name: v })} />
           <Input label="Email" type="email" placeholder="contact@company.com" value={form.email} onChange={v => setForm({ ...form, email: v })} />
           <Input label="Phone" placeholder="+233 XX XXX XXXX" value={form.phone} onChange={v => setForm({ ...form, phone: v })} />
-          <Input label="Deal Value (GH₵)" type="number" placeholder="0" value={form.value} onChange={v => setForm({ ...form, value: v })} />
+          <Input label="Deal Value (GHS )" type="number" placeholder="0" value={form.value} onChange={v => setForm({ ...form, value: v })} />
           <Select label="Source" options={[
             { value: "", label: "Select source..." },
             { value: "referral", label: "Referral" },
@@ -2030,7 +2030,7 @@ const CRMView = ({ user }) => {
       {proposalModal && (
         <Modal title={"New Proposal — " + proposalModal.company} onClose={() => setProposalModal(null)}>
           <Input label="Proposal Title" placeholder="e.g. Event Management Package" value={propForm.title} onChange={v => setPropForm({ ...propForm, title: v })} />
-          <Input label="Amount (GH₵)" type="number" placeholder="0" value={propForm.amount} onChange={v => setPropForm({ ...propForm, amount: v })} />
+          <Input label="Amount (GHS )" type="number" placeholder="0" value={propForm.amount} onChange={v => setPropForm({ ...propForm, amount: v })} />
           <Input label="Notes" placeholder="Proposal details..." value={propForm.notes} onChange={v => setPropForm({ ...propForm, notes: v })} />
           <div style={{ marginBottom: 16 }}>
             <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Attach Document</div>
@@ -2667,8 +2667,8 @@ const CRMDashboardCEO = ({ user }) => {
         <Btn onClick={() => setModal(true)}>+ Set Target</Btn>
       </div>
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 32 }}>
-        <Stat icon="💰" label="Total Revenue" value={"GH₵" + totalRevenue.toLocaleString()} color={T.teal} />
-        <Stat icon="📅" label="YTD Revenue" value={"GH₵" + ytdRevenue.toLocaleString()} color={T.cyan} />
+        <Stat icon="💰" label="Total Revenue" value={"GHS " + totalRevenue.toLocaleString()} color={T.teal} />
+        <Stat icon="📅" label="YTD Revenue" value={"GHS " + ytdRevenue.toLocaleString()} color={T.cyan} />
         <Stat icon="📊" label="Closing %" value={closingPct + "%"} color={T.blue} />
         <Stat icon="⏱" label="Avg Cycle" value={avgCycle + " days"} color={T.amber} />
         <Stat icon="🏆" label="Deals Won" value={wonLeads.length} sub={"of " + leads.length + " total"} color={T.magenta} />
@@ -2688,8 +2688,8 @@ const CRMDashboardCEO = ({ user }) => {
                     <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{rep.repWon.length} deals · {rep.closingPct}% close · {rep.repCycle}d cycle</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ color: T.teal, fontWeight: 700, fontSize: 13 }}>GH₵{rep.repRevenue.toLocaleString()}</div>
-                    {target > 0 && <div style={{ color: T.textMuted, fontSize: 11 }}>of GH₵{target.toLocaleString()}</div>}
+                    <div style={{ color: T.teal, fontWeight: 700, fontSize: 13 }}>GHS {rep.repRevenue.toLocaleString()}</div>
+                    {target > 0 && <div style={{ color: T.textMuted, fontSize: 11 }}>of GHS {target.toLocaleString()}</div>}
                   </div>
                 </div>
                 {target > 0 && <><ProgressBar value={pct} color={pct >= 100 ? T.teal : pct >= 60 ? T.cyan : T.amber} /><div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>{pct}% of target</div></>}
@@ -2704,7 +2704,7 @@ const CRMDashboardCEO = ({ user }) => {
             <div key={company} style={{ marginBottom: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
                 <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{company}</div>
-                <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>GH₵{amount.toLocaleString()}</div>
+                <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>GHS {amount.toLocaleString()}</div>
               </div>
               <ProgressBar value={Math.round((amount / totalRevenue) * 100)} color={T.blue} />
             </div>
@@ -2724,7 +2724,7 @@ const CRMDashboardCEO = ({ user }) => {
                 <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{t.period} · {t.start_date} to {t.end_date}</div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ color: T.amber, fontWeight: 700 }}>GH₵{t.target_amount.toLocaleString()}</div>
+                <div style={{ color: T.amber, fontWeight: 700 }}>GHS {t.target_amount.toLocaleString()}</div>
                 <div style={{ color: pct >= 100 ? T.teal : T.textMuted, fontSize: 11, marginTop: 2 }}>{pct}% achieved</div>
               </div>
             </div>
@@ -2735,7 +2735,7 @@ const CRMDashboardCEO = ({ user }) => {
         <Modal title="Set Sales Target" onClose={() => setModal(false)}>
           <Select label="Sales Rep" options={[{ value: "", label: "Select rep..." }, ...members.map(m => ({ value: m.id, label: m.name + " — " + m.role }))]}
             value={form.rep_id} onChange={v => { const m = members.find(x => x.id === v); setForm({ ...form, rep_id: v, rep_name: m ? m.name : "" }); }} />
-          <Input label="Target Amount (GH₵)" type="number" placeholder="0" value={form.target_amount} onChange={v => setForm({ ...form, target_amount: v })} />
+          <Input label="Target Amount (GHS )" type="number" placeholder="0" value={form.target_amount} onChange={v => setForm({ ...form, target_amount: v })} />
           <Select label="Period" options={[{ value: "monthly", label: "Monthly" }, { value: "quarterly", label: "Quarterly" }, { value: "yearly", label: "Yearly" }]}
             value={form.period} onChange={v => setForm({ ...form, period: v })} />
           <Input label="Start Date" type="date" value={form.start_date} onChange={v => setForm({ ...form, start_date: v })} />
@@ -2806,9 +2806,9 @@ const CRMDashboardSM = ({ user }) => {
         ))}
       </div>
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
-        <Stat icon="💰" label={periodLabel + " Revenue"} value={"GH₵" + periodRevenue.toLocaleString()} color={T.teal} />
-        <Stat icon="📅" label="YTD Revenue" value={"GH₵" + ytdRevenue.toLocaleString()} color={T.cyan} />
-        <Stat icon="🎯" label="Pipeline" value={"GH₵" + pipelineValue.toLocaleString()} color={T.amber} />
+        <Stat icon="💰" label={periodLabel + " Revenue"} value={"GHS " + periodRevenue.toLocaleString()} color={T.teal} />
+        <Stat icon="📅" label="YTD Revenue" value={"GHS " + ytdRevenue.toLocaleString()} color={T.cyan} />
+        <Stat icon="🎯" label="Pipeline" value={"GHS " + pipelineValue.toLocaleString()} color={T.amber} />
         <Stat icon="📊" label="Close Rate" value={closingPct + "%"} color={T.magenta} />
         <Stat icon="⏱" label="Avg Cycle" value={avgCycle + " days"} color={T.blue} />
       </div>
@@ -2824,19 +2824,19 @@ const CRMDashboardSM = ({ user }) => {
                 <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{target.start_date} to {target.end_date}</div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ color: T.teal, fontWeight: 800, fontSize: 22 }}>GH₵{periodRevenue.toLocaleString()}</div>
-                <div style={{ color: T.textMuted, fontSize: 12 }}>of GH₵{targetAmount.toLocaleString()} target</div>
+                <div style={{ color: T.teal, fontWeight: 800, fontSize: 22 }}>GHS {periodRevenue.toLocaleString()}</div>
+                <div style={{ color: T.textMuted, fontSize: 12 }}>of GHS {targetAmount.toLocaleString()} target</div>
               </div>
             </div>
             <ProgressBar value={targetPct} height={14} color={targetPct >= 100 ? T.teal : targetPct >= 60 ? T.cyan : T.amber} />
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
               <div style={{ color: targetPct >= 100 ? T.teal : T.amber, fontSize: 14, fontWeight: 700 }}>{targetPct}% of target</div>
-              <div style={{ color: T.textMuted, fontSize: 12 }}>{targetAmount - periodRevenue > 0 ? "GH₵" + (targetAmount - periodRevenue).toLocaleString() + " to go" : "🎉 Target exceeded!"}</div>
+              <div style={{ color: T.textMuted, fontSize: 12 }}>{targetAmount - periodRevenue > 0 ? "GHS " + (targetAmount - periodRevenue).toLocaleString() + " to go" : "🎉 Target exceeded!"}</div>
             </div>
             <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid " + T.border }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
                 <div style={{ color: T.textSecondary, fontSize: 13, fontWeight: 600 }}>Year to Date</div>
-                <div style={{ color: T.cyan, fontWeight: 700 }}>GH₵{ytdRevenue.toLocaleString()} <span style={{ color: T.textMuted, fontWeight: 400, fontSize: 12 }}>({ytdTargetPct}%)</span></div>
+                <div style={{ color: T.cyan, fontWeight: 700 }}>GHS {ytdRevenue.toLocaleString()} <span style={{ color: T.textMuted, fontWeight: 400, fontSize: 12 }}>({ytdTargetPct}%)</span></div>
               </div>
               <ProgressBar value={ytdTargetPct} height={8} color={T.blue} />
             </div>
@@ -2859,7 +2859,7 @@ const CRMDashboardSM = ({ user }) => {
                 </div>
                 <div style={{ display: "flex", gap: 16 }}>
                   <div style={{ color: T.textMuted, fontSize: 12 }}>{count} deals</div>
-                  <div style={{ color: colors[s], fontWeight: 700, fontSize: 12, minWidth: 80, textAlign: "right" }}>GH₵{val.toLocaleString()}</div>
+                  <div style={{ color: colors[s], fontWeight: 700, fontSize: 12, minWidth: 80, textAlign: "right" }}>GHS {val.toLocaleString()}</div>
                 </div>
               </div>
             );
@@ -2874,7 +2874,7 @@ const CRMDashboardSM = ({ user }) => {
                 <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{company}</div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <div style={{ color: T.textMuted, fontSize: 11 }}>{totalRevenue ? Math.round((amount / totalRevenue) * 100) : 0}%</div>
-                  <div style={{ color: T.amber, fontWeight: 700, fontSize: 12 }}>GH₵{amount.toLocaleString()}</div>
+                  <div style={{ color: T.amber, fontWeight: 700, fontSize: 12 }}>GHS {amount.toLocaleString()}</div>
                 </div>
               </div>
               <ProgressBar value={totalRevenue ? Math.round((amount / totalRevenue) * 100) : 0} color={T.blue} />

@@ -1923,7 +1923,13 @@ const CRMView = ({ user }) => {
                       <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Update Status</div>
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                         {statusOrder.map(s => (
-                          <button key={s} onClick={async () => { await supabase.from("leads").update({ status: s }).eq("id", lead.id); load(); }} style={{
+                          <button key={s} onClick={async () => { const updates = { status: s };
+                            if (s === "won") {
+                              updates.closed_date = new Date().toISOString().split("T")[0];
+                              const created = new Date(lead.created_at);
+                              updates.sales_cycle_days = Math.round((new Date() - created) / (1000 * 60 * 60 * 24));
+                            }
+                            await supabase.from("leads").update(updates).eq("id", lead.id); load(); }} style={{
                             padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600,
                             border: "1px solid " + (lead.status === s ? statusColors[s] : T.border),
                             background: lead.status === s ? statusColors[s] + "20" : "none",

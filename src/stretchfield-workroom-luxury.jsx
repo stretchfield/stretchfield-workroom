@@ -2775,6 +2775,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "strategy-overview": return <StrategyOverviewView />;
       case "feedback-summary": return <FeedbackView userRole={currentUser.role} />;
       case "finance": return <FinanceDashboard user={currentUser} onTab={setActiveTab} />;
+      case "finance-approvals": return <FinanceApprovalsView user={currentUser} />;
       case "budgets": return <BudgetView user={currentUser} />;
       case "expenses": return <ExpenseView user={currentUser} />;
       case "finance-reports": return <FinanceReportsView user={currentUser} />;
@@ -3347,7 +3348,9 @@ const BudgetView = ({ user }) => {
   const [expenses, setExpenses] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [modal, setModal] = useState(false);
+  const [requestModal, setRequestModal] = useState(null);
   const [form, setForm] = useState({ project_id: "", event_name: "", total_budget: "", notes: "" });
+  const [requestForm, setRequestForm] = useState({ requested_amount: "", reason: "" });
   const [saving, setSaving] = useState(false);
   const canEdit = ["CEO", "Administrator", "Finance Manager"].includes(user?.role);
 
@@ -3376,6 +3379,24 @@ const BudgetView = ({ user }) => {
     });
     setModal(false);
     setForm({ project_id: "", event_name: "", total_budget: "", notes: "" });
+    setSaving(false);
+    load();
+  };
+
+  const handleBudgetRequest = async () => {
+    if (!requestForm.requested_amount || !requestModal) return;
+    setSaving(true);
+    const budget = budgets.find(b => b.project_id === requestModal.id);
+    await supabase.from("budget_requests").insert({
+      project_id: requestModal.id,
+      event_name: requestModal.name,
+      current_budget: budget?.total_budget || 0,
+      requested_amount: parseFloat(requestForm.requested_amount),
+      reason: requestForm.reason,
+      created_by: user.id,
+    });
+    setRequestModal(null);
+    setRequestForm({ requested_amount: "", reason: "" });
     setSaving(false);
     load();
   };
@@ -3427,6 +3448,14 @@ const BudgetView = ({ user }) => {
             ))}
           </div>
           {ev.budget.notes && <div style={{ color: T.textMuted, fontSize: 12, marginTop: 10, fontStyle: "italic" }}>{ev.budget.notes}</div>}
+          {ev.pct >= 70 && canEdit && !["CEO","Administrator"].includes(user?.role) && (
+            <button onClick={() => setRequestModal(ev)} style={{ marginTop: 12, width: "100%", background: T.magenta + "20", border: "1px solid " + T.magenta, color: T.magenta, padding: "8px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Request Budget Increase</button>
+          )}
+          {["CEO","Administrator"].includes(user?.role) && ev.pct >= 70 && (
+            <div style={{ marginTop: 10, padding: "8px 12px", background: "#F43F5E15", borderRadius: 6, border: "1px solid #F43F5E33" }}>
+              <span style={{ color: "#F43F5E", fontSize: 12, fontWeight: 600 }}>⚠ Budget {ev.pct >= 100 ? "exceeded" : "nearly exhausted"}</span>
+            </div>
+          )}
         </Card>
       ))}
       {eventsWithBudget.filter(e => !e.budget).length > 0 && (
@@ -3439,6 +3468,24 @@ const BudgetView = ({ user }) => {
             </div>
           ))}
         </Card>
+      )}
+      {requestModal && (
+        <Modal title={"Budget Increase — " + requestModal.name} onClose={() => setRequestModal(null)}>
+          <div style={{ padding: "12px 16px", background: T.magenta + "15", borderRadius: 8, border: "1px solid " + T.magenta + "33", marginBottom: 16 }}>
+            <div style={{ color: T.magenta, fontWeight: 700, fontSize: 13 }}>Current Budget: GHS {(budgets.find(b => b.project_id === requestModal.id)?.total_budget || 0).toLocaleString()}</div>
+          </div>
+          <Input label="Requested Increase (GHS)" type="number" placeholder="0" value={requestForm.requested_amount} onChange={v => setRequestForm({ ...requestForm, requested_amount: v })} />
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Reason</div>
+            <textarea value={requestForm.reason} onChange={e => setRequestForm({ ...requestForm, reason: e.target.value })}
+              placeholder="Why is additional budget needed?"
+              style={{ width: "100%", minHeight: 80, background: T.bg, border: "1px solid " + T.border, borderRadius: 6, padding: 10, color: T.textPrimary, fontSize: 13, resize: "vertical", fontFamily: "inherit" }} />
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <Btn onClick={handleBudgetRequest} disabled={saving}>{saving ? "Submitting..." : "Submit Request"}</Btn>
+            <Btn variant="ghost" onClick={() => setRequestModal(null)}>Cancel</Btn>
+          </div>
+        </Modal>
       )}
       {modal && (
         <Modal title="Set Event Budget" onClose={() => setModal(false)}>
@@ -3495,12 +3542,16 @@ const ExpenseView = ({ user }) => {
         receipt_name = receiptFile.name;
       }
     }
+    const amt = parseFloat(form.amount);
+    const needsApproval = amt >= 500;
     await supabase.from("expenses").insert({
       project_id: form.project_id || null, event_name: form.event_name,
       category: form.category, description: form.description,
-      amount: parseFloat(form.amount), date: form.date || new Date().toISOString().split("T")[0],
+      amount: amt, date: form.date || new Date().toISOString().split("T")[0],
       vendor: form.vendor, receipt_url, receipt_name,
-      created_by: user.id, approved: false,
+      created_by: user.id, approved: !needsApproval,
+      approval_required: needsApproval,
+      approval_status: needsApproval ? "pending" : "auto-approved",
     });
     setModal(false);
     setForm({ project_id: "", event_name: "", category: "", description: "", amount: "", date: "", vendor: "" });
@@ -3686,6 +3737,184 @@ const FinanceReportsView = ({ user }) => {
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}><div style={{ width: 12, height: 12, borderRadius: 2, background: T.amber + "80" }} /><span style={{ color: T.textMuted, fontSize: 12 }}>Expenses</span></div>
         </div>
       </Card>
+    </div>
+  );
+};
+
+// ─── FINANCE APPROVALS VIEW ───────────────────────────────────────────────────
+const FinanceApprovalsView = ({ user }) => {
+  const [expenses, setExpenses] = useState([]);
+  const [budgetRequests, setBudgetRequests] = useState([]);
+  const [paymentRequests, setPaymentRequests] = useState([]);
+  const [saving, setSaving] = useState(null);
+  const canApprove = ["CEO", "Administrator"].includes(user?.role);
+
+  const load = async () => {
+    const [ex, br, pr] = await Promise.all([
+      supabase.from("expenses").select("*").eq("approval_required", true).order("created_at", { ascending: false }),
+      supabase.from("budget_requests").select("*").order("created_at", { ascending: false }),
+      supabase.from("invoice_payments").select("*").order("created_at", { ascending: false }),
+    ]);
+    setExpenses(ex.data || []);
+    setBudgetRequests(br.data || []);
+    setPaymentRequests(pr.data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const pendingExpenses = expenses.filter(e => e.approval_status === "pending");
+  const pendingBudgets = budgetRequests.filter(b => b.status === "pending");
+  const pendingPayments = paymentRequests.filter(p => p.status === "pending");
+  const totalPending = pendingExpenses.length + pendingBudgets.length + pendingPayments.length;
+
+  const handleExpense = async (id, status, notes) => {
+    setSaving(id);
+    await supabase.from("expenses").update({ approval_status: status, approved_by: user.id, approval_notes: notes || "" }).eq("id", id);
+    setSaving(null);
+    load();
+  };
+
+  const handleBudget = async (req, status) => {
+    setSaving(req.id);
+    await supabase.from("budget_requests").update({ status, approved_by: user.id }).eq("id", req.id);
+    if (status === "approved") {
+      const { data: existing } = await supabase.from("budgets").select("*").eq("project_id", req.project_id).single();
+      if (existing) {
+        await supabase.from("budgets").update({ total_budget: existing.total_budget + req.requested_amount }).eq("id", existing.id);
+      }
+    }
+    setSaving(null);
+    load();
+  };
+
+  const handlePayment = async (req, status) => {
+    setSaving(req.id);
+    await supabase.from("invoice_payments").update({ status, approved_by: user.id }).eq("id", req.id);
+    if (status === "approved") {
+      await supabase.from("invoices").update({ status: "paid" }).eq("id", req.invoice_id);
+    }
+    setSaving(null);
+    load();
+  };
+
+  return (
+    <div>
+      <PageHeader title="Finance Approvals" subtitle={totalPending + " items pending your approval"} />
+
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 28 }}>
+        <Stat icon="📤" label="Pending Expenses" value={pendingExpenses.length} color={pendingExpenses.length > 0 ? T.amber : T.teal} />
+        <Stat icon="🎯" label="Budget Requests" value={pendingBudgets.length} color={pendingBudgets.length > 0 ? T.magenta : T.teal} />
+        <Stat icon="💳" label="Payment Requests" value={pendingPayments.length} color={pendingPayments.length > 0 ? T.cyan : T.teal} />
+      </div>
+
+      {/* Expense Approvals */}
+      {expenses.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+            <div style={{ width: 3, height: 20, background: T.amber, borderRadius: 2 }} />
+            <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>Expense Approvals</div>
+          </div>
+          {expenses.map(e => (
+            <Card key={e.id} style={{ marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                <div>
+                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{e.description}</div>
+                  <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>
+                    {e.category && <span style={{ background: T.cyan + "20", color: T.cyan, padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600, marginRight: 8 }}>{e.category}</span>}
+                    {e.event_name && <span>📁 {e.event_name} · </span>}
+                    {e.vendor && <span>🏢 {e.vendor} · </span>}
+                    {e.date}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ color: T.amber, fontWeight: 800, fontSize: 18 }}>GHS {(e.amount || 0).toLocaleString()}</div>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: e.approval_status === "approved" ? T.teal : e.approval_status === "rejected" ? "#F43F5E" : T.amber }}>
+                    {e.approval_status === "approved" ? "✓ Approved" : e.approval_status === "rejected" ? "✗ Rejected" : "⏳ Pending"}
+                  </span>
+                </div>
+              </div>
+              {e.receipt_url && <a href={e.receipt_url} target="_blank" rel="noopener noreferrer" style={{ color: T.cyan, fontSize: 12, fontWeight: 600, textDecoration: "none", display: "block", marginBottom: 10 }}>📎 View Receipt</a>}
+              {canApprove && e.approval_status === "pending" && (
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  <button onClick={() => handleExpense(e.id, "approved")} disabled={saving === e.id} style={{ flex: 1, background: T.teal + "20", border: "1px solid " + T.teal, color: T.teal, padding: "8px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>✓ Approve</button>
+                  <button onClick={() => handleExpense(e.id, "rejected")} disabled={saving === e.id} style={{ flex: 1, background: "#F43F5E20", border: "1px solid #F43F5E", color: "#F43F5E", padding: "8px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>✗ Reject</button>
+                </div>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Budget Requests */}
+      {budgetRequests.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+            <div style={{ width: 3, height: 20, background: T.magenta, borderRadius: 2 }} />
+            <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>Budget Increase Requests</div>
+          </div>
+          {budgetRequests.map(b => (
+            <Card key={b.id} style={{ marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                <div>
+                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>📁 {b.event_name}</div>
+                  <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Current: GHS {(b.current_budget || 0).toLocaleString()} · Requesting: GHS {(b.requested_amount || 0).toLocaleString()}</div>
+                  {b.reason && <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 6, fontStyle: "italic" }}>{b.reason}</div>}
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 600, color: b.status === "approved" ? T.teal : b.status === "rejected" ? "#F43F5E" : T.amber }}>
+                  {b.status === "approved" ? "✓ Approved" : b.status === "rejected" ? "✗ Rejected" : "⏳ Pending"}
+                </span>
+              </div>
+              {canApprove && b.status === "pending" && (
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => handleBudget(b, "approved")} disabled={saving === b.id} style={{ flex: 1, background: T.teal + "20", border: "1px solid " + T.teal, color: T.teal, padding: "8px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>✓ Approve + GHS {(b.requested_amount || 0).toLocaleString()}</button>
+                  <button onClick={() => handleBudget(b, "rejected")} disabled={saving === b.id} style={{ flex: 1, background: "#F43F5E20", border: "1px solid #F43F5E", color: "#F43F5E", padding: "8px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>✗ Reject</button>
+                </div>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Payment Requests */}
+      {paymentRequests.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+            <div style={{ width: 3, height: 20, background: T.cyan, borderRadius: 2 }} />
+            <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>Invoice Payment Requests</div>
+          </div>
+          {paymentRequests.map(p => (
+            <Card key={p.id} style={{ marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                <div>
+                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>🏢 {p.vendor}</div>
+                  <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>📁 {p.event_name}</div>
+                  {p.notes && <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 6, fontStyle: "italic" }}>{p.notes}</div>}
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ color: T.cyan, fontWeight: 800, fontSize: 18 }}>GHS {(p.amount || 0).toLocaleString()}</div>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: p.status === "approved" ? T.teal : p.status === "rejected" ? "#F43F5E" : T.amber }}>
+                    {p.status === "approved" ? "✓ Payment Approved" : p.status === "rejected" ? "✗ Rejected" : "⏳ Pending"}
+                  </span>
+                </div>
+              </div>
+              {canApprove && p.status === "pending" && (
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => handlePayment(p, "approved")} disabled={saving === p.id} style={{ flex: 1, background: T.teal + "20", border: "1px solid " + T.teal, color: T.teal, padding: "8px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>✓ Approve Payment</button>
+                  <button onClick={() => handlePayment(p, "rejected")} disabled={saving === p.id} style={{ flex: 1, background: "#F43F5E20", border: "1px solid #F43F5E", color: "#F43F5E", padding: "8px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>✗ Reject</button>
+                </div>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {totalPending === 0 && (
+        <Card style={{ textAlign: "center", padding: 60 }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>✅</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>All caught up!</div>
+          <div style={{ color: T.textMuted, fontSize: 13 }}>No pending finance approvals.</div>
+        </Card>
+      )}
     </div>
   );
 };

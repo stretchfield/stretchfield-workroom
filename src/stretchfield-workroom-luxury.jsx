@@ -1937,6 +1937,13 @@ const CRMView = ({ user }) => {
   const [propForm, setPropForm] = useState({ title: "", amount: "", notes: "" });
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState("all");
+  const [approvalModal, setApprovalModal] = useState(null);
+  const [existingClients, setExistingClients] = useState([]);
+  const [matchedClient, setMatchedClient] = useState(null);
+  const [clientForm, setClientForm] = useState({ name: "", company: "", email: "", phone: "" });
+  const [eventForm, setEventForm] = useState({ name: "", deadline: "", phase: "Planning" });
+  const [createLogin, setCreateLogin] = useState(false);
+  const [loginPassword, setLoginPassword] = useState("");
 
   const canEdit = ["CEO", "Administrator", "Sales & Marketing"].includes(user?.role);
   const canApprove = ["CEO", "Administrator"].includes(user?.role);
@@ -1944,16 +1951,18 @@ const CRMView = ({ user }) => {
   const statusOrder = ["new", "contacted", "qualified", "proposal", "won", "lost"];
 
   const load = async () => {
-    const [l, a, p, m] = await Promise.all([
+    const [l, a, p, m, c] = await Promise.all([
       ["CEO", "Administrator"].includes(user?.role) ? supabase.from("leads").select("*").order("created_at", { ascending: false }) : supabase.from("leads").select("*").or("assigned_to.eq." + user.id + ",created_by.eq." + user.id).order("created_at", { ascending: false }),
       supabase.from("crm_activities").select("*").order("created_at", { ascending: false }),
       supabase.from("proposals").select("*").order("created_at", { ascending: false }),
       supabase.from('profiles').select('*').not('role', 'in', '("Client","Vendor")'),
+      supabase.from("clients").select("*"),
     ]);
     setLeads(l.data || []);
     setActivities(a.data || []);
     setProposals(p.data || []);
     setMembers(m.data || []);
+    setExistingClients(c.data || []);
   };
 
   useEffect(() => { load(); }, []);
@@ -2008,6 +2017,89 @@ const CRMView = ({ user }) => {
     setProposalModal(null);
     setPropForm({ title: "", amount: "", notes: "" });
     setProposalFile(null);
+    setSaving(false);
+    load();
+  };
+
+  const openApprovalModal = (lead) => {
+    const matched = existingClients.find(c =>
+      c.company?.toLowerCase() === lead.company?.toLowerCase() ||
+      c.email?.toLowerCase() === lead.email?.toLowerCase()
+    );
+    setMatchedClient(matched || null);
+    setClientForm({ name: lead.contact_name || "", company: lead.company || "", email: lead.email || "", phone: lead.phone || "" });
+    setEventForm({ name: lead.company + " Event", deadline: "", phase: "Planning" });
+    setCreateLogin(false);
+    setLoginPassword("");
+    setApprovalModal(lead);
+  };
+
+  const handleApproveWonLead = async () => {
+    setSaving(true);
+    let clientId = matchedClient?.id;
+    let clientEmail = matchedClient?.email || clientForm.email;
+
+    if (!matchedClient) {
+      const { data: newClient } = await supabase.from("clients").insert({
+        name: clientForm.name,
+        company: clientForm.company,
+        email: clientForm.email,
+        phone: clientForm.phone,
+      }).select().single();
+      clientId = newClient?.id;
+      clientEmail = clientForm.email;
+
+      // Create portal login if requested
+      if (createLogin && loginPassword && clientEmail) {
+        const { data: authData } = await supabase.auth.signUp({
+          email: clientEmail,
+          password: loginPassword,
+        });
+        if (authData?.user) {
+          const initials = (clientForm.name || clientForm.company).split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase();
+          await supabase.from("profiles").insert({
+            id: authData.user.id,
+            name: clientForm.name || clientForm.company,
+            email: clientEmail,
+            role: "Client",
+            avatar: initials,
+          });
+          await supabase.from("clients").update({ profile_id: authData.user.id }).eq("id", clientId);
+        }
+      }
+    }
+
+    // Create event for client
+    await supabase.from("projects").insert({
+      name: eventForm.name,
+      client_id: clientId,
+      client: clientForm.company || matchedClient?.company,
+      deadline: eventForm.deadline || null,
+      phase: eventForm.phase,
+      completion: 0,
+      status: "active",
+      tasks: 0,
+      completed: 0,
+      active_for_client: true,
+    });
+
+    // Mark lead approved
+    await supabase.from("leads").update({ approved: true, approved_by: user.id }).eq("id", approvalModal.id);
+
+    // Notify Sales & Marketing
+    const { data: smUsers } = await supabase.from("profiles").select("id").eq("role", "Sales & Marketing");
+    if (smUsers) {
+      await Promise.all(smUsers.map(u =>
+        supabase.from("notifications").insert({
+          user_id: u.id,
+          title: "Lead Approved",
+          message: approvalModal.company + " approved. Client and event created.",
+          type: "crm",
+        })
+      ));
+    }
+
+    setApprovalModal(null);
     setSaving(false);
     load();
   };
@@ -2171,6 +2263,44 @@ const CRMView = ({ user }) => {
           <div style={{ display: "flex", gap: 10 }}>
             <Btn onClick={handleAddActivity} disabled={saving}>{saving ? "Saving..." : "Log Activity"}</Btn>
             <Btn variant="ghost" onClick={() => setActivityModal(null)}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+      {approvalModal && (
+        <Modal title={"Approve Won Lead — " + approvalModal.company} onClose={() => setApprovalModal(null)}>
+          {matchedClient ? (
+            <div style={{ padding: "12px 16px", background: T.cyan + "15", borderRadius: 8, border: "1px solid " + T.cyan + "33", marginBottom: 16 }}>
+              <div style={{ color: T.cyan, fontWeight: 700, fontSize: 13 }}>✓ Existing Client Found</div>
+              <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 4 }}>{matchedClient.company || matchedClient.name} — a new event will be created for this client.</div>
+            </div>
+          ) : (
+            <div style={{ marginBottom: 4 }}>
+              <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>New Client Details</div>
+              <Input label="Contact Name" value={clientForm.name} onChange={v => setClientForm({ ...clientForm, name: v })} />
+              <Input label="Company" value={clientForm.company} onChange={v => setClientForm({ ...clientForm, company: v })} />
+              <Input label="Email" type="email" value={clientForm.email} onChange={v => setClientForm({ ...clientForm, email: v })} />
+              <Input label="Phone" value={clientForm.phone} onChange={v => setClientForm({ ...clientForm, phone: v })} />
+              <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "12px 0", padding: "10px 14px", background: T.bg, borderRadius: 8, border: "1px solid " + T.border }}>
+                <input type="checkbox" id="createLogin" checked={createLogin} onChange={e => setCreateLogin(e.target.checked)} style={{ accentColor: T.cyan, width: 16, height: 16 }} />
+                <label htmlFor="createLogin" style={{ color: T.textSecondary, fontSize: 13, cursor: "pointer" }}>Create client portal login</label>
+              </div>
+              {createLogin && (
+                <Input label="Portal Password" type="password" placeholder="Set password for client" value={loginPassword} onChange={v => setLoginPassword(v)} />
+              )}
+            </div>
+          )}
+          <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12, marginTop: 8 }}>Event to Create</div>
+          <Input label="Event Name" value={eventForm.name} onChange={v => setEventForm({ ...eventForm, name: v })} />
+          <Input label="Deadline" type="date" value={eventForm.deadline} onChange={v => setEventForm({ ...eventForm, deadline: v })} />
+          <Select label="Phase" options={[
+            { value: "Planning", label: "Planning" },
+            { value: "Design", label: "Design" },
+            { value: "Execution", label: "Execution" },
+            { value: "Review", label: "Review" },
+          ]} value={eventForm.phase} onChange={v => setEventForm({ ...eventForm, phase: v })} />
+          <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+            <Btn onClick={handleApproveWonLead} disabled={saving}>{saving ? "Creating..." : "Approve & Create"}</Btn>
+            <Btn variant="ghost" onClick={() => setApprovalModal(null)}>Cancel</Btn>
           </div>
         </Modal>
       )}

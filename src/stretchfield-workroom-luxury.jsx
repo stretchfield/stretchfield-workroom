@@ -3192,22 +3192,30 @@ const FinanceDashboard = ({ user, onTab }) => {
   const [budgets, setBudgets] = useState([]);
   const [leads, setLeads] = useState([]);
   const [events, setEvents] = useState([]);
+  const [budgetRequests, setBudgetRequests] = useState([]);
+  const [paymentRequests, setPaymentRequests] = useState([]);
 
-  useEffect(() => {
+  const load = () => {
     Promise.all([
       supabase.from("invoices").select("*").order("created_at", { ascending: false }),
       supabase.from("expenses").select("*").order("created_at", { ascending: false }),
       supabase.from("budgets").select("*"),
       supabase.from("leads").select("*").eq("status", "won"),
       supabase.from("projects").select("*"),
-    ]).then(([inv, exp, bud, l, ev]) => {
+      supabase.from("budget_requests").select("*").eq("status", "pending"),
+      supabase.from("invoice_payments").select("*").eq("status", "pending"),
+    ]).then(([inv, exp, bud, l, ev, br, pr]) => {
       setInvoices(inv.data || []);
       setExpenses(exp.data || []);
       setBudgets(bud.data || []);
       setLeads(l.data || []);
       setEvents(ev.data || []);
+      setBudgetRequests(br.data || []);
+      setPaymentRequests(pr.data || []);
     });
-  }, []);
+  };
+
+  useEffect(() => { load(); }, []);
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -3221,14 +3229,17 @@ const FinanceDashboard = ({ user, onTab }) => {
   const mtdExpenses = expenses.filter(e => e.date && new Date(e.date) >= startOfMonth).reduce((a, e) => a + (e.amount || 0), 0);
   const ytdExpenses = expenses.filter(e => e.date && new Date(e.date) >= startOfYear).reduce((a, e) => a + (e.amount || 0), 0);
 
-  const totalInvoiced = invoices.reduce((a, i) => a + (i.amount || 0), 0);
   const pendingInvoices = invoices.filter(i => i.status === "pending");
   const paidInvoices = invoices.filter(i => i.status === "paid");
+  const totalInvoiced = invoices.reduce((a, i) => a + (i.amount || 0), 0);
   const totalPaid = paidInvoices.reduce((a, i) => a + (i.amount || 0), 0);
   const totalPending = pendingInvoices.reduce((a, i) => a + (i.amount || 0), 0);
 
   const grossProfit = totalRevenue - totalExpenses;
   const profitMargin = totalRevenue ? Math.round((grossProfit / totalRevenue) * 100) : 0;
+
+  const pendingExpenseApprovals = expenses.filter(e => e.approval_required && e.approval_status === "pending");
+  const totalPendingApprovals = pendingExpenseApprovals.length + budgetRequests.length + paymentRequests.length;
 
   const expensesByCategory = expenses.reduce((acc, e) => {
     acc[e.category] = (acc[e.category] || 0) + (e.amount || 0);
@@ -3239,26 +3250,55 @@ const FinanceDashboard = ({ user, onTab }) => {
     const budget = budgets.find(b => b.project_id === ev.id);
     const spent = expenses.filter(e => e.project_id === ev.id).reduce((a, e) => a + (e.amount || 0), 0);
     const invoiced = invoices.filter(i => i.project_id === ev.id).reduce((a, i) => a + (i.amount || 0), 0);
-    return { ...ev, budget: budget?.total_budget || 0, spent, invoiced };
+    const pct = budget ? Math.min(100, Math.round(((spent + invoiced) / budget.total_budget) * 100)) : 0;
+    return { ...ev, budget: budget?.total_budget || 0, spent, invoiced, pct };
   }).filter(e => e.budget > 0 || e.spent > 0).slice(0, 5);
+
+  const canApprove = ["CEO", "Administrator"].includes(user?.role);
 
   return (
     <div>
-      <PageHeader title="Finance Overview" subtitle="Company financial health at a glance" />
+      <PageHeader title="Finance Dashboard" subtitle="Complete financial overview and tools" />
 
-      {/* Alerts */}
-      {pendingInvoices.length > 0 && (
-        <div onClick={() => onTab("invoices")} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: T.amber + "15", border: "1px solid " + T.amber + "44", borderRadius: 8, marginBottom: 20, cursor: "pointer" }}>
-          <span style={{ fontSize: 18 }}>🧾</span>
-          <div style={{ flex: 1 }}>
-            <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>{pendingInvoices.length} Pending Invoice{pendingInvoices.length > 1 ? "s" : ""}</div>
-            <div style={{ color: T.textMuted, fontSize: 12 }}>GHS {totalPending.toLocaleString()} outstanding</div>
+      {/* Alerts Row */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
+        {totalPendingApprovals > 0 && (
+          <div onClick={() => onTab("finance-approvals")} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: canApprove ? T.amber + "15" : T.blue + "15", border: "1px solid " + (canApprove ? T.amber : T.blue) + "44", borderRadius: 8, cursor: "pointer" }}>
+            <span style={{ fontSize: 18 }}>⏳</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: canApprove ? T.amber : T.blue, fontWeight: 700, fontSize: 13 }}>{canApprove ? totalPendingApprovals + " Finance Item(s) Awaiting Your Approval" : totalPendingApprovals + " Item(s) Pending CEO Approval"}</div>
+              <div style={{ color: T.textMuted, fontSize: 12 }}>
+                {pendingExpenseApprovals.length > 0 && pendingExpenseApprovals.length + " expense(s) · "}
+                {budgetRequests.length > 0 && budgetRequests.length + " budget request(s) · "}
+                {paymentRequests.length > 0 && paymentRequests.length + " payment(s)"}
+              </div>
+            </div>
+            <span style={{ color: canApprove ? T.amber : T.blue, fontSize: 12 }}>{canApprove ? "Approve →" : "View →"}</span>
           </div>
-          <span style={{ color: T.amber, fontSize: 12 }}>Review →</span>
-        </div>
-      )}
+        )}
+        {pendingInvoices.length > 0 && (
+          <div onClick={() => onTab("invoices")} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: T.magenta + "15", border: "1px solid " + T.magenta + "44", borderRadius: 8, cursor: "pointer" }}>
+            <span style={{ fontSize: 18 }}>🧾</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: T.magenta, fontWeight: 700, fontSize: 13 }}>{pendingInvoices.length} Pending Invoice{pendingInvoices.length > 1 ? "s" : ""}</div>
+              <div style={{ color: T.textMuted, fontSize: 12 }}>GHS {totalPending.toLocaleString()} outstanding</div>
+            </div>
+            <span style={{ color: T.magenta, fontSize: 12 }}>Review →</span>
+          </div>
+        )}
+        {eventBudgetSummary.some(e => e.pct >= 90) && (
+          <div onClick={() => onTab("budgets")} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: "#F43F5E15", border: "1px solid #F43F5E44", borderRadius: 8, cursor: "pointer" }}>
+            <span style={{ fontSize: 18 }}>⚠️</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: "#F43F5E", fontWeight: 700, fontSize: 13 }}>{eventBudgetSummary.filter(e => e.pct >= 90).length} Event(s) Near or Over Budget</div>
+              <div style={{ color: T.textMuted, fontSize: 12 }}>{eventBudgetSummary.filter(e => e.pct >= 90).map(e => e.name).join(", ")}</div>
+            </div>
+            <span style={{ color: "#F43F5E", fontSize: 12 }}>Review →</span>
+          </div>
+        )}
+      </div>
 
-      {/* Revenue Stats */}
+      {/* Revenue */}
       <div style={{ marginBottom: 8, color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Revenue</div>
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
         <Stat icon="💰" label="MTD Revenue" value={"GHS " + mtdRevenue.toLocaleString()} color={T.teal} />
@@ -3266,27 +3306,28 @@ const FinanceDashboard = ({ user, onTab }) => {
         <Stat icon="🏆" label="Total Revenue" value={"GHS " + totalRevenue.toLocaleString()} color={T.blue} />
       </div>
 
-      {/* Expense Stats */}
+      {/* Expenses */}
       <div style={{ marginBottom: 8, color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Expenses & Invoices</div>
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
         <Stat icon="📤" label="MTD Expenses" value={"GHS " + mtdExpenses.toLocaleString()} color={T.amber} />
         <Stat icon="📤" label="YTD Expenses" value={"GHS " + ytdExpenses.toLocaleString()} color={T.magenta} />
         <Stat icon="🧾" label="Total Invoiced" value={"GHS " + totalInvoiced.toLocaleString()} color={T.amber} />
-        <Stat icon="✅" label="Paid Invoices" value={"GHS " + totalPaid.toLocaleString()} color={T.teal} />
+        <Stat icon="✅" label="Paid" value={"GHS " + totalPaid.toLocaleString()} color={T.teal} />
         <Stat icon="⏳" label="Outstanding" value={"GHS " + totalPending.toLocaleString()} color={T.magenta} />
       </div>
 
-      {/* Profit */}
+      {/* Profitability */}
       <div style={{ marginBottom: 8, color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Profitability</div>
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 28 }}>
         <Stat icon="📊" label="Gross Profit" value={"GHS " + grossProfit.toLocaleString()} color={grossProfit >= 0 ? T.teal : "#F43F5E"} />
         <Stat icon="📈" label="Profit Margin" value={profitMargin + "%"} color={profitMargin >= 30 ? T.teal : profitMargin >= 10 ? T.amber : "#F43F5E"} />
       </div>
 
+      {/* Main Grid */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
-        {/* Expense by Category */}
+        {/* Expenses by Category */}
         <Card>
-          <SectionHeader title="Expenses by Category" actionLabel="View All" action={() => onTab("expenses")} />
+          <SectionHeader title="Expenses by Category" actionLabel="+ Log Expense" action={() => onTab("expenses")} />
           {Object.keys(expensesByCategory).length === 0 ? (
             <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No expenses yet.</div>
           ) : Object.entries(expensesByCategory).sort((a,b) => b[1]-a[1]).map(([cat, amt]) => (
@@ -3303,47 +3344,87 @@ const FinanceDashboard = ({ user, onTab }) => {
           ))}
         </Card>
 
-        {/* Event Budget vs Spend */}
+        {/* Budget vs Spend */}
         <Card>
-          <SectionHeader title="Budget vs Spend per Event" actionLabel="Manage" action={() => onTab("budgets")} />
+          <SectionHeader title="Budget vs Spend" actionLabel="Manage" action={() => onTab("budgets")} />
           {eventBudgetSummary.length === 0 ? (
             <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No budgets set yet.</div>
-          ) : eventBudgetSummary.map(ev => {
-            const pct = ev.budget ? Math.min(100, Math.round((ev.spent / ev.budget) * 100)) : 0;
-            return (
-              <div key={ev.id} style={{ marginBottom: 16 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                  <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{ev.name}</div>
-                  <div style={{ color: pct >= 90 ? "#F43F5E" : pct >= 70 ? T.amber : T.teal, fontWeight: 700, fontSize: 12 }}>{pct}%</div>
-                </div>
-                <ProgressBar value={pct} color={pct >= 90 ? "#F43F5E" : pct >= 70 ? T.amber : T.teal} />
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                  <div style={{ color: T.textMuted, fontSize: 11 }}>Spent: GHS {ev.spent.toLocaleString()}</div>
-                  <div style={{ color: T.textMuted, fontSize: 11 }}>Budget: GHS {ev.budget.toLocaleString()}</div>
-                </div>
+          ) : eventBudgetSummary.map(ev => (
+            <div key={ev.id} style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{ev.name}</div>
+                <div style={{ color: ev.pct >= 90 ? "#F43F5E" : ev.pct >= 70 ? T.amber : T.teal, fontWeight: 700, fontSize: 12 }}>{ev.pct}%</div>
               </div>
-            );
-          })}
+              <ProgressBar value={ev.pct} color={ev.pct >= 90 ? "#F43F5E" : ev.pct >= 70 ? T.amber : T.teal} />
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                <div style={{ color: T.textMuted, fontSize: 11 }}>Spent: GHS {ev.spent.toLocaleString()}</div>
+                <div style={{ color: T.textMuted, fontSize: 11 }}>Budget: GHS {ev.budget.toLocaleString()}</div>
+              </div>
+            </div>
+          ))}
         </Card>
       </div>
 
-      {/* Recent Expenses */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+        {/* Recent Invoices */}
+        <Card>
+          <SectionHeader title="Recent Invoices" actionLabel="View All" action={() => onTab("invoices")} />
+          {invoices.length === 0 ? (
+            <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No invoices yet.</div>
+          ) : invoices.slice(0, 5).map((inv, i) => (
+            <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < 4 ? "1px solid " + T.border : "none" }}>
+              <div>
+                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{inv.vendor || "Vendor"}</div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{inv.event_name} · {inv.date}</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 700 }}>GHS {(inv.amount || 0).toLocaleString()}</div>
+                <Badge status={inv.status} />
+              </div>
+            </div>
+          ))}
+        </Card>
+
+        {/* Recent Expenses */}
+        <Card>
+          <SectionHeader title="Recent Expenses" actionLabel="View All" action={() => onTab("expenses")} />
+          {expenses.length === 0 ? (
+            <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No expenses yet.</div>
+          ) : expenses.slice(0, 5).map((e, i) => (
+            <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < 4 ? "1px solid " + T.border : "none" }}>
+              <div>
+                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{e.description}</div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>
+                  {e.category} · {e.event_name || "General"} · {e.date}
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>GHS {(e.amount || 0).toLocaleString()}</div>
+                <div style={{ fontSize: 11, color: e.approval_status === "approved" || e.approval_status === "auto-approved" ? T.teal : e.approval_status === "rejected" ? "#F43F5E" : T.amber }}>
+                  {e.approval_status === "auto-approved" ? "✓ Auto-approved" : e.approval_status === "approved" ? "✓ Approved" : e.approval_status === "rejected" ? "✗ Rejected" : "⏳ Pending"}
+                </div>
+              </div>
+            </div>
+          ))}
+        </Card>
+      </div>
+
+      {/* Quick Actions */}
       <Card>
-        <SectionHeader title="Recent Expenses" actionLabel="View All" action={() => onTab("expenses")} />
-        {expenses.length === 0 ? (
-          <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No expenses logged yet.</div>
-        ) : expenses.slice(0, 5).map((e, i) => (
-          <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < 4 ? "1px solid " + T.border : "none" }}>
-            <div>
-              <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{e.description}</div>
-              <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{e.category} · {e.event_name} · {e.date}</div>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>GHS {(e.amount || 0).toLocaleString()}</div>
-              {e.vendor && <div style={{ color: T.textMuted, fontSize: 11 }}>{e.vendor}</div>}
-            </div>
-          </div>
-        ))}
+        <SectionHeader title="Quick Actions" />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+          {[
+            { icon: "📤", label: "Log Expense", tab: "expenses", color: T.amber },
+            { icon: "🎯", label: "Set Budget", tab: "budgets", color: T.cyan },
+            { icon: "📊", label: "View Reports", tab: "finance-reports", color: T.blue },
+            { icon: "✅", label: "Approvals" + (totalPendingApprovals > 0 ? " (" + totalPendingApprovals + ")" : ""), tab: "finance-approvals", color: totalPendingApprovals > 0 ? T.amber : T.teal },
+          ].map(a => (
+            <button key={a.tab} onClick={() => onTab(a.tab)} style={{ padding: "16px 12px", background: a.color + "15", border: "1px solid " + a.color + "33", borderRadius: 10, cursor: "pointer", textAlign: "center" }}>
+              <div style={{ fontSize: 24, marginBottom: 8 }}>{a.icon}</div>
+              <div style={{ color: a.color, fontWeight: 700, fontSize: 12 }}>{a.label}</div>
+            </button>
+          ))}
+        </div>
       </Card>
     </div>
   );

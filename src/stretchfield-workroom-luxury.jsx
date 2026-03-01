@@ -290,6 +290,7 @@ const Btn = ({ children, onClick, variant = "primary", small }) => {
 // ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 const getNavItems = (role) => {
   const base = [{ id: "dashboard", label: "Dashboard", icon: "▪" }];
+
   if (["CEO","Administrator","Vendor Manager","Strategy & Events Lead","Finance Manager"].includes(role)) {
     base.push({ id: "events", label: "Events", icon: "▪" }, { id: "tasks", label: "Event Tasks", icon: "▪" });
   }
@@ -303,18 +304,27 @@ const getNavItems = (role) => {
       { id: "sm-tasks", label: "S&M Tasks" },
     ]});
   }
-  if (["Strategy & Events Lead"].includes(role)) {
-    base.push({ id: "strategy-overview", label: "Client Overview", icon: "▪" }, { id: "feedback-summary", label: "Feedback", icon: "▪" });
-  }
-  if (["Strategy & Events Lead"].includes(role)) {
-    base.push({ id: "strategy-overview", label: "Client Overview", icon: "▪" }, { id: "feedback-summary", label: "Feedback", icon: "▪" });
+  if (["CEO","Administrator","Vendor Manager","Finance Manager"].includes(role)) {
+    base.push({ id: "invoices", label: "Invoices", icon: "▪" });
   }
   if (["CEO","Administrator","Vendor Manager"].includes(role)) {
-    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "invoices", label: "Invoices", icon: "▪" });
+    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" });
+  }
+  if (["CEO","Administrator","Finance Manager"].includes(role)) {
+    base.push({ id: "finance-group", label: "Finance", icon: "▪", isGroup: true, children: [
+      { id: "finance", label: "Overview" },
+      { id: "budgets", label: "Budgets" },
+      { id: "expenses", label: "Expenses" },
+      { id: "finance-reports", label: "Reports" },
+      { id: "finance-approvals", label: "Approvals" },
+    ]});
   }
   if (["CEO","Administrator"].includes(role)) {
     base.push({ id: "clients", label: "Clients", icon: "▪" });
     base.push({ id: "users", label: "User Management", icon: "▪" });
+  }
+  if (["Strategy & Events Lead"].includes(role)) {
+    base.push({ id: "strategy-overview", label: "Client Overview", icon: "▪" }, { id: "feedback-summary", label: "Feedback", icon: "▪" });
   }
   if (role === "Vendor") {
     base.push({ id: "rffs", label: "My RFFs", icon: "▪" }, { id: "quotes", label: "Quotes", icon: "▪" }, { id: "vendor-tasks", label: "My Tasks", icon: "▪" });

@@ -297,7 +297,11 @@ const getNavItems = (role) => {
     base.push({ id: "events", label: "Events", icon: "▪" });
   }
   if (["CEO","Administrator","Sales & Marketing"].includes(role)) {
-    base.push({ id: "crm", label: "CRM", icon: "▪" }, { id: "crm-insights", label: "CRM Insights", icon: "▪" }, { id: "sm-tasks", label: "S&M Tasks", icon: "▪" });
+    base.push({ id: "sm-group", label: "Sales & Marketing", icon: "▪", isGroup: true, children: [
+      { id: "crm", label: "CRM" },
+      { id: "crm-insights", label: "CRM Insights" },
+      { id: "sm-tasks", label: "S&M Tasks" },
+    ]});
   }
   if (["Strategy & Events Lead"].includes(role)) {
     base.push({ id: "strategy-overview", label: "Client Overview", icon: "▪" }, { id: "feedback-summary", label: "Feedback", icon: "▪" });
@@ -355,6 +359,53 @@ const Sidebar = ({ user, activeTab, onTab, collapsed, onToggle }) => {
       <nav style={{ flex: 1, padding: "16px 10px", overflowY: "auto" }}>
         {navItems.map(item => {
           const active = activeTab === item.id;
+          const groupActive = item.isGroup && item.children && item.children.some(c => c.id === activeTab);
+
+          if (item.isGroup) {
+            const [open, setOpen] = React.useState(groupActive);
+            return (
+              <div key={item.id}>
+                <button onClick={() => setOpen(o => !o)} style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 10,
+                  padding: "9px 10px", borderRadius: 2, border: "none", cursor: "pointer",
+                  background: groupActive ? `linear-gradient(90deg, ${T.cyan}14, transparent)` : "transparent",
+                  color: groupActive ? T.cyan : T.textMuted,
+                  fontSize: 11, fontWeight: groupActive ? 700 : 500,
+                  marginBottom: 1, transition: "all 0.15s",
+                  whiteSpace: "nowrap", overflow: "hidden",
+                  letterSpacing: "0.04em", textTransform: "uppercase",
+                  borderLeft: groupActive ? `2px solid ${T.cyan}` : "2px solid transparent",
+                }}>
+                  <span style={{ fontSize: 6, flexShrink: 0, color: groupActive ? T.cyan : T.textGhost }}>■</span>
+                  {!collapsed && <><span style={{ flex: 1, textAlign: "left" }}>{item.label}</span><span style={{ fontSize: 9, marginLeft: 4 }}>{open ? "▾" : "▸"}</span></>}
+                </button>
+                {open && !collapsed && item.children.map(child => {
+                  const childActive = activeTab === child.id;
+                  return (
+                    <button key={child.id} onClick={() => onTab(child.id)} style={{
+                      width: "100%", display: "flex", alignItems: "center", gap: 10,
+                      padding: "7px 10px 7px 26px", borderRadius: 2, border: "none", cursor: "pointer",
+                      background: childActive ? `linear-gradient(90deg, ${T.cyan}14, transparent)` : "transparent",
+                      color: childActive ? T.cyan : T.textMuted,
+                      fontSize: 11, fontWeight: childActive ? 700 : 400,
+                      marginBottom: 1, transition: "all 0.15s",
+                      whiteSpace: "nowrap", overflow: "hidden",
+                      letterSpacing: childActive ? "0.08em" : "0.04em",
+                      textTransform: "uppercase",
+                      borderLeft: childActive ? `2px solid ${T.cyan}` : "2px solid transparent",
+                    }}
+                      onMouseEnter={e => { if (!childActive) { e.currentTarget.style.background = T.surfaceRaise; e.currentTarget.style.color = T.textSecondary; }}}
+                      onMouseLeave={e => { if (!childActive) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMuted; }}}
+                    >
+                      <span style={{ fontSize: 5, flexShrink: 0, color: childActive ? T.cyan : T.textGhost }}>◆</span>
+                      {child.label}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          }
+
           return (
             <button key={item.id} onClick={() => onTab(item.id)} style={{
               width: "100%", display: "flex", alignItems: "center", gap: 10,

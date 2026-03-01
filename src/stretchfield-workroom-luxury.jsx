@@ -362,10 +362,10 @@ const Sidebar = ({ user, activeTab, onTab, collapsed, onToggle }) => {
           const groupActive = item.isGroup && item.children && item.children.some(c => c.id === activeTab);
 
           if (item.isGroup) {
-            const [open, setOpen] = React.useState(groupActive);
+            const open = openGroups[item.id];
             return (
               <div key={item.id}>
-                <button onClick={() => setOpen(o => !o)} style={{
+                <button onClick={() => toggleGroup(item.id)} style={{
                   width: "100%", display: "flex", alignItems: "center", gap: 10,
                   padding: "9px 10px", borderRadius: 2, border: "none", cursor: "pointer",
                   background: groupActive ? `linear-gradient(90deg, ${T.cyan}14, transparent)` : "transparent",

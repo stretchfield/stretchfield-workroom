@@ -330,6 +330,8 @@ const getNavItems = (role) => {
 };
 
 const Sidebar = ({ user, activeTab, onTab, collapsed, onToggle }) => {
+  const [openGroups, setOpenGroups] = React.useState({});
+  const toggleGroup = (id) => setOpenGroups(prev => ({ ...prev, [id]: !prev[id] }));
   const navItems = getNavItems(user.role);
   return (
     <div style={{

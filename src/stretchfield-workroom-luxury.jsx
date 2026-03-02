@@ -732,21 +732,41 @@ const VendorDashboard = ({ user }) => {
 const ClientDashboard = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [clientInfo, setClientInfo] = useState(null);
+
   useEffect(() => {
-    supabase.from('clients').select('id').eq('profile_id', user.id).single().then(({ data: clientData }) => {
+    supabase.from('clients').select('*').eq('profile_id', user.id).single().then(({ data: clientData }) => {
       if (clientData) {
+        setClientInfo(clientData);
         supabase.from('projects').select('*').eq('client_id', clientData.id).eq('active_for_client', true).then(({ data }) => setEvents(data || []));
+        supabase.from('tasks').select('*').eq('visible_to_client', true).eq('client_id', clientData.id).then(({ data }) => setTasks(data || []));
       } else {
-        setEvents([]);
+        // fallback: try matching by email
+        supabase.from('clients').select('*').eq('email', user.email).single().then(({ data: clientByEmail }) => {
+          if (clientByEmail) {
+            setClientInfo(clientByEmail);
+            // Link profile_id for future logins
+            supabase.from('clients').update({ profile_id: user.id }).eq('id', clientByEmail.id);
+            supabase.from('projects').select('*').eq('client_id', clientByEmail.id).eq('active_for_client', true).then(({ data }) => setEvents(data || []));
+            supabase.from('tasks').select('*').eq('visible_to_client', true).eq('client_id', clientByEmail.id).then(({ data }) => setTasks(data || []));
+          }
+        });
       }
     });
-    supabase.from('tasks').select('*').eq('visible_to_client', true).then(({ data }) => setTasks(data || []));
   }, [user.id]);
-
 
   return (
     <div>
-      <PageHeader title={`Welcome, ${user.name.split(" ")[0]}`} subtitle="Track your event progress below." />
+      <PageHeader
+        title={"Welcome, " + user.name.split(" ")[0]}
+        subtitle={clientInfo?.company ? clientInfo.company : clientInfo?.name ? clientInfo.name : "Track your event progress below."}
+      />
+      {clientInfo?.company && (
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 14px", background: T.cyan + "15", border: "1px solid " + T.cyan + "33", borderRadius: 20, marginBottom: 20 }}>
+          <span style={{ fontSize: 14 }}>🏢</span>
+          <span style={{ color: T.cyan, fontWeight: 600, fontSize: 13 }}>{clientInfo.company}</span>
+        </div>
+      )}
       {events.length === 0 ? (
         <Card style={{ textAlign: "center", padding: 60 }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>📁</div>
@@ -1032,7 +1052,7 @@ const TasksView = ({ userRole }) => {
     });
     if (error) { alert('Error: ' + error.message); setSaving(false); return; }
     setModal(false);
-    setForm({ name: '', event_id: '', deadline: '', status: 'pending' });
+    setForm({ name: '', event_id: '', project_id: '', client_id: '', deadline: '', status: 'pending' });
     setSaving(false);
     load();
   };

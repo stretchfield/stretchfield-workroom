@@ -863,7 +863,7 @@ const ClientEventsView = ({ user }) => {
           <div style={{ color: T.textMuted, fontSize: 13 }}>Events assigned to you will appear here.</div>
         </Card>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 20 }}>
           {events.map(p => {
             const eventTasks = tasks.filter(t => t.project_id === p.id);
             const completedTasks = eventTasks.filter(t => t.status === 'completed').length;
@@ -922,6 +922,7 @@ const ClientEventsView = ({ user }) => {
                 {eventTasks.length === 0 && (
                   <div style={{ marginTop: 12, color: T.textMuted, fontSize: 13, fontStyle: "italic" }}>No tasks assigned yet.</div>
                 )}
+                <ClientFeedbackForm event={p} user={user} />
               </Card>
             );
           })}
@@ -2667,14 +2668,23 @@ const ClientFeedbackForm = ({ event, user }) => {
   const [rating, setRating] = useState(0);
   const [summary, setSummary] = useState("");
   const [detailed, setDetailed] = useState("");
+  const [recommend, setRecommend] = useState(null);
+  const [categoryRatings, setCategoryRatings] = useState({ communication: 0, quality: 0, timeliness: 0, value: 0 });
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  const [existing, setExisting] = useState(null);
   const [clientId, setClientId] = useState(null);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    supabase.from("clients").select("id").eq("profile_id", user.id).single()
-      .then(({ data }) => setClientId(data?.id));
-  }, [user.id]);
+    supabase.from("clients").select("id").eq("profile_id", user.id).single().then(({ data }) => {
+      if (data) {
+        setClientId(data.id);
+        supabase.from("feedback").select("*").eq("project_id", event.id).eq("client_id", data.id).single()
+          .then(({ data: fb }) => { if (fb) { setExisting(fb); setDone(true); } });
+      }
+    });
+  }, [user.id, event.id]);
 
   const handleSubmit = async () => {
     if (!rating || !summary) return;
@@ -2683,39 +2693,122 @@ const ClientFeedbackForm = ({ event, user }) => {
       client_id: clientId, project_id: event.id,
       client_name: user.name, event_name: event.name,
       rating, summary, detailed_feedback: detailed,
+      recommend,
+      communication_rating: categoryRatings.communication,
+      quality_rating: categoryRatings.quality,
+      timeliness_rating: categoryRatings.timeliness,
+      value_rating: categoryRatings.value,
     });
     setSaving(false);
     setDone(true);
+    setOpen(false);
   };
 
+  const StarRow = ({ label, field }) => (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid " + T.border }}>
+      <div style={{ color: T.textSecondary, fontSize: 13 }}>{label}</div>
+      <div style={{ display: "flex", gap: 4 }}>
+        {[1,2,3,4,5].map(s => (
+          <button key={s} onClick={() => setCategoryRatings(prev => ({ ...prev, [field]: s }))}
+            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: s <= categoryRatings[field] ? "#F59E0B" : T.border, padding: "2px" }}>★</button>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (done && existing) return (
+    <div style={{ marginTop: 20, padding: 16, background: T.teal + "15", borderRadius: 10, border: "1px solid " + T.teal + "33" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <div style={{ color: T.teal, fontWeight: 700, fontSize: 14, marginBottom: 4 }}>✓ Feedback Submitted</div>
+          <div style={{ color: "#F59E0B", fontSize: 18 }}>{"★".repeat(existing.rating)}{"☆".repeat(5 - existing.rating)}</div>
+          <div style={{ color: T.textSecondary, fontSize: 13, marginTop: 6, fontStyle: "italic" }}>"{existing.summary}"</div>
+        </div>
+      </div>
+    </div>
+  );
+
   if (done) return (
-    <div style={{ padding: 16, background: T.teal + "15", borderRadius: 8, border: "1px solid " + T.teal + "33", marginTop: 16 }}>
-      <div style={{ color: T.teal, fontWeight: 700, fontSize: 14 }}>✓ Feedback submitted — thank you!</div>
+    <div style={{ marginTop: 20, padding: 16, background: T.teal + "15", borderRadius: 10, border: "1px solid " + T.teal + "33" }}>
+      <div style={{ color: T.teal, fontWeight: 700, fontSize: 14 }}>✓ Thank you for your feedback!</div>
     </div>
   );
 
   return (
-    <div style={{ marginTop: 20, padding: 16, background: T.surface, borderRadius: 10, border: "1px solid " + T.border }}>
-      <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14, marginBottom: 16 }}>📝 Leave Feedback</div>
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Rating</div>
-        <div style={{ display: "flex", gap: 8 }}>
-          {[1,2,3,4,5].map(s => (
-            <button key={s} onClick={() => setRating(s)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 28, color: s <= rating ? "#F59E0B" : T.border }}>★</button>
-          ))}
+    <div style={{ marginTop: 20 }}>
+      {!open ? (
+        <button onClick={() => setOpen(true)} style={{ width: "100%", padding: "12px", background: T.cyan + "15", border: "1px solid " + T.cyan + "33", borderRadius: 10, cursor: "pointer", color: T.cyan, fontWeight: 700, fontSize: 13 }}>
+          📝 Leave Feedback for this Event
+        </button>
+      ) : (
+        <div style={{ padding: 20, background: T.surface, borderRadius: 12, border: "1px solid " + T.border }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 16 }}>📝 Event Feedback</div>
+            <button onClick={() => setOpen(false)} style={{ background: "none", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 18 }}>×</button>
+          </div>
+
+          {/* Overall Rating */}
+          <div style={{ marginBottom: 20, padding: 16, background: T.bg, borderRadius: 10 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.06em" }}>Overall Rating *</div>
+            <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
+              {[1,2,3,4,5].map(s => (
+                <button key={s} onClick={() => setRating(s)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 40, color: s <= rating ? "#F59E0B" : T.border, transition: "color 0.15s" }}>★</button>
+              ))}
+            </div>
+            {rating > 0 && (
+              <div style={{ textAlign: "center", marginTop: 8, color: T.textMuted, fontSize: 13 }}>
+                {["", "Poor", "Fair", "Good", "Very Good", "Excellent"][rating]}
+              </div>
+            )}
+          </div>
+
+          {/* Category Ratings */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.06em" }}>Rate Specific Areas</div>
+            <div style={{ background: T.bg, borderRadius: 10, padding: "0 16px" }}>
+              <StarRow label="Communication" field="communication" />
+              <StarRow label="Quality of Work" field="quality" />
+              <StarRow label="Timeliness" field="timeliness" />
+              <StarRow label="Value for Money" field="value" />
+            </div>
+          </div>
+
+          {/* Summary */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Summary *</div>
+            <input value={summary} onChange={e => setSummary(e.target.value)} placeholder="Brief summary of your experience..."
+              style={{ width: "100%", padding: "10px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }} />
+          </div>
+
+          {/* Detailed */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Detailed Feedback <span style={{ color: T.textMuted, fontWeight: 400 }}>(optional)</span></div>
+            <textarea value={detailed} onChange={e => setDetailed(e.target.value)} placeholder="What went well? What could be improved? Any other comments..."
+              style={{ width: "100%", minHeight: 100, padding: "10px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }} />
+          </div>
+
+          {/* Recommend */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>Would you recommend us?</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              {["Yes, definitely!", "Maybe", "No"].map(opt => (
+                <button key={opt} onClick={() => setRecommend(opt)} style={{
+                  flex: 1, padding: "10px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600,
+                  border: "1px solid " + (recommend === opt ? T.cyan : T.border),
+                  background: recommend === opt ? T.cyan + "20" : T.bg,
+                  color: recommend === opt ? T.cyan : T.textMuted,
+                }}>{opt}</button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <Btn onClick={handleSubmit} disabled={saving || !rating || !summary}>{saving ? "Submitting..." : "Submit Feedback"}</Btn>
+            <Btn variant="ghost" onClick={() => setOpen(false)}>Cancel</Btn>
+          </div>
+          {(!rating || !summary) && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 8 }}>* Overall rating and summary are required</div>}
         </div>
-      </div>
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Summary</div>
-        <input value={summary} onChange={e => setSummary(e.target.value)} placeholder="Brief summary of your experience..."
-          style={{ width: "100%", padding: 10, background: T.bg, border: "1px solid " + T.border, borderRadius: 6, color: T.textPrimary, fontSize: 13, fontFamily: "inherit" }} />
-      </div>
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Detailed Feedback <span style={{ color: T.textMuted, fontWeight: 400 }}>(optional)</span></div>
-        <textarea value={detailed} onChange={e => setDetailed(e.target.value)} placeholder="Share more details..."
-          style={{ width: "100%", minHeight: 80, padding: 10, background: T.bg, border: "1px solid " + T.border, borderRadius: 6, color: T.textPrimary, fontSize: 13, resize: "vertical", fontFamily: "inherit" }} />
-      </div>
-      <Btn onClick={handleSubmit} disabled={saving || !rating || !summary}>{saving ? "Submitting..." : "Submit Feedback"}</Btn>
+      )}
     </div>
   );
 };

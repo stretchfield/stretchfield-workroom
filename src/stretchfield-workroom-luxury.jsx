@@ -320,7 +320,7 @@ const getNavItems = (role) => {
   if (role === "Client") {
     base.push({ id: "client-events", label: "My Events", icon: "▪" }, { id: "client-docs", label: "Documents", icon: "▪" });
   }
-  if (!["Vendor","Client"].includes(role)) {
+  if (!["Vendor","Client","Strategy & Events Lead"].includes(role)) {
     base.push({ id: "feedback", label: "Feedback", icon: "▪" });
   }
   base.push({ id: "notifications", label: "Notifications", icon: "▪" });

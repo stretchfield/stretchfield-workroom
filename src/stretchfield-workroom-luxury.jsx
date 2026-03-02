@@ -933,12 +933,14 @@ const ClientEventsView = ({ user }) => {
 };
 
 
-const EventsView = () => {
+const EventsView = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [clients, setClients] = useState([]);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({ name: '', client: '', client_id: '', deadline: '', phase: 'Planning' });
   const [saving, setSaving] = useState(false);
+
+  const canManage = ['CEO','Administrator'].includes(user?.role);
 
   const load = async () => {
     const [p, c] = await Promise.all([
@@ -998,19 +1000,25 @@ const EventsView = () => {
               <ProgressBar value={p.completion || 0} />
               <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 6 }}>{p.completion || 0}% · {p.phase}</div>
               <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
-                <button onClick={async (e) => {
-                  e.stopPropagation();
-                  await supabase.from('projects').update({ active_for_client: !p.active_for_client }).eq('id', p.id);
-                  load();
-                }} style={{
-                  background: p.active_for_client ? T.teal + '20' : T.bg,
-                  border: `1px solid ${p.active_for_client ? T.teal : T.border}`,
-                  color: p.active_for_client ? T.teal : T.textMuted,
-                  padding: '4px 12px', borderRadius: 20, cursor: 'pointer',
-                  fontSize: 11, fontWeight: 600,
-                }}>
-                  {p.active_for_client ? '✓ Active for Client' : '○ Hidden from Client'}
-                </button>
+                {canManage ? (
+                  <button onClick={async (e) => {
+                    e.stopPropagation();
+                    await supabase.from('projects').update({ active_for_client: !p.active_for_client }).eq('id', p.id);
+                    load();
+                  }} style={{
+                    background: p.active_for_client ? T.teal + '20' : T.bg,
+                    border: `1px solid ${p.active_for_client ? T.teal : T.border}`,
+                    color: p.active_for_client ? T.teal : T.textMuted,
+                    padding: '4px 12px', borderRadius: 20, cursor: 'pointer',
+                    fontSize: 11, fontWeight: 600,
+                  }}>
+                    {p.active_for_client ? '✓ Active for Client' : '○ Hidden from Client'}
+                  </button>
+                ) : (
+                  <span style={{ color: p.active_for_client ? T.teal : T.textMuted, fontSize: 11, fontWeight: 600 }}>
+                    {p.active_for_client ? '✓ Active for Client' : '○ Hidden from Client'}
+                  </span>
+                )}
               </div>
             </Card>
           ))}
@@ -1056,8 +1064,8 @@ const TasksView = ({ userRole }) => {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', project_id: '', deadline: '', status: 'pending', assignee_id: '', assignee_name: '', assigned_by: '' });
 
-  const canEdit = ['CEO', 'Strategy & Projects Lead', 'Sales & Marketing', 'Administrator'].includes(userRole);
-  const canToggleVisibility = userRole === 'CEO';
+  const canEdit = ['CEO', 'Administrator', 'Strategy & Events Lead', 'Vendor Manager', 'Vendor', 'Sales & Marketing'].includes(userRole);
+  const canToggleVisibility = ['CEO','Administrator'].includes(userRole);
 
   const openDetail = (task) => {
     setDetailTask(task);
@@ -2950,7 +2958,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
         if (role === "Strategy & Events Lead") return <StrategyOverviewView />;
         if (role === "Vendor Manager") return <StaffDashboard user={currentUser} />;
         return <StaffDashboard user={currentUser} />;
-      case "events": return <EventsView />;
+      case "events": return <EventsView user={currentUser} />;
       case "tasks": return <TasksView userRole={currentUser.role} />;
       case "vendors": return <VendorsView />;
       case "invoices": return <InvoicesView />;

@@ -1316,8 +1316,8 @@ const VendorsView = ({ user }) => {
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No RFFs yet</div>
           <div style={{ color: T.textMuted, fontSize: 13 }}>Create an RFF and assign it to a client event.</div>
         </Card>
-      ) : Object.values(grouped).map(({ event: e, rffs: eventRffs }) => (
-        <div key={e.id} style={{ marginBottom: 24 }}>
+      ) : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 20 }}>{Object.values(grouped).map(({ event: e, rffs: eventRffs }) => (
+        <div key={e.id} style={{ marginBottom: 0 }}>
           {/* Event Group Header */}
           <button onClick={() => setExpandedEvent(expandedEvent === e.id ? null : e.id)} style={{
             width: '100%', background: T.surface, border: `1px solid ${T.border}`,
@@ -1424,7 +1424,7 @@ const VendorsView = ({ user }) => {
             </div>
           )}
         </div>
-      ))}
+      ))}</div>}
 
       {modal && (
         <Modal title="New RFF" onClose={() => { setModal(false); setError(''); }}>

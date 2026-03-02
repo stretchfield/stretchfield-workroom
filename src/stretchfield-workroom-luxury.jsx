@@ -1478,8 +1478,8 @@ const InvoicesView = () => {
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No invoices yet</div>
           <div style={{ color: T.textMuted, fontSize: 13 }}>Invoices submitted by vendors will appear here.</div>
         </Card>
-      ) : invoices.map(inv => (
-        <Card key={inv.id} style={{ marginBottom: 16 }}>
+      ) : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>{invoices.map(inv => (
+        <Card key={inv.id} style={{ marginBottom: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
             <div>
               <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{inv.vendor}</div>
@@ -1491,7 +1491,7 @@ const InvoicesView = () => {
             <Btn small onClick={() => handleApprove(inv.id)}>✓ Approve</Btn>
           )}
         </Card>
-      ))}
+      ))}</div>}
     </div>
   );
 };
@@ -1551,8 +1551,8 @@ const VendorRFFsView = ({ user }) => {
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No open RFFs</div>
           <div style={{ color: T.textMuted, fontSize: 13 }}>New RFFs will appear here when available.</div>
         </Card>
-      ) : rffs.map(r => (
-        <Card key={r.id} style={{ marginBottom: 16 }}>
+      ) : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>{rffs.map(r => (
+        <Card key={r.id} style={{ marginBottom: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
             <div>
               <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16 }}>{r.title}</div>
@@ -1574,7 +1574,7 @@ const VendorRFFsView = ({ user }) => {
             <Btn small onClick={() => { setQuoteModal(r); setQuoteAmount(''); }}>Submit Quote</Btn>
           </div>
         </Card>
-      ))}
+      ))}</div>}
 
       {quoteModal && (
         <Modal title={`Submit Quote — ${quoteModal.title}`} onClose={() => { setQuoteModal(null); setError(''); }}>

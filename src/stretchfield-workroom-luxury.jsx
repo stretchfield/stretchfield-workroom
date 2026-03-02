@@ -303,7 +303,7 @@ const getNavItems = (role) => {
     base.push({ id: "strategy-overview", label: "Client Overview", icon: "▪" }, { id: "feedback-summary", label: "Feedback", icon: "▪" });
   }
   if (["CEO","Administrator"].includes(role)) {
-    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-ratings", label: "Vendor Ratings", icon: "▪" });
+    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" });
   }
   if (role === "Vendor Manager") {
     base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" });
@@ -1429,7 +1429,7 @@ const VendorsView = ({ user }) => {
         </div>
       ))}</div>}
 
-      {modal && (
+      }{modal && (
         <Modal title="New RFF" onClose={() => { setModal(false); setError(''); }}>
           <Input label="RFF Title" placeholder="e.g. Photography Services" value={form.title} onChange={v => setForm({ ...form, title: v })} />
           <Input label="Description" placeholder="Brief description of what's needed" value={form.description} onChange={v => setForm({ ...form, description: v })} />

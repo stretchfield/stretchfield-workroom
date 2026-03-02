@@ -1337,7 +1337,7 @@ const VendorsView = ({ user }) => {
           </button>
 
           {expandedEvent === e.id && (
-            <div style={{ paddingLeft: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12, paddingLeft: 0, marginTop: 8 }}>
               {eventRffs.map(r => (
                 <div key={r.id} style={{ marginBottom: 12 }}>
                   <Card onClick={() => setExpandedRff(expandedRff === r.id ? null : r.id)} style={{ cursor: 'pointer' }}>

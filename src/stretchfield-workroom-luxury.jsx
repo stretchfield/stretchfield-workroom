@@ -814,19 +814,48 @@ const ClientDashboard = ({ user }) => {
 const ClientEventsView = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [tasks, setTasks] = useState([]);
-  useEffect(() => {
-    if (user?.id) {
-      supabase.from('clients').select('id').eq('profile_id', user.id).single().then(({ data: clientData }) => {
-        if (clientData) {
-          supabase.from('projects').select('*').eq('client_id', clientData.id).eq('active_for_client', true).then(({ data }) => setEvents(data || []));
-        }
-      });
+  const [clientInfo, setClientInfo] = useState(null);
+
+  const load = async () => {
+    if (!user?.id) return;
+    let clientData = null;
+    const { data: byProfile } = await supabase.from('clients').select('*').eq('profile_id', user.id).single();
+    if (byProfile) {
+      clientData = byProfile;
+    } else {
+      const { data: byEmail } = await supabase.from('clients').select('*').eq('email', user.email).single();
+      if (byEmail) {
+        clientData = byEmail;
+        await supabase.from('clients').update({ profile_id: user.id }).eq('id', byEmail.id);
+      }
     }
-    supabase.from('tasks').select('*').eq('visible_to_client', true).then(({ data }) => setTasks(data || []));
-  }, [user?.id]);
+    if (clientData) {
+      setClientInfo(clientData);
+      const [ev, tk] = await Promise.all([
+        supabase.from('projects').select('*').eq('client_id', clientData.id).eq('active_for_client', true),
+        supabase.from('tasks').select('*').eq('client_id', clientData.id).eq('visible_to_client', true),
+      ]);
+      setEvents(ev.data || []);
+      setTasks(tk.data || []);
+    }
+  };
+
+  useEffect(() => { load(); }, [user?.id]);
+
+  // Real-time updates
+  useEffect(() => {
+    const projectSub = supabase.channel('client-projects')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => load())
+      .subscribe();
+    const taskSub = supabase.channel('client-tasks')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(projectSub); supabase.removeChannel(taskSub); };
+  }, []);
+
   return (
     <div>
-      <PageHeader title="My Events" subtitle="Your active engagements" />
+      <PageHeader title="My Events" subtitle="Your active engagements and task progress" />
       {events.length === 0 ? (
         <Card style={{ textAlign: "center", padding: 60 }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>📁</div>
@@ -834,34 +863,68 @@ const ClientEventsView = ({ user }) => {
           <div style={{ color: T.textMuted, fontSize: 13 }}>Events assigned to you will appear here.</div>
         </Card>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
-          {events.map(p => (
-            <Card key={p.id} style={{ marginBottom: 0 }}>
-              <div style={{ color: T.textPrimary, fontSize: 18, fontWeight: 800, marginBottom: 4 }}>{p.name}</div>
-              <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 16 }}>Deadline: {p.deadline}</div>
-              <div style={{ textAlign: "center", padding: "20px 0", borderTop: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}`, marginBottom: 16 }}>
-                <div style={{ fontSize: 52, fontWeight: 900, color: T.accent }}>{p.completion || 0}%</div>
-                <div style={{ color: T.textSecondary, marginBottom: 12 }}>Complete</div>
-                <div style={{ maxWidth: 300, margin: "0 auto" }}><ProgressBar value={p.completion || 0} height={8} /></div>
-              </div>
-              <div style={{ color: T.textSecondary, fontSize: 13, marginBottom: 12 }}>Phase: {p.phase || "Planning"}</div>
-              {tasks.filter(t => t.project_id === p.id).length > 0 && (
-                <div style={{ marginTop: 8 }}>
-                  <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Tasks</div>
-                  {tasks.filter(t => t.project_id === p.id).map(t => (
-                    <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${T.border}` }}>
-                      <div>
-                        <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{t.name}</div>
-                        <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Due {t.deadline}</div>
-                      </div>
-                      <Badge status={t.status} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {events.map(p => {
+            const eventTasks = tasks.filter(t => t.project_id === p.id);
+            const completedTasks = eventTasks.filter(t => t.status === 'completed').length;
+            const inProgressTasks = eventTasks.filter(t => t.status === 'in-progress').length;
+            return (
+              <Card key={p.id} style={{ marginBottom: 0 }}>
+                {/* Event Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                  <div>
+                    <div style={{ color: T.textPrimary, fontSize: 18, fontWeight: 800, marginBottom: 4 }}>{p.name}</div>
+                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                      <span style={{ color: T.textMuted, fontSize: 12 }}>📅 Deadline: {p.deadline || "TBD"}</span>
+                      <span style={{ background: T.cyan + "20", color: T.cyan, padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>{p.phase || "Planning"}</span>
                     </div>
-                  ))}
+                  </div>
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 36, fontWeight: 900, color: p.completion >= 80 ? T.teal : p.completion >= 50 ? T.cyan : T.amber, lineHeight: 1 }}>{p.completion || 0}%</div>
+                    <div style={{ color: T.textMuted, fontSize: 11 }}>Complete</div>
+                  </div>
                 </div>
-              )}
-              <ClientFeedbackForm event={p} user={user} />
-            </Card>
-          ))}
+
+                {/* Event Progress Bar */}
+                <ProgressBar value={p.completion || 0} height={10} color={p.completion >= 80 ? T.teal : p.completion >= 50 ? T.cyan : T.amber} />
+
+                {/* Task Summary */}
+                {eventTasks.length > 0 && (
+                  <div style={{ display: "flex", gap: 12, marginTop: 12, marginBottom: 16 }}>
+                    <div style={{ color: T.textMuted, fontSize: 12 }}>📋 {eventTasks.length} task{eventTasks.length > 1 ? "s" : ""}</div>
+                    <div style={{ color: T.teal, fontSize: 12 }}>✅ {completedTasks} done</div>
+                    <div style={{ color: T.cyan, fontSize: 12 }}>⚙️ {inProgressTasks} in progress</div>
+                  </div>
+                )}
+
+                {/* Tasks Breakdown */}
+                {eventTasks.length > 0 && (
+                  <div style={{ borderTop: "1px solid " + T.border, paddingTop: 14 }}>
+                    <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>Task Breakdown</div>
+                    {eventTasks.map(t => (
+                      <div key={t.id} style={{ marginBottom: 14 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                          <div>
+                            <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{t.name}</div>
+                            {t.deadline && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Due {t.deadline}</div>}
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ color: T.cyan, fontWeight: 700, fontSize: 13 }}>{t.progress || 0}%</span>
+                            <Badge status={t.status} />
+                          </div>
+                        </div>
+                        <ProgressBar value={t.progress || 0} height={6} color={t.status === "completed" ? T.teal : t.status === "in-progress" ? T.cyan : T.amber} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {eventTasks.length === 0 && (
+                  <div style={{ marginTop: 12, color: T.textMuted, fontSize: 13, fontStyle: "italic" }}>No tasks assigned yet.</div>
+                )}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

@@ -1133,8 +1133,8 @@ const TasksView = ({ userRole }) => {
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No tasks yet</div>
           <div style={{ color: T.textMuted, fontSize: 13 }}>Click "+ New Task" to get started.</div>
         </Card>
-      ) : tasks.map(t => (
-        <Card key={t.id} style={{ marginBottom: 16 }} onClick={() => openDetail(t)}>
+      ) : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>{tasks.map(t => (
+        <Card key={t.id} style={{ marginBottom: 0, cursor: 'pointer' }} onClick={() => openDetail(t)}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
             <div>
               <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{t.name}</div>
@@ -1162,7 +1162,7 @@ const TasksView = ({ userRole }) => {
             </button>}
           </div>
         </Card>
-      ))}
+      ))}</div>}
 
       {/* Task Detail Modal */}
       {detailTask && (
@@ -1968,8 +1968,8 @@ const VendorTasksView = ({ user }) => {
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No tasks yet</div>
           <div style={{ color: T.textMuted, fontSize: 13 }}>Tasks assigned to you will appear here.</div>
         </Card>
-      ) : tasks.map(t => (
-        <Card key={t.id} style={{ marginBottom: 16 }} onClick={() => setDetailTask(t)}>
+      ) : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>{tasks.map(t => (
+        <Card key={t.id} style={{ marginBottom: 0 }} onClick={() => setDetailTask(t)}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
             <div>
               <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{t.name}</div>
@@ -1980,7 +1980,7 @@ const VendorTasksView = ({ user }) => {
           <ProgressBar value={t.progress || 0} />
           <div style={{ color: T.textMuted, fontSize: 11, marginTop: 6 }}>{t.progress || 0}% complete</div>
         </Card>
-      ))}
+      ))}</div>}
 
       {detailTask && (
         <Modal title="Update Task" onClose={() => setDetailTask(null)}>
@@ -2482,8 +2482,8 @@ const SMTasksView = ({ user }) => {
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No S&M tasks yet</div>
           <div style={{ color: T.textMuted, fontSize: 13 }}>Tasks between CEO and Sales & Marketing appear here.</div>
         </Card>
-      ) : tasks.map(t => (
-        <Card key={t.id} style={{ marginBottom: 16, cursor: "pointer" }} onClick={() => setDetailTask({ ...t })}>
+      ) : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>{tasks.map(t => (
+        <Card key={t.id} style={{ marginBottom: 0 }} style={{ marginBottom: 16, cursor: "pointer" }} onClick={() => setDetailTask({ ...t })}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
             <div>
               <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{t.name}</div>
@@ -2498,6 +2498,7 @@ const SMTasksView = ({ user }) => {
           <div style={{ color: T.textMuted, fontSize: 11, marginTop: 6 }}>{t.progress || 0}% complete</div>
         </Card>
       ))}
+      </div>}
       {modal && (
         <Modal title="New S&M Task" onClose={() => setModal(false)}>
           <Input label="Task Name" placeholder="e.g. Prepare pitch deck" value={form.name} onChange={v => setForm({ ...form, name: v })} />
@@ -2689,18 +2690,20 @@ const ClientFeedbackForm = ({ event, user }) => {
   const handleSubmit = async () => {
     if (!rating || !summary) return;
     setSaving(true);
-    await supabase.from("feedback").insert({
+    const { error } = await supabase.from("feedback").insert({
       client_id: clientId, project_id: event.id,
       client_name: user.name, event_name: event.name,
       rating, summary, detailed_feedback: detailed,
       recommend,
-      communication_rating: categoryRatings.communication,
-      quality_rating: categoryRatings.quality,
-      timeliness_rating: categoryRatings.timeliness,
-      value_rating: categoryRatings.value,
+      communication_rating: categoryRatings.communication || null,
+      quality_rating: categoryRatings.quality || null,
+      timeliness_rating: categoryRatings.timeliness || null,
+      value_rating: categoryRatings.value || null,
     });
     setSaving(false);
+    if (error) { alert("Error: " + error.message); return; }
     setDone(true);
+    setExisting({ rating, summary });
     setOpen(false);
   };
 

@@ -4382,96 +4382,172 @@ const VendorScorecardsView = ({ user }) => {
 
 
 
-// ─── VENDOR RATINGS VIEW (CEO/Admin read-only) ────────────────────────────────
+// ─── VENDOR RATINGS VIEW (CEO/Admin/Strategy read-only) ──────────────────────
 const VendorRatingsView = ({ user }) => {
   const [vendors, setVendors] = useState([]);
   const [scorecards, setScorecards] = useState([]);
+  const [rffs, setRffs] = useState([]);
+  const [events, setEvents] = useState([]);
   const [historyVendor, setHistoryVendor] = useState(null);
+  const [viewMode, setViewMode] = useState("by-event"); // "by-event" | "by-vendor"
+  const [selectedEvent, setSelectedEvent] = useState(null);
 
   const load = async () => {
-    const [v, s] = await Promise.all([
+    const [v, s, r, e] = await Promise.all([
       supabase.from("profiles").select("*").eq("role", "Vendor"),
       supabase.from("vendor_scorecards").select("*").order("created_at", { ascending: false }),
+      supabase.from("rffs").select("*").eq("status", "quote-approved"),
+      supabase.from("projects").select("*").order("created_at", { ascending: false }),
     ]);
     setVendors(v.data || []);
     setScorecards(s.data || []);
+    setRffs(r.data || []);
+    setEvents(e.data || []);
   };
 
   useEffect(() => { load(); }, []);
+
+  // Build event → vendors map from approved RFFs
+  const eventVendorMap = events.map(ev => {
+    const eventRffs = rffs.filter(r => r.project_id === ev.id);
+    const vendorIds = [...new Set(eventRffs.map(r => r.vendor).filter(Boolean))];
+    const vendorsForEvent = eventRffs.map(r => {
+      const vendorProfile = vendors.find(v => v.name === r.vendor || v.id === r.vendor_id);
+      const scorecard = scorecards.find(s => s.vendor_id === vendorProfile?.id && s.project_id === ev.id);
+      return {
+        rff: r, vendorProfile,
+        scorecard, score: scorecard?.total_pct || null,
+        tier: scorecard ? getTier(scorecard.total_pct) : null,
+      };
+    });
+    return { event: ev, vendors: vendorsForEvent };
+  }).filter(e => e.vendors.length > 0);
 
   const sorted = [...vendors].sort((a, b) => (b.vendor_score || 0) - (a.vendor_score || 0));
 
   return (
     <div>
-      <PageHeader title="Vendor Ratings" subtitle="Performance ratings across all vendors" />
+      <PageHeader title="Vendor Ratings" subtitle="Performance ratings per event and overall" />
 
-      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 28 }}>
+      {/* Stats */}
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
         <Stat icon="⭐" label="Total Vendors" value={vendors.length} color={T.cyan} />
-        <Stat icon="🟢" label="Impressive (85%+)" value={vendors.filter(v => (v.vendor_score||0) >= 85).length} color="#10B981" />
-        <Stat icon="🔵" label="Very Good (70-84%)" value={vendors.filter(v => (v.vendor_score||0) >= 70 && (v.vendor_score||0) < 85).length} color={T.cyan} />
-        <Stat icon="🟡" label="Good (50-69%)" value={vendors.filter(v => (v.vendor_score||0) >= 50 && (v.vendor_score||0) < 70).length} color={T.amber} />
-        <Stat icon="🔴" label="Poor (<50%)" value={vendors.filter(v => v.vendor_scorecard_count > 0 && (v.vendor_score||0) < 50).length} color="#F43F5E" />
+        <Stat icon="🟢" label="Impressive" value={vendors.filter(v => (v.vendor_score||0) >= 85).length} color="#10B981" />
+        <Stat icon="🔵" label="Very Good" value={vendors.filter(v => (v.vendor_score||0) >= 70 && (v.vendor_score||0) < 85).length} color={T.cyan} />
+        <Stat icon="🟡" label="Good" value={vendors.filter(v => (v.vendor_score||0) >= 50 && (v.vendor_score||0) < 70).length} color={T.amber} />
+        <Stat icon="🔴" label="Poor / Do Not Engage" value={vendors.filter(v => v.vendor_scorecard_count > 0 && (v.vendor_score||0) < 50).length} color="#F43F5E" />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
-        {sorted.map(v => {
-          const score = v.vendor_score || 0;
-          const tier = getTier(score);
-          const vendorCards = scorecards.filter(s => s.vendor_id === v.id);
-          const isPoor = v.vendor_scorecard_count > 0 && score < 50;
-          const isUnrated = !v.vendor_scorecard_count;
-          return (
-            <Card key={v.id} style={{ borderLeft: "3px solid " + (isPoor ? "#F43F5E" : isUnrated ? T.border : score >= 85 ? "#10B981" : score >= 70 ? T.cyan : T.amber) }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-                <div>
-                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{v.name}</div>
-                  <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{v.email}</div>
-                  <div style={{ marginTop: 8 }}>
-                    <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: tier.bg || T.bg, color: isUnrated ? T.textMuted : tier.color, border: "1px solid " + (isUnrated ? T.border : tier.color + "44") }}>
-                      {isUnrated ? "Unrated" : tier.label}
-                    </span>
-                  </div>
-                </div>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 28, fontWeight: 900, color: isUnrated ? T.textMuted : score >= 85 ? "#10B981" : score >= 70 ? T.cyan : score >= 50 ? T.amber : "#F43F5E" }}>
-                    {isUnrated ? "—" : score + "%"}
-                  </div>
-                  <div style={{ color: T.textMuted, fontSize: 10 }}>{v.vendor_scorecard_count || 0} scorecard{v.vendor_scorecard_count !== 1 ? "s" : ""}</div>
-                </div>
-              </div>
+      {/* View Toggle */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+        {["by-event", "by-vendor"].map(mode => (
+          <button key={mode} onClick={() => setViewMode(mode)} style={{
+            padding: "8px 20px", borderRadius: 20, border: "none", cursor: "pointer",
+            background: viewMode === mode ? T.cyan : T.bg,
+            color: viewMode === mode ? "#000" : T.textMuted,
+            fontWeight: viewMode === mode ? 700 : 500, fontSize: 12,
+            textTransform: "uppercase", letterSpacing: "0.06em",
+          }}>{mode === "by-event" ? "By Event" : "By Vendor"}</button>
+        ))}
+      </div>
 
-              {isPoor && (
-                <div style={{ padding: "8px 12px", background: "#F43F5E15", borderRadius: 6, border: "1px solid #F43F5E33", marginBottom: 10 }}>
-                  <div style={{ color: "#F43F5E", fontSize: 12, fontWeight: 700 }}>⛔ Below threshold — Do not engage</div>
-                </div>
-              )}
-              {score >= 85 && (
-                <div style={{ padding: "8px 12px", background: "#10B98115", borderRadius: 6, border: "1px solid #10B98133", marginBottom: 10 }}>
-                  <div style={{ color: "#10B981", fontSize: 12, fontWeight: 700 }}>⭐ Impressive — Priority vendor</div>
-                </div>
-              )}
-
-              {vendorCards.length > 0 && (
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Recent Events</div>
-                  {vendorCards.slice(0, 2).map(sc => (
-                    <div key={sc.id} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid " + T.border + "44" }}>
-                      <div style={{ color: T.textSecondary, fontSize: 12 }}>{sc.event_name || "General"}</div>
-                      <div style={{ color: getTier(sc.total_pct).color, fontWeight: 700, fontSize: 12 }}>{sc.total_pct}%</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {vendorCards.length > 0 && (
-                <button onClick={() => setHistoryVendor(v)} style={{ width: "100%", padding: "8px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, cursor: "pointer", color: T.textSecondary, fontSize: 12, fontWeight: 600 }}>
-                  View Full History
-                </button>
-              )}
+      {/* BY EVENT VIEW */}
+      {viewMode === "by-event" && (
+        <div>
+          {eventVendorMap.length === 0 ? (
+            <Card style={{ textAlign: "center", padding: 60 }}>
+              <div style={{ fontSize: 40, marginBottom: 16 }}>📋</div>
+              <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16 }}>No scored vendors yet</div>
+              <div style={{ color: T.textMuted, fontSize: 13, marginTop: 8 }}>Vendor Manager scores vendors after each event.</div>
             </Card>
-          );
-        })}
-      </div>
+          ) : eventVendorMap.map(({ event: ev, vendors: evVendors }) => (
+            <div key={ev.id} style={{ marginBottom: 24 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                <div style={{ width: 3, height: 20, background: T.cyan, borderRadius: 2 }} />
+                <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{ev.name}</div>
+                <div style={{ color: T.textMuted, fontSize: 12 }}>· {evVendors.length} vendor{evVendors.length > 1 ? "s" : ""}</div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+                {evVendors.map((vd, i) => {
+                  const score = vd.score;
+                  const tier = score !== null ? getTier(score) : null;
+                  const isPoor = score !== null && score < 50;
+                  return (
+                    <Card key={i} style={{ borderLeft: "3px solid " + (score === null ? T.border : isPoor ? "#F43F5E" : tier.color), marginBottom: 0 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                        <div>
+                          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{vd.rff.vendor}</div>
+                          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{vd.rff.title}</div>
+                          {score !== null && (
+                            <span style={{ display: "inline-block", marginTop: 6, padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: tier.bg, color: tier.color, border: "1px solid " + tier.color + "44" }}>
+                              {tier.label}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ textAlign: "center", minWidth: 50 }}>
+                          <div style={{ fontSize: 24, fontWeight: 900, color: score === null ? T.textMuted : isPoor ? "#F43F5E" : tier.color }}>
+                            {score !== null ? score + "%" : "—"}
+                          </div>
+                          <div style={{ color: T.textMuted, fontSize: 10 }}>{score === null ? "Unscored" : "Score"}</div>
+                        </div>
+                      </div>
+                      {isPoor && <div style={{ marginTop: 8, color: "#F43F5E", fontSize: 11, fontWeight: 700 }}>⛔ Do not re-engage</div>}
+                      {score !== null && score >= 85 && <div style={{ marginTop: 8, color: "#10B981", fontSize: 11, fontWeight: 700 }}>⭐ Priority pick for future events</div>}
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* BY VENDOR VIEW */}
+      {viewMode === "by-vendor" && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
+          {sorted.map(v => {
+            const score = v.vendor_score || 0;
+            const tier = getTier(score);
+            const vendorCards = scorecards.filter(s => s.vendor_id === v.id);
+            const isPoor = v.vendor_scorecard_count > 0 && score < 50;
+            const isUnrated = !v.vendor_scorecard_count;
+            return (
+              <Card key={v.id} style={{ borderLeft: "3px solid " + (isPoor ? "#F43F5E" : isUnrated ? T.border : tier.color), marginBottom: 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                  <div>
+                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{v.name}</div>
+                    <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{v.email}</div>
+                    <div style={{ marginTop: 8 }}>
+                      <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: isUnrated ? T.bg : tier.bg, color: isUnrated ? T.textMuted : tier.color, border: "1px solid " + (isUnrated ? T.border : tier.color + "44") }}>
+                        {isUnrated ? "Unrated" : tier.label}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 28, fontWeight: 900, color: isUnrated ? T.textMuted : tier.color }}>{isUnrated ? "—" : score + "%"}</div>
+                    <div style={{ color: T.textMuted, fontSize: 10 }}>{v.vendor_scorecard_count || 0} event{v.vendor_scorecard_count !== 1 ? "s" : ""}</div>
+                  </div>
+                </div>
+                {isPoor && <div style={{ padding: "8px 12px", background: "#F43F5E15", borderRadius: 6, border: "1px solid #F43F5E33", marginBottom: 10 }}><div style={{ color: "#F43F5E", fontSize: 12, fontWeight: 700 }}>⛔ Below threshold — Do not engage</div></div>}
+                {score >= 85 && <div style={{ padding: "8px 12px", background: "#10B98115", borderRadius: 6, border: "1px solid #10B98133", marginBottom: 10 }}><div style={{ color: "#10B981", fontSize: 12, fontWeight: 700 }}>⭐ Impressive — Priority vendor</div></div>}
+                {vendorCards.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    {vendorCards.slice(0, 3).map(sc => (
+                      <div key={sc.id} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid " + T.border + "44" }}>
+                        <div style={{ color: T.textSecondary, fontSize: 12 }}>{sc.event_name || "General"}</div>
+                        <div style={{ color: getTier(sc.total_pct).color, fontWeight: 700, fontSize: 12 }}>{sc.total_pct}%</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {vendorCards.length > 0 && (
+                  <button onClick={() => setHistoryVendor(v)} style={{ width: "100%", padding: "8px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, cursor: "pointer", color: T.textSecondary, fontSize: 12, fontWeight: 600 }}>View All Scorecards</button>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       {historyVendor && (
         <Modal title={"Scorecard History — " + historyVendor.name} onClose={() => setHistoryVendor(null)}>

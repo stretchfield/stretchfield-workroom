@@ -2451,52 +2451,111 @@ const CRMView = ({ user }) => {
           </div>
         </Modal>
       )}
-      {approvalModal && (
-        <Modal title={"Approve Won Lead — " + approvalModal.company} onClose={() => setApprovalModal(null)}>
-          {matchedClient ? (
-            <div style={{ padding: "12px 16px", background: T.cyan + "15", borderRadius: 8, border: "1px solid " + T.cyan + "33", marginBottom: 16 }}>
-              <div style={{ color: T.cyan, fontWeight: 700, fontSize: 13 }}>✓ Existing Client Found</div>
-              <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 4 }}>{matchedClient.company || matchedClient.name}</div>
-              {!matchedClient.profile_id && (
-                <div style={{ marginTop: 12 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0" }}>
-                    <input type="checkbox" id="createLogin" checked={createLogin} onChange={e => setCreateLogin(e.target.checked)} style={{ accentColor: T.cyan, width: 16, height: 16 }} />
-                    <label htmlFor="createLogin" style={{ color: T.textSecondary, fontSize: 13, cursor: "pointer" }}>Create client portal login</label>
-                  </div>
-                  {createLogin && <Input label="Portal Password" type="password" placeholder="Set password for client" value={loginPassword} onChange={v => setLoginPassword(v)} />}
-                </div>
-              )}
-              {matchedClient.profile_id && <div style={{ color: T.teal, fontSize: 12, marginTop: 6 }}>✓ Portal login already active</div>}
-            </div>
-          ) : (
-            <div style={{ marginBottom: 4 }}>
-              <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>New Client Details</div>
-              <Input label="Contact Name" value={clientForm.name} onChange={v => setClientForm({ ...clientForm, name: v })} />
-              <Input label="Company" value={clientForm.company} onChange={v => setClientForm({ ...clientForm, company: v })} />
-              <Input label="Email" type="email" value={clientForm.email} onChange={v => setClientForm({ ...clientForm, email: v })} />
-              <Input label="Phone" value={clientForm.phone} onChange={v => setClientForm({ ...clientForm, phone: v })} />
-              <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "12px 0", padding: "10px 14px", background: T.bg, borderRadius: 8, border: "1px solid " + T.border }}>
-                <input type="checkbox" id="createLogin" checked={createLogin} onChange={e => setCreateLogin(e.target.checked)} style={{ accentColor: T.cyan, width: 16, height: 16 }} />
-                <label htmlFor="createLogin" style={{ color: T.textSecondary, fontSize: 13, cursor: "pointer" }}>Create client portal login</label>
-              </div>
-              {createLogin && <Input label="Portal Password" type="password" placeholder="Set password for client" value={loginPassword} onChange={v => setLoginPassword(v)} />}
-            </div>
-          )}
-          <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12, marginTop: 8 }}>Event to Create</div>
-          <Input label="Event Name" value={eventForm.name} onChange={v => setEventForm({ ...eventForm, name: v })} />
-          <Input label="Deadline" type="date" value={eventForm.deadline} onChange={v => setEventForm({ ...eventForm, deadline: v })} />
-          <Select label="Phase" options={[
-            { value: "Planning", label: "Planning" },
-            { value: "Design", label: "Design" },
-            { value: "Execution", label: "Execution" },
-            { value: "Review", label: "Review" },
-          ]} value={eventForm.phase} onChange={v => setEventForm({ ...eventForm, phase: v })} />
-          <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-            <Btn onClick={handleApproveWonLead} disabled={saving}>{saving ? "Creating..." : "Approve & Create"}</Btn>
-            <Btn variant="ghost" onClick={() => setApprovalModal(null)}>Cancel</Btn>
+      {approvalModal && (() => {
+        const [step, setStep] = React.useState(matchedClient ? 2 : 1);
+        const totalSteps = matchedClient ? 2 : 3;
+
+        const StepIndicator = () => (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
+            {Array.from({ length: totalSteps }).map((_, i) => (
+              <React.Fragment key={i}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+                  background: step > i + 1 ? T.teal : step === i + 1 ? T.cyan : T.bg,
+                  border: "2px solid " + (step >= i + 1 ? (step > i + 1 ? T.teal : T.cyan) : T.border),
+                  color: step >= i + 1 ? "#000" : T.textMuted, fontSize: 12, fontWeight: 700,
+                }}>{step > i + 1 ? "✓" : i + 1}</div>
+                {i < totalSteps - 1 && <div style={{ flex: 1, height: 2, background: step > i + 1 ? T.teal : T.border }} />}
+              </React.Fragment>
+            ))}
           </div>
-        </Modal>
-      )}
+        );
+
+        return (
+          <Modal title={"Approve Won Lead — " + approvalModal.company} onClose={() => setApprovalModal(null)}>
+            <StepIndicator />
+
+            {/* STEP 1 — New Client Details (only for new clients) */}
+            {!matchedClient && step === 1 && (
+              <div>
+                <div style={{ padding: "10px 14px", background: T.amber + "15", border: "1px solid " + T.amber + "33", borderRadius: 8, marginBottom: 16 }}>
+                  <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>New Client</div>
+                  <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>No existing client found for <strong>{approvalModal.company}</strong>. Fill in client details below.</div>
+                </div>
+                <Input label="Contact Name" value={clientForm.name} onChange={v => setClientForm({ ...clientForm, name: v })} />
+                <Input label="Company Name" value={clientForm.company} onChange={v => setClientForm({ ...clientForm, company: v })} />
+                <Input label="Email" type="email" value={clientForm.email} onChange={v => setClientForm({ ...clientForm, email: v })} />
+                <Input label="Phone" value={clientForm.phone} onChange={v => setClientForm({ ...clientForm, phone: v })} />
+                <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+                  <Btn onClick={() => setStep(2)} disabled={!clientForm.company || !clientForm.email}>Next: Portal Login →</Btn>
+                  <Btn variant="ghost" onClick={() => setApprovalModal(null)}>Cancel</Btn>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 2 — Portal Login */}
+            {step === 2 && (
+              <div>
+                {matchedClient ? (
+                  <div style={{ padding: "12px 16px", background: T.teal + "15", border: "1px solid " + T.teal + "33", borderRadius: 8, marginBottom: 16 }}>
+                    <div style={{ color: T.teal, fontWeight: 700, fontSize: 13 }}>✓ Existing Client: {matchedClient.company || matchedClient.name}</div>
+                    <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{matchedClient.email}</div>
+                    {matchedClient.profile_id && <div style={{ color: T.teal, fontSize: 12, marginTop: 6 }}>✓ Portal login already active</div>}
+                  </div>
+                ) : (
+                  <div style={{ padding: "12px 16px", background: T.cyan + "15", border: "1px solid " + T.cyan + "33", borderRadius: 8, marginBottom: 16 }}>
+                    <div style={{ color: T.cyan, fontWeight: 700, fontSize: 13 }}>Client: {clientForm.company}</div>
+                    <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{clientForm.email}</div>
+                  </div>
+                )}
+
+                {(!matchedClient || !matchedClient.profile_id) && (
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: T.bg, borderRadius: 8, border: "1px solid " + T.border, marginBottom: 12 }}>
+                      <input type="checkbox" id="createLogin2" checked={createLogin} onChange={e => setCreateLogin(e.target.checked)} style={{ accentColor: T.cyan, width: 16, height: 16 }} />
+                      <label htmlFor="createLogin2" style={{ color: T.textSecondary, fontSize: 13, cursor: "pointer" }}>Create client portal login</label>
+                    </div>
+                    {createLogin && (
+                      <Input label="Portal Password" type="password" placeholder="Set a password for the client portal" value={loginPassword} onChange={v => setLoginPassword(v)} />
+                    )}
+                  </div>
+                )}
+
+                <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+                  <Btn onClick={() => setStep(totalSteps)}>Next: Create Event →</Btn>
+                  {!matchedClient && <Btn variant="ghost" onClick={() => setStep(1)}>← Back</Btn>}
+                  {matchedClient && <Btn variant="ghost" onClick={() => setApprovalModal(null)}>Cancel</Btn>}
+                </div>
+              </div>
+            )}
+
+            {/* STEP 3 — Create Event */}
+            {step === totalSteps && (
+              <div>
+                <div style={{ padding: "12px 16px", background: T.teal + "15", border: "1px solid " + T.teal + "33", borderRadius: 8, marginBottom: 16 }}>
+                  <div style={{ color: T.teal, fontWeight: 700, fontSize: 13 }}>
+                    {matchedClient ? "✓ " + (matchedClient.company || matchedClient.name) : "✓ " + clientForm.company}
+                    {createLogin && !matchedClient?.profile_id && <span style={{ marginLeft: 8, color: T.cyan, fontWeight: 600, fontSize: 12 }}>+ Portal Login</span>}
+                  </div>
+                  <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>Now create an event for this client</div>
+                </div>
+                <Input label="Event Name" placeholder="e.g. Annual Conference 2025" value={eventForm.name} onChange={v => setEventForm({ ...eventForm, name: v })} />
+                <Input label="Deadline" type="date" value={eventForm.deadline} onChange={v => setEventForm({ ...eventForm, deadline: v })} />
+                <Select label="Phase" options={[
+                  { value: "Planning", label: "Planning" },
+                  { value: "Design", label: "Design" },
+                  { value: "Execution", label: "Execution" },
+                  { value: "Review", label: "Review" },
+                ]} value={eventForm.phase} onChange={v => setEventForm({ ...eventForm, phase: v })} />
+                <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+                  <Btn onClick={handleApproveWonLead} disabled={saving || !eventForm.name}>{saving ? "Creating..." : "✓ Approve & Create Event"}</Btn>
+                  <Btn variant="ghost" onClick={() => setStep(totalSteps - 1)}>← Back</Btn>
+                </div>
+              </div>
+            )}
+          </Modal>
+        );
+      })()}
       {proposalModal && (
         <Modal title={"New Proposal — " + proposalModal.company} onClose={() => setProposalModal(null)}>
           <Input label="Proposal Title" placeholder="e.g. Event Management Package" value={propForm.title} onChange={v => setPropForm({ ...propForm, title: v })} />

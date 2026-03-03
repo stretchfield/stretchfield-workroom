@@ -2988,7 +2988,13 @@ const NotificationsView = ({ user }) => {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [user.id]);
+  useEffect(() => {
+    load();
+    const sub = supabase.channel('notif-view-' + user.id)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: 'user_id=eq.' + user.id }, () => load())
+      .subscribe();
+    return () => supabase.removeChannel(sub);
+  }, [user.id]);
 
   const markRead = async (id) => {
     await supabase.from('notifications').update({ read: true }).eq('id', id);
@@ -3077,6 +3083,19 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const isMobile = useIsMobile();
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const fetchUnread = async () => {
+      const { data } = await supabase.from('notifications').select('id').eq('user_id', currentUser.id).eq('read', false);
+      setUnreadCount((data || []).length);
+    };
+    fetchUnread();
+    const sub = supabase.channel('live-notif-' + currentUser.id)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: 'user_id=eq.' + currentUser.id }, () => fetchUnread())
+      .subscribe();
+    return () => supabase.removeChannel(sub);
+  }, [currentUser?.id]);
 
   const currentUser = propProfile ? {
     id: propProfile.id,
@@ -3198,6 +3217,14 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ background: T.cyan + "22", border: `1px solid ${T.cyan}44`, color: T.cyan, padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>{currentUser.role}</div>
+            <button onClick={() => setActiveTab('notifications')} style={{ position: "relative", background: activeTab === "notifications" ? T.cyan + "22" : "none", border: "1px solid " + (activeTab === "notifications" ? T.cyan + "44" : T.border), color: activeTab === "notifications" ? T.cyan : T.textMuted, width: 36, height: 36, borderRadius: 8, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              🔔
+              {unreadCount > 0 && (
+                <span style={{ position: "absolute", top: -4, right: -4, background: "#F43F5E", color: "#fff", fontSize: 10, fontWeight: 800, borderRadius: "50%", width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid " + T.bg }}>
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </button>
             <button onClick={onLogout} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "5px 14px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 600 }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = T.magenta + "44"; e.currentTarget.style.color = T.magenta; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.textMuted; }}
@@ -3217,6 +3244,14 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
           <span style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>WorkRoom</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button onClick={() => setActiveTab('notifications')} style={{ position: "relative", background: "none", border: "1px solid " + T.border, color: T.textMuted, width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            🔔
+            {unreadCount > 0 && (
+              <span style={{ position: "absolute", top: -4, right: -4, background: "#F43F5E", color: "#fff", fontSize: 9, fontWeight: 800, borderRadius: "50%", width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid " + T.bg }}>
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </button>
           <div style={{ background: T.cyan + "22", border: `1px solid ${T.cyan}44`, color: T.cyan, padding: "3px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>{currentUser.role}</div>
           <button onClick={onLogout} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>Sign Out</button>
           <button onClick={() => setMobileMenuOpen(true)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textPrimary, padding: "6px 10px", borderRadius: 4, cursor: "pointer", fontSize: 18, lineHeight: 1 }}>☰</button>

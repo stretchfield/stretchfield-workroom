@@ -1150,6 +1150,9 @@ const TasksView = ({ userRole }) => {
             <div>
               <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{t.name}</div>
               <div style={{ color: T.cyan, fontSize: 12, marginTop: 4, fontWeight: 600 }}>📁 {projects.find(p => p.id === t.project_id)?.name || 'No Event'}</div>
+              {projects.find(p => p.id === t.project_id)?.client && (
+                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2, fontWeight: 500 }}>🏢 {projects.find(p => p.id === t.project_id)?.client}</div>
+              )}
               <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>Due {t.deadline}</div>
               {t.assignee_name && <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 2 }}>👤 Assigned to: <span style={{ color: T.cyan }}>{t.assignee_name}</span></div>}
               {t.assigned_by && <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 2 }}>📋 Assigned by: {members.find(m => m.id === t.assigned_by)?.name || t.assigned_by}</div>}

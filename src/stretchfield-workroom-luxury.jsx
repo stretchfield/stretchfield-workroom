@@ -1954,6 +1954,10 @@ const VendorQuotesView = ({ user }) => {
 const VendorTasksView = ({ user }) => {
   const [tasks, setTasks] = useState([]);
   const [detailTask, setDetailTask] = useState(null);
+  const [taskNotes, setTaskNotes] = useState("");
+  const [taskPhoto, setTaskPhoto] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   const load = () => {
     supabase.from('tasks').select('*')
@@ -1964,8 +1968,47 @@ const VendorTasksView = ({ user }) => {
 
   useEffect(() => { load(); }, [user.id]);
 
-  const handleUpdateProgress = async (progress, status) => {
-    await supabase.from('tasks').update({ progress, status }).eq('id', detailTask.id);
+  const openDetail = (t) => {
+    setDetailTask(t);
+    setTaskNotes(t.notes || "");
+    setTaskPhoto(null);
+    setPhotoPreview(t.attachment_url || null);
+  };
+
+  const handlePhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setTaskPhoto(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setPhotoPreview(ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    let attachment_url = detailTask.attachment_url || null;
+    let attachment_name = detailTask.attachment_name || null;
+
+    if (taskPhoto) {
+      const ext = taskPhoto.name.split('.').pop();
+      const filename = `task_${detailTask.id}_${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from('rffs').upload(filename, taskPhoto);
+      if (!uploadErr) {
+        const { data: urlData } = supabase.storage.from('rffs').getPublicUrl(filename);
+        attachment_url = urlData.publicUrl;
+        attachment_name = taskPhoto.name;
+      }
+    }
+
+    await supabase.from('tasks').update({
+      progress: detailTask.progress,
+      status: detailTask.status,
+      notes: taskNotes,
+      attachment_url,
+      attachment_name,
+    }).eq('id', detailTask.id);
+
+    setSaving(false);
     setDetailTask(null);
     load();
   };
@@ -1980,7 +2023,7 @@ const VendorTasksView = ({ user }) => {
           <div style={{ color: T.textMuted, fontSize: 13 }}>Tasks assigned to you will appear here.</div>
         </Card>
       ) : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>{tasks.map(t => (
-        <Card key={t.id} style={{ marginBottom: 0 }} onClick={() => setDetailTask(t)}>
+        <Card key={t.id} style={{ marginBottom: 0, cursor: 'pointer' }} onClick={() => openDetail(t)}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
             <div>
               <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{t.name}</div>
@@ -1989,7 +2032,13 @@ const VendorTasksView = ({ user }) => {
             <Badge status={t.status} />
           </div>
           <ProgressBar value={t.progress || 0} />
-          <div style={{ color: T.textMuted, fontSize: 11, marginTop: 6 }}>{t.progress || 0}% complete</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+            <div style={{ color: T.textMuted, fontSize: 11 }}>{t.progress || 0}% complete</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {t.notes && <span style={{ color: T.cyan, fontSize: 11 }}>📝 Notes</span>}
+              {t.attachment_url && <span style={{ color: T.amber, fontSize: 11 }}>📎 Attachment</span>}
+            </div>
+          </div>
         </Card>
       ))}</div>}
 
@@ -1997,19 +2046,53 @@ const VendorTasksView = ({ user }) => {
         <Modal title="Update Task" onClose={() => setDetailTask(null)}>
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 4 }}>{detailTask.name}</div>
           <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 16 }}>Due {detailTask.deadline}</div>
+
+          {/* Progress */}
           <div style={{ marginBottom: 16 }}>
             <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Progress: {detailTask.progress || 0}%</div>
-            <input type="range" min="0" max="100" defaultValue={detailTask.progress || 0}
+            <input type="range" min="0" max="100" value={detailTask.progress || 0}
               onChange={e => setDetailTask({ ...detailTask, progress: parseInt(e.target.value) })}
               style={{ width: '100%', accentColor: T.cyan }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: T.textMuted, fontSize: 11, marginTop: 4 }}>
+              <span>0%</span><span>50%</span><span>100%</span>
+            </div>
           </div>
+
+          {/* Status */}
           <Select label="Status" options={[
             { value: 'pending', label: 'Pending' },
             { value: 'in-progress', label: 'In Progress' },
             { value: 'completed', label: 'Completed' },
           ]} value={detailTask.status} onChange={v => setDetailTask({ ...detailTask, status: v })} />
-          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <Btn onClick={() => handleUpdateProgress(detailTask.progress, detailTask.status)}>Save Progress</Btn>
+
+          {/* Notes */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Notes / Updates</div>
+            <textarea value={taskNotes} onChange={e => setTaskNotes(e.target.value)}
+              placeholder="Add progress notes, comments or updates..."
+              style={{ width: '100%', minHeight: 100, padding: 10, background: T.bg, border: '1px solid ' + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+          </div>
+
+          {/* Photo Attachment */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Attach Photo / Document</div>
+            <input type="file" accept="image/*,.pdf,.doc,.docx" onChange={handlePhotoChange}
+              style={{ width: '100%', padding: 10, background: T.bg, border: '1px solid ' + T.border, borderRadius: 8, color: T.textSecondary, fontSize: 13, cursor: 'pointer' }} />
+            {photoPreview && (
+              <div style={{ marginTop: 12 }}>
+                {photoPreview.startsWith('data:image') || (detailTask.attachment_url && detailTask.attachment_url.match(/\.(jpg|jpeg|png|gif|webp)/i)) ? (
+                  <img src={photoPreview} alt="Preview" style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 8, border: '1px solid ' + T.border }} />
+                ) : (
+                  <a href={photoPreview} target="_blank" rel="noopener noreferrer" style={{ color: T.cyan, fontSize: 13, fontWeight: 600 }}>
+                    📎 {detailTask.attachment_name || 'View Attachment'}
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+            <Btn onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save Update'}</Btn>
             <Btn variant="ghost" onClick={() => setDetailTask(null)}>Cancel</Btn>
           </div>
         </Modal>

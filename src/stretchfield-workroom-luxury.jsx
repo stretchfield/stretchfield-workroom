@@ -1232,7 +1232,7 @@ const TasksView = ({ userRole }) => {
       {modal && (
         <Modal title="New Task" onClose={() => setModal(false)}>
           <Input label="Task Name" placeholder="Describe the task" value={form.name} onChange={v => setForm({ ...form, name: v })} />
-          <Select label="Event" options={[{ value: '', label: 'Select event...' }, ...projects.map(p => ({ value: p.id, label: p.name }))]} value={form.project_id} onChange={v => setForm({ ...form, project_id: v })} />
+          <Select label="Event" options={[{ value: '', label: 'Select event...' }, ...projects.map(p => ({ value: p.id, label: p.name }))]} value={form.project_id} onChange={v => { const proj = projects.find(p => p.id === v); setForm({ ...form, project_id: v, client_id: proj?.client_id || '' }); }} />
           <Select label="Assign To (Person Responsible)" options={[{ value: '', label: 'Select team member...' }, ...members.map(m => ({ value: m.id, label: m.name + ' — ' + m.role }))]} value={form.assignee_id} onChange={v => { const m = members.find(x => x.id === v); setForm({ ...form, assignee_id: v, assignee_name: m ? m.name : '' }); }} />
           <Select label="Assigned By" options={[{ value: '', label: 'Select assignor...' }, ...members.map(m => ({ value: m.id, label: m.name + ' — ' + m.role }))]} value={form.assigned_by} onChange={v => setForm({ ...form, assigned_by: v })} />
           <Input label="Deadline" type="date" value={form.deadline} onChange={v => setForm({ ...form, deadline: v })} />

@@ -303,10 +303,10 @@ const getNavItems = (role) => {
     base.push({ id: "strategy-overview", label: "Client Overview", icon: "▪" }, { id: "feedback-summary", label: "Feedback", icon: "▪" });
   }
   if (["CEO","Administrator"].includes(role)) {
-    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" });
+    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "rff-approvals", label: "RFF Approvals", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" });
   }
   if (role === "Vendor Manager") {
-    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" });
+    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" });
   }
   if (["CEO","Administrator","Vendor Manager","Finance Manager"].includes(role)) {
     base.push({ id: "invoices", label: "Invoices", icon: "▪" });
@@ -1387,6 +1387,12 @@ const VendorsView = ({ user }) => {
                       <div>
                         <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{r.title}</div>
                         <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>🏢 {r.client_name} · Due {r.deadline}</div>
+                        {r.status === 'declined' && r.declined_notes && (
+                          <div style={{ marginTop: 6, padding: "6px 10px", background: "#F43F5E10", border: "1px solid #F43F5E33", borderRadius: 6 }}>
+                            <div style={{ color: "#F43F5E", fontSize: 11, fontWeight: 700 }}>⛔ Declined by CEO</div>
+                            <div style={{ color: T.textSecondary, fontSize: 11, marginTop: 2 }}>{r.declined_notes}</div>
+                          </div>
+                        )}
                         {r.description && <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 4 }}>{r.description}</div>}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -3171,8 +3177,12 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "finance-approvals": return <FinanceApprovalsView user={currentUser} />;
       case "scorecards": return <VendorScorecardsView user={currentUser} />;
       case "vendor-ratings": return <VendorRatingsView user={currentUser} />;
+      case "rff-approvals": return <RFFApprovalsView user={currentUser} />;
+      case "vendor-assignment": return <VendorAssignmentView user={currentUser} />;
       case "scorecards": return <VendorScorecardsView user={currentUser} />;
       case "vendor-ratings": return <VendorRatingsView user={currentUser} />;
+      case "rff-approvals": return <RFFApprovalsView user={currentUser} />;
+      case "vendor-assignment": return <VendorAssignmentView user={currentUser} />;
       case "budgets": return <BudgetView user={currentUser} />;
       case "expenses": return <ExpenseView user={currentUser} />;
       case "finance-reports": return <FinanceReportsView user={currentUser} />;
@@ -4776,6 +4786,285 @@ const VendorRatingsView = ({ user }) => {
               </div>
             );
           })}
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+
+// ─── RFF APPROVAL QUEUE (CEO) ─────────────────────────────────────────────────
+const RFFApprovalsView = ({ user }) => {
+  const [rffs, setRffs] = useState([]);
+  const [actionModal, setActionModal] = useState(null);
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const load = () => {
+    supabase.from("rffs").select("*").eq("submitted_for_approval", true).in("status", ["pending", "declined"]).order("created_at", { ascending: false }).then(({ data }) => setRffs(data || []));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleApprove = async (rff) => {
+    setSaving(true);
+    await supabase.from("rffs").update({ approved: true, status: "approved", status_notes: notes }).eq("id", rff.id);
+    // Notify Vendor Manager
+    const { data: vms } = await supabase.from("profiles").select("id").eq("role", "Vendor Manager");
+    if (vms) await Promise.all(vms.map(vm => supabase.from("notifications").insert({ user_id: vm.id, title: "RFF Approved", message: `RFF "${rff.title}" for ${rff.event_name} has been approved. Proceed to vendor assignment.`, type: "rff" })));
+    setSaving(false); setActionModal(null); setNotes(""); load();
+  };
+
+  const handleDecline = async (rff) => {
+    if (!notes) { alert("Please add notes explaining why this RFF is declined."); return; }
+    setSaving(true);
+    await supabase.from("rffs").update({ approved: false, status: "declined", declined_notes: notes }).eq("id", rff.id);
+    // Notify Vendor Manager
+    const { data: vms } = await supabase.from("profiles").select("id").eq("role", "Vendor Manager");
+    if (vms) await Promise.all(vms.map(vm => supabase.from("notifications").insert({ user_id: vm.id, title: "RFF Declined", message: `RFF "${rff.title}" was declined. Notes: ${notes}`, type: "rff" })));
+    setSaving(false); setActionModal(null); setNotes(""); load();
+  };
+
+  const pending = rffs.filter(r => r.status === "pending");
+  const declined = rffs.filter(r => r.status === "declined");
+
+  return (
+    <div>
+      <PageHeader title="RFF Approval Queue" subtitle={`${pending.length} pending review`} />
+
+      {rffs.length === 0 ? (
+        <Card style={{ textAlign: "center", padding: 60 }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>✅</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16 }}>No RFFs awaiting approval</div>
+          <div style={{ color: T.textMuted, fontSize: 13, marginTop: 8 }}>New RFF submissions will appear here.</div>
+        </Card>
+      ) : (
+        <div>
+          {pending.length > 0 && (
+            <div style={{ marginBottom: 28 }}>
+              <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Pending Review ({pending.length})</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
+                {pending.map(r => (
+                  <Card key={r.id} style={{ borderLeft: "3px solid " + T.amber, marginBottom: 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                      <div>
+                        <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{r.title}</div>
+                        <div style={{ color: T.cyan, fontSize: 12, marginTop: 3, fontWeight: 600 }}>📁 {r.event_name}</div>
+                        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>🏢 {r.client_name} · Due {r.deadline}</div>
+                        {r.description && <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 6 }}>{r.description}</div>}
+                      </div>
+                      <Badge status="pending" />
+                    </div>
+                    {r.document_url && <a href={r.document_url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.cyan, fontSize: 12, fontWeight: 600, textDecoration: "none", background: T.cyan + "15", padding: "5px 12px", borderRadius: 6, border: "1px solid " + T.cyan + "33", marginBottom: 12 }}>📄 View RFF Document</a>}
+                    <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                      <button onClick={() => { setActionModal({ rff: r, action: "approve" }); setNotes(""); }} style={{ flex: 1, padding: "8px", background: T.teal + "20", border: "1px solid " + T.teal + "44", borderRadius: 8, cursor: "pointer", color: T.teal, fontSize: 12, fontWeight: 700 }}>✓ Approve</button>
+                      <button onClick={() => { setActionModal({ rff: r, action: "decline" }); setNotes(""); }} style={{ flex: 1, padding: "8px", background: "#F43F5E15", border: "1px solid #F43F5E44", borderRadius: 8, cursor: "pointer", color: "#F43F5E", fontSize: 12, fontWeight: 700 }}>✕ Decline</button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {declined.length > 0 && (
+            <div>
+              <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Previously Declined ({declined.length})</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
+                {declined.map(r => (
+                  <Card key={r.id} style={{ borderLeft: "3px solid #F43F5E", marginBottom: 0 }}>
+                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15, marginBottom: 4 }}>{r.title}</div>
+                    <div style={{ color: T.cyan, fontSize: 12, fontWeight: 600 }}>📁 {r.event_name} · 🏢 {r.client_name}</div>
+                    {r.declined_notes && <div style={{ marginTop: 8, padding: "8px 12px", background: "#F43F5E10", border: "1px solid #F43F5E33", borderRadius: 6 }}><div style={{ color: "#F43F5E", fontSize: 11, fontWeight: 700, marginBottom: 2 }}>Decline Notes:</div><div style={{ color: T.textSecondary, fontSize: 12 }}>{r.declined_notes}</div></div>}
+                    <button onClick={() => { setActionModal({ rff: r, action: "approve" }); setNotes(""); }} style={{ marginTop: 10, width: "100%", padding: "8px", background: T.teal + "20", border: "1px solid " + T.teal + "44", borderRadius: 8, cursor: "pointer", color: T.teal, fontSize: 12, fontWeight: 700 }}>✓ Approve Now</button>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {actionModal && (
+        <Modal title={actionModal.action === "approve" ? "Approve RFF" : "Decline RFF"} onClose={() => setActionModal(null)}>
+          <div style={{ padding: "10px 14px", background: T.surface, borderRadius: 8, border: "1px solid " + T.border, marginBottom: 16 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 700 }}>{actionModal.rff.title}</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{actionModal.rff.event_name} · {actionModal.rff.client_name}</div>
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>{actionModal.action === "decline" ? "Decline Notes (Required)" : "Notes (Optional)"}</div>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder={actionModal.action === "decline" ? "Explain why this RFF needs revision..." : "Any notes for the Vendor Manager..."}
+              style={{ width: "100%", minHeight: 100, padding: 10, background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, resize: "vertical", fontFamily: "inherit" }} />
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            {actionModal.action === "approve" ? <Btn onClick={() => handleApprove(actionModal.rff)} disabled={saving}>{saving ? "Approving..." : "✓ Approve RFF"}</Btn> : <Btn onClick={() => handleDecline(actionModal.rff)} disabled={saving}>{saving ? "Declining..." : "✕ Decline RFF"}</Btn>}
+            <Btn variant="ghost" onClick={() => setActionModal(null)}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+// ─── VENDOR ASSIGNMENT TAB ────────────────────────────────────────────────────
+const VendorAssignmentView = ({ user }) => {
+  const [rffs, setRffs] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [assignments, setAssignments] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [expandedEvent, setExpandedEvent] = useState(null);
+  const [basketModal, setBasketModal] = useState(null);
+
+  const load = async () => {
+    const [r, e, v, a] = await Promise.all([
+      supabase.from("rffs").select("*").eq("approved", true).eq("status", "approved").order("created_at", { ascending: false }),
+      supabase.from("projects").select("*"),
+      supabase.from("profiles").select("*").eq("role", "Vendor"),
+      supabase.from("rff_vendor_assignments").select("*"),
+    ]);
+    setRffs(r.data || []);
+    setEvents(e.data || []);
+    setVendors(v.data || []);
+    setAssignments(a.data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const assignedVendorIds = (rffId) => assignments.filter(a => a.rff_id === rffId).map(a => a.vendor_id);
+
+  const addVendor = async (rff, vendor) => {
+    setSaving(true);
+    await supabase.from("rff_vendor_assignments").insert({ rff_id: rff.id, vendor_id: vendor.id, vendor_name: vendor.name, assigned_by: user.id });
+    // Notify vendor
+    await supabase.from("notifications").insert({ user_id: vendor.id, title: "New RFF Assignment", message: `You have been assigned to RFF: "${rff.title}" for ${rff.event_name}. Please submit your quote.`, type: "rff" });
+    // Update RFF status to show vendors are being assigned
+    await supabase.from("rffs").update({ status: "vendor-assigned" }).eq("id", rff.id);
+    setSaving(false); load();
+  };
+
+  const removeVendor = async (rffId, vendorId) => {
+    setSaving(true);
+    await supabase.from("rff_vendor_assignments").delete().eq("rff_id", rffId).eq("vendor_id", vendorId);
+    // Check if any vendors remain
+    const { data: remaining } = await supabase.from("rff_vendor_assignments").select("id").eq("rff_id", rffId);
+    if (!remaining || remaining.length === 0) await supabase.from("rffs").update({ status: "approved" }).eq("id", rffId);
+    setSaving(false); load();
+  };
+
+  // Group approved RFFs by event
+  const grouped = events.reduce((acc, ev) => {
+    const evRffs = rffs.filter(r => r.project_id === ev.id);
+    if (evRffs.length > 0) acc[ev.id] = { event: ev, rffs: evRffs };
+    return acc;
+  }, {});
+
+  const TierBadge = ({ vendor }) => {
+    const score = vendor.vendor_score || 0;
+    const isPoor = vendor.vendor_scorecard_count > 0 && score < 50;
+    const isUnrated = !vendor.vendor_scorecard_count;
+    if (isUnrated) return <span style={{ fontSize: 10, color: T.textMuted, padding: "2px 8px", borderRadius: 20, border: "1px solid " + T.border }}>Unrated</span>;
+    const t = getTier(score);
+    return <span style={{ fontSize: 10, fontWeight: 700, color: isPoor ? "#F43F5E" : t.color, padding: "2px 8px", borderRadius: 20, background: isPoor ? "#F43F5E15" : t.bg, border: "1px solid " + (isPoor ? "#F43F5E44" : t.color + "44") }}>{isPoor ? "⛔ Poor" : t.label} {score > 0 ? score + "%" : ""}</span>;
+  };
+
+  return (
+    <div>
+      <PageHeader title="Vendor Assignment" subtitle="Assign vendors to approved RFFs by event" />
+
+      {Object.keys(grouped).length === 0 ? (
+        <Card style={{ textAlign: "center", padding: 60 }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>📋</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16 }}>No approved RFFs yet</div>
+          <div style={{ color: T.textMuted, fontSize: 13, marginTop: 8 }}>RFFs approved by CEO will appear here for vendor assignment.</div>
+        </Card>
+      ) : Object.values(grouped).map(({ event: ev, rffs: evRffs }) => (
+        <div key={ev.id} style={{ marginBottom: 24 }}>
+          <button onClick={() => setExpandedEvent(expandedEvent === ev.id ? null : ev.id)} style={{ width: "100%", background: T.surface, border: "1px solid " + T.border, borderRadius: 8, padding: "14px 20px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: expandedEvent === ev.id ? 12 : 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 3, height: 20, background: T.cyan, borderRadius: 2 }} />
+              <div style={{ textAlign: "left" }}>
+                <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{ev.name}</div>
+                <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{ev.client} · {evRffs.length} RFF{evRffs.length > 1 ? "s" : ""}</div>
+              </div>
+            </div>
+            <span style={{ color: T.textMuted, fontSize: 16 }}>{expandedEvent === ev.id ? "▾" : "▸"}</span>
+          </button>
+
+          {expandedEvent === ev.id && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 14 }}>
+              {evRffs.map(rff => {
+                const assigned = assignments.filter(a => a.rff_id === rff.id);
+                const assignedIds = assigned.map(a => a.vendor_id);
+                return (
+                  <Card key={rff.id} style={{ borderLeft: "3px solid " + T.teal, marginBottom: 0 }}>
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{rff.title}</div>
+                      <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>Due {rff.deadline}</div>
+                      {rff.description && <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 4 }}>{rff.description}</div>}
+                    </div>
+
+                    {/* Assigned Vendors Basket */}
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ color: T.textSecondary, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Assigned Vendors ({assigned.length})</div>
+                      {assigned.length === 0 ? (
+                        <div style={{ color: T.textMuted, fontSize: 12, padding: "8px 12px", background: T.bg, borderRadius: 6, border: "1px dashed " + T.border }}>No vendors assigned yet</div>
+                      ) : (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                          {assigned.map(a => {
+                            const vp = vendors.find(v => v.id === a.vendor_id);
+                            return (
+                              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", background: T.teal + "15", border: "1px solid " + T.teal + "33", borderRadius: 20 }}>
+                                <span style={{ color: T.teal, fontSize: 12, fontWeight: 600 }}>{a.vendor_name}</span>
+                                {vp && <TierBadge vendor={vp} />}
+                                <button onClick={() => removeVendor(rff.id, a.vendor_id)} style={{ background: "none", border: "none", color: "#F43F5E", cursor: "pointer", fontSize: 14, padding: 0, lineHeight: 1 }}>✕</button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Add Vendor Button */}
+                    <button onClick={() => setBasketModal({ rff, assignedIds })} style={{ width: "100%", padding: "8px", background: T.cyan + "15", border: "1px solid " + T.cyan + "33", borderRadius: 8, cursor: "pointer", color: T.cyan, fontSize: 12, fontWeight: 700 }}>
+                      + Add Vendor
+                    </button>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Vendor Picker Modal */}
+      {basketModal && (
+        <Modal title={"Assign Vendors — " + basketModal.rff.title} onClose={() => setBasketModal(null)}>
+          <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 16 }}>📁 {basketModal.rff.event_name} · Select vendors in good standing</div>
+          <div style={{ maxHeight: 400, overflowY: "auto" }}>
+            {vendors.map(v => {
+              const score = v.vendor_score || 0;
+              const isPoor = v.vendor_scorecard_count > 0 && score < 50;
+              const isAssigned = basketModal.assignedIds.includes(v.id);
+              return (
+                <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid " + T.border + "66", opacity: isPoor ? 0.5 : 1 }}>
+                  <div>
+                    <div style={{ color: isPoor ? T.textMuted : T.textPrimary, fontWeight: 600, fontSize: 14 }}>{v.name}</div>
+                    <div style={{ marginTop: 4 }}><TierBadge vendor={v} /></div>
+                  </div>
+                  {isPoor ? (
+                    <span style={{ color: "#F43F5E", fontSize: 11, fontWeight: 600 }}>⛔ Cannot assign</span>
+                  ) : isAssigned ? (
+                    <button onClick={() => { removeVendor(basketModal.rff.id, v.id); setBasketModal({ ...basketModal, assignedIds: basketModal.assignedIds.filter(id => id !== v.id) }); }} style={{ padding: "6px 14px", background: "#F43F5E15", border: "1px solid #F43F5E44", borderRadius: 20, cursor: "pointer", color: "#F43F5E", fontSize: 12, fontWeight: 700 }}>✕ Remove</button>
+                  ) : (
+                    <button onClick={() => { addVendor(basketModal.rff, v); setBasketModal({ ...basketModal, assignedIds: [...basketModal.assignedIds, v.id] }); }} disabled={saving} style={{ padding: "6px 14px", background: T.cyan + "15", border: "1px solid " + T.cyan + "33", borderRadius: 20, cursor: "pointer", color: T.cyan, fontSize: 12, fontWeight: 700 }}>+ Assign</button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ marginTop: 16 }}>
+            <Btn onClick={() => setBasketModal(null)}>Done</Btn>
+          </div>
         </Modal>
       )}
     </div>

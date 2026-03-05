@@ -3084,6 +3084,14 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
   const [unreadCount, setUnreadCount] = useState(0);
   const isMobile = useIsMobile();
 
+  const currentUser = propProfile ? {
+    id: propProfile.id,
+    name: propProfile.name,
+    role: propProfile.role,
+    email: propProfile.email,
+    avatar: propProfile.avatar,
+  } : null;
+
   useEffect(() => {
     if (!currentUser?.id) return;
     const fetchUnread = async () => {
@@ -3096,14 +3104,6 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       .subscribe();
     return () => supabase.removeChannel(sub);
   }, [currentUser?.id]);
-
-  const currentUser = propProfile ? {
-    id: propProfile.id,
-    name: propProfile.name,
-    role: propProfile.role,
-    email: propProfile.email,
-    avatar: propProfile.avatar,
-  } : null;
 
   if (!currentUser) return (
     <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", color: T.textMuted, fontFamily: "DM Sans, sans-serif" }}>

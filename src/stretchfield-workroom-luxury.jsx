@@ -1322,7 +1322,7 @@ const VendorsView = ({ user }) => {
       title: form.title, description: form.description,
       client_id: form.client_id, client_name: form.client_name,
       project_id: form.project_id, event_name: form.event_name,
-      deadline: form.deadline || null, document_url, document_name, status: 'pending',
+      deadline: form.deadline || null, document_url, document_name, status: 'pending', submitted_for_approval: true, approved: false,
     });
     if (error) { setError(error.message); setSaving(false); return; }
     setModal(false);

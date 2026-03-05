@@ -516,8 +516,7 @@ const CEODashboard = ({ onTab, user }) => {
               <div style={{ color: T.textMuted, fontSize: 12 }}>GHS {pendingInvoices.reduce((a, i) => a + (i.amount || 0), 0).toLocaleString()} outstanding</div>
             </div>
             <span style={{ color: T.magenta, fontSize: 12 }}>Review →</span>
-            </div>
-          )}
+          </div>
         </div>
       )}
 

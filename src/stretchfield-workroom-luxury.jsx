@@ -1301,6 +1301,7 @@ const VendorsView = ({ user }) => {
       supabase.from('projects').select('*'),
       supabase.from('clients').select('*'),
     ]);
+    // Show all RFFs for Vendor Manager/CEO/Admin
     setRffs(r.data || []);
     setEvents(e.data || []);
     setClients(c.data || []);
@@ -4856,7 +4857,7 @@ const RFFApprovalsView = ({ user }) => {
   const [saving, setSaving] = useState(false);
 
   const load = () => {
-    supabase.from("rffs").select("*").eq("submitted_for_approval", true).in("status", ["pending", "declined"]).order("created_at", { ascending: false }).then(({ data }) => setRffs(data || []));
+    supabase.from("rffs").select("*").in("status", ["pending", "declined"]).eq("approved", false).order("created_at", { ascending: false }).then(({ data }) => setRffs(data || []));
   };
 
   useEffect(() => { load(); }, []);
@@ -4972,7 +4973,7 @@ const VendorAssignmentView = ({ user }) => {
 
   const load = async () => {
     const [r, e, v, a] = await Promise.all([
-      supabase.from("rffs").select("*").eq("approved", true).eq("status", "approved").order("created_at", { ascending: false }),
+      supabase.from("rffs").select("*").eq("approved", true).in("status", ["approved", "vendor-assigned", "quote-submitted", "quote-approved"]).order("created_at", { ascending: false }),
       supabase.from("projects").select("*"),
       supabase.from("profiles").select("*").eq("role", "Vendor"),
       supabase.from("rff_vendor_assignments").select("*"),

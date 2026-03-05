@@ -1290,6 +1290,10 @@ const VendorsView = ({ user }) => {
   const [file, setFile] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [resubmitModal, setResubmitModal] = useState(null);
+  const [resubmitFile, setResubmitFile] = useState(null);
+  const [resubmitNotes, setResubmitNotes] = useState('');
+  const isVendorManager = user?.role === 'Vendor Manager';
 
   const load = async () => {
     const [r, e, c] = await Promise.all([
@@ -1328,6 +1332,36 @@ const VendorsView = ({ user }) => {
     setModal(false);
     setForm({ title: '', description: '', client_id: '', client_name: '', project_id: '', event_name: '', deadline: '' });
     setFile(null); setSaving(false); load();
+  };
+
+  const handleResubmit = async () => {
+    setSaving(true);
+    let document_url = resubmitModal.document_url || '';
+    let document_name = resubmitModal.document_name || '';
+    if (resubmitFile) {
+      const ext = resubmitFile.name.split('.').pop();
+      const filename = `rff_${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from('rffs').upload(filename, resubmitFile);
+      if (!uploadErr) {
+        const { data: urlData } = supabase.storage.from('rffs').getPublicUrl(filename);
+        document_url = urlData.publicUrl;
+        document_name = resubmitFile.name;
+      }
+    }
+    await supabase.from('rffs').update({
+      status: 'pending',
+      approved: false,
+      submitted_for_approval: true,
+      declined_notes: null,
+      document_url,
+      document_name,
+      status_notes: resubmitNotes,
+    }).eq('id', resubmitModal.id);
+    // Notify CEO
+    const { data: ceos } = await supabase.from('profiles').select('id').in('role', ['CEO', 'Administrator']);
+    if (ceos) await Promise.all(ceos.map(c => supabase.from('notifications').insert({ user_id: c.id, title: 'RFF Resubmitted', message: `RFF "${resubmitModal.title}" has been revised and resubmitted for approval.`, type: 'rff' })));
+    setResubmitModal(null); setResubmitFile(null); setResubmitNotes('');
+    setSaving(false); load();
   };
 
   // Group RFFs by event
@@ -1387,10 +1421,27 @@ const VendorsView = ({ user }) => {
                       <div>
                         <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{r.title}</div>
                         <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>🏢 {r.client_name} · Due {r.deadline}</div>
+                        {/* Status indicators for Vendor Manager */}
+                        {isVendorManager && r.status === 'pending' && r.submitted_for_approval && (
+                          <div style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", background: T.amber + "15", border: "1px solid " + T.amber + "33", borderRadius: 20 }}>
+                            <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.amber }} />
+                            <span style={{ color: T.amber, fontSize: 11, fontWeight: 700 }}>Pending CEO Approval</span>
+                          </div>
+                        )}
+                        {isVendorManager && r.status === 'approved' && (
+                          <div style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", background: T.teal + "15", border: "1px solid " + T.teal + "33", borderRadius: 20 }}>
+                            <span style={{ color: T.teal, fontSize: 11, fontWeight: 700 }}>✓ Approved by CEO</span>
+                          </div>
+                        )}
                         {r.status === 'declined' && r.declined_notes && (
-                          <div style={{ marginTop: 6, padding: "6px 10px", background: "#F43F5E10", border: "1px solid #F43F5E33", borderRadius: 6 }}>
+                          <div style={{ marginTop: 6, padding: "8px 10px", background: "#F43F5E10", border: "1px solid #F43F5E33", borderRadius: 6 }}>
                             <div style={{ color: "#F43F5E", fontSize: 11, fontWeight: 700 }}>⛔ Declined by CEO</div>
                             <div style={{ color: T.textSecondary, fontSize: 11, marginTop: 2 }}>{r.declined_notes}</div>
+                            {isVendorManager && (
+                              <button onClick={e => { e.stopPropagation(); setResubmitModal(r); setResubmitNotes(''); setResubmitFile(null); }} style={{ marginTop: 8, padding: "5px 12px", background: T.cyan + "20", border: "1px solid " + T.cyan + "44", borderRadius: 6, cursor: "pointer", color: T.cyan, fontSize: 11, fontWeight: 700 }}>
+                                🔄 Revise & Resubmit
+                              </button>
+                            )}
                           </div>
                         )}
                         {r.description && <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 4 }}>{r.description}</div>}

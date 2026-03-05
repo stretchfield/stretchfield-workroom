@@ -4728,8 +4728,9 @@ const VendorRatingsView = ({ user }) => {
   const [rffs, setRffs] = useState([]);
   const [events, setEvents] = useState([]);
   const [historyVendor, setHistoryVendor] = useState(null);
-  const [viewMode, setViewMode] = useState("by-event"); // "by-event" | "by-vendor"
+  const [viewMode, setViewMode] = useState("by-event");
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [period, setPeriod] = useState("all"); // "all" | "this-month" | "last-3" | "this-year"
 
   const load = async () => {
     const [v, s, r, e] = await Promise.all([
@@ -4746,13 +4747,30 @@ const VendorRatingsView = ({ user }) => {
 
   useEffect(() => { load(); }, []);
 
+  // Period filter
+  const now = new Date();
+  const filteredScorecards = scorecards.filter(sc => {
+    if (period === "all") return true;
+    const d = new Date(sc.created_at);
+    if (period === "this-month") return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    if (period === "last-3") return d >= new Date(now.getFullYear(), now.getMonth() - 3, 1);
+    if (period === "this-year") return d.getFullYear() === now.getFullYear();
+    return true;
+  });
+
+  // Analytics
+  const scoredVendors = vendors.filter(v => filteredScorecards.some(s => s.vendor_id === v.id));
+  const avgScore = scoredVendors.length ? Math.round(filteredScorecards.reduce((a, s) => a + s.total_pct, 0) / filteredScorecards.length) : 0;
+  const topVendor = filteredScorecards.length ? vendors.find(v => v.id === [...filteredScorecards].sort((a,b) => b.total_pct - a.total_pct)[0]?.vendor_id) : null;
+  const poorVendors = vendors.filter(v => { const sc = filteredScorecards.filter(s => s.vendor_id === v.id); return sc.length > 0 && sc[sc.length-1].total_pct < 50; });
+
   // Build event → vendors map from approved RFFs
   const eventVendorMap = events.map(ev => {
     const eventRffs = rffs.filter(r => r.project_id === ev.id);
     const vendorIds = [...new Set(eventRffs.map(r => r.vendor).filter(Boolean))];
     const vendorsForEvent = eventRffs.map(r => {
       const vendorProfile = vendors.find(v => v.name === r.vendor || v.id === r.vendor_id);
-      const scorecard = scorecards.find(s => s.vendor_id === vendorProfile?.id && s.project_id === ev.id);
+      const scorecard = filteredScorecards.find(s => s.vendor_id === vendorProfile?.id && s.project_id === ev.id);
       return {
         rff: r, vendorProfile,
         scorecard, score: scorecard?.total_pct || null,
@@ -4768,13 +4786,21 @@ const VendorRatingsView = ({ user }) => {
     <div>
       <PageHeader title="Vendor Ratings" subtitle="Performance ratings per event and overall" />
 
-      {/* Stats */}
-      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
-        <Stat icon="⭐" label="Total Vendors" value={vendors.length} color={T.cyan} />
-        <Stat icon="🟢" label="Impressive" value={vendors.filter(v => (v.vendor_score||0) >= 85).length} color="#10B981" />
-        <Stat icon="🔵" label="Very Good" value={vendors.filter(v => (v.vendor_score||0) >= 70 && (v.vendor_score||0) < 85).length} color={T.cyan} />
-        <Stat icon="🟡" label="Good" value={vendors.filter(v => (v.vendor_score||0) >= 50 && (v.vendor_score||0) < 70).length} color={T.amber} />
-        <Stat icon="🔴" label="Poor / Do Not Engage" value={vendors.filter(v => v.vendor_scorecard_count > 0 && (v.vendor_score||0) < 50).length} color="#F43F5E" />
+      {/* Period Filter */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+        {[["all","All Time"],["this-month","This Month"],["last-3","Last 3 Months"],["this-year","This Year"]].map(([val, label]) => (
+          <button key={val} onClick={() => setPeriod(val)} style={{ padding: "7px 18px", borderRadius: 20, border: "1px solid " + (period === val ? T.cyan : T.border), cursor: "pointer", background: period === val ? T.cyan + "20" : "none", color: period === val ? T.cyan : T.textMuted, fontWeight: period === val ? 700 : 500, fontSize: 12 }}>{label}</button>
+        ))}
+      </div>
+
+      {/* Analytics Summary */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 14, marginBottom: 24 }}>
+        <Stat icon="📊" label="Scorecards" value={filteredScorecards.length} color={T.cyan} />
+        <Stat icon="⭐" label="Avg Score" value={filteredScorecards.length ? avgScore + "%" : "—"} color={T.amber} />
+        <Stat icon="🏆" label="Top Vendor" value={topVendor?.name || "—"} color="#10B981" />
+        <Stat icon="⛔" label="Do Not Engage" value={poorVendors.length} color="#F43F5E" />
+        <Stat icon="🟢" label="Impressive (85%+)" value={filteredScorecards.filter(s => s.total_pct >= 85).length} color="#10B981" />
+        <Stat icon="🔴" label="Poor (<50%)" value={filteredScorecards.filter(s => s.total_pct < 50).length} color="#F43F5E" />
       </div>
 
       {/* View Toggle */}
@@ -4871,7 +4897,7 @@ const VendorRatingsView = ({ user }) => {
                 {score >= 85 && <div style={{ padding: "8px 12px", background: "#10B98115", borderRadius: 6, border: "1px solid #10B98133", marginBottom: 10 }}><div style={{ color: "#10B981", fontSize: 12, fontWeight: 700 }}>⭐ Impressive — Priority vendor</div></div>}
                 {vendorCards.length > 0 && (
                   <div style={{ marginBottom: 12 }}>
-                    {vendorCards.slice(0, 3).map(sc => (
+                    {filteredScorecards.filter(s => s.vendor_id === v.id).slice(0, 3).map(sc => (
                       <div key={sc.id} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid " + T.border + "44" }}>
                         <div style={{ color: T.textSecondary, fontSize: 12 }}>{sc.event_name || "General"}</div>
                         <div style={{ color: getTier(sc.total_pct).color, fontWeight: 700, fontSize: 12 }}>{sc.total_pct}%</div>

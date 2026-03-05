@@ -421,16 +421,18 @@ const PageHeader = ({ title, subtitle }) => (
 );
 
 // ─── DASHBOARDS ──────────────────────────────────────────────────────────────
-const CEODashboard = ({ onTab }) => {
+const CEODashboard = ({ onTab, user }) => {
   const [events, setEvents] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [vendors, setVendors] = useState([]);
+  const [vendorProfiles, setVendorProfiles] = useState([]);
   const [leads, setLeads] = useState([]);
   const [targets, setTargets] = useState([]);
   const [feedback, setFeedback] = useState([]);
   const [clients, setClients] = useState([]);
   const [rffs, setRffs] = useState([]);
+  const [unreadNotifs, setUnreadNotifs] = useState([]);
 
   useEffect(() => {
     supabase.from('projects').select('*').order('created_at', { ascending: false }).then(({ data }) => setEvents(data || []));
@@ -445,7 +447,17 @@ const CEODashboard = ({ onTab }) => {
       const unique = [...new Set((data || []).map(r => r.vendor).filter(Boolean))];
       setVendors(unique);
     });
+    supabase.from('profiles').select('*').eq('role', 'Vendor').then(({ data }) => setVendorProfiles(data || []));
   }, []);
+
+  // Live unread notifications for CEO
+  useEffect(() => {
+    if (!user?.id) return;
+    const fetch = () => supabase.from('notifications').select('*').eq('user_id', user.id).eq('read', false).order('created_at', { ascending: false }).then(({ data }) => setUnreadNotifs(data || []));
+    fetch();
+    const sub = supabase.channel('ceo-dash-notif-' + user.id).on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: 'user_id=eq.' + user.id }, fetch).subscribe();
+    return () => supabase.removeChannel(sub);
+  }, [user?.id]);
 
   const pendingInvoices = invoices.filter(i => i.status === 'pending');
   const openTasks = tasks.filter(t => t.status !== 'completed');
@@ -467,27 +479,43 @@ const CEODashboard = ({ onTab }) => {
     <div>
       <PageHeader title="Executive Overview" subtitle="Live company performance snapshot" />
 
-      {/* Alerts */}
-      {(wonLeadsAwaitingApproval.length > 0 || pendingInvoices.length > 0) && (
+      {/* Alerts — only show unread notifications */}
+      {unreadNotifs.length > 0 && (
         <div style={{ marginBottom: 24 }}>
-          {wonLeadsAwaitingApproval.length > 0 && (
-            <div onClick={() => onTab('crm')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: T.amber + '15', border: '1px solid ' + T.amber + '44', borderRadius: 8, marginBottom: 8, cursor: 'pointer' }}>
+          {unreadNotifs.slice(0, 5).map(n => (
+            <div key={n.id} onClick={() => onTab('notifications')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: T.amber + '15', border: '1px solid ' + T.amber + '44', borderRadius: 8, marginBottom: 8, cursor: 'pointer' }}>
               <span style={{ fontSize: 18 }}>🔔</span>
               <div style={{ flex: 1 }}>
-                <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>{wonLeadsAwaitingApproval.length} Won Lead{wonLeadsAwaitingApproval.length > 1 ? 's' : ''} Awaiting Approval</div>
-                <div style={{ color: T.textMuted, fontSize: 12 }}>{wonLeadsAwaitingApproval.map(l => l.company).join(', ')}</div>
+                <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>{n.title}</div>
+                <div style={{ color: T.textMuted, fontSize: 12 }}>{n.message}</div>
               </div>
-              <span style={{ color: T.amber, fontSize: 12 }}>Review →</span>
+              <span style={{ color: T.amber, fontSize: 12 }}>View →</span>
             </div>
-          )}
-          {pendingInvoices.length > 0 && (
-            <div onClick={() => onTab('invoices')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: T.magenta + '15', border: '1px solid ' + T.magenta + '44', borderRadius: 8, cursor: 'pointer' }}>
-              <span style={{ fontSize: 18 }}>🧾</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ color: T.magenta, fontWeight: 700, fontSize: 13 }}>{pendingInvoices.length} Invoice{pendingInvoices.length > 1 ? 's' : ''} Pending</div>
-                <div style={{ color: T.textMuted, fontSize: 12 }}>GHS {pendingInvoices.reduce((a, i) => a + (i.amount || 0), 0).toLocaleString()} outstanding</div>
-              </div>
-              <span style={{ color: T.magenta, fontSize: 12 }}>Review →</span>
+          ))}
+          {unreadNotifs.length > 5 && <div style={{ color: T.textMuted, fontSize: 12, textAlign: 'center', padding: '8px 0', cursor: 'pointer' }} onClick={() => onTab('notifications')}>+{unreadNotifs.length - 5} more notifications</div>}
+        </div>
+      )}
+      {wonLeadsAwaitingApproval.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div onClick={() => onTab('crm')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: T.amber + '15', border: '1px solid ' + T.amber + '44', borderRadius: 8, marginBottom: 8, cursor: 'pointer' }}>
+            <span style={{ fontSize: 18 }}>🏆</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>{wonLeadsAwaitingApproval.length} Won Lead{wonLeadsAwaitingApproval.length > 1 ? 's' : ''} Awaiting Approval</div>
+              <div style={{ color: T.textMuted, fontSize: 12 }}>{wonLeadsAwaitingApproval.map(l => l.company).join(', ')}</div>
+            </div>
+            <span style={{ color: T.amber, fontSize: 12 }}>Review →</span>
+          </div>
+        </div>
+      )}
+      {pendingInvoices.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div onClick={() => onTab('invoices')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: T.magenta + '15', border: '1px solid ' + T.magenta + '44', borderRadius: 8, cursor: 'pointer' }}>
+            <span style={{ fontSize: 18 }}>🧾</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: T.magenta, fontWeight: 700, fontSize: 13 }}>{pendingInvoices.length} Invoice{pendingInvoices.length > 1 ? 's' : ''} Pending</div>
+              <div style={{ color: T.textMuted, fontSize: 12 }}>GHS {pendingInvoices.reduce((a, i) => a + (i.amount || 0), 0).toLocaleString()} outstanding</div>
+            </div>
+            <span style={{ color: T.magenta, fontSize: 12 }}>Review →</span>
             </div>
           )}
         </div>
@@ -1395,7 +1423,10 @@ const VendorsView = ({ user }) => {
                           <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>Quote Received</div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <div>
-                              <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{r.vendor || 'Vendor'}</div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{r.vendor || 'Vendor'}</div>
+                            {(() => { const vp = vendors.find(v => v.name === r.vendor); if (!vp || !vp.vendor_scorecard_count) return <span style={{ fontSize: 10, color: T.textMuted, padding: '2px 8px', borderRadius: 20, border: '1px solid ' + T.border }}>Unrated</span>; const t = getTier(vp.vendor_score || 0); return <span style={{ fontSize: 10, fontWeight: 700, color: t.color, padding: '2px 8px', borderRadius: 20, background: t.bg, border: '1px solid ' + t.color + '44' }}>{t.label} {vp.vendor_score}%</span>; })()}
+                          </div>
                               <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Amount: <span style={{ color: T.amber, fontWeight: 700 }}>GHS {(r.amount || 0).toLocaleString()}</span></div>
                             </div>
                             <Badge status={r.status} />
@@ -3116,8 +3147,8 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
     const role = currentUser.role;
     switch (activeTab) {
       case "dashboard":
-        if (role === "CEO") return <CEODashboard onTab={setActiveTab} />;
-        if (role === "Administrator") return <CEODashboard onTab={setActiveTab} />;
+        if (role === "CEO") return <CEODashboard onTab={setActiveTab} user={currentUser} />;
+        if (role === "Administrator") return <CEODashboard onTab={setActiveTab} user={currentUser} />;
         if (role === "Vendor") return <VendorDashboard user={currentUser} />;
         if (role === "Client") return <ClientDashboard user={currentUser} />;
         if (role === "Finance Manager") return <FinanceDashboard user={currentUser} onTab={setActiveTab} />;

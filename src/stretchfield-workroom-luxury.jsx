@@ -1606,8 +1606,12 @@ const VendorRFFsView = ({ user }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const loadRffs = () => {
-    supabase.from('rffs').select('*').eq('approved', true).in('status', ['pending', 'quote-submitted', 'quote-approved']).order('created_at', { ascending: false }).then(({ data }) => setRffs(data || []));
+  const loadRffs = async () => {
+    const { data: myAssignments } = await supabase.from("rff_vendor_assignments").select("rff_id").eq("vendor_id", user.id);
+    if (!myAssignments || myAssignments.length === 0) { setRffs([]); return; }
+    const rffIds = myAssignments.map(a => a.rff_id);
+    const { data } = await supabase.from("rffs").select("*").in("id", rffIds).order("created_at", { ascending: false });
+    setRffs(data || []);
   };
 
   useEffect(() => { loadRffs(); }, []);

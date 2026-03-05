@@ -4401,37 +4401,40 @@ const calcScore = (scores) => {
   return Math.round((total / 5) * 100 * 10) / 10;
 };
 
-const VendorScorecardModal = ({ vendor, event, user, onClose, onSaved }) => {
+const VendorScorecardModal = ({ vendor, events, user, onClose, onSaved }) => {
   const initScores = {};
   SCORECARD_CATEGORIES.forEach(cat => cat.fields.forEach(f => { initScores[f.key] = 0; }));
   const [scores, setScores] = useState(initScores);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
-  const [expandedCat, setExpandedCat] = useState("pricing");
+  const [expandedCat, setExpandedCat] = useState(null);
+  const [selectedEventId, setSelectedEventId] = useState("");
 
+  const selectedEvent = events.find(e => e.id === selectedEventId) || null;
   const liveScore = calcScore(scores);
   const tier = getTier(liveScore);
 
   const setScore = (key, val) => setScores(prev => ({ ...prev, [key]: val }));
 
   const handleSave = async () => {
+    if (!selectedEventId) { alert("Please select an event before saving."); return; }
     setSaving(true);
     const pct = calcScore(scores);
     const tierLabel = getTier(pct).label;
     const { error } = await supabase.from("vendor_scorecards").insert({
       vendor_id: vendor.id, vendor_name: vendor.name,
-      project_id: event?.id || null, event_name: event?.name || "",
+      project_id: selectedEvent?.id || null, event_name: selectedEvent?.name || "",
       ...scores, total_score: (pct / 20), total_pct: pct, tier: tierLabel,
       notes, scored_by: user.id,
     });
     if (!error) {
-      // Update vendor profile with latest score
-      const { data: allScores } = await supabase.from("vendor_scorecards").select("total_pct").eq("vendor_id", vendor.id);
+      // Update vendor profile with most recent score
+      const { data: allScores } = await supabase.from("vendor_scorecards").select("total_pct, created_at").eq("vendor_id", vendor.id).order("created_at", { ascending: false });
       if (allScores && allScores.length > 0) {
-        const avgScore = allScores.reduce((a, s) => a + s.total_pct, 0) / allScores.length;
+        const latestScore = allScores[0].total_pct; // Use most recent event score
         await supabase.from("profiles").update({
-          vendor_score: Math.round(avgScore * 10) / 10,
-          vendor_tier: getTier(avgScore).label,
+          vendor_score: Math.round(latestScore * 10) / 10,
+          vendor_tier: getTier(latestScore).label,
           vendor_scorecard_count: allScores.length,
         }).eq("id", vendor.id);
       }
@@ -4456,6 +4459,16 @@ const VendorScorecardModal = ({ vendor, event, user, onClose, onSaved }) => {
 
   return (
     <Modal title={"Scorecard — " + vendor.name} onClose={onClose}>
+      {/* Event Selector */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Select Event to Score</div>
+        <select value={selectedEventId} onChange={e => setSelectedEventId(e.target.value)} style={{ width: "100%", padding: "10px 12px", background: T.bg, border: "1px solid " + (selectedEventId ? T.cyan : T.border), borderRadius: 8, color: selectedEventId ? T.textPrimary : T.textMuted, fontSize: 13, fontFamily: "inherit" }}>
+          <option value="">Select event...</option>
+          {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name} — {ev.client || ""}</option>)}
+        </select>
+        {!selectedEventId && <div style={{ color: T.amber, fontSize: 11, marginTop: 6 }}>⚠ Please select an event to proceed</div>}
+      </div>
+
       {/* Live Score */}
       <div style={{ padding: 16, background: tier.bg, border: "1px solid " + tier.color + "44", borderRadius: 10, marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
@@ -4464,7 +4477,7 @@ const VendorScorecardModal = ({ vendor, event, user, onClose, onSaved }) => {
           <div style={{ color: T.textMuted, fontSize: 12 }}>{tier.desc}</div>
         </div>
         <div style={{ textAlign: "right" }}>
-          {event && <div style={{ color: T.textMuted, fontSize: 12 }}>📁 {event.name}</div>}
+          {selectedEvent && <div style={{ color: T.cyan, fontSize: 12, fontWeight: 600 }}>📁 {selectedEvent.name}</div>}
           <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>Score updates as you fill in</div>
         </div>
       </div>
@@ -4630,7 +4643,7 @@ const VendorScorecardsView = ({ user }) => {
       {scoreModal && (
         <VendorScorecardModal
           vendor={scoreModal}
-          event={events[0]}
+          events={events}
           user={user}
           onClose={() => setScoreModal(null)}
           onSaved={load}

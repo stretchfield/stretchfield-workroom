@@ -692,42 +692,88 @@ const StaffDashboard = ({ user }) => (
 const VendorDashboard = ({ user }) => {
   const [rffs, setRffs] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [scorecards, setScorecards] = useState([]);
 
   useEffect(() => {
-    // Only show RFFs submitted by this vendor
-    supabase.from('rffs').select('*')
-      .or(`vendor.eq.${user.name},status.eq.pending`)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => setRffs(data || []));
-    // Tasks assigned to this vendor
-    supabase.from('tasks').select('*')
-      .eq('assignee_id', user.id)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => setTasks(data || []));
+    // Only show RFFs assigned to this vendor
+    supabase.from("rff_vendor_assignments").select("rff_id").eq("vendor_id", user.id).then(({ data: assignments }) => {
+      if (assignments && assignments.length > 0) {
+        const ids = assignments.map(a => a.rff_id);
+        supabase.from("rffs").select("*").in("id", ids).order("created_at", { ascending: false }).then(({ data }) => setRffs(data || []));
+      }
+    });
+    supabase.from("tasks").select("*").eq("assignee_id", user.id).order("created_at", { ascending: false }).then(({ data }) => setTasks(data || []));
+    supabase.from("vendor_scorecards").select("*").eq("vendor_id", user.id).order("created_at", { ascending: false }).then(({ data }) => setScorecards(data || []));
   }, [user.id]);
 
-  const myRffs = rffs.filter(r => r.vendor === user.name || r.status === 'pending');
-  const pendingRffs = rffs.filter(r => r.status === 'pending');
-  const submittedRffs = rffs.filter(r => r.status === 'quote-submitted');
-  const approvedRffs = rffs.filter(r => r.status === 'quote-approved');
+  const pendingRffs = rffs.filter(r => r.status === "vendor-assigned" || r.status === "pending");
+  const submittedRffs = rffs.filter(r => r.status === "quote-submitted");
+  const approvedRffs = rffs.filter(r => r.status === "quote-approved");
+  const latestScore = scorecards.length > 0 ? scorecards[0] : null;
+  const overallTier = latestScore ? getTier(latestScore.total_pct) : null;
 
   return (
     <div>
-      <PageHeader title={`Welcome, ${user.name.split(' ')[0]}`} subtitle="Your RFFs and assigned tasks" />
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 32 }}>
+      <PageHeader title={`Welcome, ${user.name.split(" ")[0]}`} subtitle="Your performance, RFFs and tasks" />
+
+      {/* Stats */}
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 28 }}>
         <Stat icon="📋" label="Open RFFs" value={pendingRffs.length} color={T.cyan} />
         <Stat icon="📤" label="Quotes Submitted" value={submittedRffs.length} color={T.amber} />
         <Stat icon="✅" label="Approved" value={approvedRffs.length} color={T.teal} />
         <Stat icon="✦" label="My Tasks" value={tasks.length} color={T.magenta} />
       </div>
 
+      {/* Performance Score Card */}
+      {scorecards.length > 0 && (
+        <Card style={{ marginBottom: 24, borderLeft: "3px solid " + (overallTier?.color || T.cyan) }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+            <div>
+              <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>My Performance Rating</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ fontSize: 36, fontWeight: 900, color: overallTier?.color }}>{latestScore.total_pct}%</div>
+                <div>
+                  <div style={{ color: overallTier?.color, fontWeight: 700, fontSize: 16 }}>{overallTier?.label}</div>
+                  <div style={{ color: T.textMuted, fontSize: 12 }}>Based on most recent event</div>
+                </div>
+              </div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ color: T.textMuted, fontSize: 12 }}>{scorecards.length} event{scorecards.length !== 1 ? "s" : ""} scored</div>
+              <div style={{ color: T.cyan, fontSize: 12, marginTop: 2 }}>📁 {latestScore.event_name}</div>
+            </div>
+          </div>
+
+          {/* Score History per Event */}
+          <div style={{ borderTop: "1px solid " + T.border, paddingTop: 12 }}>
+            <div style={{ color: T.textSecondary, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Score History by Event</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
+              {scorecards.map(sc => {
+                const t = getTier(sc.total_pct);
+                return (
+                  <div key={sc.id} style={{ padding: "10px 12px", background: T.bg, borderRadius: 8, border: "1px solid " + t.color + "33", borderLeft: "3px solid " + t.color }}>
+                    <div style={{ color: T.textPrimary, fontWeight: 600, fontSize: 13 }}>{sc.event_name || "General"}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
+                      <span style={{ color: t.color, fontWeight: 800, fontSize: 20 }}>{sc.total_pct}%</span>
+                      <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: t.bg, color: t.color, border: "1px solid " + t.color + "44" }}>{t.label}</span>
+                    </div>
+                    <div style={{ color: T.textMuted, fontSize: 10, marginTop: 4 }}>{new Date(sc.created_at).toLocaleDateString()}</div>
+                    {sc.notes && <div style={{ color: T.textSecondary, fontSize: 11, marginTop: 4, fontStyle: "italic" }}>{sc.notes}</div>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Recent RFFs */}
       <Card style={{ marginBottom: 20 }}>
         <SectionHeader title="My RFFs" />
         {rffs.length === 0 ? (
-          <div style={{ color: T.textMuted, fontSize: 13, padding: '20px 0', textAlign: 'center' }}>No RFFs assigned yet.</div>
+          <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No RFFs assigned yet.</div>
         ) : rffs.slice(0, 4).map((r, i) => (
-          <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: i < Math.min(rffs.length, 4) - 1 ? `1px solid ${T.border}` : 'none' }}>
+          <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: i < Math.min(rffs.length, 4) - 1 ? "1px solid " + T.border : "none" }}>
             <div>
               <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{r.title}</div>
               <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>🏢 {r.client_name} · Due {r.deadline}</div>
@@ -741,10 +787,10 @@ const VendorDashboard = ({ user }) => {
       <Card>
         <SectionHeader title="My Tasks" />
         {tasks.length === 0 ? (
-          <div style={{ color: T.textMuted, fontSize: 13, padding: '20px 0', textAlign: 'center' }}>No tasks assigned yet.</div>
+          <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No tasks assigned yet.</div>
         ) : tasks.slice(0, 4).map((t, i) => (
-          <div key={t.id} style={{ padding: '12px 0', borderBottom: i < Math.min(tasks.length, 4) - 1 ? `1px solid ${T.border}` : 'none' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+          <div key={t.id} style={{ padding: "12px 0", borderBottom: i < Math.min(tasks.length, 4) - 1 ? "1px solid " + T.border : "none" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
               <div>
                 <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{t.name}</div>
                 <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Due {t.deadline}</div>

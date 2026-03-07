@@ -452,13 +452,18 @@ const CEODashboard = ({ onTab, user }) => {
     supabase.from('vendor_scorecards').select('*').order('created_at', { ascending: false }).then(({ data }) => setScorecards(data || []));
   }, []);
 
-  // Live unread notifications for CEO
+  // Live unread notifications for CEO - polls every 5s + realtime
   useEffect(() => {
     if (!user?.id) return;
     const fetch = () => supabase.from('notifications').select('*').eq('user_id', user.id).eq('read', false).order('created_at', { ascending: false }).then(({ data }) => setUnreadNotifs(data || []));
     fetch();
-    const sub = supabase.channel('ceo-dash-notif-' + user.id).on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: 'user_id=eq.' + user.id }, fetch).subscribe();
-    return () => supabase.removeChannel(sub);
+    const sub = supabase.channel('ceo-dash-notif-' + user.id)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications' }, fetch)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, fetch)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'notifications' }, fetch)
+      .subscribe();
+    const interval = setInterval(fetch, 5000);
+    return () => { supabase.removeChannel(sub); clearInterval(interval); };
   }, [user?.id]);
 
   const pendingInvoices = invoices.filter(i => i.status === 'pending');
@@ -1165,7 +1170,7 @@ const EventsView = ({ user }) => {
   );
 };
 
-const TasksView = ({ userRole }) => {
+const TasksView = ({ userRole, openTaskId, onOpenHandled }) => {
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [members, setMembers] = useState([]);
@@ -3149,7 +3154,7 @@ const ClientFeedbackForm = ({ event, user }) => {
 };
 
 
-const NotificationsView = ({ user }) => {
+const NotificationsView = ({ user, onNavigate }) => {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -3171,6 +3176,26 @@ const NotificationsView = ({ user }) => {
       .subscribe();
     return () => supabase.removeChannel(sub);
   }, [user.id]);
+
+  const getNavTarget = (note) => {
+    const typeMap = {
+      invoice: 'invoices', task: 'tasks', quote: 'vendors', rff: 'vendors',
+      crm: 'crm', approval: 'vendors', event: 'events', finance: 'finance',
+      budget: 'budgets', expense: 'expenses', scorecard: 'scorecards',
+    };
+    return typeMap[note.type] || null;
+  };
+
+  const handleNoteClick = async (note) => {
+    // Mark as read
+    await supabase.from('notifications').update({ read: true }).eq('id', note.id);
+    load();
+    // Navigate to source
+    const target = getNavTarget(note);
+    if (target && onNavigate) {
+      onNavigate(target, note.resource_id || null);
+    }
+  };
 
   const markRead = async (id) => {
     await supabase.from('notifications').update({ read: true }).eq('id', id);
@@ -3258,6 +3283,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingResourceId, setPendingResourceId] = useState(null);
   const isMobile = useIsMobile();
 
   const currentUser = propProfile ? {
@@ -3302,7 +3328,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
         if (role === "Vendor Manager") return <StaffDashboard user={currentUser} />;
         return <StaffDashboard user={currentUser} />;
       case "events": return <EventsView user={currentUser} />;
-      case "tasks": return <TasksView userRole={currentUser.role} />;
+      case "tasks": return <TasksView userRole={currentUser.role} openTaskId={pendingResourceId} onOpenHandled={() => setPendingResourceId(null)} />;
       case "vendors": return <VendorsView />;
       case "invoices": return <InvoicesView />;
       case "clients": return <ClientsView user={currentUser} />;
@@ -3326,7 +3352,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "expenses": return <ExpenseView user={currentUser} />;
       case "finance-reports": return <FinanceReportsView user={currentUser} />;
       case "feedback": return <FeedbackView userRole={currentUser.role} />;
-      case "notifications": return <NotificationsView user={currentUser} />;
+      case "notifications": return <NotificationsView user={currentUser} onNavigate={(tab, resourceId) => { setActiveTab(tab); if (resourceId) setPendingResourceId(resourceId); }} />;
       case "rffs": return <VendorRFFsView user={currentUser} />;
       case "quotes": return <VendorQuotesView user={currentUser} />;
       case "vendor-tasks": return <VendorTasksView user={currentUser} />;

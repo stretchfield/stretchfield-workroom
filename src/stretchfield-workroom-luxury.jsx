@@ -661,30 +661,32 @@ const CEODashboard = ({ onTab, user }) => {
         </Card>
       )}
 
-      {/* Vendor Ratings Summary */}
+      {/* Vendor Ratings Summary — A/B/C/D grades only */}
       {vendorProfiles.length > 0 && (
         <div style={{ marginBottom: 28 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Vendor Performance</div>
-            <button onClick={() => onTab('vendors')} style={{ background: 'none', border: 'none', color: T.cyan, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>View Full Ratings →</button>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Vendor Grades</div>
+            <button onClick={() => onTab('vendors')} style={{ background: 'none', border: 'none', color: T.cyan, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Full Ratings →</button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
             {vendorProfiles.sort((a,b) => (b.vendor_score||0) - (a.vendor_score||0)).map(v => {
               const score = v.vendor_score || 0;
               const count = v.vendor_scorecard_count || 0;
-              const isPoor = count > 0 && score < 50;
               const isUnrated = count === 0;
-              const t = count > 0 ? getTier(score) : null;
-              const recentSc = scorecards.find(s => s.vendor_id === v.id);
+              // A/B/C/D grading
+              let grade, gradeColor, gradeBg;
+              if (isUnrated) { grade = '—'; gradeColor = T.textMuted; gradeBg = T.bg; }
+              else if (score >= 85) { grade = 'A'; gradeColor = '#10B981'; gradeBg = '#10B98115'; }
+              else if (score >= 70) { grade = 'B'; gradeColor = T.cyan; gradeBg = T.cyan + '15'; }
+              else if (score >= 50) { grade = 'C'; gradeColor = T.amber; gradeBg = T.amber + '15'; }
+              else { grade = 'D'; gradeColor = '#F43F5E'; gradeBg = '#F43F5E15'; }
               return (
-                <div key={v.id} style={{ padding: '12px 14px', background: T.surface, border: '1px solid ' + (isPoor ? '#F43F5E44' : isUnrated ? T.border : t.color + '33'), borderRadius: 10, borderLeft: '3px solid ' + (isPoor ? '#F43F5E' : isUnrated ? T.border : t.color) }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <div key={v.id} style={{ padding: '12px 14px', background: T.surface, border: '1px solid ' + gradeColor + '44', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: gradeBg, border: '2px solid ' + gradeColor + '66', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 900, color: gradeColor, flexShrink: 0 }}>{grade}</div>
+                  <div>
                     <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{v.name}</div>
-                    <div style={{ color: isUnrated ? T.textMuted : isPoor ? '#F43F5E' : t.color, fontWeight: 900, fontSize: 18 }}>{isUnrated ? '—' : score + '%'}</div>
+                    <div style={{ color: gradeColor, fontSize: 11, fontWeight: 600, marginTop: 2 }}>{isUnrated ? 'Unrated' : grade === 'D' ? '⛔ Do Not Engage' : grade === 'A' ? 'Excellent' : grade === 'B' ? 'Good' : 'Fair'}</div>
                   </div>
-                  <div style={{ color: isUnrated ? T.textMuted : isPoor ? '#F43F5E' : t.color, fontSize: 11, fontWeight: 600 }}>{isUnrated ? 'Unrated' : isPoor ? '⛔ Do Not Engage' : t.label}</div>
-                  {recentSc && <div style={{ color: T.textMuted, fontSize: 10, marginTop: 4 }}>Last: {recentSc.event_name}</div>}
-                  <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{count} event{count !== 1 ? 's' : ''} scored</div>
                 </div>
               );
             })}

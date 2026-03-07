@@ -1289,40 +1289,52 @@ const EventsView = ({ user }) => {
           <div style={{ color: T.textMuted, fontSize: 13 }}>Click "+ New Event" to get started.</div>
         </Card>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
-          {events.map(p => (
-            <Card key={p.id} style={{ marginBottom: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                <div>
-                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16 }}>{p.name}</div>
-                  <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{p.client} · Due {p.deadline}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
+          {events.map((p, idx) => (
+            <div key={p.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 22px", transition: "box-shadow 0.2s, border-color 0.2s", animationDelay: idx * 0.04 + "s" }}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 4px 28px ${T.cyan}12`; e.currentTarget.style.borderColor = T.cyan + "40"; }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = T.border; }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, letterSpacing: "-0.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>{p.client}</div>
                 </div>
                 <Badge status={p.status} />
               </div>
-              <ProgressBar value={p.completion || 0} />
-              <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 6 }}>{p.completion || 0}% · {p.phase}</div>
-              <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+
+              {/* Phase + deadline row */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ background: T.cyan + "18", color: T.cyan, padding: "2px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>{p.phase}</div>
+                {p.deadline && <div style={{ color: T.textMuted, fontSize: 11 }}>Due {p.deadline}</div>}
+              </div>
+
+              {/* Progress bar */}
+              <div style={{ height: 4, background: T.border + "44", borderRadius: 2, marginBottom: 6 }}>
+                <div style={{ height: "100%", width: (p.completion || 0) + "%", background: `linear-gradient(90deg, ${T.cyan}, ${T.teal})`, borderRadius: 2, transition: "width 0.4s ease" }} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ color: T.textMuted, fontSize: 10 }}>{p.completion || 0}% complete</div>
                 {canManage ? (
                   <button onClick={async (e) => {
                     e.stopPropagation();
-                    await supabase.from('projects').update({ active_for_client: !p.active_for_client }).eq('id', p.id);
+                    await supabase.from("projects").update({ active_for_client: !p.active_for_client }).eq("id", p.id);
                     load();
                   }} style={{
-                    background: p.active_for_client ? T.teal + '20' : T.bg,
-                    border: `1px solid ${p.active_for_client ? T.teal : T.border}`,
+                    background: p.active_for_client ? T.teal + "18" : "none",
+                    border: `1px solid ${p.active_for_client ? T.teal + "60" : T.border}`,
                     color: p.active_for_client ? T.teal : T.textMuted,
-                    padding: '4px 12px', borderRadius: 20, cursor: 'pointer',
-                    fontSize: 11, fontWeight: 600,
+                    padding: "3px 10px", borderRadius: 20, cursor: "pointer", fontSize: 10, fontWeight: 700,
                   }}>
-                    {p.active_for_client ? '✓ Active for Client' : '○ Hidden from Client'}
+                    {p.active_for_client ? "✓ Client Visible" : "○ Hidden"}
                   </button>
                 ) : (
-                  <span style={{ color: p.active_for_client ? T.teal : T.textMuted, fontSize: 11, fontWeight: 600 }}>
-                    {p.active_for_client ? '✓ Active for Client' : '○ Hidden from Client'}
+                  <span style={{ color: p.active_for_client ? T.teal : T.textMuted, fontSize: 10, fontWeight: 600 }}>
+                    {p.active_for_client ? "✓ Visible" : "○ Hidden"}
                   </span>
                 )}
               </div>
-            </Card>
+            </div>
           ))}
         </div>
       )}

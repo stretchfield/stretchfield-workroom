@@ -1455,39 +1455,61 @@ const TasksView = ({ userRole, openTaskId, onOpenHandled }) => {
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No tasks yet</div>
           <div style={{ color: T.textMuted, fontSize: 13 }}>Click "+ New Task" to get started.</div>
         </Card>
-      ) : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>{tasks.map(t => (
-        <Card key={t.id} style={{ marginBottom: 0, cursor: 'pointer' }} onClick={() => openDetail(t)}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-            <div>
-              <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{t.name}</div>
-              <div style={{ color: T.cyan, fontSize: 12, marginTop: 4, fontWeight: 600 }}>📁 {projects.find(p => p.id === t.project_id)?.name || 'No Event'}</div>
-              {projects.find(p => p.id === t.project_id)?.client && (
-                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2, fontWeight: 500 }}>🏢 {projects.find(p => p.id === t.project_id)?.client}</div>
-              )}
-              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>Due {t.deadline}</div>
-              {t.assignee_name && <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 2 }}>👤 Assigned to: <span style={{ color: T.cyan }}>{t.assignee_name}</span></div>}
-              {t.assigned_by && <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 2 }}>📋 Assigned by: {members.find(m => m.id === t.assigned_by)?.name || t.assigned_by}</div>}
-            </div>
-            <Badge status={t.status} />
-          </div>
-          <ProgressBar value={t.progress || 0} />
-          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
-            {canToggleVisibility && <button onClick={async (e) => {
-              e.stopPropagation();
-              await supabase.from('tasks').update({ visible_to_client: !t.visible_to_client }).eq('id', t.id);
-              load();
-            }} style={{
-              background: t.visible_to_client ? T.cyan + '20' : T.bg,
-              border: `1px solid ${t.visible_to_client ? T.cyan : T.border}`,
-              color: t.visible_to_client ? T.cyan : T.textMuted,
-              padding: '4px 12px', borderRadius: 20, cursor: 'pointer',
-              fontSize: 11, fontWeight: 600,
-            }}>
-              {t.visible_to_client ? '👁 Visible to Client' : '🚫 Hidden from Client'}
-            </button>}
-          </div>
-        </Card>
-      ))}</div>}
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
+          {tasks.map((t, idx) => {
+            const proj = projects.find(p => p.id === t.project_id);
+            const pct = t.progress || 0;
+            const barColor = t.status === "completed" ? T.teal : pct > 66 ? T.cyan : pct > 33 ? T.amber : T.magenta;
+            return (
+              <div key={t.id} onClick={() => openDetail(t)} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px", cursor: "pointer", transition: "box-shadow 0.2s, border-color 0.2s" }}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 4px 24px ${T.cyan}12`; e.currentTarget.style.borderColor = T.cyan + "40"; }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = T.border; }}
+              >
+                {/* Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, letterSpacing: "-0.01em", marginBottom: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</div>
+                    {proj && <div style={{ color: T.cyan, fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>{proj.name}</div>}
+                    {proj?.client && <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{proj.client}</div>}
+                  </div>
+                  <Badge status={t.status} />
+                </div>
+
+                {/* Progress bar */}
+                <div style={{ height: 3, background: T.border + "44", borderRadius: 2, marginBottom: 6 }}>
+                  <div style={{ height: "100%", width: pct + "%", background: barColor, borderRadius: 2, transition: "width 0.4s ease" }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <div style={{ color: T.textMuted, fontSize: 10 }}>{pct}% complete</div>
+                  {t.deadline && <div style={{ color: T.textMuted, fontSize: 10 }}>Due {t.deadline}</div>}
+                </div>
+
+                {/* Assignee + visibility */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 8, borderTop: `1px solid ${T.border}44` }}>
+                  <div style={{ color: t.assignee_name ? T.cyan : T.textMuted, fontSize: 10, fontWeight: t.assignee_name ? 600 : 400 }}>
+                    {t.assignee_name ? "→ " + t.assignee_name : "Unassigned"}
+                  </div>
+                  {canToggleVisibility && (
+                    <button onClick={async (e) => {
+                      e.stopPropagation();
+                      await supabase.from("tasks").update({ visible_to_client: !t.visible_to_client }).eq("id", t.id);
+                      load();
+                    }} style={{
+                      background: t.visible_to_client ? T.teal + "18" : "none",
+                      border: `1px solid ${t.visible_to_client ? T.teal + "50" : T.border}`,
+                      color: t.visible_to_client ? T.teal : T.textMuted,
+                      padding: "2px 8px", borderRadius: 20, cursor: "pointer", fontSize: 9, fontWeight: 700,
+                    }}>
+                      {t.visible_to_client ? "👁 Client" : "Hidden"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Task Detail Modal */}
       {detailTask && (

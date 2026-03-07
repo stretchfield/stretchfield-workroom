@@ -64,7 +64,8 @@ const NOTIFICATIONS = {
 };
 
 // ─── THEME — Deep Navy + Cyan/Blue/Magenta Luxury ───────────────────────────
-const T = {
+// ─── THEME SYSTEM ────────────────────────────────────────────────────────────
+const DARK_THEME = {
   bg:           "#060B14",
   bgDeep:       "#03070E",
   surface:      "#0C1525",
@@ -72,7 +73,6 @@ const T = {
   surfaceHigh:  "#152238",
   border:       "#1A2E4A",
   borderLight:  "#223B5E",
-  // Logo-pulled accent palette
   cyan:         "#00C8FF",
   cyanDim:      "#00C8FF18",
   cyanGlow:     "#00C8FF",
@@ -88,11 +88,87 @@ const T = {
   redDim:       "#F43F5E15",
   gold:         "#C9A84C",
   goldDim:      "#C9A84C15",
-  // Text
   textPrimary:  "#E8F0FF",
   textSecondary:"#7A94BF",
   textMuted:    "#3D5478",
   textGhost:    "#243551",
+  isDark:       true,
+};
+
+const LIGHT_THEME = {
+  bg:           "#F4F6FB",
+  bgDeep:       "#EAECF4",
+  surface:      "#FFFFFF",
+  surfaceRaise: "#F0F3FA",
+  surfaceHigh:  "#E8EDF8",
+  border:       "#D8DEEE",
+  borderLight:  "#C8D0E4",
+  cyan:         "#0088CC",
+  cyanDim:      "#0088CC18",
+  cyanGlow:     "#0088CC",
+  magenta:      "#B020D0",
+  magentaDim:   "#B020D015",
+  teal:         "#009982",
+  tealDim:      "#00998215",
+  blue:         "#2255DD",
+  blueDim:      "#2255DD15",
+  amber:        "#C07800",
+  amberDim:     "#C0780015",
+  red:          "#D42040",
+  redDim:       "#D4204015",
+  gold:         "#9A7020",
+  goldDim:      "#9A702015",
+  textPrimary:  "#0F1A2E",
+  textSecondary:"#3D5478",
+  textMuted:    "#7A94BF",
+  textGhost:    "#B8C8E0",
+  isDark:       false,
+};
+
+let T = DARK_THEME;
+
+const ThemeContext = React.createContext({ T: DARK_THEME, toggleTheme: () => {}, isDark: true });
+
+const ThemeProvider = ({ children }) => {
+  const [isDark, setIsDark] = useState(() => {
+    try { return localStorage.getItem("sf-theme") !== "light"; } catch { return true; }
+  });
+  const theme = isDark ? DARK_THEME : LIGHT_THEME;
+  T = theme;
+  const toggleTheme = () => {
+    setIsDark(d => {
+      const next = !d;
+      try { localStorage.setItem("sf-theme", next ? "dark" : "light"); } catch {}
+      return next;
+    });
+  };
+  return (
+    <ThemeContext.Provider value={{ T: theme, toggleTheme, isDark }}>
+      <div style={{ colorScheme: isDark ? "dark" : "light" }}>{children}</div>
+    </ThemeContext.Provider>
+  );
+};
+
+const useTheme = () => React.useContext(ThemeContext);
+
+const ThemeToggle = ({ compact }) => {
+  const { isDark, toggleTheme } = useTheme();
+  return (
+    <button onClick={toggleTheme} title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+      style={{
+        background: "none", border: `1px solid ${T.border}`, borderRadius: 20,
+        padding: compact ? "4px 10px" : "5px 14px", cursor: "pointer",
+        display: "flex", alignItems: "center", gap: 6,
+        color: T.textMuted, fontSize: 11, fontWeight: 600,
+        letterSpacing: "0.06em", transition: "all 0.2s", flexShrink: 0,
+      }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = T.cyan + "80"; e.currentTarget.style.color = T.cyan; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.textMuted; }}
+    >
+      <span style={{ fontSize: 13 }}>{isDark ? "☀️" : "🌙"}</span>
+      {!compact && <span>{isDark ? "Light" : "Dark"}</span>}
+    </button>
+  );
 };
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -3396,14 +3472,17 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
   };
 
   return (
+    <ThemeProvider>
     <div className="sf-layout" style={{ display: "flex", height: "100vh", background: T.bg, fontFamily: "'DM Sans', sans-serif", color: T.textPrimary, overflow: "hidden" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;0,9..40,900&family=Cormorant+Garamond:wght@300;400;500;600;700&display=swap');
         * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: ${T.bg}; } ::-webkit-scrollbar-thumb { background: ${T.border}; border-radius: 3px; }
-        input, select { font-family: inherit; }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: ${T.bg}; } ::-webkit-scrollbar-thumb { background: ${T.border}44; border-radius: 3px; }
+        input, select, textarea { font-family: inherit; }
         .sf-bottom-nav { display: none; }
         .sf-mobile-header { display: none; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        .sf-animate { animation: fadeUp 0.35s ease forwards; }
         @media (max-width: 768px) {
           .sf-mobile-header { display: flex !important; }
           .sf-sidebar { display: none !important; }
@@ -3412,57 +3491,76 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
         }
       `}</style>
 
-      <div className="sf-sidebar" style={{ display: isMobile ? "none" : "flex", width: sidebarCollapsed ? 60 : 230, background: T.surface, borderRight: `1px solid ${T.border}`, flexDirection: "column", transition: "width 0.25s ease", flexShrink: 0, overflow: "hidden" }}>
-        <div style={{ padding: "20px 16px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: `linear-gradient(135deg, ${T.cyan}, #3B7BFF)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 900, color: "#000", flexShrink: 0 }}>S</div>
-          {!sidebarCollapsed && <div><div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>WorkRoom</div><div style={{ color: T.textMuted, fontSize: 11 }}>Stretchfield</div></div>}
+      <div className="sf-sidebar" style={{ display: isMobile ? "none" : "flex", width: sidebarCollapsed ? 58 : 228, background: T.bgDeep, borderRight: `1px solid ${T.border}`, flexDirection: "column", transition: "width 0.28s cubic-bezier(0.22,1,0.36,1)", flexShrink: 0, overflow: "hidden", position: "relative" }}>
+        <div style={{ position: "absolute", top: 0, right: 0, width: 1, height: "100%", background: `linear-gradient(180deg, transparent, ${T.cyan}25, ${T.magenta}18, transparent)`, pointerEvents: "none" }} />
+        <div style={{ padding: "16px 12px 14px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 10, minHeight: 60 }}>
+          <img src={LOGO_SRC} alt="S" style={{ width: 28, height: 28, objectFit: "contain", flexShrink: 0, borderRadius: 6 }} />
+          {!sidebarCollapsed && (
+            <div>
+              <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13, letterSpacing: "0.05em" }}>Stretchfield</div>
+              <div style={{ color: T.textMuted, fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", marginTop: 1 }}>WorkRoom</div>
+            </div>
+          )}
         </div>
-        <nav style={{ flex: 1, padding: "12px 8px", overflowY: "auto" }}>
-          {getNavItems(currentUser.role).map(item => (
-            <button key={item.id} onClick={() => setActiveTab(item.id)} style={{
-              width: "100%", display: "flex", alignItems: "center", gap: 10,
-              padding: "10px 12px", borderRadius: 8, border: "none", cursor: "pointer",
-              background: activeTab === item.id ? T.cyan + "18" : "none",
-              color: activeTab === item.id ? T.cyan : T.textSecondary,
-              fontWeight: activeTab === item.id ? 700 : 400, fontSize: 13,
-              marginBottom: 2, textAlign: "left",
-            }}>
-              <span style={{ fontSize: 16, flexShrink: 0 }}>{item.icon}</span>
-              {!sidebarCollapsed && item.label}
-            </button>
-          ))}
+        <nav style={{ flex: 1, padding: "10px 8px", overflowY: "auto" }}>
+          {getNavItems(currentUser.role).map(item => {
+            const active = activeTab === item.id;
+            return (
+              <button key={item.id} onClick={() => setActiveTab(item.id)} style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 10,
+                padding: "9px 10px", borderRadius: 6, border: "none", cursor: "pointer",
+                background: active ? T.cyan + "18" : "none",
+                color: active ? T.cyan : T.textMuted,
+                fontWeight: active ? 700 : 400, fontSize: 11,
+                marginBottom: 1, textAlign: "left",
+                borderLeft: active ? `2px solid ${T.cyan}` : "2px solid transparent",
+                letterSpacing: "0.04em", textTransform: "uppercase",
+                transition: "all 0.15s", whiteSpace: "nowrap", overflow: "hidden",
+              }}
+                onMouseEnter={e => { if (!active) { e.currentTarget.style.background = T.surface; e.currentTarget.style.color = T.textSecondary; } }}
+                onMouseLeave={e => { if (!active) { e.currentTarget.style.background = "none"; e.currentTarget.style.color = T.textMuted; } }}
+              >
+                <span style={{ fontSize: 5, flexShrink: 0, color: active ? T.cyan : T.textGhost }}>■</span>
+                {!sidebarCollapsed && item.label}
+              </button>
+            );
+          })}
         </nav>
-        <div style={{ padding: "12px 16px", borderTop: `1px solid ${T.border}` }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 8px", borderRadius: 8 }}>
-            <Avatar initials={currentUser.avatar} size={32} color={T.cyan} />
-            {!sidebarCollapsed && <div style={{ overflow: "hidden" }}>
-              <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{currentUser.name}</div>
-              <div style={{ color: T.textMuted, fontSize: 11 }}>{currentUser.role}</div>
+        <div style={{ padding: "10px 10px 12px", borderTop: `1px solid ${T.border}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px", borderRadius: 6, marginBottom: 8 }}>
+            <Avatar initials={currentUser.avatar} size={28} color={T.cyan} />
+            {!sidebarCollapsed && <div style={{ overflow: "hidden", flex: 1 }}>
+              <div style={{ color: T.textPrimary, fontSize: 11, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{currentUser.name}</div>
+              <div style={{ color: T.textMuted, fontSize: 10 }}>{currentUser.role}</div>
             </div>}
           </div>
-          <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} style={{ width: "100%", background: "none", border: `1px solid ${T.border}`, color: T.textMuted, borderRadius: 6, padding: "6px", cursor: "pointer", marginTop: 8, fontSize: 12 }}>{sidebarCollapsed ? "→" : "←"}</button>
+          {!sidebarCollapsed && <div style={{ marginBottom: 6 }}><ThemeToggle /></div>}
+          <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} style={{ width: "100%", background: "none", border: `1px solid ${T.border}`, color: T.textMuted, borderRadius: 6, padding: "5px", cursor: "pointer", fontSize: 13, transition: "all 0.15s" }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = T.cyan + "60"; e.currentTarget.style.color = T.cyan; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.textMuted; }}
+          >{sidebarCollapsed ? "›" : "‹"}</button>
         </div>
       </div>
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <div style={{ padding: "0 24px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${T.border}`, background: T.surface, flexShrink: 0 }}>
-          <div style={{ color: T.textSecondary, fontSize: 13 }}>
-            <span style={{ color: T.textMuted }}>Stretchfield</span>
-            <span style={{ margin: "0 8px" }}>/</span>
-            <span style={{ color: T.textPrimary, fontWeight: 600, textTransform: "capitalize" }}>{activeTab.replace("-", " ")}</span>
+        <div style={{ padding: "0 24px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${T.border}`, background: T.bgDeep, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ color: T.textMuted, fontSize: 11, letterSpacing: "0.04em" }}>Stretchfield</span>
+            <span style={{ color: T.textGhost, fontSize: 11 }}>/</span>
+            <span style={{ color: T.textPrimary, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.10em" }}>{activeTab.replace(/-/g, " ")}</span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ background: T.cyan + "22", border: `1px solid ${T.cyan}44`, color: T.cyan, padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>{currentUser.role}</div>
-            <button onClick={() => setActiveTab('notifications')} style={{ position: "relative", background: activeTab === "notifications" ? T.cyan + "22" : "none", border: "1px solid " + (activeTab === "notifications" ? T.cyan + "44" : T.border), color: activeTab === "notifications" ? T.cyan : T.textMuted, width: 36, height: 36, borderRadius: 8, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ background: T.cyan + "18", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "3px 12px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>{currentUser.role}</div>
+            <button onClick={() => setActiveTab("notifications")} style={{ position: "relative", background: activeTab === "notifications" ? T.cyan + "18" : "none", border: "1px solid " + (activeTab === "notifications" ? T.cyan + "40" : T.border), color: activeTab === "notifications" ? T.cyan : T.textMuted, width: 34, height: 34, borderRadius: 8, cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}>
               🔔
               {unreadCount > 0 && (
-                <span style={{ position: "absolute", top: -4, right: -4, background: "#F43F5E", color: "#fff", fontSize: 10, fontWeight: 800, borderRadius: "50%", width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid " + T.bg }}>
+                <span style={{ position: "absolute", top: -5, right: -5, background: T.red, color: "#fff", fontSize: 9, fontWeight: 900, borderRadius: "50%", width: 17, height: 17, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid " + T.bgDeep, boxShadow: `0 0 8px ${T.red}80` }}>
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
               )}
             </button>
-            <button onClick={onLogout} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "5px 14px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 600 }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = T.magenta + "44"; e.currentTarget.style.color = T.magenta; }}
+            <button onClick={onLogout} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "5px 14px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", transition: "all 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = T.red + "60"; e.currentTarget.style.color = T.red; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.textMuted; }}
             >Sign Out</button>
           </div>
@@ -3509,6 +3607,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
         </div>
       )}
     </div>
+    </ThemeProvider>
   );
 }
 

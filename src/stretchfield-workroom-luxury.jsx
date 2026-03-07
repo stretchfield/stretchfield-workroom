@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { getEvents, createEvent, updateEvent, getTasks, createTask, getProfiles, deleteProfile, updateTask, getInvoices, createInvoice, updateInvoice, getRFFs, createRFF, updateRFF, uploadRFFDocument } from "./dataService";
 
 // ─── LOGO ────────────────────────────────────────────────────────────────────

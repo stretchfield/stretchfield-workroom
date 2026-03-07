@@ -2219,49 +2219,55 @@ const ClientsView = ({ user }) => {
   const isCEOorAdmin = ['CEO', 'Administrator'].includes(user?.role);
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <PageHeader title="Client Database" subtitle={`${clients.length} clients`} />
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>CRM</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Client Database</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{clients.length} client{clients.length !== 1 ? "s" : ""} in portfolio</div>
+        </div>
         <Btn onClick={() => setModal(true)}>+ Add Client</Btn>
       </div>
 
       {loading ? (
-        <div style={{ color: T.textMuted, textAlign: 'center', padding: 60 }}>Loading...</div>
+        <div style={{ color: T.textMuted, textAlign: "center", padding: 60 }}>Loading...</div>
       ) : clients.length === 0 ? (
-        <Card style={{ textAlign: 'center', padding: 60 }}>
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>🏢</div>
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No clients yet</div>
           <div style={{ color: T.textMuted, fontSize: 13 }}>Click "+ Add Client" to get started.</div>
-        </Card>
+        </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
-          {clients.map(c => (
-            <Card key={c.id}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
-                <Avatar initials={c.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2)} size={48} color={T.blue} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16 }}>{c.company || c.name}</div>
-                  <div style={{ color: T.textMuted, fontSize: 12 }}>{c.company ? c.name : ''}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
+          {clients.map((c, idx) => (
+            <div key={c.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 22px", transition: "box-shadow 0.2s, border-color 0.2s" }}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 4px 24px ${T.cyan}10`; e.currentTarget.style.borderColor = T.cyan + "35"; }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = T.border; }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 10, background: `linear-gradient(135deg, ${T.cyan}30, ${T.teal}20)`, border: `1px solid ${T.cyan}30`, display: "flex", alignItems: "center", justifyContent: "center", color: T.cyan, fontWeight: 800, fontSize: 15, flexShrink: 0 }}>
+                  {c.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)}
                 </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.company || c.name}</div>
+                  {c.company && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{c.name}</div>}
+                </div>
+                {isCEOorAdmin && profileEmails.includes(c.email) && (
+                  <div style={{ color: T.teal, fontSize: 10, fontWeight: 700, background: T.teal + "18", border: `1px solid ${T.teal}40`, padding: "2px 8px", borderRadius: 20, flexShrink: 0 }}>✓ Portal</div>
+                )}
               </div>
-              <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 12, marginBottom: 12 }}>
-                {c.email && <div style={{ color: T.textSecondary, fontSize: 13, marginBottom: 4 }}>✉ {c.email}</div>}
-                {c.phone && <div style={{ color: T.textSecondary, fontSize: 13, marginBottom: 4 }}>📞 {c.phone}</div>}
-                {c.notes && <div style={{ color: T.textMuted, fontSize: 12, marginTop: 8, fontStyle: 'italic' }}>{c.notes}</div>}
+              <div style={{ borderTop: `1px solid ${T.border}44`, paddingTop: 12, marginBottom: 12 }}>
+                {c.email && <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 4 }}>✉ {c.email}</div>}
+                {c.phone && <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 4 }}>📞 {c.phone}</div>}
+                {c.notes && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 8, fontStyle: "italic", lineHeight: 1.5 }}>{c.notes}</div>}
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {isCEOorAdmin && (
-                  profileEmails.includes(c.email) ? (
-                    <span style={{ color: T.teal, fontSize: 12, fontWeight: 600 }}>✓ Login Active</span>
-                  ) : (
-                    <Btn small onClick={() => { setLoginModal(c); setError(''); setSuccess(''); }}>
-                      🔑 Create Login
-                    </Btn>
-                  )
+              <div style={{ display: "flex", gap: 8 }}>
+                {isCEOorAdmin && !profileEmails.includes(c.email) && (
+                  <Btn small onClick={() => { setLoginModal(c); setError(""); setSuccess(""); }}>🔑 Create Login</Btn>
                 )}
                 <Btn small variant="ghost" onClick={() => handleDelete(c.id)}>Remove</Btn>
               </div>
-            </Card>
+            </div>
           ))}
         </div>
       )}

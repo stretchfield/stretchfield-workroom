@@ -482,188 +482,218 @@ const CEODashboard = ({ onTab, user }) => {
   const wonLeadsAwaitingApproval = leads.filter(l => l.status === 'won' && !l.approved);
   const avgRating = feedback.length ? (feedback.reduce((a, f) => a + f.rating, 0) / feedback.length).toFixed(1) : null;
 
+  const now2 = new Date();
+  const greeting = now2.getHours() < 12 ? 'Good Morning' : now2.getHours() < 17 ? 'Good Afternoon' : 'Good Evening';
+  const dateStr = now2.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
   return (
-    <div>
-      <PageHeader title="Executive Overview" subtitle="Live company performance snapshot" />
+    <div style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <style>{`
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
+        .exec-card { animation: fadeUp 0.4s ease forwards; }
+        .exec-kpi:hover { transform: translateY(-2px); transition: transform 0.2s ease; }
+      `}</style>
 
-      {/* Alerts — only show unread notifications */}
-      {unreadNotifs.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
-          {unreadNotifs.slice(0, 5).map(n => (
-            <div key={n.id} onClick={() => onTab('notifications')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: T.amber + '15', border: '1px solid ' + T.amber + '44', borderRadius: 8, marginBottom: 8, cursor: 'pointer' }}>
-              <span style={{ fontSize: 18 }}>🔔</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>{n.title}</div>
-                <div style={{ color: T.textMuted, fontSize: 12 }}>{n.message}</div>
-              </div>
-              <span style={{ color: T.amber, fontSize: 12 }}>View →</span>
-            </div>
-          ))}
-          {unreadNotifs.length > 5 && <div style={{ color: T.textMuted, fontSize: 12, textAlign: 'center', padding: '8px 0', cursor: 'pointer' }} onClick={() => onTab('notifications')}>+{unreadNotifs.length - 5} more notifications</div>}
-        </div>
-      )}
-      {wonLeadsAwaitingApproval.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <div onClick={() => onTab('crm')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: T.amber + '15', border: '1px solid ' + T.amber + '44', borderRadius: 8, marginBottom: 8, cursor: 'pointer' }}>
-            <span style={{ fontSize: 18 }}>🏆</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>{wonLeadsAwaitingApproval.length} Won Lead{wonLeadsAwaitingApproval.length > 1 ? 's' : ''} Awaiting Approval</div>
-              <div style={{ color: T.textMuted, fontSize: 12 }}>{wonLeadsAwaitingApproval.map(l => l.company).join(', ')}</div>
-            </div>
-            <span style={{ color: T.amber, fontSize: 12 }}>Review →</span>
+      {/* Executive Header */}
+      <div style={{ marginBottom: 32, paddingBottom: 24, borderBottom: '1px solid ' + T.border }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <div style={{ color: T.textMuted, fontSize: 12, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>{dateStr}</div>
+            <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: T.textPrimary, letterSpacing: '-0.02em' }}>{greeting}</h1>
+            <div style={{ color: T.textMuted, fontSize: 14, marginTop: 4 }}>Here's your company at a glance</div>
           </div>
-        </div>
-      )}
-      {pendingInvoices.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <div onClick={() => onTab('invoices')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: T.magenta + '15', border: '1px solid ' + T.magenta + '44', borderRadius: 8, cursor: 'pointer' }}>
-            <span style={{ fontSize: 18 }}>🧾</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ color: T.magenta, fontWeight: 700, fontSize: 13 }}>{pendingInvoices.length} Invoice{pendingInvoices.length > 1 ? 's' : ''} Pending</div>
-              <div style={{ color: T.textMuted, fontSize: 12 }}>GHS {pendingInvoices.reduce((a, i) => a + (i.amount || 0), 0).toLocaleString()} outstanding</div>
-            </div>
-            <span style={{ color: T.magenta, fontSize: 12 }}>Review →</span>
-          </div>
-        </div>
-      )}
-
-      {/* Top Stats Row */}
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 24 }}>
-        <Stat icon="📁" label="Active Events" value={events.filter(e => e.status === 'active').length} sub={events.length + ' total'} color={T.cyan} />
-        <Stat icon="👥" label="Clients" value={clients.length} color={T.blue} />
-        <Stat icon="🤝" label="Vendors" value={vendors.length} color={T.teal} />
-        <Stat icon="✅" label="Open Tasks" value={openTasks.length} color={T.magenta} />
-        <Stat icon="📋" label="Pending RFFs" value={pendingRffs.length} color={T.amber} />
-        {avgRating && <Stat icon="⭐" label="Client Rating" value={avgRating + '/5'} color={T.cyan} />}
-      </div>
-
-      {/* CRM Revenue Row */}
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 28 }}>
-        <Stat icon="💰" label="MTD Revenue" value={'GHS ' + mtdRevenue.toLocaleString()} color={T.teal} />
-        <Stat icon="📅" label="YTD Revenue" value={'GHS ' + ytdRevenue.toLocaleString()} color={T.cyan} />
-        <Stat icon="🏆" label="Total Won" value={'GHS ' + totalRevenue.toLocaleString()} sub={wonLeads.length + ' deals'} color={T.amber} />
-        <Stat icon="📊" label="Closing %" value={closingPct + '%'} color={T.blue} />
-        <Stat icon="⏱" label="Avg Sales Cycle" value={avgCycle + ' days'} color={T.magenta} />
-      </div>
-
-      {/* Main Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
-        {/* Event Progress */}
-        <Card>
-          <SectionHeader title="Event Progress" actionLabel="View All" action={() => onTab('events')} />
-          {events.length === 0 ? (
-            <div style={{ color: T.textMuted, fontSize: 13, padding: '20px 0', textAlign: 'center' }}>No events yet.</div>
-          ) : events.filter(e => e.status === 'active').slice(0, 4).map(e => (
-            <div key={e.id} style={{ marginBottom: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                <div>
-                  <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{e.name}</div>
-                  <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{e.phase} · {e.deadline}</div>
+          {(unreadNotifs.length > 0 || wonLeadsAwaitingApproval.length > 0 || pendingInvoices.length > 0) && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 260 }}>
+              {unreadNotifs.slice(0, 2).map(n => (
+                <div key={n.id} onClick={() => onTab('notifications')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', background: 'linear-gradient(135deg, ' + T.amber + '18, ' + T.amber + '08)', border: '1px solid ' + T.amber + '33', borderRadius: 8, cursor: 'pointer', backdropFilter: 'blur(8px)' }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: T.amber, flexShrink: 0, boxShadow: '0 0 6px ' + T.amber }} />
+                  <div style={{ color: T.amber, fontSize: 12, fontWeight: 600, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.title}</div>
+                  <span style={{ color: T.amber, fontSize: 11, opacity: 0.7 }}>→</span>
                 </div>
-                <span style={{ color: T.cyan, fontWeight: 300, fontSize: 18 }}>{e.completion || 0}%</span>
-              </div>
-              <ProgressBar value={e.completion || 0} color={e.completion >= 80 ? T.teal : e.completion >= 50 ? T.cyan : T.amber} />
-            </div>
-          ))}
-        </Card>
-
-        {/* CRM Pipeline */}
-        <Card>
-          <SectionHeader title="CRM Pipeline" actionLabel="View All" action={() => onTab('crm')} />
-          {leads.length === 0 ? (
-            <div style={{ color: T.textMuted, fontSize: 13, padding: '20px 0', textAlign: 'center' }}>No leads yet.</div>
-          ) : (
-            <div>
-              {['new','contacted','qualified','proposal','won','lost'].map(s => {
-                const count = leads.filter(l => l.status === s).length;
-                const val = leads.filter(l => l.status === s).reduce((a, l) => a + (l.value || 0), 0);
-                if (!count) return null;
-                const colors = { new: T.cyan, contacted: T.blue, qualified: T.amber, proposal: T.magenta, won: T.teal, lost: '#F43F5E' };
-                return (
-                  <div key={s} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid ' + T.border }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: colors[s] }} />
-                      <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{s.charAt(0).toUpperCase() + s.slice(1)}</div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 16 }}>
-                      <div style={{ color: T.textMuted, fontSize: 12 }}>{count} deals</div>
-                      <div style={{ color: colors[s], fontWeight: 700, fontSize: 12, minWidth: 90, textAlign: 'right' }}>GHS {val.toLocaleString()}</div>
-                    </div>
-                  </div>
-                );
-              })}
-              <div style={{ marginTop: 12, padding: '10px 0', display: 'flex', justifyContent: 'space-between' }}>
-                <div style={{ color: T.textMuted, fontSize: 12 }}>Total Pipeline</div>
-                <div style={{ color: T.amber, fontWeight: 700 }}>GHS {leads.filter(l => !['won','lost'].includes(l.status)).reduce((a, l) => a + (l.value || 0), 0).toLocaleString()}</div>
-              </div>
+              ))}
+              {wonLeadsAwaitingApproval.length > 0 && (
+                <div onClick={() => onTab('crm')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', background: 'linear-gradient(135deg, ' + T.teal + '18, ' + T.teal + '08)', border: '1px solid ' + T.teal + '33', borderRadius: 8, cursor: 'pointer' }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: T.teal, flexShrink: 0, boxShadow: '0 0 6px ' + T.teal }} />
+                  <div style={{ color: T.teal, fontSize: 12, fontWeight: 600 }}>{wonLeadsAwaitingApproval.length} Won Lead{wonLeadsAwaitingApproval.length > 1 ? 's' : ''} Awaiting Approval</div>
+                  <span style={{ color: T.teal, fontSize: 11, opacity: 0.7 }}>→</span>
+                </div>
+              )}
+              {pendingInvoices.length > 0 && (
+                <div onClick={() => onTab('invoices')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', background: 'linear-gradient(135deg, ' + T.magenta + '18, ' + T.magenta + '08)', border: '1px solid ' + T.magenta + '33', borderRadius: 8, cursor: 'pointer' }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: T.magenta, flexShrink: 0, boxShadow: '0 0 6px ' + T.magenta }} />
+                  <div style={{ color: T.magenta, fontSize: 12, fontWeight: 600 }}>{pendingInvoices.length} Invoice{pendingInvoices.length > 1 ? 's' : ''} Pending · GHS {pendingInvoices.reduce((a, i) => a + (i.amount || 0), 0).toLocaleString()}</div>
+                  <span style={{ color: T.magenta, fontSize: 11, opacity: 0.7 }}>→</span>
+                </div>
+              )}
             </div>
           )}
-        </Card>
+        </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
-        {/* Recent Invoices */}
-        <Card>
-          <SectionHeader title="Recent Invoices" actionLabel="View All" action={() => onTab('invoices')} />
-          {invoices.length === 0 ? (
-            <div style={{ color: T.textMuted, fontSize: 13, padding: '20px 0', textAlign: 'center' }}>No invoices yet.</div>
-          ) : invoices.slice(0, 4).map((inv, i) => (
-            <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i < 3 ? '1px solid ' + T.border : 'none' }}>
+      {/* Revenue Command Centre */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 24 }}>
+        {[
+          { label: 'Total Revenue', value: 'GHS ' + totalRevenue.toLocaleString(), sub: wonLeads.length + ' deals closed', color: '#C9A84C', gradient: 'linear-gradient(135deg, #C9A84C22, #C9A84C08)' },
+          { label: 'YTD Revenue', value: 'GHS ' + ytdRevenue.toLocaleString(), sub: 'Year to date', color: T.cyan, gradient: 'linear-gradient(135deg, ' + T.cyan + '22, ' + T.cyan + '08)' },
+          { label: 'MTD Revenue', value: 'GHS ' + mtdRevenue.toLocaleString(), sub: 'This month', color: T.teal, gradient: 'linear-gradient(135deg, ' + T.teal + '22, ' + T.teal + '08)' },
+        ].map((k, i) => (
+          <div key={i} className="exec-kpi" style={{ padding: '20px 22px', background: k.gradient, border: '1px solid ' + k.color + '33', borderRadius: 14, animationDelay: (i * 0.08) + 's' }}>
+            <div style={{ color: k.color, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, opacity: 0.8 }}>{k.label}</div>
+            <div style={{ color: k.color, fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em', marginBottom: 4 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 11 }}>{k.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* KPI Strip */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginBottom: 28 }}>
+        {[
+          { label: 'Active Events', value: events.filter(e => e.status === 'active').length, sub: events.length + ' total', color: T.cyan, tab: 'events' },
+          { label: 'Clients', value: clients.length, sub: 'active', color: T.blue, tab: 'clients' },
+          { label: 'Vendors', value: vendors.length, sub: 'registered', color: T.teal, tab: 'vendors' },
+          { label: 'Open Tasks', value: openTasks.length, sub: 'in progress', color: T.magenta, tab: 'tasks' },
+          { label: 'Closing Rate', value: closingPct + '%', sub: 'win rate', color: '#C9A84C', tab: 'crm' },
+          { label: 'Client Rating', value: avgRating ? avgRating + '/5' : '—', sub: 'avg score', color: T.amber, tab: 'feedback' },
+        ].map((k, i) => (
+          <div key={i} onClick={() => onTab(k.tab)} className="exec-kpi" style={{ padding: '14px 16px', background: T.surface, border: '1px solid ' + T.border, borderTop: '2px solid ' + k.color, borderRadius: 10, cursor: 'pointer', animationDelay: (0.24 + i * 0.06) + 's', textAlign: 'center' }}>
+            <div style={{ color: k.color, fontSize: 20, fontWeight: 900, letterSpacing: '-0.02em' }}>{k.value}</div>
+            <div style={{ color: T.textPrimary, fontSize: 11, fontWeight: 600, marginTop: 4 }}>{k.label}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{k.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Main 3-col executive grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 18, marginBottom: 18 }}>
+        {/* Event Progress */}
+        <div style={{ background: T.surface, border: '1px solid ' + T.border, borderRadius: 14, padding: '20px 22px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, letterSpacing: '-0.01em' }}>Active Events</div>
+            <button onClick={() => onTab('events')} style={{ background: 'none', border: 'none', color: T.cyan, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>View All →</button>
+          </div>
+          {events.filter(e => e.status === 'active').slice(0, 4).map((e, i) => (
+            <div key={e.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: i < 3 ? '1px solid ' + T.border + '55' : 'none' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div>
+                  <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 700 }}>{e.name}</div>
+                  <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{e.phase} · {e.client}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ color: e.completion >= 80 ? T.teal : e.completion >= 50 ? T.cyan : T.amber, fontWeight: 900, fontSize: 16 }}>{e.completion || 0}%</div>
+                </div>
+              </div>
+              <div style={{ height: 4, background: T.border + '44', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: (e.completion || 0) + '%', background: e.completion >= 80 ? T.teal : e.completion >= 50 ? T.cyan : T.amber, borderRadius: 2, transition: 'width 0.6s ease' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* CRM Pipeline — elegant funnel */}
+        <div style={{ background: T.surface, border: '1px solid ' + T.border, borderRadius: 14, padding: '20px 22px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, letterSpacing: '-0.01em' }}>Pipeline</div>
+            <button onClick={() => onTab('crm')} style={{ background: 'none', border: 'none', color: T.cyan, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>View All →</button>
+          </div>
+          {['new','contacted','qualified','proposal','won','lost'].map(s => {
+            const count = leads.filter(l => l.status === s).length;
+            const val = leads.filter(l => l.status === s).reduce((a, l) => a + (l.value || 0), 0);
+            if (!count) return null;
+            const colors = { new: T.cyan, contacted: T.blue, qualified: T.amber, proposal: T.magenta, won: T.teal, lost: '#F43F5E' };
+            const maxVal = Math.max(...['new','contacted','qualified','proposal','won','lost'].map(st => leads.filter(l => l.status === st).reduce((a,l) => a + (l.value||0), 0)));
+            const barW = maxVal > 0 ? Math.round((val / maxVal) * 100) : 0;
+            return (
+              <div key={s} style={{ marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ color: colors[s], fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{s}</span>
+                  <span style={{ color: T.textMuted, fontSize: 11 }}>{count} · GHS {val.toLocaleString()}</span>
+                </div>
+                <div style={{ height: 3, background: T.border + '44', borderRadius: 2 }}>
+                  <div style={{ height: '100%', width: barW + '%', background: colors[s], borderRadius: 2, opacity: 0.8 }} />
+                </div>
+              </div>
+            );
+          })}
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid ' + T.border + '44', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ color: T.textMuted, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Pipeline Value</span>
+            <span style={{ color: '#C9A84C', fontWeight: 800, fontSize: 15 }}>GHS {leads.filter(l => !['won','lost'].includes(l.status)).reduce((a, l) => a + (l.value || 0), 0).toLocaleString()}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom row — Invoices + Feedback side by side */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 18 }}>
+        <div style={{ background: T.surface, border: '1px solid ' + T.border, borderRadius: 14, padding: '20px 22px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>Recent Invoices</div>
+            <button onClick={() => onTab('invoices')} style={{ background: 'none', border: 'none', color: T.cyan, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>View All →</button>
+          </div>
+          {invoices.slice(0, 4).map((inv, i) => (
+            <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i < 3 ? '1px solid ' + T.border + '44' : 'none' }}>
               <div>
                 <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{inv.vendor || 'Vendor'}</div>
-                <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{inv.event_name} · {inv.date}</div>
+                <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{inv.event_name}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ color: T.textPrimary, fontSize: 14, fontWeight: 700 }}>GHS {(inv.amount || 0).toLocaleString()}</div>
+                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 700 }}>GHS {(inv.amount || 0).toLocaleString()}</div>
                 <Badge status={inv.status} />
               </div>
             </div>
           ))}
-        </Card>
+        </div>
 
-        {/* Client Feedback */}
-        <Card>
-          <SectionHeader title="Latest Client Feedback" actionLabel="View All" action={() => onTab('feedback')} />
+        <div style={{ background: T.surface, border: '1px solid ' + T.border, borderRadius: 14, padding: '20px 22px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>Client Feedback</div>
+            <button onClick={() => onTab('feedback')} style={{ background: 'none', border: 'none', color: T.cyan, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>View All →</button>
+          </div>
           {feedback.length === 0 ? (
             <div style={{ color: T.textMuted, fontSize: 13, padding: '20px 0', textAlign: 'center' }}>No feedback yet.</div>
-          ) : feedback.slice(0, 4).map((f, i) => (
-            <div key={f.id} style={{ padding: '10px 0', borderBottom: i < 3 ? '1px solid ' + T.border : 'none' }}>
+          ) : feedback.slice(0, 3).map((f, i) => (
+            <div key={f.id} style={{ padding: '10px 0', borderBottom: i < 2 ? '1px solid ' + T.border + '44' : 'none' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{f.client_name}</div>
-                <div style={{ color: '#F59E0B', fontSize: 13 }}>{'★'.repeat(f.rating)}{'☆'.repeat(5 - f.rating)}</div>
+                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 700 }}>{f.client_name}</div>
+                <div style={{ color: '#C9A84C', fontSize: 12, letterSpacing: 2 }}>{'★'.repeat(f.rating)}{'☆'.repeat(5 - f.rating)}</div>
               </div>
-              <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 4 }}>📁 {f.event_name}</div>
-              <div style={{ color: T.textSecondary, fontSize: 12, fontStyle: 'italic' }}>"{f.summary}"</div>
+              <div style={{ color: T.textMuted, fontSize: 10, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{f.event_name}</div>
+              <div style={{ color: T.textSecondary, fontSize: 12, fontStyle: 'italic', opacity: 0.8 }}>"{f.summary}"</div>
             </div>
           ))}
-        </Card>
+        </div>
       </div>
 
       {/* Sales Targets Progress */}
       {targets.length > 0 && (
-        <Card>
-          <SectionHeader title="Sales Targets" actionLabel="View All" action={() => onTab('crm-insights')} />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+        <div style={{ background: T.surface, border: '1px solid ' + T.border, borderRadius: 14, padding: '20px 22px', marginBottom: 18 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>Sales Team Performance</div>
+            <button onClick={() => onTab('crm-insights')} style={{ background: 'none', border: 'none', color: T.cyan, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Full Insights →</button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
             {targets.map(t => {
               const repWon = wonLeads.filter(l => l.assigned_to === t.rep_id || l.created_by === t.rep_id);
               const repRevenue = repWon.reduce((a, l) => a + (l.value || 0), 0);
               const pct = Math.min(100, Math.round((repRevenue / t.target_amount) * 100));
+              const col = pct >= 100 ? T.teal : pct >= 60 ? T.cyan : T.amber;
               return (
-                <div key={t.id} style={{ padding: '14px', background: T.bg, borderRadius: 8, border: '1px solid ' + T.border }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <div key={t.id} style={{ padding: '16px', background: T.bg, borderRadius: 10, border: '1px solid ' + T.border, borderTop: '2px solid ' + col }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
                     <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{t.rep_name}</div>
-                    <span style={{ color: pct >= 100 ? T.teal : T.amber, fontSize: 12, fontWeight: 700 }}>{pct}%</span>
+                    <span style={{ color: col, fontSize: 14, fontWeight: 900 }}>{pct}%</span>
                   </div>
-                  <ProgressBar value={pct} color={pct >= 100 ? T.teal : pct >= 60 ? T.cyan : T.amber} />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-                    <div style={{ color: T.teal, fontSize: 12, fontWeight: 600 }}>GHS {repRevenue.toLocaleString()}</div>
-                    <div style={{ color: T.textMuted, fontSize: 11 }}>of GHS {t.target_amount.toLocaleString()}</div>
+                  <div style={{ height: 4, background: T.border + '44', borderRadius: 2, marginBottom: 10 }}>
+                    <div style={{ height: '100%', width: pct + '%', background: col, borderRadius: 2 }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <div style={{ color: col, fontSize: 12, fontWeight: 700 }}>GHS {repRevenue.toLocaleString()}</div>
+                    <div style={{ color: T.textMuted, fontSize: 11 }}>/ GHS {t.target_amount.toLocaleString()}</div>
                   </div>
                 </div>
               );
             })}
           </div>
-        </Card>
+        </div>
       )}
 
       {/* Vendor Ratings Summary — A/B/C/D grades only */}

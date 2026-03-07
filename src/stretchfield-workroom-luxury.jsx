@@ -1153,7 +1153,11 @@ const ClientEventsView = ({ user }) => {
 
   return (
     <div>
-      <PageHeader title="My Events" subtitle="Your active engagements and task progress" />
+      <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Client Portal</div>
+              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>My Events</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"Your active engagements and task progress"}</div>
+      </div>
       {events.length === 0 ? (
         <Card style={{ textAlign: "center", padding: 60 }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>📁</div>
@@ -1993,7 +1997,11 @@ const VendorRFFsView = ({ user }) => {
 
   return (
     <div>
-      <PageHeader title="Available RFFs" subtitle="Browse and submit your quotes" />
+      <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Procurement</div>
+              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Available RFFs</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"Browse and submit your quotes"}</div>
+      </div>
       {rffs.length === 0 ? (
         <Card style={{ textAlign: 'center', padding: 60 }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>📋</div>
@@ -3083,7 +3091,11 @@ const SMTasksView = ({ user }) => {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <PageHeader title="S&M Tasks" subtitle="Sales & Marketing internal tasks" />
+        <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Sales</div>
+              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>S&M Tasks</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"Sales & Marketing internal tasks"}</div>
+      </div>
         {canCreate && <Btn onClick={() => setModal(true)}>+ New Task</Btn>}
       </div>
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
@@ -3182,7 +3194,11 @@ const FeedbackView = ({ userRole }) => {
 
   return (
     <div>
-      <PageHeader title="Client Feedback" subtitle="Event satisfaction and reviews" />
+      <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Clients</div>
+              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Client Feedback</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"Event satisfaction and reviews"}</div>
+      </div>
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
         <Stat icon="⭐" label="Avg Rating" value={avgRating + "/5"} color={T.amber} />
         <Stat icon="💬" label="Total Reviews" value={filtered.length} color={T.cyan} />
@@ -3238,7 +3254,11 @@ const StrategyOverviewView = () => {
 
   return (
     <div>
-      <PageHeader title="Client & Event Overview" subtitle="Pictorial view of all active clients and events" />
+      <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Strategy</div>
+              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Client & Event Overview</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"Pictorial view of all active clients and events"}</div>
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 20 }}>
         {clients.map(c => {
           const clientEvents = events.filter(e => e.client_id === c.id);
@@ -3843,7 +3863,11 @@ const CRMDashboardCEO = ({ user }) => {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <PageHeader title="CRM Insights" subtitle="Team performance and revenue overview" />
+        <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Sales Analytics</div>
+              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>CRM Insights</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"Team performance and revenue overview"}</div>
+      </div>
         <Btn onClick={() => setModal(true)}>+ Set Target</Btn>
       </div>
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 32 }}>
@@ -3974,7 +3998,11 @@ const CRMDashboardSM = ({ user }) => {
 
   return (
     <div>
-      <PageHeader title="My CRM Insights" subtitle={"Performance overview for " + user.name} />
+      <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Sales Analytics</div>
+              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>My CRM Insights</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"Performance overview for " + user.name}</div>
+      </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
         {[["mtd","MTD"],["ytd","YTD"],["all","All Time"]].map(([val, label]) => (
           <button key={val} onClick={() => setPeriod(val)} style={{
@@ -4422,7 +4450,11 @@ const BudgetView = ({ user }) => {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <PageHeader title="Budget Management" subtitle="Event budgets vs actual spend" />
+        <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
+              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Budget Management</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"Event budgets vs actual spend"}</div>
+      </div>
         {canEdit && <Btn onClick={() => setModal(true)}>+ Set Budget</Btn>}
       </div>
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
@@ -4571,7 +4603,11 @@ const ExpenseView = ({ user }) => {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <PageHeader title="Expense Tracker" subtitle="Log and manage company expenses" />
+        <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
+              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Expense Tracker</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"Log and manage company expenses"}</div>
+      </div>
         {canEdit && <Btn onClick={() => setModal(true)}>+ Log Expense</Btn>}
       </div>
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
@@ -4693,7 +4729,11 @@ const FinanceReportsView = ({ user }) => {
 
   return (
     <div>
-      <PageHeader title="Financial Reports" subtitle="P&L and cash flow analysis" />
+      <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
+              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Financial Reports</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"P&L and cash flow analysis"}</div>
+      </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
         {[["mtd","MTD"],["ytd","YTD"],["all","All Time"]].map(([val, label]) => (
           <button key={val} onClick={() => setPeriod(val)} style={{ padding: "7px 18px", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: 600, border: "1px solid " + (period === val ? T.cyan : T.border), background: period === val ? T.cyan + "20" : "none", color: period === val ? T.cyan : T.textMuted }}>{label}</button>
@@ -5006,7 +5046,11 @@ const VendorScorecardsView = ({ user }) => {
 
   return (
     <div>
-      <PageHeader title="Vendor Scorecards" subtitle="Performance ratings based on Stretchfield scoring formula" />
+      <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Vendors</div>
+              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Vendor Scorecards</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"Performance ratings based on Stretchfield scoring formula"}</div>
+      </div>
 
       {/* Summary Stats */}
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 28 }}>
@@ -5180,7 +5224,11 @@ const VendorRatingsView = ({ user }) => {
 
   return (
     <div>
-      <PageHeader title="Vendor Ratings" subtitle="Performance ratings per event and overall" />
+      <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Vendors</div>
+              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Vendor Ratings</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"Performance ratings per event and overall"}</div>
+      </div>
 
       {/* Period Filter */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
@@ -5682,7 +5730,11 @@ const FinanceApprovalsView = ({ user }) => {
 
   return (
     <div>
-      <PageHeader title="Finance Approvals" subtitle={totalPending + " items pending your approval"} />
+      <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
+              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Finance Approvals</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{totalPending + " items pending your approval"}</div>
+      </div>
 
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 28 }}>
         <Stat icon="📤" label="Pending Expenses" value={pendingExpenses.length} color={pendingExpenses.length > 0 ? T.amber : T.teal} />

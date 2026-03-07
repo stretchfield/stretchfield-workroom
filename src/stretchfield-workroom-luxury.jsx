@@ -2735,48 +2735,66 @@ const CRMView = ({ user }) => {
   const pipelineValue = leads.filter(l => !["won","lost"].includes(l.status)).reduce((a, l) => a + (l.value || 0), 0);
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <PageHeader title="CRM" subtitle="Sales pipeline and lead management" />
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Sales</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>CRM Pipeline</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{leads.length} leads · GHS {pipelineValue.toLocaleString()} in pipeline</div>
+        </div>
         {canEdit && <Btn onClick={() => setModal(true)}>+ New Lead</Btn>}
       </div>
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
-        <Stat icon="🎯" label="Total Leads" value={leads.length} color={T.cyan} />
-        <Stat icon="💰" label="Pipeline" value={"GHS " + pipelineValue.toLocaleString()} color={T.amber} />
-        <Stat icon="🏆" label="Won" value={leads.filter(l => l.status === "won").length} sub={"GHS " + totalValue.toLocaleString()} color={T.teal} />
-        <Stat icon="📄" label="Proposals" value={proposals.length} color={T.magenta} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Total Leads", value: leads.length, color: T.cyan },
+          { label: "Pipeline Value", value: "GHS " + pipelineValue.toLocaleString(), color: T.amber },
+          { label: "Won", value: leads.filter(l => l.status === "won").length, sub: "GHS " + totalValue.toLocaleString(), color: T.teal },
+          { label: "Proposals", value: proposals.length, color: T.magenta },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 20, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textPrimary, fontSize: 10, fontWeight: 700, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+            {k.sub && <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{k.sub}</div>}
+          </div>
+        ))}
       </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
         {["all", ...statusOrder].map(s => (
           <button key={s} onClick={() => setFilter(s)} style={{
-            padding: "6px 14px", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: 600,
+            padding: "5px 14px", borderRadius: 20, cursor: "pointer", fontSize: 11, fontWeight: 700,
             border: "1px solid " + (filter === s ? (statusColors[s] || T.cyan) : T.border),
             background: filter === s ? (statusColors[s] || T.cyan) + "20" : "none",
             color: filter === s ? (statusColors[s] || T.cyan) : T.textMuted,
-          }}>{s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}{s !== "all" ? " (" + leads.filter(l => l.status === s).length + ")" : ""}</button>
+            letterSpacing: "0.04em", textTransform: "uppercase", transition: "all 0.15s",
+          }}>{s === "all" ? "All" : s}{s !== "all" ? ` (${leads.filter(l => l.status === s).length})` : ""}</button>
         ))}
       </div>
       {filteredLeads.length === 0 ? (
-        <Card style={{ textAlign: "center", padding: 60 }}>
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>🎯</div>
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No leads yet</div>
           <div style={{ color: T.textMuted, fontSize: 13 }}>Add your first lead to get started.</div>
-        </Card>
+        </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
-          {filteredLeads.map(lead => (
-            <Card key={lead.id} onClick={() => setSelectedLead(selectedLead?.id === lead.id ? null : lead)} style={{ cursor: "pointer" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
+          {filteredLeads.map((lead, idx) => (
+            <div key={lead.id} onClick={() => setSelectedLead(selectedLead?.id === lead.id ? null : lead)}
+              style={{ background: T.surface, border: `1px solid ${selectedLead?.id === lead.id ? (statusColors[lead.status] || T.cyan) + "60" : T.border}`, borderRadius: 12, padding: "18px 20px", cursor: "pointer", transition: "box-shadow 0.2s, border-color 0.2s" }}
+              onMouseEnter={e => { if (selectedLead?.id !== lead.id) { e.currentTarget.style.boxShadow = `0 4px 24px ${T.cyan}10`; e.currentTarget.style.borderColor = T.cyan + "40"; }}}
+              onMouseLeave={e => { if (selectedLead?.id !== lead.id) { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = T.border; }}}
+            >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                <div>
-                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{lead.company}</div>
-                  <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{lead.contact_name} · {lead.phone}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{lead.company}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>{lead.contact_name}{lead.phone ? " · " + lead.phone : ""}</div>
                 </div>
-                <span style={{ background: (statusColors[lead.status] || T.cyan) + "22", color: statusColors[lead.status] || T.cyan, padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700 }}>{lead.status}</span>
+                <span style={{ background: (statusColors[lead.status] || T.cyan) + "20", color: statusColors[lead.status] || T.cyan, padding: "3px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", flexShrink: 0, marginLeft: 8 }}>{lead.status}</span>
               </div>
-              <div style={{ color: T.amber, fontWeight: 700, fontSize: 14, marginBottom: 8 }}>GHS {(lead.value || 0).toLocaleString()}</div>
-              <div style={{ display: "flex", gap: 10, color: T.textMuted, fontSize: 12 }}>
-                <span>📞 {activities.filter(a => a.lead_id === lead.id).length} activities</span>
-                <span>📄 {proposals.filter(p => p.lead_id === lead.id).length} proposals</span>
+              <div style={{ color: T.gold, fontWeight: 900, fontSize: 16, marginBottom: 10 }}>GHS {(lead.value || 0).toLocaleString()}</div>
+              <div style={{ display: "flex", gap: 12, paddingTop: 8, borderTop: `1px solid ${T.border}44` }}>
+                <span style={{ color: T.textMuted, fontSize: 10 }}>{activities.filter(a => a.lead_id === lead.id).length} activities</span>
+                <span style={{ color: T.textMuted, fontSize: 10 }}>{proposals.filter(p => p.lead_id === lead.id).length} proposals</span>
+                {lead.assigned_name && <span style={{ color: T.cyan, fontSize: 10, fontWeight: 600, marginLeft: "auto" }}>→ {lead.assigned_name}</span>}
               </div>
               {selectedLead?.id === lead.id && (
                 <div onClick={e => e.stopPropagation()} style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid " + T.border }}>
@@ -2840,7 +2858,7 @@ const CRMView = ({ user }) => {
                   </div>
                 </div>
               )}
-            </Card>
+            </div>
           ))}
         </div>
       )}

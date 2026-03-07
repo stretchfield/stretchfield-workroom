@@ -312,7 +312,7 @@ const getNavItems = (role) => {
     base.push({ id: "invoices", label: "Invoices", icon: "▪" });
   }
   if (["CEO","Administrator","Finance Manager"].includes(role)) {
-    base.push({ id: "finance", label: "Finance", icon: "▪" }, { id: "budgets", label: "Budgets", icon: "▪" }, { id: "expenses", label: "Expenses", icon: "▪" }, { id: "finance-reports", label: "Reports", icon: "▪" }, { id: "finance-approvals", label: "Approvals", icon: "▪" });
+    base.push({ id: "finance", label: "Finance", icon: "▪" });
   }
   if (["CEO","Administrator"].includes(role)) {
     base.push({ id: "clients", label: "Clients", icon: "▪" }, { id: "users", label: "User Management", icon: "▪" });
@@ -3836,14 +3836,44 @@ const FinanceDashboard = ({ user, onTab }) => {
 
   const canApprove = ["CEO", "Administrator"].includes(user?.role);
 
+  const [financeTab, setFinanceTab] = useState("overview");
+
   return (
     <div>
-      <PageHeader title="Finance Dashboard" subtitle="Complete financial overview and tools" />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <PageHeader title="Finance Dashboard" subtitle="Complete financial overview and tools" />
+      </div>
+
+      {/* Internal Tab Nav */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
+        {[
+          { id: "overview", label: "Overview", icon: "📊" },
+          { id: "approvals", label: "Approvals" + (totalPendingApprovals > 0 ? " (" + totalPendingApprovals + ")" : ""), icon: "⏳" },
+          { id: "budgets", label: "Budgets", icon: "💰" },
+          { id: "expenses", label: "Expenses", icon: "🧾" },
+          { id: "reports", label: "Reports", icon: "📈" },
+        ].map(tab => (
+          <button key={tab.id} onClick={() => setFinanceTab(tab.id)} style={{
+            padding: "8px 18px", borderRadius: 20, border: "1px solid " + (financeTab === tab.id ? T.cyan : T.border),
+            cursor: "pointer", background: financeTab === tab.id ? T.cyan + "20" : "none",
+            color: financeTab === tab.id ? T.cyan : T.textMuted,
+            fontWeight: financeTab === tab.id ? 700 : 500, fontSize: 12,
+          }}>{tab.icon} {tab.label}</button>
+        ))}
+      </div>
+
+      {/* Route to internal tabs */}
+      {financeTab === "approvals" && <FinanceApprovalsView user={user} />}
+      {financeTab === "budgets" && <BudgetView user={user} />}
+      {financeTab === "expenses" && <ExpenseView user={user} />}
+      {financeTab === "reports" && <FinanceReportsView user={user} />}
+
+      {financeTab === "overview" && <div>
 
       {/* Alerts Row */}
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
         {totalPendingApprovals > 0 && (
-          <div onClick={() => onTab("finance-approvals")} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: canApprove ? T.amber + "15" : T.blue + "15", border: "1px solid " + (canApprove ? T.amber : T.blue) + "44", borderRadius: 8, cursor: "pointer" }}>
+          <div onClick={() => setFinanceTab("approvals")} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: canApprove ? T.amber + "15" : T.blue + "15", border: "1px solid " + (canApprove ? T.amber : T.blue) + "44", borderRadius: 8, cursor: "pointer" }}>
             <span style={{ fontSize: 18 }}>⏳</span>
             <div style={{ flex: 1 }}>
               <div style={{ color: canApprove ? T.amber : T.blue, fontWeight: 700, fontSize: 13 }}>{canApprove ? totalPendingApprovals + " Finance Item(s) Awaiting Your Approval" : totalPendingApprovals + " Item(s) Pending CEO Approval"}</div>
@@ -3867,7 +3897,7 @@ const FinanceDashboard = ({ user, onTab }) => {
           </div>
         )}
         {eventBudgetSummary.some(e => e.pct >= 90) && (
-          <div onClick={() => onTab("budgets")} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: "#F43F5E15", border: "1px solid #F43F5E44", borderRadius: 8, cursor: "pointer" }}>
+          <div onClick={() => setFinanceTab("budgets")} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: "#F43F5E15", border: "1px solid #F43F5E44", borderRadius: 8, cursor: "pointer" }}>
             <span style={{ fontSize: 18 }}>⚠️</span>
             <div style={{ flex: 1 }}>
               <div style={{ color: "#F43F5E", fontWeight: 700, fontSize: 13 }}>{eventBudgetSummary.filter(e => e.pct >= 90).length} Event(s) Near or Over Budget</div>
@@ -3996,16 +4026,17 @@ const FinanceDashboard = ({ user, onTab }) => {
           {[
             { icon: "📤", label: "Log Expense", tab: "expenses", color: T.amber },
             { icon: "🎯", label: "Set Budget", tab: "budgets", color: T.cyan },
-            { icon: "📊", label: "View Reports", tab: "finance-reports", color: T.blue },
-            { icon: "✅", label: "Approvals" + (totalPendingApprovals > 0 ? " (" + totalPendingApprovals + ")" : ""), tab: "finance-approvals", color: totalPendingApprovals > 0 ? T.amber : T.teal },
+            { icon: "📊", label: "View Reports", tab: "reports", color: T.blue },
+            { icon: "✅", label: "Approvals" + (totalPendingApprovals > 0 ? " (" + totalPendingApprovals + ")" : ""), tab: "approvals", color: totalPendingApprovals > 0 ? T.amber : T.teal },
           ].map(a => (
-            <button key={a.tab} onClick={() => onTab(a.tab)} style={{ padding: "16px 12px", background: a.color + "15", border: "1px solid " + a.color + "33", borderRadius: 10, cursor: "pointer", textAlign: "center" }}>
+            <button key={a.tab} onClick={() => setFinanceTab(a.tab)} style={{ padding: "16px 12px", background: a.color + "15", border: "1px solid " + a.color + "33", borderRadius: 10, cursor: "pointer", textAlign: "center" }}>
               <div style={{ fontSize: 24, marginBottom: 8 }}>{a.icon}</div>
               <div style={{ color: a.color, fontWeight: 700, fontSize: 12 }}>{a.label}</div>
             </button>
           ))}
         </div>
       </Card>
+    </div>}
     </div>
   );
 };

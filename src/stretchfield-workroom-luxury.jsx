@@ -3735,13 +3735,30 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       </div>
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <div style={{ padding: "0 24px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${T.border}`, background: T.bgDeep, flexShrink: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ color: T.textMuted, fontSize: 11, letterSpacing: "0.04em" }}>Stretchfield</span>
-            <span style={{ color: T.textGhost, fontSize: 11 }}>/</span>
-            <span style={{ color: T.textPrimary, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.10em" }}>{activeTab.replace(/-/g, " ")}</span>
+        <div style={{ padding: "0 24px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${T.border}`, background: T.bgDeep, flexShrink: 0, position: "relative" }}>
+          {/* Left — breadcrumb */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
+            <span style={{ color: T.textMuted, fontSize: 11, letterSpacing: "0.04em", whiteSpace: "nowrap" }}>Stretchfield / {currentUser.name.split(" ")[0]}</span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+
+          {/* Centre — tagline */}
+          <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", pointerEvents: "none", textAlign: "center" }}>
+            <span style={{
+              fontFamily: "'Cormorant Garamond', Georgia, serif",
+              fontStyle: "italic",
+              fontWeight: 500,
+              fontSize: 13,
+              letterSpacing: "0.06em",
+              background: `linear-gradient(90deg, ${T.textMuted}, ${T.textPrimary}, ${T.textMuted})`,
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              whiteSpace: "nowrap",
+            }}>We don't plan events. We engineer impact.</span>
+          </div>
+
+          {/* Right — controls */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, justifyContent: "flex-end" }}>
+            <span style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.04em" }}>{currentUser.name}</span>
             <div style={{ background: T.cyan + "18", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "3px 12px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>{currentUser.role}</div>
             <button onClick={() => setActiveTab("notifications")} style={{ position: "relative", background: activeTab === "notifications" ? T.cyan + "18" : "none", border: "1px solid " + (activeTab === "notifications" ? T.cyan + "40" : T.border), color: activeTab === "notifications" ? T.cyan : T.textMuted, width: 34, height: 34, borderRadius: 8, cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}>
               🔔

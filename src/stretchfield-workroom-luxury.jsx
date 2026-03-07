@@ -5138,11 +5138,20 @@ const VendorAssignmentView = ({ user }) => {
 
   const TierBadge = ({ vendor }) => {
     const score = vendor.vendor_score || 0;
-    const isPoor = vendor.vendor_scorecard_count > 0 && score < 50;
-    const isUnrated = !vendor.vendor_scorecard_count;
-    if (isUnrated) return <span style={{ fontSize: 10, color: T.textMuted, padding: "2px 8px", borderRadius: 20, border: "1px solid " + T.border }}>Unrated</span>;
-    const t = getTier(score);
-    return <span style={{ fontSize: 10, fontWeight: 700, color: isPoor ? "#F43F5E" : t.color, padding: "2px 8px", borderRadius: 20, background: isPoor ? "#F43F5E15" : t.bg, border: "1px solid " + (isPoor ? "#F43F5E44" : t.color + "44") }}>{isPoor ? "⛔ Poor" : t.label} {score > 0 ? score + "%" : ""}</span>;
+    const count = vendor.vendor_scorecard_count || 0;
+    const isUnrated = count === 0;
+    let grade, gradeColor, gradeBg, gradeLabel;
+    if (isUnrated) { grade = "—"; gradeColor = T.textMuted; gradeBg = T.bg; gradeLabel = "Unrated"; }
+    else if (score >= 85) { grade = "A"; gradeColor = "#10B981"; gradeBg = "#10B98115"; gradeLabel = "Excellent"; }
+    else if (score >= 70) { grade = "B"; gradeColor = T.cyan; gradeBg = T.cyan + "15"; gradeLabel = "Good"; }
+    else if (score >= 50) { grade = "C"; gradeColor = T.amber; gradeBg = T.amber + "15"; gradeLabel = "Fair"; }
+    else { grade = "D"; gradeColor = "#F43F5E"; gradeBg = "#F43F5E15"; gradeLabel = "Do Not Engage"; }
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ width: 24, height: 24, borderRadius: 6, background: gradeBg, border: "1.5px solid " + gradeColor + "66", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900, color: gradeColor }}>{grade}</div>
+        <span style={{ fontSize: 11, color: gradeColor, fontWeight: 600 }}>{gradeLabel}</span>
+      </div>
+    );
   };
 
   return (

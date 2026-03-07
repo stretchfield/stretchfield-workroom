@@ -1273,10 +1273,14 @@ const EventsView = ({ user }) => {
   };
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <PageHeader title="Events" subtitle={`${events.length} active engagements`} />
-        <Btn onClick={() => setModal(true)}>+ New Event</Btn>
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Portfolio</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Events</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{events.length} active engagement{events.length !== 1 ? "s" : ""}</div>
+        </div>
+        {canManage && <Btn onClick={() => setModal(true)}>+ New Event</Btn>}
       </div>
       {events.length === 0 ? (
         <Card style={{ textAlign: 'center', padding: 60 }}>
@@ -1837,31 +1841,65 @@ const InvoicesView = () => {
     load();
   };
 
+  // Summary stats
+  const totalPending = invoices.filter(i => i.status === "pending").reduce((a, i) => a + (i.amount || 0), 0);
+  const totalApproved = invoices.filter(i => i.status === "approved").reduce((a, i) => a + (i.amount || 0), 0);
+  const totalPaid = invoices.filter(i => i.status === "paid").reduce((a, i) => a + (i.amount || 0), 0);
+
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <PageHeader title="Invoices" subtitle="Review and approve vendor invoices" />
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Invoices</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Review and approve vendor invoices</div>
       </div>
+
+      {/* Summary strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Pending", value: "GHS " + totalPending.toLocaleString(), count: invoices.filter(i => i.status === "pending").length, color: T.amber },
+          { label: "Approved", value: "GHS " + totalApproved.toLocaleString(), count: invoices.filter(i => i.status === "approved").length, color: T.teal },
+          { label: "Paid", value: "GHS " + totalPaid.toLocaleString(), count: invoices.filter(i => i.status === "paid").length, color: T.cyan },
+        ].map((s, i) => (
+          <div key={i} style={{ padding: "16px 18px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${s.color}`, borderRadius: 10 }}>
+            <div style={{ color: s.color, fontSize: 18, fontWeight: 900 }}>{s.value}</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+              <div style={{ color: T.textPrimary, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>{s.label}</div>
+              <div style={{ color: T.textMuted, fontSize: 11 }}>{s.count} invoice{s.count !== 1 ? "s" : ""}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {invoices.length === 0 ? (
-        <Card style={{ textAlign: 'center', padding: 60 }}>
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>🧾</div>
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No invoices yet</div>
           <div style={{ color: T.textMuted, fontSize: 13 }}>Invoices submitted by vendors will appear here.</div>
-        </Card>
-      ) : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>{invoices.map(inv => (
-        <Card key={inv.id} style={{ marginBottom: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-            <div>
-              <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{inv.vendor}</div>
-              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>GHS {(inv.amount || 0).toLocaleString()} · {inv.date}</div>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
+          {invoices.map(inv => (
+            <div key={inv.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px", transition: "box-shadow 0.2s" }}
+              onMouseEnter={e => e.currentTarget.style.boxShadow = `0 4px 24px ${T.cyan}10`}
+              onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                <div>
+                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{inv.vendor}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>{inv.event_name || "—"}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{inv.date}</div>
+                </div>
+                <Badge status={inv.status} />
+              </div>
+              <div style={{ color: T.gold, fontSize: 20, fontWeight: 900, marginBottom: 12 }}>GHS {(inv.amount || 0).toLocaleString()}</div>
+              {inv.status === "pending" && (
+                <Btn small onClick={() => handleApprove(inv.id)}>✓ Approve</Btn>
+              )}
             </div>
-            <Badge status={inv.status} />
-          </div>
-          {inv.status === 'pending' && (
-            <Btn small onClick={() => handleApprove(inv.id)}>✓ Approve</Btn>
-          )}
-        </Card>
-      ))}</div>}
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -4046,7 +4084,11 @@ const FinanceDashboard = ({ user, onTab }) => {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <PageHeader title="Finance Dashboard" subtitle="Complete financial overview and tools" />
+        <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Finance Dashboard</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Complete financial overview and tools</div>
+      </div>
       </div>
 
       {/* Internal Tab Nav */}
@@ -5418,7 +5460,11 @@ const VendorAssignmentView = ({ user }) => {
 
   return (
     <div>
-      <PageHeader title="Vendor Assignment" subtitle="Assign vendors to approved RFFs by event" />
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Procurement</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Vendor Assignment</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Assign vendors to approved RFFs by event</div>
+      </div>
 
       {Object.keys(grouped).length === 0 ? (
         <Card style={{ textAlign: "center", padding: 60 }}>

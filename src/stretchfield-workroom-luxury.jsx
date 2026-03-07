@@ -427,6 +427,7 @@ const CEODashboard = ({ onTab, user }) => {
   const [tasks, setTasks] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [vendorProfiles, setVendorProfiles] = useState([]);
+  const [scorecards, setScorecards] = useState([]);
   const [leads, setLeads] = useState([]);
   const [targets, setTargets] = useState([]);
   const [feedback, setFeedback] = useState([]);
@@ -448,6 +449,7 @@ const CEODashboard = ({ onTab, user }) => {
       setVendors(unique);
     });
     supabase.from('profiles').select('*').eq('role', 'Vendor').then(({ data }) => setVendorProfiles(data || []));
+    supabase.from('vendor_scorecards').select('*').order('created_at', { ascending: false }).then(({ data }) => setScorecards(data || []));
   }, []);
 
   // Live unread notifications for CEO
@@ -474,8 +476,6 @@ const CEODashboard = ({ onTab, user }) => {
   const pendingRffs = rffs.filter(r => r.status === 'pending' && r.approved);
   const wonLeadsAwaitingApproval = leads.filter(l => l.status === 'won' && !l.approved);
   const avgRating = feedback.length ? (feedback.reduce((a, f) => a + f.rating, 0) / feedback.length).toFixed(1) : null;
-
-  try { vendorProfiles.filter(v => v.vendor_scorecard_count > 0); } catch(e) { console.error("CEO vendor profiles error:", e); }
 
   return (
     <div>
@@ -659,6 +659,37 @@ const CEODashboard = ({ onTab, user }) => {
             })}
           </div>
         </Card>
+      )}
+
+      {/* Vendor Ratings Summary */}
+      {vendorProfiles.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Vendor Performance</div>
+            <button onClick={() => onTab('vendors')} style={{ background: 'none', border: 'none', color: T.cyan, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>View Full Ratings →</button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
+            {vendorProfiles.sort((a,b) => (b.vendor_score||0) - (a.vendor_score||0)).map(v => {
+              const score = v.vendor_score || 0;
+              const count = v.vendor_scorecard_count || 0;
+              const isPoor = count > 0 && score < 50;
+              const isUnrated = count === 0;
+              const t = count > 0 ? getTier(score) : null;
+              const recentSc = scorecards.find(s => s.vendor_id === v.id);
+              return (
+                <div key={v.id} style={{ padding: '12px 14px', background: T.surface, border: '1px solid ' + (isPoor ? '#F43F5E44' : isUnrated ? T.border : t.color + '33'), borderRadius: 10, borderLeft: '3px solid ' + (isPoor ? '#F43F5E' : isUnrated ? T.border : t.color) }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{v.name}</div>
+                    <div style={{ color: isUnrated ? T.textMuted : isPoor ? '#F43F5E' : t.color, fontWeight: 900, fontSize: 18 }}>{isUnrated ? '—' : score + '%'}</div>
+                  </div>
+                  <div style={{ color: isUnrated ? T.textMuted : isPoor ? '#F43F5E' : t.color, fontSize: 11, fontWeight: 600 }}>{isUnrated ? 'Unrated' : isPoor ? '⛔ Do Not Engage' : t.label}</div>
+                  {recentSc && <div style={{ color: T.textMuted, fontSize: 10, marginTop: 4 }}>Last: {recentSc.event_name}</div>}
+                  <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{count} event{count !== 1 ? 's' : ''} scored</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
   );

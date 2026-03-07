@@ -808,31 +808,87 @@ const CEODashboard = ({ onTab, user }) => {
   );
 };
 
-const StaffDashboard = ({ user }) => (
-  <div>
-    <PageHeader title={`Welcome, ${user.name.split(" ")[0]}`} subtitle="Your assignments and workload for today" />
-    <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 32 }}>
-      <Stat icon="◈" label="My Events" value="3" color={T.cyan} />
-      <Stat icon="✦" label="Pending Tasks" value="5" sub="2 due soon" color={T.amber} />
-      <Stat icon="◌" label="Unread Alerts" value="3" color={T.blue} />
-    </div>
-    <Card>
-      <SectionHeader title="My Tasks" />
-      {[].slice(0, 4).map((t, i) => (
-        <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 0", borderBottom: i < 3 ? `1px solid ${T.border}` : "none" }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600, letterSpacing: "0.02em" }}>{t.name}</div>
-            <div style={{ color: T.textMuted, fontSize: 10, marginTop: 4, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-              Due {t.deadline}
-            </div>
-            <div style={{ marginTop: 10 }}><ProgressBar value={t.progress} /></div>
+const StaffDashboard = ({ user }) => {
+  const [tasks, setTasks] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [notifs, setNotifs] = useState([]);
+
+  useEffect(() => {
+    supabase.from("tasks").select("*").eq("assignee_id", user.id).order("created_at", { ascending: false }).then(({ data }) => setTasks(data || []));
+    supabase.from("projects").select("*").eq("status", "active").then(({ data }) => setEvents(data || []));
+    supabase.from("notifications").select("*").eq("user_id", user.id).eq("read", false).order("created_at", { ascending: false }).limit(5).then(({ data }) => setNotifs(data || []));
+  }, [user.id]);
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+  const greeting = now.getHours() < 12 ? "Good Morning" : now.getHours() < 17 ? "Good Afternoon" : "Good Evening";
+  const pending = tasks.filter(t => t.status !== "completed");
+  const dueSoon = tasks.filter(t => t.deadline && new Date(t.deadline) <= new Date(Date.now() + 3 * 86400000) && t.status !== "completed");
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>{dateStr}</div>
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: T.textPrimary, letterSpacing: "-0.02em" }}>{greeting}, {user.name.split(" ")[0]}</h1>
+        <div style={{ color: T.textMuted, fontSize: 13, marginTop: 4 }}>Here's your workload for today</div>
+      </div>
+
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Active Events", value: events.length, color: T.cyan },
+          { label: "Pending Tasks", value: pending.length, sub: dueSoon.length > 0 ? dueSoon.length + " due soon" : null, color: T.amber },
+          { label: "Unread Alerts", value: notifs.length, color: T.blue },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "16px 18px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textPrimary, fontSize: 11, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+            {k.sub && <div style={{ color: T.amber, fontSize: 10, marginTop: 2 }}>{k.sub}</div>}
           </div>
-          <Badge status={t.status} />
+        ))}
+      </div>
+
+      {/* Alerts */}
+      {notifs.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          {notifs.slice(0, 3).map(n => (
+            <div key={n.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: T.amber + "12", border: `1px solid ${T.amber}30`, borderRadius: 8, marginBottom: 6 }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.amber, boxShadow: `0 0 6px ${T.amber}`, flexShrink: 0 }} />
+              <div style={{ color: T.amber, fontSize: 12, fontWeight: 600, flex: 1 }}>{n.title}</div>
+              <div style={{ color: T.textMuted, fontSize: 11 }}>{n.message}</div>
+            </div>
+          ))}
         </div>
-      ))}
-    </Card>
-  </div>
-);
+      )}
+
+      {/* Tasks */}
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 22px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>My Tasks</div>
+          <div style={{ color: T.textMuted, fontSize: 11 }}>{pending.length} open</div>
+        </div>
+        {tasks.length === 0 ? (
+          <div style={{ color: T.textMuted, fontSize: 13, padding: "24px 0", textAlign: "center" }}>No tasks assigned yet.</div>
+        ) : tasks.slice(0, 5).map((t, i) => (
+          <div key={t.id} style={{ padding: "12px 0", borderBottom: i < Math.min(tasks.length, 5) - 1 ? `1px solid ${T.border}44` : "none" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{t.name}</div>
+              <Badge status={t.status} />
+            </div>
+            <div style={{ height: 3, background: T.border + "44", borderRadius: 2, marginBottom: 4 }}>
+              <div style={{ height: "100%", width: (t.progress || 0) + "%", background: t.status === "completed" ? T.teal : T.cyan, borderRadius: 2 }} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <div style={{ color: T.textMuted, fontSize: 10 }}>Due {t.deadline}</div>
+              <div style={{ color: T.textMuted, fontSize: 10 }}>{t.progress || 0}%</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const VendorDashboard = ({ user }) => {
   const [rffs, setRffs] = useState([]);
@@ -857,16 +913,31 @@ const VendorDashboard = ({ user }) => {
   const latestScore = scorecards.length > 0 ? scorecards[0] : null;
   const overallTier = latestScore ? getTier(latestScore.total_pct) : null;
 
-  return (
-    <div>
-      <PageHeader title={`Welcome, ${user.name.split(" ")[0]}`} subtitle="Your performance, RFFs and tasks" />
+  const now2 = new Date();
+  const greeting2 = now2.getHours() < 12 ? "Good Morning" : now2.getHours() < 17 ? "Good Afternoon" : "Good Evening";
 
-      {/* Stats */}
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 28 }}>
-        <Stat icon="📋" label="Open RFFs" value={pendingRffs.length} color={T.cyan} />
-        <Stat icon="📤" label="Quotes Submitted" value={submittedRffs.length} color={T.amber} />
-        <Stat icon="✅" label="Approved" value={approvedRffs.length} color={T.teal} />
-        <Stat icon="✦" label="My Tasks" value={tasks.length} color={T.magenta} />
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>{now2.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}</div>
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: T.textPrimary, letterSpacing: "-0.02em" }}>{greeting2}, {user.name.split(" ")[0]}</h1>
+        <div style={{ color: T.textMuted, fontSize: 13, marginTop: 4 }}>Your performance, RFFs and tasks</div>
+      </div>
+
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Open RFFs", value: pendingRffs.length, color: T.cyan },
+          { label: "Quotes Submitted", value: submittedRffs.length, color: T.amber },
+          { label: "Approved", value: approvedRffs.length, color: T.teal },
+          { label: "My Tasks", value: tasks.length, color: T.magenta },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "16px 18px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textPrimary, fontSize: 11, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+          </div>
+        ))}
       </div>
 
       {/* Performance Score Card */}

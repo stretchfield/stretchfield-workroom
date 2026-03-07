@@ -983,41 +983,41 @@ const VendorDashboard = ({ user }) => {
         </Card>
       )}
 
-      {/* Recent RFFs */}
-      <Card style={{ marginBottom: 20 }}>
-        <SectionHeader title="My RFFs" />
-        {rffs.length === 0 ? (
-          <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No RFFs assigned yet.</div>
-        ) : rffs.slice(0, 4).map((r, i) => (
-          <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: i < Math.min(rffs.length, 4) - 1 ? "1px solid " + T.border : "none" }}>
-            <div>
-              <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{r.title}</div>
-              <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>🏢 {r.client_name} · Due {r.deadline}</div>
-            </div>
-            <Badge status={r.status} />
-          </div>
-        ))}
-      </Card>
-
-      {/* Assigned Tasks */}
-      <Card>
-        <SectionHeader title="My Tasks" />
-        {tasks.length === 0 ? (
-          <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No tasks assigned yet.</div>
-        ) : tasks.slice(0, 4).map((t, i) => (
-          <div key={t.id} style={{ padding: "12px 0", borderBottom: i < Math.min(tasks.length, 4) - 1 ? "1px solid " + T.border : "none" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+      {/* RFFs + Tasks grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.06em" }}>My RFFs</div>
+          {rffs.length === 0 ? (
+            <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No RFFs assigned yet.</div>
+          ) : rffs.slice(0, 4).map((r, i) => (
+            <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < Math.min(rffs.length, 4) - 1 ? `1px solid ${T.border}44` : "none" }}>
               <div>
-                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{t.name}</div>
-                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Due {t.deadline}</div>
+                <div style={{ color: T.textPrimary, fontSize: 12, fontWeight: 600 }}>{r.title}</div>
+                <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{r.client_name} · {r.deadline}</div>
               </div>
-              <Badge status={t.status} />
+              <Badge status={r.status} />
             </div>
-            <ProgressBar value={t.progress || 0} />
-            <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>{t.progress || 0}% complete</div>
-          </div>
-        ))}
-      </Card>
+          ))}
+        </div>
+
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.06em" }}>My Tasks</div>
+          {tasks.length === 0 ? (
+            <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No tasks assigned yet.</div>
+          ) : tasks.slice(0, 4).map((t, i) => (
+            <div key={t.id} style={{ padding: "10px 0", borderBottom: i < Math.min(tasks.length, 4) - 1 ? `1px solid ${T.border}44` : "none" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <div style={{ color: T.textPrimary, fontSize: 12, fontWeight: 600 }}>{t.name}</div>
+                <Badge status={t.status} />
+              </div>
+              <div style={{ height: 3, background: T.border + "44", borderRadius: 2, marginBottom: 3 }}>
+                <div style={{ height: "100%", width: (t.progress || 0) + "%", background: t.status === "completed" ? T.teal : T.cyan, borderRadius: 2 }} />
+              </div>
+              <div style={{ color: T.textMuted, fontSize: 10 }}>{t.progress || 0}% · Due {t.deadline}</div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 };
@@ -1048,16 +1048,21 @@ const ClientDashboard = ({ user }) => {
     });
   }, [user.id]);
 
+  const now3 = new Date();
+  const greeting3 = now3.getHours() < 12 ? "Good Morning" : now3.getHours() < 17 ? "Good Afternoon" : "Good Evening";
+
   return (
-    <div>
-      <PageHeader
-        title={"Welcome, " + user.name.split(" ")[0]}
-        subtitle={clientInfo?.company ? clientInfo.company : clientInfo?.name ? clientInfo.name : "Track your event progress below."}
-      />
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Client Header */}
+      <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>{now3.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}</div>
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: T.textPrimary, letterSpacing: "-0.02em" }}>{greeting3}, {user.name.split(" ")[0]}</h1>
+        <div style={{ color: T.textMuted, fontSize: 13, marginTop: 4 }}>{clientInfo?.company || "Track your event progress below."}</div>
+      </div>
       {clientInfo?.company && (
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 14px", background: T.cyan + "15", border: "1px solid " + T.cyan + "33", borderRadius: 20, marginBottom: 20 }}>
-          <span style={{ fontSize: 14 }}>🏢</span>
-          <span style={{ color: T.cyan, fontWeight: 600, fontSize: 13 }}>{clientInfo.company}</span>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "5px 14px", background: T.cyan + "15", border: `1px solid ${T.cyan}30`, borderRadius: 20, marginBottom: 20 }}>
+          <span style={{ fontSize: 13 }}>🏢</span>
+          <span style={{ color: T.cyan, fontWeight: 700, fontSize: 12, letterSpacing: "0.04em" }}>{clientInfo.company}</span>
         </div>
       )}
       {events.length === 0 ? (

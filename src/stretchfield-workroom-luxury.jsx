@@ -475,6 +475,8 @@ const CEODashboard = ({ onTab, user }) => {
   const wonLeadsAwaitingApproval = leads.filter(l => l.status === 'won' && !l.approved);
   const avgRating = feedback.length ? (feedback.reduce((a, f) => a + f.rating, 0) / feedback.length).toFixed(1) : null;
 
+  try { vendorProfiles.filter(v => v.vendor_scorecard_count > 0); } catch(e) { console.error("CEO vendor profiles error:", e); }
+
   return (
     <div>
       <PageHeader title="Executive Overview" subtitle="Live company performance snapshot" />

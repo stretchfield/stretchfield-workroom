@@ -3803,15 +3803,57 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.6)" }} onClick={() => setMobileMenuOpen(false)}>
-          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: T.surface, borderRadius: "20px 20px 0 0", padding: "12px 0 40px", borderTop: `1px solid ${T.border}` }} onClick={e => e.stopPropagation()}>
-            <div style={{ width: 40, height: 4, borderRadius: 2, background: T.border, margin: "0 auto 20px" }} />
-            {getNavItems(currentUser.role).map(item => (
-              <button key={item.id} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 16, padding: "14px 20px", background: activeTab === item.id ? T.cyan + "15" : "none", border: "none", cursor: "pointer", textAlign: "left", borderLeft: activeTab === item.id ? `3px solid ${T.cyan}` : "3px solid transparent" }}>
-                <span style={{ fontSize: 22 }}>{item.icon}</span>
-                <span style={{ color: activeTab === item.id ? T.cyan : T.textPrimary, fontWeight: activeTab === item.id ? 700 : 500, fontSize: 15 }}>{item.label}</span>
-              </button>
-            ))}
+        <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }} onClick={() => setMobileMenuOpen(false)}>
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: T.bgDeep, borderRadius: "24px 24px 0 0", borderTop: `1px solid ${T.border}`, boxShadow: `0 -8px 48px rgba(0,0,0,0.4)`, overflow: "hidden" }} onClick={e => e.stopPropagation()}>
+
+            {/* Pull handle */}
+            <div style={{ width: 36, height: 3, borderRadius: 2, background: T.border, margin: "14px auto 0" }} />
+
+            {/* User identity */}
+            <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "18px 24px 14px", borderBottom: `1px solid ${T.border}` }}>
+              <Avatar initials={currentUser.avatar} size={40} color={T.cyan} />
+              <div>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{currentUser.name}</div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2, textTransform: "uppercase", letterSpacing: "0.08em" }}>{currentUser.role}</div>
+              </div>
+            </div>
+
+            {/* Tagline */}
+            <div style={{ textAlign: "center", padding: "12px 24px 10px", borderBottom: `1px solid ${T.border}44` }}>
+              <span style={{
+                fontFamily: "'Cormorant Garamond', Georgia, serif",
+                fontStyle: "italic",
+                fontWeight: 500,
+                fontSize: 13,
+                letterSpacing: "0.06em",
+                color: T.textMuted,
+              }}>We don't plan events. We engineer impact.</span>
+            </div>
+
+            {/* Nav items */}
+            <div style={{ padding: "8px 0 16px", overflowY: "auto", maxHeight: "55vh" }}>
+              {getNavItems(currentUser.role).map(item => {
+                const active = activeTab === item.id;
+                return (
+                  <button key={item.id} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }} style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: 16,
+                    padding: "13px 24px", background: active ? T.cyan + "14" : "none",
+                    border: "none", cursor: "pointer", textAlign: "left",
+                    borderLeft: active ? `3px solid ${T.cyan}` : "3px solid transparent",
+                    transition: "all 0.15s",
+                  }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: active ? T.cyan : T.border, boxShadow: active ? `0 0 8px ${T.cyan}` : "none", flexShrink: 0, transition: "all 0.15s" }} />
+                    <span style={{ color: active ? T.cyan : T.textPrimary, fontWeight: active ? 700 : 500, fontSize: 14, letterSpacing: "0.04em", textTransform: "uppercase" }}>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Bottom — theme toggle + sign out */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px 36px", borderTop: `1px solid ${T.border}` }}>
+              <ThemeToggle compact />
+              <button onClick={onLogout} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "6px 16px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600, letterSpacing: "0.06em" }}>Sign Out</button>
+            </div>
           </div>
         </div>
       )}

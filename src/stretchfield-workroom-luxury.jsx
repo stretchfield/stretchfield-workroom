@@ -4535,53 +4535,66 @@ const BudgetView = ({ user }) => {
   const totalInvoiced = invoices.reduce((a, i) => a + (i.amount || 0), 0);
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
-              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Budget Management</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"Event budgets vs actual spend"}</div>
-      </div>
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Budget Management</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Event budgets vs actual spend</div>
+        </div>
         {canEdit && <Btn onClick={() => setModal(true)}>+ Set Budget</Btn>}
       </div>
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
-        <Stat icon="🎯" label="Total Budgeted" value={"GHS " + totalBudget.toLocaleString()} color={T.cyan} />
-        <Stat icon="📤" label="Total Expenses" value={"GHS " + totalSpent.toLocaleString()} color={T.amber} />
-        <Stat icon="🧾" label="Total Invoiced" value={"GHS " + totalInvoiced.toLocaleString()} color={T.magenta} />
-        <Stat icon="💰" label="Remaining" value={"GHS " + (totalBudget - totalSpent - totalInvoiced).toLocaleString()} color={T.teal} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Total Budgeted", value: "GHS " + totalBudget.toLocaleString(), color: T.cyan },
+          { label: "Total Expenses", value: "GHS " + totalSpent.toLocaleString(), color: T.amber },
+          { label: "Total Invoiced", value: "GHS " + totalInvoiced.toLocaleString(), color: T.magenta },
+          { label: "Remaining", value: "GHS " + (totalBudget - totalSpent - totalInvoiced).toLocaleString(), color: (totalBudget - totalSpent - totalInvoiced) >= 0 ? T.teal : T.red },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 16, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+          </div>
+        ))}
       </div>
-      {eventsWithBudget.filter(e => e.budget).map(ev => (
-        <Card key={ev.id} style={{ marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+      {eventsWithBudget.filter(e => e.budget).map((ev, idx) => {
+        const barColor = ev.pct >= 90 ? T.red : ev.pct >= 70 ? T.amber : T.teal;
+        return (
+        <div key={ev.id} style={{ background: T.surface, border: `1px solid ${ev.pct >= 90 ? T.red + "50" : T.border}`, borderRadius: 12, padding: "20px 22px", marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
             <div>
-              <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{ev.name}</div>
-              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{ev.phase} · Due {ev.deadline}</div>
+              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{ev.name}</div>
+              <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>{ev.phase} · Due {ev.deadline}</div>
             </div>
             <div style={{ textAlign: "right" }}>
-              <div style={{ color: ev.pct >= 90 ? "#F43F5E" : ev.pct >= 70 ? T.amber : T.teal, fontWeight: 800, fontSize: 18 }}>{ev.pct}%</div>
-              <div style={{ color: T.textMuted, fontSize: 11 }}>of budget used</div>
+              <div style={{ color: barColor, fontWeight: 900, fontSize: 22 }}>{ev.pct}%</div>
+              <div style={{ color: T.textMuted, fontSize: 10 }}>of budget used</div>
             </div>
           </div>
-          <ProgressBar value={ev.pct} height={10} color={ev.pct >= 90 ? "#F43F5E" : ev.pct >= 70 ? T.amber : T.teal} />
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginTop: 14 }}>
-            {[["🎯 Budget", ev.budget.total_budget, T.cyan], ["📤 Expenses", ev.spent, T.amber], ["🧾 Invoiced", ev.invoiced, T.magenta], ["💰 Remaining", ev.remaining, ev.remaining < 0 ? "#F43F5E" : T.teal]].map(([label, val, color]) => (
-              <div key={label} style={{ padding: "10px", background: T.bg, borderRadius: 8, border: "1px solid " + T.border }}>
-                <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 4 }}>{label}</div>
-                <div style={{ color, fontWeight: 700, fontSize: 13 }}>GHS {(val || 0).toLocaleString()}</div>
+          <div style={{ height: 6, background: T.border + "44", borderRadius: 3, marginBottom: 14 }}>
+            <div style={{ height: "100%", width: ev.pct + "%", background: `linear-gradient(90deg, ${barColor}, ${barColor}cc)`, borderRadius: 3, transition: "width 0.4s ease" }} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+            {[["Budget", ev.budget.total_budget, T.cyan], ["Expenses", ev.spent, T.amber], ["Invoiced", ev.invoiced, T.magenta], ["Remaining", ev.remaining, ev.remaining < 0 ? T.red : T.teal]].map(([label, val, color]) => (
+              <div key={label} style={{ padding: "10px 12px", background: T.bg, borderRadius: 8, border: `1px solid ${T.border}44` }}>
+                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{label}</div>
+                <div style={{ color, fontWeight: 800, fontSize: 13 }}>GHS {(val || 0).toLocaleString()}</div>
               </div>
             ))}
           </div>
-          {ev.budget.notes && <div style={{ color: T.textMuted, fontSize: 12, marginTop: 10, fontStyle: "italic" }}>{ev.budget.notes}</div>}
+          {ev.budget.notes && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 12, fontStyle: "italic", borderTop: `1px solid ${T.border}44`, paddingTop: 10 }}>{ev.budget.notes}</div>}
           {ev.pct >= 70 && canEdit && !["CEO","Administrator"].includes(user?.role) && (
-            <button onClick={() => setRequestModal(ev)} style={{ marginTop: 12, width: "100%", background: T.magenta + "20", border: "1px solid " + T.magenta, color: T.magenta, padding: "8px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Request Budget Increase</button>
+            <button onClick={() => setRequestModal(ev)} style={{ marginTop: 12, width: "100%", background: T.magenta + "15", border: `1px solid ${T.magenta}50`, color: T.magenta, padding: "9px", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>Request Budget Increase</button>
           )}
-          {["CEO","Administrator"].includes(user?.role) && ev.pct >= 70 && (
-            <div style={{ marginTop: 10, padding: "8px 12px", background: "#F43F5E15", borderRadius: 6, border: "1px solid #F43F5E33" }}>
-              <span style={{ color: "#F43F5E", fontSize: 12, fontWeight: 600 }}>⚠ Budget {ev.pct >= 100 ? "exceeded" : "nearly exhausted"}</span>
+          {["CEO","Administrator"].includes(user?.role) && ev.pct >= 90 && (
+            <div style={{ marginTop: 12, padding: "8px 14px", background: T.red + "12", borderRadius: 8, border: `1px solid ${T.red}30`, display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.red, boxShadow: `0 0 6px ${T.red}` }} />
+              <span style={{ color: T.red, fontSize: 11, fontWeight: 700 }}>Budget {ev.pct >= 100 ? "exceeded" : "nearly exhausted"}</span>
             </div>
           )}
-        </Card>
-      ))}
+        </div>
+        );
+      })}
       {eventsWithBudget.filter(e => !e.budget).length > 0 && (
         <Card style={{ marginTop: 8 }}>
           <div style={{ color: T.textMuted, fontSize: 12, fontWeight: 600, marginBottom: 12 }}>Events without budgets</div>
@@ -4688,16 +4701,16 @@ const ExpenseView = ({ user }) => {
   const total = filtered.reduce((a, e) => a + (e.amount || 0), 0);
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
-              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Expense Tracker</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"Log and manage company expenses"}</div>
-      </div>
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Expense Tracker</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Log and manage company expenses</div>
+        </div>
         {canEdit && <Btn onClick={() => setModal(true)}>+ Log Expense</Btn>}
       </div>
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, marginBottom: 24 }}>
         <Stat icon="📤" label="Total Expenses" value={"GHS " + total.toLocaleString()} color={T.amber} />
         <Stat icon="✅" label="Approved" value={filtered.filter(e => e.approved).length} color={T.teal} />
         <Stat icon="⏳" label="Pending Approval" value={filtered.filter(e => !e.approved).length} color={T.magenta} />
@@ -4815,29 +4828,46 @@ const FinanceReportsView = ({ user }) => {
   const maxVal = Math.max(...monthlyData.map(m => Math.max(m.rev, m.exp)), 1);
 
   return (
-    <div>
-      <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
-              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Financial Reports</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"P&L and cash flow analysis"}</div>
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Financial Reports</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>P&L and cash flow analysis</div>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {[["mtd","MTD"],["ytd","YTD"],["all","All Time"]].map(([val, label]) => (
+            <button key={val} onClick={() => setPeriod(val)} style={{ padding: "6px 16px", borderRadius: 20, cursor: "pointer", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", border: `1px solid ${period === val ? T.cyan : T.border}`, background: period === val ? T.cyan + "20" : "none", color: period === val ? T.cyan : T.textMuted, transition: "all 0.15s" }}>{label}</button>
+          ))}
+        </div>
       </div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-        {[["mtd","MTD"],["ytd","YTD"],["all","All Time"]].map(([val, label]) => (
-          <button key={val} onClick={() => setPeriod(val)} style={{ padding: "7px 18px", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: 600, border: "1px solid " + (period === val ? T.cyan : T.border), background: period === val ? T.cyan + "20" : "none", color: period === val ? T.cyan : T.textMuted }}>{label}</button>
+
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Revenue", value: "GHS " + periodRevenue.toLocaleString(), color: T.teal, grad: `linear-gradient(135deg, ${T.teal}20, ${T.teal}08)` },
+          { label: "Gross Profit", value: "GHS " + grossProfit.toLocaleString(), sub: margin + "% margin", color: grossProfit >= 0 ? T.cyan : T.red, grad: `linear-gradient(135deg, ${grossProfit >= 0 ? T.cyan : T.red}20, transparent)` },
+          { label: "Total Expenses", value: "GHS " + periodExpenses.toLocaleString(), color: T.amber, grad: `linear-gradient(135deg, ${T.amber}20, ${T.amber}08)` },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "18px 20px", background: k.grad, border: `1px solid ${k.color}30`, borderRadius: 12 }}>
+            <div style={{ color: k.color, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>{k.label}</div>
+            <div style={{ color: T.textPrimary, fontSize: 20, fontWeight: 900 }}>{k.value}</div>
+            {k.sub && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>{k.sub}</div>}
+          </div>
         ))}
       </div>
 
       {/* P&L Summary */}
-      <Card style={{ marginBottom: 20 }}>
-        <SectionHeader title="P&L Summary" />
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px", marginBottom: 20 }}>
+        <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>P&L Summary</div>
         {[
           ["Revenue (Won Deals)", periodRevenue, T.teal],
           ["Total Expenses", periodExpenses, T.amber],
           ["Total Invoiced", periodInvoiced, T.blue],
           ["Invoices Paid", periodPaid, T.cyan],
         ].map(([label, val, color]) => (
-          <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px solid " + T.border }}>
-            <div style={{ color: T.textSecondary, fontSize: 14 }}>{label}</div>
+          <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: `1px solid ${T.border}44` }}>
+            <div style={{ color: T.textMuted, fontSize: 13 }}>{label}</div>
             <div style={{ color, fontWeight: 700, fontSize: 15 }}>GHS {val.toLocaleString()}</div>
           </div>
         ))}
@@ -4845,14 +4875,14 @@ const FinanceReportsView = ({ user }) => {
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>Gross Profit</div>
           <div style={{ color: grossProfit >= 0 ? T.teal : "#F43F5E", fontWeight: 800, fontSize: 18 }}>GHS {grossProfit.toLocaleString()}</div>
         </div>
-        <div style={{ padding: "12px 16px", background: (grossProfit >= 0 ? T.teal : "#F43F5E") + "15", borderRadius: 8, border: "1px solid " + (grossProfit >= 0 ? T.teal : "#F43F5E") + "33" }}>
-          <div style={{ color: grossProfit >= 0 ? T.teal : "#F43F5E", fontWeight: 700, fontSize: 14 }}>Profit Margin: {margin}%</div>
+        <div style={{ padding: "12px 16px", background: (grossProfit >= 0 ? T.teal : T.red) + "15", borderRadius: 8, border: `1px solid ${(grossProfit >= 0 ? T.teal : T.red)}33` }}>
+          <div style={{ color: grossProfit >= 0 ? T.teal : T.red, fontWeight: 700, fontSize: 13 }}>Profit Margin: {margin}%</div>
         </div>
-      </Card>
+      </div>
 
       {/* 6-Month Chart */}
-      <Card>
-        <SectionHeader title="6-Month Revenue vs Expenses" />
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px", marginBottom: 20 }}>
+        <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>6-Month Revenue vs Expenses</div>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 12, height: 160, padding: "10px 0" }}>
           {monthlyData.map(m => (
             <div key={m.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
@@ -4868,7 +4898,7 @@ const FinanceReportsView = ({ user }) => {
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}><div style={{ width: 12, height: 12, borderRadius: 2, background: T.teal + "80" }} /><span style={{ color: T.textMuted, fontSize: 12 }}>Revenue</span></div>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}><div style={{ width: 12, height: 12, borderRadius: 2, background: T.amber + "80" }} /><span style={{ color: T.textMuted, fontSize: 12 }}>Expenses</span></div>
         </div>
-      </Card>
+      </div>
     </div>
   );
 };
@@ -5156,7 +5186,7 @@ const VendorScorecardsView = ({ user }) => {
           const vendorCards = scorecards.filter(s => s.vendor_id === v.id);
           const isPoor = v.vendor_scorecard_count > 0 && score < 50;
           return (
-            <Card key={v.id} style={{ borderLeft: "3px solid " + (isPoor ? "#F43F5E" : score >= 85 ? "#10B981" : score >= 70 ? T.cyan : score >= 50 ? T.amber : T.border) }}>
+            <div key={v.id} style={{ background: T.surface, border: "1px solid " + (isPoor ? T.red + "60" : score >= 85 ? "#10B981" + "60" : T.border), borderLeft: "3px solid " + (isPoor ? T.red : score >= 85 ? "#10B981" : score >= 70 ? T.cyan : score >= 50 ? T.amber : T.border), borderRadius: 12, padding: "18px 20px", transition: "box-shadow 0.2s" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
                 <div>
                   <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{v.name}</div>
@@ -5207,7 +5237,7 @@ const VendorScorecardsView = ({ user }) => {
                   </button>
                 )}
               </div>
-            </Card>
+            </div>
           );
         })}
       </div>
@@ -5816,17 +5846,32 @@ const FinanceApprovalsView = ({ user }) => {
   };
 
   return (
-    <div>
-      <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
         <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
-              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Finance Approvals</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{totalPending + " items pending your approval"}</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+          <div>
+            <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Finance Approvals</h2>
+            <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{totalPending} item{totalPending !== 1 ? "s" : ""} pending your approval</div>
+          </div>
+          {totalPending > 0 && <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 14px", background: T.amber + "15", border: `1px solid ${T.amber}40`, borderRadius: 20 }}>
+            <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.amber, boxShadow: `0 0 6px ${T.amber}` }} />
+            <span style={{ color: T.amber, fontSize: 11, fontWeight: 700 }}>{totalPending} pending</span>
+          </div>}
+        </div>
       </div>
 
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 28 }}>
-        <Stat icon="📤" label="Pending Expenses" value={pendingExpenses.length} color={pendingExpenses.length > 0 ? T.amber : T.teal} />
-        <Stat icon="🎯" label="Budget Requests" value={pendingBudgets.length} color={pendingBudgets.length > 0 ? T.magenta : T.teal} />
-        <Stat icon="💳" label="Payment Requests" value={pendingPayments.length} color={pendingPayments.length > 0 ? T.cyan : T.teal} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Pending Expenses", value: pendingExpenses.length, color: pendingExpenses.length > 0 ? T.amber : T.teal },
+          { label: "Budget Requests", value: pendingBudgets.length, color: pendingBudgets.length > 0 ? T.magenta : T.teal },
+          { label: "Payment Requests", value: pendingPayments.length, color: pendingPayments.length > 0 ? T.cyan : T.teal },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 24, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+          </div>
+        ))}
       </div>
 
       {/* Expense Approvals */}

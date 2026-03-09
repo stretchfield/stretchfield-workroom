@@ -4710,53 +4710,71 @@ const ExpenseView = ({ user }) => {
         </div>
         {canEdit && <Btn onClick={() => setModal(true)}>+ Log Expense</Btn>}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, marginBottom: 24 }}>
-        <Stat icon="📤" label="Total Expenses" value={"GHS " + total.toLocaleString()} color={T.amber} />
-        <Stat icon="✅" label="Approved" value={filtered.filter(e => e.approved).length} color={T.teal} />
-        <Stat icon="⏳" label="Pending Approval" value={filtered.filter(e => !e.approved).length} color={T.magenta} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Total Expenses", value: "GHS " + total.toLocaleString(), color: T.amber },
+          { label: "Approved", value: filtered.filter(e => e.approved).length, color: T.teal },
+          { label: "Pending Approval", value: filtered.filter(e => !e.approved).length, color: T.magenta },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 18, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+          </div>
+        ))}
       </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
-        <button onClick={() => setFilter("all")} style={{ padding: "6px 14px", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: 600, border: "1px solid " + (filter === "all" ? T.cyan : T.border), background: filter === "all" ? T.cyan + "20" : "none", color: filter === "all" ? T.cyan : T.textMuted }}>All</button>
-        {categories.map(c => expenses.some(e => e.category === c) && (
-          <button key={c} onClick={() => setFilter(c)} style={{ padding: "6px 14px", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: 600, border: "1px solid " + (filter === c ? T.cyan : T.border), background: filter === c ? T.cyan + "20" : "none", color: filter === c ? T.cyan : T.textMuted }}>{c}</button>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
+        {["all", ...categories.filter(c => expenses.some(e => e.category === c))].map(c => (
+          <button key={c} onClick={() => setFilter(c)} style={{
+            padding: "5px 14px", borderRadius: 20, cursor: "pointer", fontSize: 11, fontWeight: 700,
+            border: `1px solid ${filter === c ? T.cyan : T.border}`,
+            background: filter === c ? T.cyan + "20" : "none",
+            color: filter === c ? T.cyan : T.textMuted,
+            letterSpacing: "0.04em", textTransform: "uppercase", transition: "all 0.15s",
+          }}>{c === "all" ? "All" : c}</button>
         ))}
       </div>
       {filtered.length === 0 ? (
-        <Card style={{ textAlign: "center", padding: 60 }}>
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>📤</div>
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No expenses yet</div>
-        </Card>
-      ) : filtered.map(e => (
-        <Card key={e.id} style={{ marginBottom: 14 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div>
-              <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{e.description}</div>
-              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>
-                {e.category && <span style={{ background: T.cyan + "20", color: T.cyan, padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600, marginRight: 8 }}>{e.category}</span>}
-                {e.event_name && <span>📁 {e.event_name} · </span>}
-                {e.vendor && <span>🏢 {e.vendor} · </span>}
-                {e.date}
+          <div style={{ color: T.textMuted, fontSize: 13 }}>Click "+ Log Expense" to get started.</div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {filtered.map(e => (
+            <div key={e.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px", transition: "box-shadow 0.2s" }}
+              onMouseEnter={el => el.currentTarget.style.boxShadow = `0 4px 20px ${T.cyan}10`}
+              onMouseLeave={el => el.currentTarget.style.boxShadow = "none"}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13, marginBottom: 6 }}>{e.description}</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                    {e.category && <span style={{ background: T.cyan + "18", color: T.cyan, padding: "2px 9px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>{e.category}</span>}
+                    {e.event_name && <span style={{ color: T.textMuted, fontSize: 11 }}>📁 {e.event_name}</span>}
+                    {e.vendor && <span style={{ color: T.textMuted, fontSize: 11 }}>· {e.vendor}</span>}
+                    {e.date && <span style={{ color: T.textMuted, fontSize: 11 }}>· {e.date}</span>}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right", marginLeft: 16, flexShrink: 0 }}>
+                  <div style={{ color: T.amber, fontWeight: 900, fontSize: 16, marginBottom: 6 }}>GHS {(e.amount || 0).toLocaleString()}</div>
+                  {e.approved
+                    ? <span style={{ color: T.teal, fontSize: 10, fontWeight: 700, background: T.teal + "18", padding: "2px 8px", borderRadius: 20 }}>✓ Approved</span>
+                    : canApprove
+                      ? <button onClick={async () => { await supabase.from("expenses").update({ approved: true, approved_by: user.id }).eq("id", e.id); load(); }} style={{ background: T.teal + "18", border: `1px solid ${T.teal}50`, color: T.teal, padding: "3px 10px", borderRadius: 20, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>✓ Approve</button>
+                      : <span style={{ color: T.amber, fontSize: 10, fontWeight: 700, background: T.amber + "18", padding: "2px 8px", borderRadius: 20 }}>⏳ Pending</span>
+                  }
+                </div>
               </div>
+              {e.receipt_url && (
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}44` }}>
+                  <a href={e.receipt_url} target="_blank" rel="noopener noreferrer" style={{ color: T.cyan, fontSize: 11, fontWeight: 600, textDecoration: "none" }}>📎 {e.receipt_name || "View Receipt"}</a>
+                </div>
+              )}
             </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ color: T.amber, fontWeight: 800, fontSize: 16 }}>GHS {(e.amount || 0).toLocaleString()}</div>
-              <div style={{ marginTop: 4 }}>
-                {e.approved
-                  ? <span style={{ color: T.teal, fontSize: 11, fontWeight: 600 }}>✓ Approved</span>
-                  : canApprove
-                    ? <button onClick={async () => { await supabase.from("expenses").update({ approved: true, approved_by: user.id }).eq("id", e.id); load(); }} style={{ background: T.teal + "20", border: "1px solid " + T.teal, color: T.teal, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>✓ Approve</button>
-                    : <span style={{ color: T.amber, fontSize: 11, fontWeight: 600 }}>⏳ Pending</span>
-                }
-              </div>
-            </div>
-          </div>
-          {e.receipt_url && (
-            <div style={{ marginTop: 10 }}>
-              <a href={e.receipt_url} target="_blank" rel="noopener noreferrer" style={{ color: T.cyan, fontSize: 12, fontWeight: 600, textDecoration: "none" }}>📎 {e.receipt_name || "View Receipt"}</a>
-            </div>
-          )}
-        </Card>
-      ))}
+          ))}
+        </div>
+      )}
       {modal && (
         <Modal title="Log Expense" onClose={() => setModal(false)}>
           <Input label="Description" placeholder="What was this expense for?" value={form.description} onChange={v => setForm({ ...form, description: v })} />

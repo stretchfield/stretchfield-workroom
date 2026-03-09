@@ -5292,78 +5292,114 @@ const VendorScorecardsView = ({ user }) => {
     );
   };
 
+  const impressive = vendors.filter(v => (v.vendor_score || 0) >= 85).length;
+  const veryGood = vendors.filter(v => (v.vendor_score || 0) >= 70 && (v.vendor_score || 0) < 85).length;
+  const good = vendors.filter(v => (v.vendor_score || 0) >= 50 && (v.vendor_score || 0) < 70).length;
+  const poor = vendors.filter(v => v.vendor_scorecard_count > 0 && (v.vendor_score || 0) < 50).length;
+  const unrated = vendors.filter(v => !v.vendor_scorecard_count).length;
+
   return (
-    <div>
-      <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
         <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Vendors</div>
-              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Vendor Scorecards</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"Performance ratings based on Stretchfield scoring formula"}</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Vendor Scorecards</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Performance ratings based on Stretchfield scoring formula</div>
       </div>
 
-      {/* Summary Stats */}
-      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 28 }}>
-        <Stat icon="⭐" label="Total Vendors" value={vendors.length} color={T.cyan} />
-        <Stat icon="✅" label="Impressive (85%+)" value={vendors.filter(v => (v.vendor_score || 0) >= 85).length} color="#10B981" />
-        <Stat icon="🔵" label="Very Good (70-84%)" value={vendors.filter(v => (v.vendor_score || 0) >= 70 && (v.vendor_score || 0) < 85).length} color={T.cyan} />
-        <Stat icon="🟡" label="Good (50-69%)" value={vendors.filter(v => (v.vendor_score || 0) >= 50 && (v.vendor_score || 0) < 70).length} color={T.amber} />
-        <Stat icon="🔴" label="Poor (<50%)" value={vendors.filter(v => v.vendor_scorecard_count > 0 && (v.vendor_score || 0) < 50).length} color="#F43F5E" />
+      {/* Tier distribution strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginBottom: 24 }}>
+        {[
+          { label: "Total", value: vendors.length, color: T.cyan },
+          { label: "Impressive", value: impressive, color: "#10B981" },
+          { label: "Very Good", value: veryGood, color: T.blue },
+          { label: "Good", value: good, color: T.amber },
+          { label: "Poor / Blocked", value: poor, color: T.red },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "12px 14px", background: T.surface, border: `1px solid ${k.color}30`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 20, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, marginTop: 3, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+          </div>
+        ))}
       </div>
 
       {/* Vendor Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
-        {vendors.map(v => {
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
+        {vendors.sort((a, b) => (b.vendor_score || 0) - (a.vendor_score || 0)).map(v => {
           const score = v.vendor_score || 0;
           const tier = getTier(score);
           const vendorCards = scorecards.filter(s => s.vendor_id === v.id);
           const isPoor = v.vendor_scorecard_count > 0 && score < 50;
+          const isUnrated = !v.vendor_scorecard_count;
+          const accentColor = isPoor ? T.red : score >= 85 ? "#10B981" : score >= 70 ? T.cyan : score >= 50 ? T.amber : T.border;
+          const initials = v.name.slice(0,2).toUpperCase();
+
           return (
-            <div key={v.id} style={{ background: T.surface, border: "1px solid " + (isPoor ? T.red + "60" : score >= 85 ? "#10B981" + "60" : T.border), borderLeft: "3px solid " + (isPoor ? T.red : score >= 85 ? "#10B981" : score >= 70 ? T.cyan : score >= 50 ? T.amber : T.border), borderRadius: 12, padding: "18px 20px", transition: "box-shadow 0.2s" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-                <div>
-                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{v.name}</div>
-                  <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{v.email}</div>
-                  <div style={{ marginTop: 8 }}>{getTierBadge(v.vendor_tier, score)}</div>
+            <div key={v.id} style={{
+              background: T.surface,
+              border: `1px solid ${isPoor ? T.red + "40" : T.border}`,
+              borderTop: `3px solid ${accentColor}`,
+              borderRadius: 12, padding: "18px 20px",
+              transition: "box-shadow 0.2s, border-color 0.2s",
+            }}
+              onMouseEnter={e => e.currentTarget.style.boxShadow = `0 4px 24px ${accentColor}18`}
+              onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
+            >
+              {/* Header row */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 9, background: `linear-gradient(135deg, ${accentColor}30, ${accentColor}10)`, border: `1px solid ${accentColor}40`, display: "flex", alignItems: "center", justifyContent: "center", color: accentColor, fontWeight: 900, fontSize: 12, flexShrink: 0 }}>{initials}</div>
+                  <div>
+                    <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{v.name}</div>
+                    <div style={{ color: T.textMuted, fontSize: 11, marginTop: 1 }}>{v.email}</div>
+                  </div>
                 </div>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 28, fontWeight: 900, color: score >= 85 ? "#10B981" : score >= 70 ? T.cyan : score >= 50 ? T.amber : score > 0 ? "#F43F5E" : T.textMuted }}>
+                {/* Score dial */}
+                <div style={{ textAlign: "center", flexShrink: 0 }}>
+                  <div style={{ fontSize: 26, fontWeight: 900, lineHeight: 1, color: isUnrated ? T.textMuted : accentColor }}>
                     {score > 0 ? score + "%" : "—"}
                   </div>
-                  <div style={{ color: T.textMuted, fontSize: 10 }}>{v.vendor_scorecard_count || 0} scorecard{v.vendor_scorecard_count !== 1 ? "s" : ""}</div>
+                  <div style={{ color: T.textMuted, fontSize: 9, marginTop: 2 }}>{v.vendor_scorecard_count || 0} scored</div>
                 </div>
               </div>
 
-              {isPoor && (
-                <div style={{ padding: "8px 12px", background: "#F43F5E15", borderRadius: 6, border: "1px solid #F43F5E33", marginBottom: 12 }}>
-                  <div style={{ color: "#F43F5E", fontSize: 12, fontWeight: 700 }}>⛔ Below threshold — Cannot engage</div>
+              {/* Tier badge + score bar */}
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <span style={{ padding: "2px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: accentColor + "18", color: accentColor, border: `1px solid ${accentColor}30` }}>
+                    {tier.label}
+                  </span>
+                  {isPoor && <span style={{ color: T.red, fontSize: 10, fontWeight: 700 }}>⛔ Blocked</span>}
+                  {score >= 85 && <span style={{ color: "#10B981", fontSize: 10, fontWeight: 700 }}>★ Priority</span>}
                 </div>
-              )}
+                {score > 0 && (
+                  <div style={{ height: 4, background: T.border + "44", borderRadius: 2 }}>
+                    <div style={{ height: "100%", width: score + "%", background: `linear-gradient(90deg, ${accentColor}, ${accentColor}99)`, borderRadius: 2, transition: "width 0.4s ease" }} />
+                  </div>
+                )}
+              </div>
 
-              {score >= 85 && (
-                <div style={{ padding: "8px 12px", background: "#10B98115", borderRadius: 6, border: "1px solid #10B98133", marginBottom: 12 }}>
-                  <div style={{ color: "#10B981", fontSize: 12, fontWeight: 700 }}>⭐ Impressive — Priority vendor</div>
-                </div>
-              )}
-
+              {/* Recent scores */}
               {vendorCards.length > 0 && (
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Recent Scores</div>
+                <div style={{ marginBottom: 12, paddingBottom: 12, borderBottom: `1px solid ${T.border}33` }}>
+                  <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Recent</div>
                   {vendorCards.slice(0, 2).map(sc => (
-                    <div key={sc.id} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid " + T.border + "44" }}>
-                      <div style={{ color: T.textSecondary, fontSize: 12 }}>{sc.event_name || "General"}</div>
-                      <div style={{ color: getTier(sc.total_pct).color, fontWeight: 700, fontSize: 12 }}>{sc.total_pct}%</div>
+                    <div key={sc.id} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
+                      <div style={{ color: T.textMuted, fontSize: 11 }}>{sc.event_name || "General"}</div>
+                      <div style={{ color: getTier(sc.total_pct).color, fontWeight: 800, fontSize: 11 }}>{sc.total_pct}%</div>
                     </div>
                   ))}
                 </div>
               )}
 
+              {/* Actions */}
               <div style={{ display: "flex", gap: 8 }}>
                 {canScore && !isPoor && (
-                  <button onClick={() => setScoreModal(v)} style={{ flex: 1, padding: "8px", background: T.cyan + "15", border: "1px solid " + T.cyan + "33", borderRadius: 8, cursor: "pointer", color: T.cyan, fontSize: 12, fontWeight: 700 }}>
+                  <button onClick={() => setScoreModal(v)} style={{ flex: 1, padding: "7px", background: T.cyan + "12", border: `1px solid ${T.cyan}30`, borderRadius: 8, cursor: "pointer", color: T.cyan, fontSize: 11, fontWeight: 700, letterSpacing: "0.04em" }}>
                     + Score
                   </button>
                 )}
                 {vendorCards.length > 0 && (
-                  <button onClick={() => setHistoryVendor(v)} style={{ flex: 1, padding: "8px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, cursor: "pointer", color: T.textSecondary, fontSize: 12, fontWeight: 600 }}>
+                  <button onClick={() => setHistoryVendor(v)} style={{ flex: 1, padding: "7px", background: "none", border: `1px solid ${T.border}`, borderRadius: 8, cursor: "pointer", color: T.textMuted, fontSize: 11, fontWeight: 600 }}>
                     History
                   </button>
                 )}
@@ -5390,14 +5426,19 @@ const VendorScorecardsView = ({ user }) => {
           {scorecards.filter(s => s.vendor_id === historyVendor.id).map(sc => {
             const t = getTier(sc.total_pct);
             return (
-              <div key={sc.id} style={{ padding: "12px 0", borderBottom: "1px solid " + T.border }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                  <div style={{ color: T.textPrimary, fontWeight: 700 }}>{sc.event_name || "General"}</div>
-                  <span style={{ color: t.color, fontWeight: 800, fontSize: 16 }}>{sc.total_pct}%</span>
+              <div key={sc.id} style={{ padding: "14px 0", borderBottom: `1px solid ${T.border}44` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{sc.event_name || "General"}</div>
+                  <span style={{ color: t.color, fontWeight: 900, fontSize: 18 }}>{sc.total_pct}%</span>
                 </div>
-                <div style={{ color: t.color, fontSize: 12, fontWeight: 600 }}>{t.label}</div>
-                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{new Date(sc.created_at).toLocaleDateString()}</div>
-                {sc.notes && <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 6, fontStyle: "italic" }}>{sc.notes}</div>}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ padding: "2px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: t.color + "18", color: t.color, border: `1px solid ${t.color}30` }}>{t.label}</span>
+                  <div style={{ color: T.textMuted, fontSize: 11 }}>{new Date(sc.created_at).toLocaleDateString()}</div>
+                </div>
+                <div style={{ height: 3, background: T.border + "44", borderRadius: 2, marginTop: 8 }}>
+                  <div style={{ height: "100%", width: sc.total_pct + "%", background: t.color, borderRadius: 2 }} />
+                </div>
+                {sc.notes && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 8, fontStyle: "italic", borderTop: `1px solid ${T.border}33`, paddingTop: 8 }}>{sc.notes}</div>}
               </div>
             );
           })}

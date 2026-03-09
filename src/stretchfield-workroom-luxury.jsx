@@ -1153,17 +1153,17 @@ const ClientEventsView = ({ user }) => {
 
   return (
     <div>
-      <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, animation: "fadeUp 0.35s ease" }}>
         <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Client Portal</div>
-              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>My Events</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"Your active engagements and task progress"}</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>My Events</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Your active engagements and task progress</div>
       </div>
       {events.length === 0 ? (
-        <Card style={{ textAlign: "center", padding: 60 }}>
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>📁</div>
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No events assigned</div>
           <div style={{ color: T.textMuted, fontSize: 13 }}>Events assigned to you will appear here.</div>
-        </Card>
+        </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 20 }}>
           {events.map(p => {
@@ -1171,7 +1171,10 @@ const ClientEventsView = ({ user }) => {
             const completedTasks = eventTasks.filter(t => t.status === 'completed').length;
             const inProgressTasks = eventTasks.filter(t => t.status === 'in-progress').length;
             return (
-              <Card key={p.id} style={{ marginBottom: 0 }}>
+              <div key={p.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 22px", transition: "box-shadow 0.2s" }}
+                onMouseEnter={e => e.currentTarget.style.boxShadow = `0 4px 24px ${T.cyan}10`}
+                onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
+              >
                 {/* Event Header */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
                   <div>
@@ -1225,7 +1228,7 @@ const ClientEventsView = ({ user }) => {
                   <div style={{ marginTop: 12, color: T.textMuted, fontSize: 13, fontStyle: "italic" }}>No tasks assigned yet.</div>
                 )}
                 <ClientFeedbackForm event={p} user={user} />
-              </Card>
+              </div>
             );
           })}
         </div>
@@ -1997,41 +2000,43 @@ const VendorRFFsView = ({ user }) => {
 
   return (
     <div>
-      <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, animation: "fadeUp 0.35s ease" }}>
         <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Procurement</div>
-              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Available RFFs</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"Browse and submit your quotes"}</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Available RFFs</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Browse and submit your quotes</div>
       </div>
       {rffs.length === 0 ? (
-        <Card style={{ textAlign: 'center', padding: 60 }}>
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>📋</div>
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No open RFFs</div>
           <div style={{ color: T.textMuted, fontSize: 13 }}>New RFFs will appear here when available.</div>
-        </Card>
-      ) : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>{rffs.map(r => (
-        <Card key={r.id} style={{ marginBottom: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-            <div>
-              <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16 }}>{r.title}</div>
-              <div style={{ color: T.cyan, fontSize: 12, marginTop: 4, fontWeight: 600 }}>🏢 {r.client_name}</div>
-              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>📁 {r.event_name} · Due {r.deadline}</div>
-              {r.description && <div style={{ color: T.textSecondary, fontSize: 13, marginTop: 8 }}>{r.description}</div>}
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
+          {rffs.map(r => (
+            <div key={r.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderTop: `3px solid ${T.cyan}`, borderRadius: 12, padding: "18px 20px", transition: "box-shadow 0.2s" }}
+              onMouseEnter={e => e.currentTarget.style.boxShadow = `0 4px 24px ${T.cyan}12`}
+              onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{r.title}</div>
+                  <div style={{ color: T.cyan, fontSize: 11, marginTop: 4, fontWeight: 700 }}>{r.client_name}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{r.event_name} · Due {r.deadline}</div>
+                  {r.description && <div style={{ color: T.textMuted, fontSize: 12, marginTop: 8, fontStyle: "italic" }}>{r.description}</div>}
+                </div>
+                <Badge status={r.status} />
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${T.border}44` }}>
+                {r.document_url && (
+                  <a href={r.document_url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.cyan, fontSize: 11, fontWeight: 700, textDecoration: "none", background: T.cyan + "12", padding: "6px 12px", borderRadius: 8, border: `1px solid ${T.cyan}30` }}>📄 Download</a>
+                )}
+                <Btn small onClick={() => { setQuoteModal(r); setQuoteAmount(""); }}>Submit Quote</Btn>
+              </div>
             </div>
-            <Badge status={r.status} />
-          </div>
-          <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-            {r.document_url && (
-              <a href={r.document_url} target="_blank" rel="noopener noreferrer" style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                color: T.cyan, fontSize: 12, fontWeight: 600, textDecoration: 'none',
-                background: T.cyan + '15', padding: '6px 14px', borderRadius: 6,
-                border: `1px solid ${T.cyan}33`,
-              }}>📄 Download RFF</a>
-            )}
-            <Btn small onClick={() => { setQuoteModal(r); setQuoteAmount(''); }}>Submit Quote</Btn>
-          </div>
-        </Card>
-      ))}</div>}
+          ))}
+        </div>
+      )}
 
       {quoteModal && (
         <Modal title={`Submit Quote — ${quoteModal.title}`} onClose={() => { setQuoteModal(null); setError(''); }}>
@@ -3213,47 +3218,57 @@ const FeedbackView = ({ userRole }) => {
   const avgRating = filtered.length ? (filtered.reduce((a, f) => a + f.rating, 0) / filtered.length).toFixed(1) : 0;
 
   return (
-    <div>
-      <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
         <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Clients</div>
-              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Client Feedback</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"Event satisfaction and reviews"}</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Client Feedback</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Event satisfaction and reviews</div>
       </div>
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
-        <Stat icon="⭐" label="Avg Rating" value={avgRating + "/5"} color={T.amber} />
-        <Stat icon="💬" label="Total Reviews" value={filtered.length} color={T.cyan} />
-        <Stat icon="✅" label="5-Star" value={filtered.filter(f => f.rating === 5).length} color={T.teal} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 20 }}>
+        {[
+          { label: "Avg Rating", value: avgRating + " / 5", color: "#F59E0B" },
+          { label: "Total Reviews", value: filtered.length, color: T.cyan },
+          { label: "5-Star Reviews", value: filtered.filter(f => f.rating === 5).length, color: T.teal },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 20, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+          </div>
+        ))}
       </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
-        <button onClick={() => setSelectedEvent("all")} style={{ padding: "7px 16px", borderRadius: 20, border: "1px solid " + (selectedEvent === "all" ? T.cyan : T.border), background: selectedEvent === "all" ? T.cyan + "20" : "none", color: selectedEvent === "all" ? T.cyan : T.textMuted, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>All Events</button>
-        {events.filter(e => feedback.some(f => f.project_id === e.id)).map(e => (
-          <button key={e.id} onClick={() => setSelectedEvent(e.id)} style={{ padding: "7px 16px", borderRadius: 20, border: "1px solid " + (selectedEvent === e.id ? T.cyan : T.border), background: selectedEvent === e.id ? T.cyan + "20" : "none", color: selectedEvent === e.id ? T.cyan : T.textMuted, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>{e.name}</button>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
+        {[{ id: "all", name: "All Events" }, ...events.filter(e => feedback.some(f => f.project_id === e.id))].map(e => (
+          <button key={e.id} onClick={() => setSelectedEvent(e.id)} style={{ padding: "5px 14px", borderRadius: 20, border: `1px solid ${selectedEvent === e.id ? T.cyan : T.border}`, background: selectedEvent === e.id ? T.cyan + "20" : "none", color: selectedEvent === e.id ? T.cyan : T.textMuted, cursor: "pointer", fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", transition: "all 0.15s" }}>{e.name}</button>
         ))}
       </div>
       {loading ? <div style={{ color: T.textMuted, textAlign: "center", padding: 60 }}>Loading...</div>
       : filtered.length === 0 ? (
-        <Card style={{ textAlign: "center", padding: 60 }}>
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>💬</div>
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No feedback yet</div>
-        </Card>
-      ) : filtered.map(f => (
-        <Card key={f.id} style={{ marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-            <div>
-              <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{f.client_name}</div>
-              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>📁 {f.event_name} · {new Date(f.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {filtered.map(f => (
+            <div key={f.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                <div>
+                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{f.client_name}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{f.event_name} · {new Date(f.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>
+                </div>
+                <div style={{ color: "#F59E0B", fontSize: 16, flexShrink: 0 }}>{"★".repeat(f.rating)}{"☆".repeat(5 - f.rating)}</div>
+              </div>
+              <div style={{ color: T.textMuted, fontSize: 12, fontStyle: "italic", marginBottom: canSeeDetailed && f.detailed_feedback ? 10 : 0 }}>"{f.summary}"</div>
+              {canSeeDetailed && f.detailed_feedback && (
+                <div style={{ padding: "10px 14px", background: T.bg, borderRadius: 8, border: `1px solid ${T.border}44`, marginTop: 10 }}>
+                  <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Detailed Feedback</div>
+                  <div style={{ color: T.textMuted, fontSize: 12 }}>{f.detailed_feedback}</div>
+                </div>
+              )}
             </div>
-            <div style={{ color: "#F59E0B", fontSize: 18 }}>{"★".repeat(f.rating)}{"☆".repeat(5 - f.rating)}</div>
-          </div>
-          <div style={{ color: T.textSecondary, fontSize: 13, fontStyle: "italic", marginBottom: canSeeDetailed && f.detailed_feedback ? 10 : 0 }}>"{f.summary}"</div>
-          {canSeeDetailed && f.detailed_feedback && (
-            <div style={{ padding: "10px 14px", background: T.bg, borderRadius: 6, border: "1px solid " + T.border, marginTop: 8 }}>
-              <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Detailed Feedback</div>
-              <div style={{ color: T.textSecondary, fontSize: 13 }}>{f.detailed_feedback}</div>
-            </div>
-          )}
-        </Card>
-      ))}
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -3581,48 +3596,54 @@ const NotificationsView = ({ user, onNavigate }) => {
   const unread = notes.filter(n => !n.read).length;
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <PageHeader title="Notifications" subtitle={`${unread} unread`} />
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>System</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Notifications</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{unread > 0 ? <span style={{ color: T.cyan, fontWeight: 700 }}>{unread} unread</span> : "All caught up"}</div>
+        </div>
         {unread > 0 && <Btn small onClick={markAllRead}>✓ Mark All Read</Btn>}
       </div>
-
       {loading ? (
-        <div style={{ color: T.textMuted, textAlign: 'center', padding: 60 }}>Loading...</div>
+        <div style={{ color: T.textMuted, textAlign: "center", padding: 60 }}>Loading...</div>
       ) : notes.length === 0 ? (
-        <Card style={{ textAlign: 'center', padding: 60 }}>
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>🔔</div>
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No notifications</div>
           <div style={{ color: T.textMuted, fontSize: 13 }}>You're all caught up.</div>
-        </Card>
+        </div>
       ) : (
-        <Card style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
           {notes.map((n, i) => (
-            <div key={n.id} onClick={() => !n.read && markRead(n.id)} style={{
-              display: 'flex', alignItems: 'flex-start', gap: 14,
-              padding: '16px 20px',
-              borderBottom: i < notes.length - 1 ? `1px solid ${T.border}` : 'none',
-              background: !n.read ? T.cyan + '08' : 'transparent',
-              cursor: !n.read ? 'pointer' : 'default',
-              transition: 'background 0.2s',
-            }}>
-              <div style={{ fontSize: 20, flexShrink: 0, marginTop: 2 }}>{typeIcon(n.type)}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ color: !n.read ? T.textPrimary : T.textSecondary, fontSize: 14, fontWeight: !n.read ? 700 : 400 }}>{n.title}</div>
-                {n.message && <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{n.message}</div>}
-                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 6 }}>
-                  {new Date(n.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            <div key={n.id} onClick={() => { if (!n.read) markRead(n.id); handleNoteClick(n); }} style={{
+              display: "flex", alignItems: "flex-start", gap: 14,
+              padding: "16px 20px",
+              borderBottom: i < notes.length - 1 ? `1px solid ${T.border}44` : "none",
+              background: !n.read ? T.cyan + "08" : "transparent",
+              cursor: "pointer", transition: "background 0.15s",
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = !n.read ? T.cyan + "12" : T.bg + "80"}
+              onMouseLeave={e => e.currentTarget.style.background = !n.read ? T.cyan + "08" : "transparent"}
+            >
+              <div style={{ fontSize: 18, flexShrink: 0, marginTop: 2 }}>{typeIcon(n.type)}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: !n.read ? T.textPrimary : T.textMuted, fontSize: 13, fontWeight: !n.read ? 700 : 500 }}>{n.title}</div>
+                {n.message && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>{n.message}</div>}
+                <div style={{ color: T.textMuted, fontSize: 10, marginTop: 5 }}>
+                  {new Date(n.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                {!n.read && <div style={{ width: 8, height: 8, borderRadius: '50%', background: T.cyan }} />}
-                <button onClick={(e) => { e.stopPropagation(); deleteNote(n.id); }} style={{
-                  background: 'none', border: 'none', color: T.textMuted, cursor: 'pointer', fontSize: 16, padding: '2px 6px',
-                }}>×</button>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+                {!n.read && <div style={{ width: 7, height: 7, borderRadius: "50%", background: T.cyan, boxShadow: `0 0 6px ${T.cyan}` }} />}
+                <button onClick={(e) => { e.stopPropagation(); deleteNote(n.id); }} style={{ background: "none", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 16, padding: "2px 6px", borderRadius: 4, transition: "color 0.15s" }}
+                  onMouseEnter={e => e.currentTarget.style.color = T.red}
+                  onMouseLeave={e => e.currentTarget.style.color = T.textMuted}
+                >×</button>
               </div>
             </div>
           ))}
-        </Card>
+        </div>
       )}
     </div>
   );
@@ -5512,28 +5533,35 @@ const VendorRatingsView = ({ user }) => {
   const sorted = [...vendors].sort((a, b) => (b.vendor_score || 0) - (a.vendor_score || 0));
 
   return (
-    <div>
-      <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Vendors</div>
-              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Vendor Ratings</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"Performance ratings per event and overall"}</div>
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Vendors</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Vendor Ratings</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Performance ratings per event and overall</div>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {[["all","All"],["this-month","Month"],["last-3","3M"],["this-year","YTD"]].map(([val, label]) => (
+            <button key={val} onClick={() => setPeriod(val)} style={{ padding: "5px 14px", borderRadius: 20, border: `1px solid ${period === val ? T.cyan : T.border}`, cursor: "pointer", background: period === val ? T.cyan + "20" : "none", color: period === val ? T.cyan : T.textMuted, fontWeight: 700, fontSize: 11, letterSpacing: "0.04em", transition: "all 0.15s" }}>{label}</button>
+          ))}
+        </div>
       </div>
 
-      {/* Period Filter */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
-        {[["all","All Time"],["this-month","This Month"],["last-3","Last 3 Months"],["this-year","This Year"]].map(([val, label]) => (
-          <button key={val} onClick={() => setPeriod(val)} style={{ padding: "7px 18px", borderRadius: 20, border: "1px solid " + (period === val ? T.cyan : T.border), cursor: "pointer", background: period === val ? T.cyan + "20" : "none", color: period === val ? T.cyan : T.textMuted, fontWeight: period === val ? 700 : 500, fontSize: 12 }}>{label}</button>
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10, marginBottom: 24 }}>
+        {[
+          { label: "Scorecards", value: filteredScorecards.length, color: T.cyan },
+          { label: "Avg Score", value: filteredScorecards.length ? avgScore + "%" : "—", color: T.amber },
+          { label: "Top Vendor", value: topVendor?.name?.split(" ")[0] || "—", color: "#10B981" },
+          { label: "Do Not Engage", value: poorVendors.length, color: T.red },
+          { label: "Impressive", value: filteredScorecards.filter(s => s.total_pct >= 85).length, color: "#10B981" },
+          { label: "Poor (<50%)", value: filteredScorecards.filter(s => s.total_pct < 50).length, color: T.red },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "12px 14px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 16, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 600, marginTop: 3, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+          </div>
         ))}
-      </div>
-
-      {/* Analytics Summary */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 14, marginBottom: 24 }}>
-        <Stat icon="📊" label="Scorecards" value={filteredScorecards.length} color={T.cyan} />
-        <Stat icon="⭐" label="Avg Score" value={filteredScorecards.length ? avgScore + "%" : "—"} color={T.amber} />
-        <Stat icon="🏆" label="Top Vendor" value={topVendor?.name || "—"} color="#10B981" />
-        <Stat icon="⛔" label="Do Not Engage" value={poorVendors.length} color="#F43F5E" />
-        <Stat icon="🟢" label="Impressive (85%+)" value={filteredScorecards.filter(s => s.total_pct >= 85).length} color="#10B981" />
-        <Stat icon="🔴" label="Poor (<50%)" value={filteredScorecards.filter(s => s.total_pct < 50).length} color="#F43F5E" />
       </div>
 
       {/* View Toggle */}
@@ -5571,27 +5599,27 @@ const VendorRatingsView = ({ user }) => {
                   const tier = score !== null ? getTier(score) : null;
                   const isPoor = score !== null && score < 50;
                   return (
-                    <Card key={i} style={{ borderLeft: "3px solid " + (score === null ? T.border : isPoor ? "#F43F5E" : tier.color), marginBottom: 0 }}>
+                    <div key={i} style={{ background: T.surface, border: `1px solid ${score === null ? T.border : isPoor ? T.red + "40" : tier.color + "40"}`, borderTop: `2px solid ${score === null ? T.border : isPoor ? T.red : tier.color}`, borderRadius: 10, padding: "14px 16px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                        <div>
-                          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{vd.rff.vendor}</div>
-                          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{vd.rff.title}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{vd.rff.vendor}</div>
+                          <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{vd.rff.title}</div>
                           {score !== null && (
-                            <span style={{ display: "inline-block", marginTop: 6, padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: tier.bg, color: tier.color, border: "1px solid " + tier.color + "44" }}>
+                            <span style={{ display: "inline-block", marginTop: 6, padding: "2px 9px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: tier.color + "18", color: tier.color, border: `1px solid ${tier.color}30` }}>
                               {tier.label}
                             </span>
                           )}
                         </div>
-                        <div style={{ textAlign: "center", minWidth: 50 }}>
-                          <div style={{ fontSize: 24, fontWeight: 900, color: score === null ? T.textMuted : isPoor ? "#F43F5E" : tier.color }}>
+                        <div style={{ textAlign: "center", minWidth: 48, flexShrink: 0 }}>
+                          <div style={{ fontSize: 22, fontWeight: 900, color: score === null ? T.textMuted : isPoor ? T.red : tier.color }}>
                             {score !== null ? score + "%" : "—"}
                           </div>
-                          <div style={{ color: T.textMuted, fontSize: 10 }}>{score === null ? "Unscored" : "Score"}</div>
+                          <div style={{ color: T.textMuted, fontSize: 9 }}>{score === null ? "Unscored" : "Score"}</div>
                         </div>
                       </div>
-                      {isPoor && <div style={{ marginTop: 8, color: "#F43F5E", fontSize: 11, fontWeight: 700 }}>⛔ Do not re-engage</div>}
-                      {score !== null && score >= 85 && <div style={{ marginTop: 8, color: "#10B981", fontSize: 11, fontWeight: 700 }}>⭐ Priority pick for future events</div>}
-                    </Card>
+                      {isPoor && <div style={{ marginTop: 8, color: T.red, fontSize: 10, fontWeight: 700 }}>⛔ Do not re-engage</div>}
+                      {score !== null && score >= 85 && <div style={{ marginTop: 8, color: "#10B981", fontSize: 10, fontWeight: 700 }}>★ Priority pick</div>}
+                    </div>
                   );
                 })}
               </div>
@@ -5610,38 +5638,46 @@ const VendorRatingsView = ({ user }) => {
             const isPoor = v.vendor_scorecard_count > 0 && score < 50;
             const isUnrated = !v.vendor_scorecard_count;
             return (
-              <Card key={v.id} style={{ borderLeft: "3px solid " + (isPoor ? "#F43F5E" : isUnrated ? T.border : tier.color), marginBottom: 0 }}>
+              <div key={v.id} style={{ background: T.surface, border: `1px solid ${isPoor ? T.red + "40" : T.border}`, borderTop: `3px solid ${isPoor ? T.red : isUnrated ? T.border : tier.color}`, borderRadius: 12, padding: "18px 20px", transition: "box-shadow 0.2s" }}
+                onMouseEnter={e => e.currentTarget.style.boxShadow = `0 4px 20px ${isPoor ? T.red : isUnrated ? T.border : tier.color}15`}
+                onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
+              >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-                  <div>
-                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{v.name}</div>
-                    <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{v.email}</div>
-                    <div style={{ marginTop: 8 }}>
-                      <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: isUnrated ? T.bg : tier.bg, color: isUnrated ? T.textMuted : tier.color, border: "1px solid " + (isUnrated ? T.border : tier.color + "44") }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{v.name}</div>
+                    <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{v.email}</div>
+                    <div style={{ marginTop: 7 }}>
+                      <span style={{ padding: "2px 9px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: isUnrated ? T.bg : tier.color + "18", color: isUnrated ? T.textMuted : tier.color, border: `1px solid ${isUnrated ? T.border : tier.color + "30"}` }}>
                         {isUnrated ? "Unrated" : tier.label}
                       </span>
                     </div>
                   </div>
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 28, fontWeight: 900, color: isUnrated ? T.textMuted : tier.color }}>{isUnrated ? "—" : score + "%"}</div>
-                    <div style={{ color: T.textMuted, fontSize: 10 }}>{v.vendor_scorecard_count || 0} event{v.vendor_scorecard_count !== 1 ? "s" : ""}</div>
+                  <div style={{ textAlign: "center", flexShrink: 0 }}>
+                    <div style={{ fontSize: 26, fontWeight: 900, color: isUnrated ? T.textMuted : tier.color }}>{isUnrated ? "—" : score + "%"}</div>
+                    <div style={{ color: T.textMuted, fontSize: 9 }}>{v.vendor_scorecard_count || 0} scored</div>
                   </div>
                 </div>
-                {isPoor && <div style={{ padding: "8px 12px", background: "#F43F5E15", borderRadius: 6, border: "1px solid #F43F5E33", marginBottom: 10 }}><div style={{ color: "#F43F5E", fontSize: 12, fontWeight: 700 }}>⛔ Below threshold — Do not engage</div></div>}
-                {score >= 85 && <div style={{ padding: "8px 12px", background: "#10B98115", borderRadius: 6, border: "1px solid #10B98133", marginBottom: 10 }}><div style={{ color: "#10B981", fontSize: 12, fontWeight: 700 }}>⭐ Impressive — Priority vendor</div></div>}
+                {!isUnrated && score > 0 && (
+                  <div style={{ height: 3, background: T.border + "44", borderRadius: 2, marginBottom: 10 }}>
+                    <div style={{ height: "100%", width: score + "%", background: isPoor ? T.red : tier.color, borderRadius: 2 }} />
+                  </div>
+                )}
+                {isPoor && <div style={{ padding: "6px 12px", background: T.red + "12", borderRadius: 6, border: `1px solid ${T.red}30`, marginBottom: 8 }}><div style={{ color: T.red, fontSize: 11, fontWeight: 700 }}>⛔ Do not engage</div></div>}
+                {score >= 85 && <div style={{ padding: "6px 12px", background: "#10B98112", borderRadius: 6, border: "1px solid #10B98130", marginBottom: 8 }}><div style={{ color: "#10B981", fontSize: 11, fontWeight: 700 }}>★ Priority vendor</div></div>}
                 {vendorCards.length > 0 && (
-                  <div style={{ marginBottom: 12 }}>
+                  <div style={{ marginBottom: 10 }}>
                     {filteredScorecards.filter(s => s.vendor_id === v.id).slice(0, 3).map(sc => (
-                      <div key={sc.id} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid " + T.border + "44" }}>
-                        <div style={{ color: T.textSecondary, fontSize: 12 }}>{sc.event_name || "General"}</div>
-                        <div style={{ color: getTier(sc.total_pct).color, fontWeight: 700, fontSize: 12 }}>{sc.total_pct}%</div>
+                      <div key={sc.id} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
+                        <div style={{ color: T.textMuted, fontSize: 11 }}>{sc.event_name || "General"}</div>
+                        <div style={{ color: getTier(sc.total_pct).color, fontWeight: 800, fontSize: 11 }}>{sc.total_pct}%</div>
                       </div>
                     ))}
                   </div>
                 )}
                 {vendorCards.length > 0 && (
-                  <button onClick={() => setHistoryVendor(v)} style={{ width: "100%", padding: "8px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, cursor: "pointer", color: T.textSecondary, fontSize: 12, fontWeight: 600 }}>View All Scorecards</button>
+                  <button onClick={() => setHistoryVendor(v)} style={{ width: "100%", padding: "7px", background: "none", border: `1px solid ${T.border}`, borderRadius: 8, cursor: "pointer", color: T.textMuted, fontSize: 11, fontWeight: 600 }}>View All Scorecards</button>
                 )}
-              </Card>
+              </div>
             );
           })}
         </div>

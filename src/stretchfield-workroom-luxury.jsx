@@ -4227,30 +4227,46 @@ const FinanceDashboard = ({ user, onTab }) => {
   const [financeTab, setFinanceTab] = useState("overview");
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
         <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
-        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Finance Dashboard</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Complete financial overview and tools</div>
-      </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+          <div>
+            <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Finance Dashboard</h2>
+            <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Complete financial overview and management</div>
+          </div>
+          {totalPendingApprovals > 0 && (
+            <div onClick={() => setFinanceTab("approvals")} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 14px", background: T.amber + "15", border: `1px solid ${T.amber}40`, borderRadius: 20, cursor: "pointer" }}>
+              <div style={{ width: 7, height: 7, borderRadius: "50%", background: T.amber, boxShadow: `0 0 8px ${T.amber}` }} />
+              <span style={{ color: T.amber, fontSize: 11, fontWeight: 700 }}>{totalPendingApprovals} pending approval{totalPendingApprovals > 1 ? "s" : ""}</span>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Internal Tab Nav */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
+      {/* Internal Tab Nav — luxury underline style */}
+      <div style={{ display: "flex", gap: 0, marginBottom: 28, borderBottom: `1px solid ${T.border}` }}>
         {[
-          { id: "overview", label: "Overview", icon: "📊" },
-          { id: "approvals", label: "Approvals" + (totalPendingApprovals > 0 ? " (" + totalPendingApprovals + ")" : ""), icon: "⏳" },
-          { id: "budgets", label: "Budgets", icon: "💰" },
-          { id: "expenses", label: "Expenses", icon: "🧾" },
-          { id: "reports", label: "Reports", icon: "📈" },
+          { id: "overview", label: "Overview" },
+          { id: "approvals", label: "Approvals", badge: totalPendingApprovals },
+          { id: "budgets", label: "Budgets" },
+          { id: "expenses", label: "Expenses" },
+          { id: "reports", label: "Reports" },
         ].map(tab => (
           <button key={tab.id} onClick={() => setFinanceTab(tab.id)} style={{
-            padding: "8px 18px", borderRadius: 20, border: "1px solid " + (financeTab === tab.id ? T.cyan : T.border),
-            cursor: "pointer", background: financeTab === tab.id ? T.cyan + "20" : "none",
-            color: financeTab === tab.id ? T.cyan : T.textMuted,
-            fontWeight: financeTab === tab.id ? 700 : 500, fontSize: 12,
-          }}>{tab.icon} {tab.label}</button>
+            padding: "10px 20px", border: "none", cursor: "pointer", background: "none",
+            color: financeTab === tab.id ? T.textPrimary : T.textMuted,
+            fontWeight: financeTab === tab.id ? 700 : 400,
+            fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase",
+            borderBottom: financeTab === tab.id ? `2px solid ${T.cyan}` : "2px solid transparent",
+            marginBottom: -1, transition: "all 0.15s", position: "relative",
+          }}>
+            {tab.label}
+            {tab.badge > 0 && (
+              <span style={{ marginLeft: 6, background: T.amber, color: "#000", fontSize: 9, fontWeight: 900, borderRadius: 20, padding: "1px 6px", verticalAlign: "middle" }}>{tab.badge}</span>
+            )}
+          </button>
         ))}
       </div>
 
@@ -4262,74 +4278,71 @@ const FinanceDashboard = ({ user, onTab }) => {
 
       {financeTab === "overview" && <div>
 
-      {/* Alerts Row */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
-        {totalPendingApprovals > 0 && (
-          <div onClick={() => setFinanceTab("approvals")} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: canApprove ? T.amber + "15" : T.blue + "15", border: "1px solid " + (canApprove ? T.amber : T.blue) + "44", borderRadius: 8, cursor: "pointer" }}>
-            <span style={{ fontSize: 18 }}>⏳</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ color: canApprove ? T.amber : T.blue, fontWeight: 700, fontSize: 13 }}>{canApprove ? totalPendingApprovals + " Finance Item(s) Awaiting Your Approval" : totalPendingApprovals + " Item(s) Pending CEO Approval"}</div>
-              <div style={{ color: T.textMuted, fontSize: 12 }}>
-                {pendingExpenseApprovals.length > 0 && pendingExpenseApprovals.length + " expense(s) · "}
-                {budgetRequests.length > 0 && budgetRequests.length + " budget request(s) · "}
-                {paymentRequests.length > 0 && paymentRequests.length + " payment(s)"}
-              </div>
+      {/* Alert pills */}
+      {(totalPendingApprovals > 0 || pendingInvoices.length > 0 || eventBudgetSummary.some(e => e.pct >= 90)) && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 24 }}>
+          {totalPendingApprovals > 0 && (
+            <div onClick={() => setFinanceTab("approvals")} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 14px", background: T.amber + "15", border: `1px solid ${T.amber}40`, borderRadius: 20, cursor: "pointer" }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.amber, boxShadow: `0 0 6px ${T.amber}` }} />
+              <span style={{ color: T.amber, fontSize: 11, fontWeight: 700 }}>{totalPendingApprovals} approval{totalPendingApprovals > 1 ? "s" : ""} pending</span>
+              <span style={{ color: T.amber, fontSize: 11 }}>→</span>
             </div>
-            <span style={{ color: canApprove ? T.amber : T.blue, fontSize: 12 }}>{canApprove ? "Approve →" : "View →"}</span>
-          </div>
-        )}
-        {pendingInvoices.length > 0 && (
-          <div onClick={() => onTab("invoices")} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: T.magenta + "15", border: "1px solid " + T.magenta + "44", borderRadius: 8, cursor: "pointer" }}>
-            <span style={{ fontSize: 18 }}>🧾</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ color: T.magenta, fontWeight: 700, fontSize: 13 }}>{pendingInvoices.length} Pending Invoice{pendingInvoices.length > 1 ? "s" : ""}</div>
-              <div style={{ color: T.textMuted, fontSize: 12 }}>GHS {totalPending.toLocaleString()} outstanding</div>
+          )}
+          {pendingInvoices.length > 0 && (
+            <div onClick={() => onTab("invoices")} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 14px", background: T.magenta + "15", border: `1px solid ${T.magenta}40`, borderRadius: 20, cursor: "pointer" }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.magenta, boxShadow: `0 0 6px ${T.magenta}` }} />
+              <span style={{ color: T.magenta, fontSize: 11, fontWeight: 700 }}>{pendingInvoices.length} invoice{pendingInvoices.length > 1 ? "s" : ""} outstanding · GHS {totalPending.toLocaleString()}</span>
+              <span style={{ color: T.magenta, fontSize: 11 }}>→</span>
             </div>
-            <span style={{ color: T.magenta, fontSize: 12 }}>Review →</span>
-          </div>
-        )}
-        {eventBudgetSummary.some(e => e.pct >= 90) && (
-          <div onClick={() => setFinanceTab("budgets")} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: "#F43F5E15", border: "1px solid #F43F5E44", borderRadius: 8, cursor: "pointer" }}>
-            <span style={{ fontSize: 18 }}>⚠️</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ color: "#F43F5E", fontWeight: 700, fontSize: 13 }}>{eventBudgetSummary.filter(e => e.pct >= 90).length} Event(s) Near or Over Budget</div>
-              <div style={{ color: T.textMuted, fontSize: 12 }}>{eventBudgetSummary.filter(e => e.pct >= 90).map(e => e.name).join(", ")}</div>
+          )}
+          {eventBudgetSummary.some(e => e.pct >= 90) && (
+            <div onClick={() => setFinanceTab("budgets")} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 14px", background: T.red + "15", border: `1px solid ${T.red}40`, borderRadius: 20, cursor: "pointer" }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.red, boxShadow: `0 0 6px ${T.red}` }} />
+              <span style={{ color: T.red, fontSize: 11, fontWeight: 700 }}>{eventBudgetSummary.filter(e => e.pct >= 90).length} event{eventBudgetSummary.filter(e => e.pct >= 90).length > 1 ? "s" : ""} near budget limit</span>
+              <span style={{ color: T.red, fontSize: 11 }}>→</span>
             </div>
-            <span style={{ color: "#F43F5E", fontSize: 12 }}>Review →</span>
+          )}
+        </div>
+      )}
+
+      {/* KPI Command Centre */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 12 }}>
+        {[
+          { label: "Total Revenue", value: "GHS " + totalRevenue.toLocaleString(), sub: "YTD: GHS " + ytdRevenue.toLocaleString(), color: T.teal, grad: `linear-gradient(135deg, ${T.teal}22, ${T.teal}08)` },
+          { label: "Gross Profit", value: "GHS " + grossProfit.toLocaleString(), sub: profitMargin + "% margin", color: grossProfit >= 0 ? T.cyan : T.red, grad: `linear-gradient(135deg, ${grossProfit >= 0 ? T.cyan : T.red}22, ${grossProfit >= 0 ? T.cyan : T.red}08)` },
+          { label: "Total Expenses", value: "GHS " + totalExpenses.toLocaleString(), sub: "MTD: GHS " + mtdExpenses.toLocaleString(), color: T.amber, grad: `linear-gradient(135deg, ${T.amber}22, ${T.amber}08)` },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "20px 22px", background: k.grad, border: `1px solid ${k.color}30`, borderRadius: 12 }}>
+            <div style={{ color: k.color, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 8 }}>{k.label}</div>
+            <div style={{ color: T.textPrimary, fontSize: 22, fontWeight: 900, letterSpacing: "-0.02em", marginBottom: 4 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 11 }}>{k.sub}</div>
           </div>
-        )}
+        ))}
       </div>
 
-      {/* Revenue */}
-      <div style={{ marginBottom: 8, color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Revenue</div>
-      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
-        <Stat icon="💰" label="MTD Revenue" value={"GHS " + mtdRevenue.toLocaleString()} color={T.teal} />
-        <Stat icon="📅" label="YTD Revenue" value={"GHS " + ytdRevenue.toLocaleString()} color={T.cyan} />
-        <Stat icon="🏆" label="Total Revenue" value={"GHS " + totalRevenue.toLocaleString()} color={T.blue} />
-      </div>
-
-      {/* Expenses */}
-      <div style={{ marginBottom: 8, color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Expenses & Invoices</div>
-      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
-        <Stat icon="📤" label="MTD Expenses" value={"GHS " + mtdExpenses.toLocaleString()} color={T.amber} />
-        <Stat icon="📤" label="YTD Expenses" value={"GHS " + ytdExpenses.toLocaleString()} color={T.magenta} />
-        <Stat icon="🧾" label="Total Invoiced" value={"GHS " + totalInvoiced.toLocaleString()} color={T.amber} />
-        <Stat icon="✅" label="Paid" value={"GHS " + totalPaid.toLocaleString()} color={T.teal} />
-        <Stat icon="⏳" label="Outstanding" value={"GHS " + totalPending.toLocaleString()} color={T.magenta} />
-      </div>
-
-      {/* Profitability */}
-      <div style={{ marginBottom: 8, color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Profitability</div>
-      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 28 }}>
-        <Stat icon="📊" label="Gross Profit" value={"GHS " + grossProfit.toLocaleString()} color={grossProfit >= 0 ? T.teal : "#F43F5E"} />
-        <Stat icon="📈" label="Profit Margin" value={profitMargin + "%"} color={profitMargin >= 30 ? T.teal : profitMargin >= 10 ? T.amber : "#F43F5E"} />
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 24 }}>
+        {[
+          { label: "MTD Revenue", value: "GHS " + mtdRevenue.toLocaleString(), color: T.teal },
+          { label: "Invoiced", value: "GHS " + totalInvoiced.toLocaleString(), color: T.cyan },
+          { label: "Paid", value: "GHS " + totalPaid.toLocaleString(), color: T.teal },
+          { label: "Outstanding", value: "GHS " + totalPending.toLocaleString(), color: T.magenta },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "12px 14px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 8 }}>
+            <div style={{ color: k.color, fontSize: 14, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, marginTop: 3, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+          </div>
+        ))}
       </div>
 
       {/* Main Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
         {/* Expenses by Category */}
-        <Card>
-          <SectionHeader title="Expenses by Category" actionLabel="+ Log Expense" action={() => onTab("expenses")} />
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em" }}>Expenses by Category</div>
+            <button onClick={() => setFinanceTab("expenses")} style={{ background: "none", border: "none", color: T.cyan, fontSize: 11, cursor: "pointer", fontWeight: 600 }}>+ Log →</button>
+          </div>
           {Object.keys(expensesByCategory).length === 0 ? (
             <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No expenses yet.</div>
           ) : Object.entries(expensesByCategory).sort((a,b) => b[1]-a[1]).map(([cat, amt]) => (
@@ -4344,11 +4357,14 @@ const FinanceDashboard = ({ user, onTab }) => {
               <ProgressBar value={totalExpenses ? Math.round((amt / totalExpenses) * 100) : 0} color={T.amber} />
             </div>
           ))}
-        </Card>
+        </div>
 
         {/* Budget vs Spend */}
-        <Card>
-          <SectionHeader title="Budget vs Spend" actionLabel="Manage" action={() => onTab("budgets")} />
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em" }}>Budget vs Spend</div>
+            <button onClick={() => setFinanceTab("budgets")} style={{ background: "none", border: "none", color: T.cyan, fontSize: 11, cursor: "pointer", fontWeight: 600 }}>Manage →</button>
+          </div>
           {eventBudgetSummary.length === 0 ? (
             <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No budgets set yet.</div>
           ) : eventBudgetSummary.map(ev => (
@@ -4364,13 +4380,16 @@ const FinanceDashboard = ({ user, onTab }) => {
               </div>
             </div>
           ))}
-        </Card>
+        </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
         {/* Recent Invoices */}
-        <Card>
-          <SectionHeader title="Recent Invoices" actionLabel="View All" action={() => onTab("invoices")} />
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em" }}>Recent Invoices</div>
+            <button onClick={() => onTab("invoices")} style={{ background: "none", border: "none", color: T.cyan, fontSize: 11, cursor: "pointer", fontWeight: 600 }}>View All →</button>
+          </div>
           {invoices.length === 0 ? (
             <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No invoices yet.</div>
           ) : invoices.slice(0, 5).map((inv, i) => (
@@ -4385,11 +4404,14 @@ const FinanceDashboard = ({ user, onTab }) => {
               </div>
             </div>
           ))}
-        </Card>
+        </div>
 
         {/* Recent Expenses */}
-        <Card>
-          <SectionHeader title="Recent Expenses" actionLabel="View All" action={() => onTab("expenses")} />
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em" }}>Recent Expenses</div>
+            <button onClick={() => setFinanceTab("expenses")} style={{ background: "none", border: "none", color: T.cyan, fontSize: 11, cursor: "pointer", fontWeight: 600 }}>View All →</button>
+          </div>
           {expenses.length === 0 ? (
             <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No expenses yet.</div>
           ) : expenses.slice(0, 5).map((e, i) => (
@@ -4408,26 +4430,32 @@ const FinanceDashboard = ({ user, onTab }) => {
               </div>
             </div>
           ))}
-        </Card>
+        </div>
       </div>
 
       {/* Quick Actions */}
-      <Card>
-        <SectionHeader title="Quick Actions" />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px", marginBottom: 0 }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 14 }}>Quick Actions</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
           {[
-            { icon: "📤", label: "Log Expense", tab: "expenses", color: T.amber },
-            { icon: "🎯", label: "Set Budget", tab: "budgets", color: T.cyan },
-            { icon: "📊", label: "View Reports", tab: "reports", color: T.blue },
-            { icon: "✅", label: "Approvals" + (totalPendingApprovals > 0 ? " (" + totalPendingApprovals + ")" : ""), tab: "approvals", color: totalPendingApprovals > 0 ? T.amber : T.teal },
+            { label: "Log Expense", tab: "expenses", color: T.amber },
+            { label: "Set Budget", tab: "budgets", color: T.cyan },
+            { label: "View Reports", tab: "reports", color: T.teal },
+            { label: "Approvals" + (totalPendingApprovals > 0 ? " · " + totalPendingApprovals : ""), tab: "approvals", color: totalPendingApprovals > 0 ? T.amber : T.textMuted },
           ].map(a => (
-            <button key={a.tab} onClick={() => setFinanceTab(a.tab)} style={{ padding: "16px 12px", background: a.color + "15", border: "1px solid " + a.color + "33", borderRadius: 10, cursor: "pointer", textAlign: "center" }}>
-              <div style={{ fontSize: 24, marginBottom: 8 }}>{a.icon}</div>
-              <div style={{ color: a.color, fontWeight: 700, fontSize: 12 }}>{a.label}</div>
+            <button key={a.tab} onClick={() => setFinanceTab(a.tab)} style={{
+              padding: "14px 12px", background: a.color + "12", border: `1px solid ${a.color}30`,
+              borderRadius: 10, cursor: "pointer", textAlign: "center", transition: "all 0.15s",
+            }}
+              onMouseEnter={e => { e.currentTarget.style.background = a.color + "22"; e.currentTarget.style.borderColor = a.color + "60"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = a.color + "12"; e.currentTarget.style.borderColor = a.color + "30"; }}
+            >
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: a.color, boxShadow: `0 0 8px ${a.color}80`, margin: "0 auto 10px" }} />
+              <div style={{ color: a.color, fontWeight: 700, fontSize: 11, letterSpacing: "0.04em", textTransform: "uppercase" }}>{a.label}</div>
             </button>
           ))}
         </div>
-      </Card>
+      </div>
     </div>}
     </div>
   );

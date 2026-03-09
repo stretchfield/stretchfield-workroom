@@ -3272,46 +3272,89 @@ const StrategyOverviewView = () => {
     ]).then(([c, e, f]) => { setClients(c.data || []); setEvents(e.data || []); setFeedback(f.data || []); });
   }, []);
 
+  const totalEvents = events.length;
+  const avgCompletion = totalEvents ? Math.round(events.reduce((a, e) => a + (e.completion || 0), 0) / totalEvents) : 0;
+  const avgFeedbackRating = feedback.length ? (feedback.reduce((a, f) => a + f.rating, 0) / feedback.length).toFixed(1) : null;
+
   return (
-    <div>
-      <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
         <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Strategy</div>
-              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Client & Event Overview</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"Pictorial view of all active clients and events"}</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Client & Event Overview</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Pictorial view of all active clients and events</div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 20 }}>
+
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Active Clients", value: clients.length, color: T.cyan },
+          { label: "Active Events", value: totalEvents, color: T.teal },
+          { label: "Avg Completion", value: avgCompletion + "%", color: T.amber },
+          { label: "Avg Feedback", value: avgFeedbackRating ? avgFeedbackRating + " / 5" : "—", color: "#F59E0B" },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 20, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
         {clients.map(c => {
           const clientEvents = events.filter(e => e.client_id === c.id);
           const clientFeedback = feedback.filter(f => f.client_id === c.id);
           const avgRating = clientFeedback.length ? (clientFeedback.reduce((a, f) => a + f.rating, 0) / clientFeedback.length).toFixed(1) : null;
+          const initials = (c.company || c.name).slice(0,2).toUpperCase();
           return (
-            <Card key={c.id}>
-              <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16, paddingBottom: 14, borderBottom: "1px solid " + T.border }}>
-                <Avatar initials={(c.company || c.name).slice(0,2).toUpperCase()} size={48} color={T.blue} />
-                <div>
-                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{c.company || c.name}</div>
-                  <div style={{ color: T.textMuted, fontSize: 12 }}>{c.name}</div>
-                  {avgRating && <div style={{ color: "#F59E0B", fontSize: 12, marginTop: 2 }}>{"★".repeat(Math.round(avgRating))} {avgRating}/5</div>}
+            <div key={c.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px", transition: "box-shadow 0.2s" }}
+              onMouseEnter={e => e.currentTarget.style.boxShadow = `0 4px 24px ${T.cyan}10`}
+              onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
+            >
+              {/* Client header */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, paddingBottom: 14, borderBottom: `1px solid ${T.border}44` }}>
+                <div style={{ width: 44, height: 44, borderRadius: 10, background: `linear-gradient(135deg, ${T.blue}40, ${T.cyan}20)`, border: `1px solid ${T.cyan}30`, display: "flex", alignItems: "center", justifyContent: "center", color: T.cyan, fontWeight: 900, fontSize: 14, flexShrink: 0 }}>{initials}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.company || c.name}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 1 }}>{c.name}</div>
+                  {avgRating && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 3 }}>
+                      <span style={{ color: "#F59E0B", fontSize: 11 }}>{"★".repeat(Math.round(avgRating))}</span>
+                      <span style={{ color: T.textMuted, fontSize: 10 }}>{avgRating}/5</span>
+                    </div>
+                  )}
+                </div>
+                <div style={{ background: clientEvents.length > 0 ? T.teal + "18" : T.border + "40", border: `1px solid ${clientEvents.length > 0 ? T.teal + "40" : T.border}`, color: clientEvents.length > 0 ? T.teal : T.textMuted, padding: "2px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                  {clientEvents.length} event{clientEvents.length !== 1 ? "s" : ""}
                 </div>
               </div>
-              {clientEvents.length === 0 ? <div style={{ color: T.textMuted, fontSize: 12 }}>No active events</div>
-              : clientEvents.map(e => (
-                <div key={e.id} style={{ marginBottom: 12 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <div style={{ color: T.textSecondary, fontSize: 13, fontWeight: 600 }}>📁 {e.name}</div>
-                    <span style={{ color: T.cyan, fontSize: 12 }}>{e.completion || 0}%</span>
-                  </div>
-                  <ProgressBar value={e.completion || 0} />
-                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>{e.phase} · Due {e.deadline}</div>
-                  {feedback.filter(f => f.project_id === e.id).slice(0,1).map(f => (
-                    <div key={f.id} style={{ marginTop: 8, padding: "8px 10px", background: T.cyan + "10", borderRadius: 6, border: "1px solid " + T.cyan + "22" }}>
-                      <div style={{ color: "#F59E0B", fontSize: 11 }}>{"★".repeat(f.rating)}</div>
-                      <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 2, fontStyle: "italic" }}>"{f.summary}"</div>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </Card>
+
+              {clientEvents.length === 0
+                ? <div style={{ color: T.textMuted, fontSize: 12, fontStyle: "italic", padding: "8px 0" }}>No active events</div>
+                : clientEvents.map(e => {
+                    const pct = e.completion || 0;
+                    const barColor = pct >= 80 ? T.teal : pct >= 50 ? T.cyan : T.amber;
+                    const evFeedback = feedback.filter(f => f.project_id === e.id).slice(0,1);
+                    return (
+                      <div key={e.id} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: `1px solid ${T.border}33` }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                          <div style={{ color: T.textPrimary, fontSize: 12, fontWeight: 700, flex: 1, marginRight: 8 }}>{e.name}</div>
+                          <span style={{ color: barColor, fontWeight: 900, fontSize: 13, flexShrink: 0 }}>{pct}%</span>
+                        </div>
+                        <div style={{ height: 4, background: T.border + "44", borderRadius: 2, marginBottom: 5 }}>
+                          <div style={{ height: "100%", width: pct + "%", background: `linear-gradient(90deg, ${barColor}, ${barColor}cc)`, borderRadius: 2, transition: "width 0.4s ease" }} />
+                        </div>
+                        <div style={{ color: T.textMuted, fontSize: 10 }}>{e.phase} · Due {e.deadline}</div>
+                        {evFeedback.map(f => (
+                          <div key={f.id} style={{ marginTop: 8, padding: "8px 10px", background: T.cyan + "08", borderRadius: 8, border: `1px solid ${T.cyan}18` }}>
+                            <div style={{ color: "#F59E0B", fontSize: 10, marginBottom: 2 }}>{"★".repeat(f.rating)}</div>
+                            <div style={{ color: T.textMuted, fontSize: 11, fontStyle: "italic" }}>"{f.summary}"</div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })
+              }
+            </div>
           );
         })}
       </div>

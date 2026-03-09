@@ -3089,43 +3089,63 @@ const SMTasksView = ({ user }) => {
   };
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Sales</div>
-              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>S&M Tasks</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"Sales & Marketing internal tasks"}</div>
-      </div>
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Sales</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>S&M Tasks</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Sales & Marketing internal tasks</div>
+        </div>
         {canCreate && <Btn onClick={() => setModal(true)}>+ New Task</Btn>}
       </div>
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
-        <Stat icon="📋" label="Total" value={tasks.length} color={T.cyan} />
-        <Stat icon="⏳" label="In Progress" value={tasks.filter(t => t.status === "in-progress").length} color={T.amber} />
-        <Stat icon="✅" label="Completed" value={tasks.filter(t => t.status === "completed").length} color={T.teal} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Total Tasks", value: tasks.length, color: T.cyan },
+          { label: "In Progress", value: tasks.filter(t => t.status === "in-progress").length, color: T.amber },
+          { label: "Completed", value: tasks.filter(t => t.status === "completed").length, color: T.teal },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+          </div>
+        ))}
       </div>
       {tasks.length === 0 ? (
-        <Card style={{ textAlign: "center", padding: 60 }}>
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>📋</div>
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No S&M tasks yet</div>
           <div style={{ color: T.textMuted, fontSize: 13 }}>Tasks between CEO and Sales & Marketing appear here.</div>
-        </Card>
-      ) : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>{tasks.map(t => (
-        <Card key={t.id} style={{ marginBottom: 0 }} style={{ marginBottom: 16, cursor: "pointer" }} onClick={() => setDetailTask({ ...t })}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-            <div>
-              <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{t.name}</div>
-              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>
-                {t.assignee_name && <span>👤 {t.assignee_name} · </span>}Due {t.deadline}
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
+          {tasks.map((t, idx) => {
+            const pct = t.progress || 0;
+            const barColor = t.status === "completed" ? T.teal : pct > 66 ? T.cyan : pct > 33 ? T.amber : T.magenta;
+            return (
+              <div key={t.id} onClick={() => setDetailTask({ ...t })} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px", cursor: "pointer", transition: "box-shadow 0.2s, border-color 0.2s" }}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 4px 24px ${T.cyan}12`; e.currentTarget.style.borderColor = T.cyan + "40"; }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = T.border; }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</div>
+                    {t.assignee_name && <div style={{ color: T.cyan, fontSize: 10, fontWeight: 700 }}>→ {t.assignee_name}</div>}
+                    {t.notes && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4, fontStyle: "italic", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.notes}</div>}
+                  </div>
+                  <Badge status={t.status} />
+                </div>
+                <div style={{ height: 3, background: T.border + "44", borderRadius: 2, marginBottom: 6 }}>
+                  <div style={{ height: "100%", width: pct + "%", background: barColor, borderRadius: 2 }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <div style={{ color: T.textMuted, fontSize: 10 }}>{pct}% complete</div>
+                  {t.deadline && <div style={{ color: T.textMuted, fontSize: 10 }}>Due {t.deadline}</div>}
+                </div>
               </div>
-              {t.notes && <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 4, fontStyle: "italic" }}>{t.notes}</div>}
-            </div>
-            <Badge status={t.status} />
-          </div>
-          <ProgressBar value={t.progress || 0} />
-          <div style={{ color: T.textMuted, fontSize: 11, marginTop: 6 }}>{t.progress || 0}% complete</div>
-        </Card>
-      ))}
-      </div>}
+            );
+          })}
+        </div>
+      )}
       {modal && (
         <Modal title="New S&M Task" onClose={() => setModal(false)}>
           <Input label="Task Name" placeholder="e.g. Prepare pitch deck" value={form.name} onChange={v => setForm({ ...form, name: v })} />
@@ -3920,80 +3940,107 @@ const CRMDashboardCEO = ({ user }) => {
   };
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Sales Analytics</div>
-              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>CRM Insights</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"Team performance and revenue overview"}</div>
-      </div>
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Sales Analytics</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>CRM Insights</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Team performance and revenue overview</div>
+        </div>
         <Btn onClick={() => setModal(true)}>+ Set Target</Btn>
       </div>
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 32 }}>
-        <Stat icon="💰" label="Total Revenue" value={"GHS " + totalRevenue.toLocaleString()} color={T.teal} />
-        <Stat icon="📅" label="YTD Revenue" value={"GHS " + ytdRevenue.toLocaleString()} color={T.cyan} />
-        <Stat icon="📊" label="Closing %" value={closingPct + "%"} color={T.blue} />
-        <Stat icon="⏱" label="Avg Cycle" value={avgCycle + " days"} color={T.amber} />
-        <Stat icon="🏆" label="Deals Won" value={wonLeads.length} sub={"of " + leads.length + " total"} color={T.magenta} />
+
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Total Revenue", value: "GHS " + totalRevenue.toLocaleString(), color: T.teal },
+          { label: "YTD Revenue", value: "GHS " + ytdRevenue.toLocaleString(), color: T.cyan },
+          { label: "Closing Rate", value: closingPct + "%", color: T.blue },
+          { label: "Avg Cycle", value: avgCycle + "d", color: T.amber },
+          { label: "Deals Won", value: wonLeads.length + " / " + leads.length, color: T.magenta },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 18, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+          </div>
+        ))}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
-        <Card>
-          <SectionHeader title="Rep Performance vs Target" />
+
+      {/* Rep Performance + Revenue by Client */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>Rep Performance vs Target</div>
           {repStats.length === 0 ? <div style={{ color: T.textMuted, fontSize: 13 }}>No reps yet.</div>
           : repStats.map((rep, i) => {
             const target = rep.repTarget ? rep.repTarget.target_amount : 0;
             const pct = target ? Math.min(100, Math.round((rep.repRevenue / target) * 100)) : 0;
+            const barColor = pct >= 100 ? T.teal : pct >= 60 ? T.cyan : T.amber;
             return (
-              <div key={rep.id} style={{ marginBottom: 20 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <div key={rep.id} style={{ marginBottom: 18, paddingBottom: 18, borderBottom: `1px solid ${T.border}44` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <div>
-                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{i === 0 && <span style={{ color: T.amber }}>🏆 </span>}{rep.name}</div>
-                    <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{rep.repWon.length} deals · {rep.closingPct}% close · {rep.repCycle}d cycle</div>
+                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>{i === 0 && <span style={{ color: T.gold }}>★ </span>}{rep.name}</div>
+                    <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{rep.repWon.length} won · {rep.closingPct}% close · {rep.repCycle}d</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ color: T.teal, fontWeight: 700, fontSize: 13 }}>GHS {rep.repRevenue.toLocaleString()}</div>
-                    {target > 0 && <div style={{ color: T.textMuted, fontSize: 11 }}>of GHS {target.toLocaleString()}</div>}
+                    <div style={{ color: T.teal, fontWeight: 800, fontSize: 13 }}>GHS {rep.repRevenue.toLocaleString()}</div>
+                    {target > 0 && <div style={{ color: T.textMuted, fontSize: 10 }}>of GHS {target.toLocaleString()}</div>}
                   </div>
                 </div>
-                {target > 0 && <><ProgressBar value={pct} color={pct >= 100 ? T.teal : pct >= 60 ? T.cyan : T.amber} /><div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>{pct}% of target</div></>}
+                {target > 0 && (
+                  <>
+                    <div style={{ height: 4, background: T.border + "44", borderRadius: 2, marginBottom: 4 }}>
+                      <div style={{ height: "100%", width: pct + "%", background: barColor, borderRadius: 2 }} />
+                    </div>
+                    <div style={{ color: T.textMuted, fontSize: 10 }}>{pct}% of target</div>
+                  </>
+                )}
               </div>
             );
           })}
-        </Card>
-        <Card>
-          <SectionHeader title="Revenue by Client" />
+        </div>
+
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>Revenue by Client</div>
           {Object.keys(clientEarnings).length === 0 ? <div style={{ color: T.textMuted, fontSize: 13 }}>No won deals yet.</div>
           : Object.entries(clientEarnings).sort((a,b) => b[1]-a[1]).map(([company, amount]) => (
             <div key={company} style={{ marginBottom: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{company}</div>
-                <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>GHS {amount.toLocaleString()}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <div style={{ color: T.textPrimary, fontSize: 12, fontWeight: 600 }}>{company}</div>
+                <div style={{ color: T.gold, fontWeight: 800, fontSize: 12 }}>GHS {amount.toLocaleString()}</div>
               </div>
-              <ProgressBar value={Math.round((amount / totalRevenue) * 100)} color={T.blue} />
+              <div style={{ height: 3, background: T.border + "44", borderRadius: 2 }}>
+                <div style={{ height: "100%", width: Math.round((amount / totalRevenue) * 100) + "%", background: `linear-gradient(90deg, ${T.cyan}, ${T.teal})`, borderRadius: 2 }} />
+              </div>
             </div>
           ))}
-        </Card>
+        </div>
       </div>
-      <Card>
-        <SectionHeader title="Sales Targets" actionLabel="+ Set Target" action={() => setModal(true)} />
-        {targets.length === 0 ? <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0" }}>No targets set yet.</div>
+
+      {/* Sales Targets */}
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em" }}>Sales Targets</div>
+          <button onClick={() => setModal(true)} style={{ background: "none", border: "none", color: T.cyan, fontSize: 11, cursor: "pointer", fontWeight: 700 }}>+ Set Target →</button>
+        </div>
+        {targets.length === 0 ? <div style={{ color: T.textMuted, fontSize: 13, padding: "16px 0" }}>No targets set yet.</div>
         : targets.map(t => {
           const rep = repStats.find(r => r.id === t.rep_id);
           const pct = rep ? Math.min(100, Math.round(((rep.repRevenue || 0) / t.target_amount) * 100)) : 0;
           return (
-            <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px solid " + T.border }}>
+            <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: `1px solid ${T.border}44` }}>
               <div>
-                <div style={{ color: T.textPrimary, fontWeight: 600, fontSize: 13 }}>{t.rep_name}</div>
-                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{t.period} · {t.start_date} to {t.end_date}</div>
+                <div style={{ color: T.textPrimary, fontWeight: 600, fontSize: 12 }}>{t.rep_name}</div>
+                <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{t.period} · {t.start_date} → {t.end_date}</div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ color: T.amber, fontWeight: 700 }}>GHS {t.target_amount.toLocaleString()}</div>
-                <div style={{ color: pct >= 100 ? T.teal : T.textMuted, fontSize: 11, marginTop: 2 }}>{pct}% achieved</div>
+                <div style={{ color: T.gold, fontWeight: 800, fontSize: 13 }}>GHS {t.target_amount.toLocaleString()}</div>
+                <div style={{ color: pct >= 100 ? T.teal : T.textMuted, fontSize: 10, marginTop: 2 }}>{pct}% achieved</div>
               </div>
             </div>
           );
         })}
-      </Card>
+      </div>
       {modal && (
         <Modal title="Set Sales Target" onClose={() => setModal(false)}>
           <Select label="Sales Rep" options={[{ value: "", label: "Select rep..." }, ...members.map(m => ({ value: m.id, label: m.name + " — " + m.role }))]}
@@ -4056,98 +4103,121 @@ const CRMDashboardSM = ({ user }) => {
   const periodLabel = period === "mtd" ? "Month to Date" : period === "ytd" ? "Year to Date" : "All Time";
 
   return (
-    <div>
-      <div style={{ marginBottom: 24, paddingBottom: 18, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Sales Analytics</div>
-              <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>My CRM Insights</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{"Performance overview for " + user.name}</div>
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Sales Analytics</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>My CRM Insights</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Performance overview for {user.name}</div>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {[["mtd","MTD"],["ytd","YTD"],["all","All"]].map(([val, label]) => (
+            <button key={val} onClick={() => setPeriod(val)} style={{
+              padding: "6px 16px", borderRadius: 20, cursor: "pointer", fontSize: 11, fontWeight: 700,
+              letterSpacing: "0.06em", border: `1px solid ${period === val ? T.cyan : T.border}`,
+              background: period === val ? T.cyan + "20" : "none",
+              color: period === val ? T.cyan : T.textMuted, transition: "all 0.15s",
+            }}>{label}</button>
+          ))}
+        </div>
       </div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-        {[["mtd","MTD"],["ytd","YTD"],["all","All Time"]].map(([val, label]) => (
-          <button key={val} onClick={() => setPeriod(val)} style={{
-            padding: "7px 18px", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: 600,
-            border: "1px solid " + (period === val ? T.cyan : T.border),
-            background: period === val ? T.cyan + "20" : "none",
-            color: period === val ? T.cyan : T.textMuted,
-          }}>{label}</button>
+
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: periodLabel + " Revenue", value: "GHS " + periodRevenue.toLocaleString(), color: T.teal },
+          { label: "YTD Revenue", value: "GHS " + ytdRevenue.toLocaleString(), color: T.cyan },
+          { label: "Pipeline", value: "GHS " + pipelineValue.toLocaleString(), color: T.amber },
+          { label: "Close Rate", value: closingPct + "%", color: T.magenta },
+          { label: "Avg Cycle", value: avgCycle + "d", color: T.blue },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 15, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+          </div>
         ))}
       </div>
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
-        <Stat icon="💰" label={periodLabel + " Revenue"} value={"GHS " + periodRevenue.toLocaleString()} color={T.teal} />
-        <Stat icon="📅" label="YTD Revenue" value={"GHS " + ytdRevenue.toLocaleString()} color={T.cyan} />
-        <Stat icon="🎯" label="Pipeline" value={"GHS " + pipelineValue.toLocaleString()} color={T.amber} />
-        <Stat icon="📊" label="Close Rate" value={closingPct + "%"} color={T.magenta} />
-        <Stat icon="⏱" label="Avg Cycle" value={avgCycle + " days"} color={T.blue} />
-      </div>
-      <Card style={{ marginBottom: 20 }}>
-        <SectionHeader title={"Target Tracking — " + periodLabel} />
+
+      {/* Target Tracking */}
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 22px", marginBottom: 16 }}>
+        <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>Target Tracking — {periodLabel}</div>
         {!target ? (
-          <div style={{ color: T.textMuted, fontSize: 13, padding: "12px 0" }}>No target set. Ask your CEO to set a target.</div>
+          <div style={{ color: T.textMuted, fontSize: 13, padding: "8px 0" }}>No target set. Ask your CEO to set a target.</div>
         ) : (
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
               <div>
-                <div style={{ color: T.textSecondary, fontSize: 13 }}>{target.period.charAt(0).toUpperCase() + target.period.slice(1)} Target</div>
-                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{target.start_date} to {target.end_date}</div>
+                <div style={{ color: T.textMuted, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>{target.period} target</div>
+                <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{target.start_date} → {target.end_date}</div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ color: T.teal, fontWeight: 800, fontSize: 22 }}>GHS {periodRevenue.toLocaleString()}</div>
-                <div style={{ color: T.textMuted, fontSize: 12 }}>of GHS {targetAmount.toLocaleString()} target</div>
+                <div style={{ color: T.teal, fontWeight: 900, fontSize: 24 }}>GHS {periodRevenue.toLocaleString()}</div>
+                <div style={{ color: T.textMuted, fontSize: 11 }}>of GHS {targetAmount.toLocaleString()}</div>
               </div>
             </div>
-            <ProgressBar value={targetPct} height={14} color={targetPct >= 100 ? T.teal : targetPct >= 60 ? T.cyan : T.amber} />
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
-              <div style={{ color: targetPct >= 100 ? T.teal : T.amber, fontSize: 14, fontWeight: 700 }}>{targetPct}% of target</div>
-              <div style={{ color: T.textMuted, fontSize: 12 }}>{targetAmount - periodRevenue > 0 ? "GHS " + (targetAmount - periodRevenue).toLocaleString() + " to go" : "🎉 Target exceeded!"}</div>
+            <div style={{ height: 8, background: T.border + "44", borderRadius: 4, marginBottom: 8 }}>
+              <div style={{ height: "100%", width: targetPct + "%", background: targetPct >= 100 ? T.teal : targetPct >= 60 ? T.cyan : T.amber, borderRadius: 4, transition: "width 0.4s ease" }} />
             </div>
-            <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid " + T.border }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                <div style={{ color: T.textSecondary, fontSize: 13, fontWeight: 600 }}>Year to Date</div>
-                <div style={{ color: T.cyan, fontWeight: 700 }}>GHS {ytdRevenue.toLocaleString()} <span style={{ color: T.textMuted, fontWeight: 400, fontSize: 12 }}>({ytdTargetPct}%)</span></div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <div style={{ color: targetPct >= 100 ? T.teal : T.amber, fontSize: 13, fontWeight: 700 }}>{targetPct}%</div>
+              <div style={{ color: T.textMuted, fontSize: 11 }}>{targetAmount - periodRevenue > 0 ? "GHS " + (targetAmount - periodRevenue).toLocaleString() + " to go" : "🎉 Target exceeded!"}</div>
+            </div>
+            <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${T.border}44` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>Year to Date</div>
+                <div style={{ color: T.cyan, fontWeight: 700, fontSize: 12 }}>GHS {ytdRevenue.toLocaleString()} <span style={{ color: T.textMuted, fontWeight: 400 }}>({ytdTargetPct}%)</span></div>
               </div>
-              <ProgressBar value={ytdTargetPct} height={8} color={T.blue} />
+              <div style={{ height: 4, background: T.border + "44", borderRadius: 2 }}>
+                <div style={{ height: "100%", width: ytdTargetPct + "%", background: T.blue, borderRadius: 2 }} />
+              </div>
             </div>
-          </div>
+          </>
         )}
-      </Card>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-        <Card>
-          <SectionHeader title="Pipeline by Stage" />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        {/* Pipeline by Stage */}
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>Pipeline by Stage</div>
           {["new","contacted","qualified","proposal","won","lost"].map(s => {
             const count = leads.filter(l => l.status === s).length;
             const val = leads.filter(l => l.status === s).reduce((a, l) => a + (l.value || 0), 0);
             if (!count) return null;
-            const colors = { new: T.cyan, contacted: T.blue, qualified: T.amber, proposal: T.magenta, won: T.teal, lost: "#F43F5E" };
+            const colors = { new: T.cyan, contacted: T.blue, qualified: T.amber, proposal: T.magenta, won: T.teal, lost: T.red };
             return (
-              <div key={s} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: "1px solid " + T.border }}>
+              <div key={s} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: `1px solid ${T.border}44` }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: colors[s] }} />
-                  <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{s.charAt(0).toUpperCase() + s.slice(1)}</div>
+                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: colors[s], boxShadow: `0 0 5px ${colors[s]}` }} />
+                  <div style={{ color: T.textPrimary, fontSize: 12, fontWeight: 600 }}>{s.charAt(0).toUpperCase() + s.slice(1)}</div>
                 </div>
-                <div style={{ display: "flex", gap: 16 }}>
-                  <div style={{ color: T.textMuted, fontSize: 12 }}>{count} deals</div>
-                  <div style={{ color: colors[s], fontWeight: 700, fontSize: 12, minWidth: 80, textAlign: "right" }}>GHS {val.toLocaleString()}</div>
+                <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+                  <div style={{ color: T.textMuted, fontSize: 11 }}>{count}</div>
+                  <div style={{ color: colors[s], fontWeight: 800, fontSize: 12, minWidth: 90, textAlign: "right" }}>GHS {val.toLocaleString()}</div>
                 </div>
               </div>
             );
           })}
-        </Card>
-        <Card>
-          <SectionHeader title="Business Spread by Client" />
+        </div>
+
+        {/* Business Spread */}
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>Business Spread by Client</div>
           {Object.keys(clientSpread).length === 0 ? <div style={{ color: T.textMuted, fontSize: 13 }}>No won deals yet.</div>
           : Object.entries(clientSpread).sort((a,b) => b[1]-a[1]).map(([company, amount]) => (
             <div key={company} style={{ marginBottom: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{company}</div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <div style={{ color: T.textMuted, fontSize: 11 }}>{totalRevenue ? Math.round((amount / totalRevenue) * 100) : 0}%</div>
-                  <div style={{ color: T.amber, fontWeight: 700, fontSize: 12 }}>GHS {amount.toLocaleString()}</div>
+                <div style={{ color: T.textPrimary, fontSize: 12, fontWeight: 600 }}>{company}</div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <div style={{ color: T.textMuted, fontSize: 10 }}>{totalRevenue ? Math.round((amount / totalRevenue) * 100) : 0}%</div>
+                  <div style={{ color: T.gold, fontWeight: 800, fontSize: 12 }}>GHS {amount.toLocaleString()}</div>
                 </div>
               </div>
-              <ProgressBar value={totalRevenue ? Math.round((amount / totalRevenue) * 100) : 0} color={T.blue} />
+              <div style={{ height: 3, background: T.border + "44", borderRadius: 2 }}>
+                <div style={{ height: "100%", width: (totalRevenue ? Math.round((amount / totalRevenue) * 100) : 0) + "%", background: `linear-gradient(90deg, ${T.cyan}, ${T.teal})`, borderRadius: 2 }} />
+              </div>
             </div>
           ))}
-        </Card>
+        </div>
       </div>
     </div>
   );

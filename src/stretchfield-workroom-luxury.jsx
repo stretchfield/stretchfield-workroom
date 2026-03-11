@@ -1920,6 +1920,7 @@ const TaskCommentCard = ({ task: t, user, canComment, barColor, statusColor, pct
         title: `${user.name} commented on your task`,
         message: `"${t.name}" — ${newComment.trim().slice(0, 80)}`,
         type: "task",
+        resource_id: t.id,
       });
     }
     // notify CEO + Strategy Lead if assignee replies
@@ -1932,6 +1933,7 @@ const TaskCommentCard = ({ task: t, user, canComment, barColor, statusColor, pct
             title: `${user.name} replied on task`,
             message: `"${t.name}" — ${newComment.trim().slice(0, 80)}`,
             type: "task",
+            resource_id: t.id,
           });
         }
       }
@@ -2389,6 +2391,7 @@ const TaskCommentThread = ({ task, user }) => {
         title: `${user.name} commented on your task`,
         message: `"${task.name}" — ${newComment.trim().slice(0, 80)}`,
         type: "task",
+        resource_id: task.id,
       });
     }
     // Notify CEO + Strategy Lead if assignee replies
@@ -2401,6 +2404,7 @@ const TaskCommentThread = ({ task, user }) => {
             title: `${user.name} replied on task`,
             message: `"${task.name}" — ${newComment.trim().slice(0, 80)}`,
             type: "task",
+            resource_id: task.id,
           });
         }
       }
@@ -2524,6 +2528,17 @@ const TasksView = ({ userRole, openTaskId, onOpenHandled }) => {
   };
 
   useEffect(() => { load(); }, []);
+
+  // Auto-open task from notification deep-link
+  useEffect(() => {
+    if (openTaskId && tasks.length > 0) {
+      const task = tasks.find(t => t.id === openTaskId);
+      if (task) {
+        openDetail(task);
+        if (onOpenHandled) onOpenHandled();
+      }
+    }
+  }, [openTaskId, tasks]);
 
   const handleCreate = async () => {
     setSaving(true);
@@ -4732,7 +4747,9 @@ const NotificationsView = ({ user, onNavigate }) => {
     // Navigate to source
     const target = getNavTarget(note);
     if (target && onNavigate) {
-      onNavigate(target, note.resource_id || null);
+      // For task notifications, always route to tasks tab with the task id
+      const resolvedTarget = note.type === "task" ? "tasks" : target;
+      onNavigate(resolvedTarget, note.resource_id || null);
     }
   };
 

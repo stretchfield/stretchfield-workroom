@@ -117,7 +117,7 @@ const LIGHT_THEME = {
 
 let T = DARK_THEME;
 
-const ThemeContext = React.createContext({ isDark: true, toggleTheme: () => {} });
+const ThemeContext = React.createContext({ isDark: true, toggleTheme: () => {}, theme: DARK_THEME });
 
 const ThemeProvider = ({ children }) => {
   const getInitial = () => { try { return localStorage.getItem("sf-theme") !== "light"; } catch { return true; } };
@@ -127,20 +127,30 @@ const ThemeProvider = ({ children }) => {
     setIsDark(prev => {
       const next = !prev;
       try { localStorage.setItem("sf-theme", next ? "dark" : "light"); } catch {}
-      T = next ? DARK_THEME : LIGHT_THEME;
       return next;
     });
   };
 
-  // Keep global T in sync
-  T = isDark ? DARK_THEME : LIGHT_THEME;
+  const theme = isDark ? DARK_THEME : LIGHT_THEME;
+  // Keep global T in sync so inline styles using T still work
+  T = theme;
 
   return (
-    <ThemeContext.Provider value={{ isDark, toggleTheme }}>
-      <div key={isDark ? "dark" : "light"} style={{ minHeight: "100vh", background: T.bg, color: T.textPrimary, transition: "background 0.3s, color 0.3s" }}>
-        {children}
-      </div>
+    <ThemeContext.Provider value={{ isDark, toggleTheme, theme }}>
+      <ThemeConsumer>{children}</ThemeConsumer>
     </ThemeContext.Provider>
+  );
+};
+
+// Forces ALL children to re-render when theme changes by consuming context
+const ThemeConsumer = ({ children }) => {
+  const { theme } = React.useContext(ThemeContext);
+  // Update global T on every render of any child tree
+  T = theme;
+  return (
+    <div style={{ minHeight: "100vh", background: theme.bg, color: theme.textPrimary, transition: "background 0.3s, color 0.3s" }}>
+      {children}
+    </div>
   );
 };
 

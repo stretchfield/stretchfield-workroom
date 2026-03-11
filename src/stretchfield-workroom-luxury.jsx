@@ -397,7 +397,7 @@ const getNavItems = (role) => {
     base.push({ id: "rffs", label: "My RFFs", icon: "▪" }, { id: "quotes", label: "Quotes", icon: "▪" }, { id: "vendor-tasks", label: "My Tasks", icon: "▪" });
   }
   if (role === "Client") {
-    base.push({ id: "client-events", label: "My Events", icon: "▪" }, { id: "client-docs", label: "Documents", icon: "▪" });
+    base.push({ id: "client-events", label: "My Events", icon: "▪" }, { id: "client-finance", label: "Budget & Invoices", icon: "▪" }, { id: "client-docs", label: "Documents", icon: "▪" });
   }
   if (!["Vendor","Client","Strategy & Events Lead"].includes(role)) {
     base.push({ id: "feedback", label: "Feedback", icon: "▪" });

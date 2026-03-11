@@ -156,6 +156,148 @@ const ThemeConsumer = ({ children }) => {
 
 const useTheme = () => React.useContext(ThemeContext);
 
+const AccountSettingsModal = ({ user, onClose, onUpdate }) => {
+  const [phone, setPhone] = React.useState(user.phone || "");
+  const [password, setPassword] = React.useState("");
+  const [confirmPassword, setConfirmPassword] = React.useState("");
+  const [avatarFile, setAvatarFile] = React.useState(null);
+  const [avatarPreview, setAvatarPreview] = React.useState(user.avatar_url || null);
+  const [saving, setSaving] = React.useState(false);
+  const [uploading, setUploading] = React.useState(false);
+  const [msg, setMsg] = React.useState("");
+  const [error, setError] = React.useState("");
+  const fileRef = React.useRef();
+
+  const handleAvatarChange = (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    setAvatarFile(f);
+    setAvatarPreview(URL.createObjectURL(f));
+  };
+
+  const handleSave = async () => {
+    setError(""); setMsg("");
+    if (password && password !== confirmPassword) { setError("Passwords do not match."); return; }
+    setSaving(true);
+    let avatar_url = user.avatar_url || null;
+
+    // Upload avatar if changed
+    if (avatarFile) {
+      setUploading(true);
+      const ext = avatarFile.name.split(".").pop();
+      const filename = `avatar_${user.id}_${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("avatars").upload(filename, avatarFile, { upsert: true });
+      if (upErr) { setError("Upload failed: " + upErr.message); setSaving(false); setUploading(false); return; }
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(filename);
+      avatar_url = urlData.publicUrl;
+      setUploading(false);
+    }
+
+    // Update profile
+    const updates = { phone, avatar_url };
+    await supabase.from("profiles").update(updates).eq("id", user.id);
+
+    // Update password if provided
+    if (password) {
+      const { error: pwErr } = await supabase.auth.updateUser({ password });
+      if (pwErr) { setError("Password update failed: " + pwErr.message); setSaving(false); return; }
+    }
+
+    setSaving(false);
+    setMsg("Profile updated successfully.");
+    onUpdate({ ...user, phone, avatar_url });
+  };
+
+  const initials = user.name ? user.name.split(" ").map(n => n[0]).join("").slice(0,2).toUpperCase() : "?";
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+      onClick={onClose}>
+      <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 480, boxShadow: `0 24px 80px rgba(0,0,0,0.5)`, animation: "fadeUp 0.25s ease" }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ padding: "20px 24px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>Account</div>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18 }}>Profile Settings</div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = T.red + "60"; e.currentTarget.style.color = T.red; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.textMuted; }}>×</button>
+        </div>
+
+        <div style={{ padding: "24px" }}>
+          {/* Avatar upload */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 28 }}>
+            <div onClick={() => fileRef.current.click()} style={{ width: 96, height: 96, borderRadius: "50%", overflow: "hidden", border: `3px solid ${T.cyan}40`, cursor: "pointer", position: "relative", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10 }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = T.cyan}
+              onMouseLeave={e => e.currentTarget.style.borderColor = T.cyan + "40"}>
+              {avatarPreview ? (
+                <img src={avatarPreview} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                <div style={{ width: "100%", height: "100%", background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ color: "#fff", fontWeight: 900, fontSize: 28 }}>{initials}</span>
+                </div>
+              )}
+              {/* Overlay */}
+              <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.2s", borderRadius: "50%" }}
+                onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                onMouseLeave={e => e.currentTarget.style.opacity = 0}>
+                <span style={{ color: "#fff", fontSize: 22 }}>📷</span>
+              </div>
+            </div>
+            <input ref={fileRef} type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: "none" }} />
+            <div style={{ color: T.textMuted, fontSize: 11 }}>Click to change photo</div>
+          </div>
+
+          {/* Name (read only) */}
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Name</label>
+            <div style={{ padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}44`, borderRadius: 8, color: T.textMuted, fontSize: 13 }}>{user.name}</div>
+          </div>
+
+          {/* Phone */}
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Phone Number</label>
+            <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+233 XX XXX XXXX"
+              style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+              onFocus={e => e.target.style.borderColor = T.cyan + "60"}
+              onBlur={e => e.target.style.borderColor = T.border} />
+          </div>
+
+          {/* New Password */}
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>New Password</label>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Leave blank to keep current"
+              style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+              onFocus={e => e.target.style.borderColor = T.cyan + "60"}
+              onBlur={e => e.target.style.borderColor = T.border} />
+          </div>
+
+          {/* Confirm Password */}
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Confirm Password</label>
+            <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Repeat new password"
+              style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+              onFocus={e => e.target.style.borderColor = T.cyan + "60"}
+              onBlur={e => e.target.style.borderColor = T.border} />
+          </div>
+
+          {error && <div style={{ color: T.red, fontSize: 12, marginBottom: 12, padding: "8px 12px", background: T.red + "12", borderRadius: 8 }}>{error}</div>}
+          {msg && <div style={{ color: T.teal, fontSize: 12, marginBottom: 12, padding: "8px 12px", background: T.teal + "12", borderRadius: 8 }}>✓ {msg}</div>}
+
+          <button onClick={handleSave} disabled={saving} style={{
+            width: "100%", padding: "11px", background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`,
+            border: "none", borderRadius: 8, color: "#fff", fontWeight: 800, fontSize: 13,
+            cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1, fontFamily: "inherit",
+          }}>{uploading ? "Uploading..." : saving ? "Saving..." : "Save Changes"}</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ThemeToggle = ({ compact }) => {
   const { isDark, toggleTheme } = useTheme();
   return (
@@ -4846,6 +4988,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [pendingResourceId, setPendingResourceId] = useState(null);
+  const [showAccountSettings, setShowAccountSettings] = useState(false);
   const isMobile = useIsMobile();
 
   const currentUser = propProfile ? {
@@ -5124,6 +5267,16 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
         </div>
       )}
     </div>
+      {showAccountSettings && (
+        <AccountSettingsModal
+          user={currentUser}
+          onClose={() => setShowAccountSettings(false)}
+          onUpdate={(updated) => {
+            setCurrentUser(updated);
+            setShowAccountSettings(false);
+          }}
+        />
+      )}
     </ThemeProvider>
   );
 }

@@ -3404,12 +3404,26 @@ const UsersView = ({ user }) => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Remove this user?')) return;
-    // Delete profile first
-    await supabase.from('profiles').delete().eq('id', id);
-    // Delete from auth using admin client
-    await supabase.auth.admin.deleteUser(id);
-    setUsers(prev => prev.filter(u => u.id !== id));
+    if (!window.confirm('Remove this user? This cannot be undone.')) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        'https://okbduzenceoknkjqnrha.supabase.co/functions/v1/delete-user',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ userId: id }),
+        }
+      );
+      const result = await res.json();
+      if (result.error) { alert('Delete failed: ' + result.error); return; }
+      setUsers(prev => prev.filter(u => u.id !== id));
+    } catch (err) {
+      alert('Delete failed: ' + err.message);
+    }
   };
 
   return (

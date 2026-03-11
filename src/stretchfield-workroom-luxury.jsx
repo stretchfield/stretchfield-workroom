@@ -1245,7 +1245,7 @@ const EventsView = ({ user }) => {
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({ name: '', client: '', client_id: '', deadline: '', phase: 'Planning' });
   const [saving, setSaving] = useState(false);
-  const [expandedEvent, setExpandedEvent] = useState(null);
+  const [taskModalEvent, setTaskModalEvent] = useState(null);
 
   const canManage = ['CEO','Administrator'].includes(user?.role);
   const canSeeTasks = ['CEO','Administrator','Strategy & Events Lead','Vendor Manager'].includes(user?.role);
@@ -1349,69 +1349,122 @@ const EventsView = ({ user }) => {
                   )}
                 </div>
 
-                {/* Tasks toggle button — only for privileged roles */}
+                {/* View Tasks button — privileged roles only */}
                 {canSeeTasks && (() => {
-                  const eventTasks = tasks.filter(t => t.project_id === p.id);
+                  const eventTaskCount = tasks.filter(t => t.project_id === p.id).length;
                   return (
-                    <button onClick={() => setExpandedEvent(expandedEvent === p.id ? null : p.id)} style={{
+                    <button onClick={() => setTaskModalEvent(p)} style={{
                       marginTop: 14, width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
-                      background: expandedEvent === p.id ? T.cyan + "12" : T.bg,
-                      border: `1px solid ${expandedEvent === p.id ? T.cyan + "40" : T.border + "80"}`,
+                      background: T.bg, border: `1px solid ${T.border}80`,
                       borderRadius: 8, padding: "7px 12px", cursor: "pointer", transition: "all 0.15s",
-                    }}>
-                      <span style={{ color: expandedEvent === p.id ? T.cyan : T.textMuted, fontSize: 11, fontWeight: 700 }}>
-                        {eventTasks.length} Task{eventTasks.length !== 1 ? "s" : ""}
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = T.cyan + "60"; e.currentTarget.style.background = T.cyan + "10"; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = T.border + "80"; e.currentTarget.style.background = T.bg; }}
+                    >
+                      <span style={{ color: T.textMuted, fontSize: 11, fontWeight: 700 }}>
+                        📋 {eventTaskCount} Task{eventTaskCount !== 1 ? "s" : ""}
                       </span>
-                      <span style={{ color: T.textMuted, fontSize: 12, transition: "transform 0.2s", display: "inline-block", transform: expandedEvent === p.id ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+                      <span style={{ color: T.cyan, fontSize: 11, fontWeight: 700 }}>View →</span>
                     </button>
                   );
                 })()}
               </div>
-
-              {/* Task panel — expands below */}
-              {canSeeTasks && expandedEvent === p.id && (() => {
-                const eventTasks = tasks.filter(t => t.project_id === p.id);
-                return (
-                  <div style={{ borderTop: `1px solid ${T.cyan}30`, background: T.bg, padding: "14px 22px" }}>
-                    {eventTasks.length === 0 ? (
-                      <div style={{ color: T.textMuted, fontSize: 12, fontStyle: "italic", textAlign: "center", padding: "12px 0" }}>No tasks for this event yet.</div>
-                    ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        {eventTasks.map(t => {
-                          const pct = t.progress || 0;
-                          const barColor = t.status === "completed" ? T.teal : pct > 66 ? T.cyan : pct > 33 ? T.amber : T.magenta;
-                          const statusColors = { completed: T.teal, "in-progress": T.cyan, pending: T.amber, blocked: T.red };
-                          const statusColor = statusColors[t.status] || T.textMuted;
-                          return (
-                            <div key={t.id} style={{ background: T.surface, border: `1px solid ${T.border}44`, borderRadius: 8, padding: "10px 14px" }}>
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</div>
-                                  <div style={{ display: "flex", gap: 8, marginTop: 3, flexWrap: "wrap" }}>
-                                    {t.assignee_name && <span style={{ color: T.cyan, fontSize: 10 }}>→ {t.assignee_name}</span>}
-                                    {t.deadline && <span style={{ color: T.textMuted, fontSize: 10 }}>Due {t.deadline}</span>}
-                                  </div>
-                                </div>
-                                <span style={{ background: statusColor + "18", color: statusColor, border: `1px solid ${statusColor}30`, borderRadius: 20, padding: "1px 8px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0, marginLeft: 8 }}>
-                                  {t.status || "pending"}
-                                </span>
-                              </div>
-                              <div style={{ height: 3, background: T.border + "44", borderRadius: 2 }}>
-                                <div style={{ height: "100%", width: pct + "%", background: barColor, borderRadius: 2, transition: "width 0.3s" }} />
-                              </div>
-                              <div style={{ color: T.textMuted, fontSize: 9, marginTop: 3 }}>{pct}% complete</div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
             </div>
           ))}
         </div>
       )}
+      {/* ── Event Tasks Modal ── */}
+      {taskModalEvent && canSeeTasks && (() => {
+        const eventTasks = tasks.filter(t => t.project_id === taskModalEvent.id);
+        const completed = eventTasks.filter(t => t.status === "completed").length;
+        const inProgress = eventTasks.filter(t => t.status === "in-progress").length;
+        const pending = eventTasks.filter(t => !["completed","in-progress"].includes(t.status)).length;
+        return (
+          <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+            onClick={() => setTaskModalEvent(null)}
+          >
+            <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 580, maxHeight: "80vh", display: "flex", flexDirection: "column", boxShadow: `0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px ${T.cyan}20`, animation: "fadeUp 0.25s ease" }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Modal header */}
+              <div style={{ padding: "20px 24px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexShrink: 0 }}>
+                <div>
+                  <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>Event Tasks</div>
+                  <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, letterSpacing: "-0.02em" }}>{taskModalEvent.name}</div>
+                  <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{taskModalEvent.client} · {taskModalEvent.phase}</div>
+                </div>
+                <button onClick={() => setTaskModalEvent(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = T.red + "60"; e.currentTarget.style.color = T.red; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.textMuted; }}
+                >×</button>
+              </div>
+
+              {/* Task stats strip */}
+              {eventTasks.length > 0 && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, padding: "14px 24px", borderBottom: `1px solid ${T.border}44`, flexShrink: 0 }}>
+                  {[
+                    { label: "Completed", value: completed, color: T.teal },
+                    { label: "In Progress", value: inProgress, color: T.cyan },
+                    { label: "Pending", value: pending, color: T.amber },
+                  ].map((k, i) => (
+                    <div key={i} style={{ padding: "10px 12px", background: T.bg, border: `1px solid ${T.border}44`, borderTop: `2px solid ${k.color}`, borderRadius: 8, textAlign: "center" }}>
+                      <div style={{ color: k.color, fontSize: 20, fontWeight: 900 }}>{k.value}</div>
+                      <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 2 }}>{k.label}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Task list — scrollable */}
+              <div style={{ overflowY: "auto", padding: "16px 24px", flex: 1 }}>
+                {eventTasks.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "40px 0" }}>
+                    <div style={{ fontSize: 36, marginBottom: 12 }}>📋</div>
+                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15, marginBottom: 6 }}>No tasks yet</div>
+                    <div style={{ color: T.textMuted, fontSize: 13 }}>No tasks have been assigned to this event.</div>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {eventTasks.map(t => {
+                      const pct = t.progress || 0;
+                      const barColor = t.status === "completed" ? T.teal : pct > 66 ? T.cyan : pct > 33 ? T.amber : T.magenta;
+                      const statusColors = { completed: T.teal, "in-progress": T.cyan, pending: T.amber, blocked: T.red };
+                      const statusColor = statusColors[t.status] || T.textMuted;
+                      return (
+                        <div key={t.id} style={{ background: T.bg, border: `1px solid ${T.border}44`, borderLeft: `3px solid ${barColor}`, borderRadius: 10, padding: "12px 16px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{t.name}</div>
+                              <div style={{ display: "flex", gap: 10, marginTop: 4, flexWrap: "wrap", alignItems: "center" }}>
+                                {t.assignee_name && <span style={{ color: T.cyan, fontSize: 11, fontWeight: 600 }}>→ {t.assignee_name}</span>}
+                                {t.deadline && <span style={{ color: T.textMuted, fontSize: 11 }}>Due {t.deadline}</span>}
+                              </div>
+                            </div>
+                            <span style={{ background: statusColor + "18", color: statusColor, border: `1px solid ${statusColor}30`, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0, marginLeft: 10 }}>
+                              {t.status || "pending"}
+                            </span>
+                          </div>
+                          <div style={{ height: 4, background: T.border + "44", borderRadius: 2, marginBottom: 4 }}>
+                            <div style={{ height: "100%", width: pct + "%", background: barColor, borderRadius: 2, transition: "width 0.4s" }} />
+                          </div>
+                          <div style={{ color: T.textMuted, fontSize: 10 }}>{pct}% complete</div>
+                          {t.notes && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 6, fontStyle: "italic" }}>{t.notes}</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div style={{ padding: "14px 24px", borderTop: `1px solid ${T.border}44`, display: "flex", justifyContent: "flex-end", flexShrink: 0 }}>
+                <button onClick={() => setTaskModalEvent(null)} style={{ background: T.cyan + "18", border: `1px solid ${T.cyan}40`, color: T.cyan, padding: "8px 24px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, letterSpacing: "0.06em" }}>Close</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {modal && (
         <Modal title="New Event" onClose={() => setModal(false)}>
           <Input label="Event Name" placeholder="e.g. Brand Campaign" value={form.name} onChange={v => setForm({ ...form, name: v })} />

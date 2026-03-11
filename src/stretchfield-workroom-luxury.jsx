@@ -391,7 +391,7 @@ const getNavItems = (role) => {
     base.push({ id: "finance", label: "Finance", icon: "▪" });
   }
   if (["CEO","Administrator"].includes(role)) {
-    base.push({ id: "clients", label: "Clients", icon: "▪" }, { id: "users", label: "User Management", icon: "▪" });
+    base.push({ id: "client-financials", label: "Client Financials", icon: "▪" }, { id: "clients", label: "Clients", icon: "▪" }, { id: "users", label: "User Management", icon: "▪" });
   }
   if (role === "Vendor") {
     base.push({ id: "rffs", label: "My RFFs", icon: "▪" }, { id: "quotes", label: "Quotes", icon: "▪" }, { id: "vendor-tasks", label: "My Tasks", icon: "▪" });
@@ -1018,6 +1018,507 @@ const VendorDashboard = ({ user }) => {
           ))}
         </div>
       </div>
+    </div>
+  );
+};
+
+const CEOClientFinanceView = ({ user }) => {
+  const [clients, setClients] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [budgets, setBudgets] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [tab, setTab] = useState("budget");
+  const [saving, setSaving] = useState(false);
+
+  // Budget form
+  const [budgetForm, setBudgetForm] = useState({ agreed_budget: "", management_fee_pct: "15" });
+  // Expense form
+  const [expenseForm, setExpenseForm] = useState({ category: "Venue", description: "", amount: "" });
+  // Invoice form
+  const [invoiceForm, setInvoiceForm] = useState({ title: "", file_url: "" });
+
+  const load = async () => {
+    const [cl, ev, bud, exp, inv] = await Promise.all([
+      supabase.from("clients").select("*").order("name"),
+      supabase.from("projects").select("*").order("name"),
+      supabase.from("client_budgets").select("*"),
+      supabase.from("client_expenses").select("*").order("created_at", { ascending: false }),
+      supabase.from("client_invoices").select("*").order("created_at", { ascending: false }),
+    ]);
+    setClients(cl.data || []);
+    setEvents(ev.data || []);
+    setBudgets(bud.data || []);
+    setExpenses(exp.data || []);
+    setInvoices(inv.data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const clientEvents = events.filter(e => e.client_id === selectedClient);
+  const currentBudget = budgets.find(b => b.project_id === selectedEvent && b.client_id === selectedClient);
+  const currentExpenses = expenses.filter(e => e.project_id === selectedEvent && e.client_id === selectedClient);
+  const currentInvoices = invoices.filter(i => i.project_id === selectedEvent && i.client_id === selectedClient);
+
+  const handleSaveBudget = async () => {
+    if (!selectedClient || !selectedEvent) return;
+    setSaving(true);
+    if (currentBudget) {
+      await supabase.from("client_budgets").update({
+        agreed_budget: parseFloat(budgetForm.agreed_budget),
+        management_fee_pct: parseFloat(budgetForm.management_fee_pct),
+        updated_at: new Date().toISOString(),
+      }).eq("id", currentBudget.id);
+    } else {
+      await supabase.from("client_budgets").insert({
+        project_id: selectedEvent, client_id: selectedClient,
+        agreed_budget: parseFloat(budgetForm.agreed_budget),
+        management_fee_pct: parseFloat(budgetForm.management_fee_pct),
+      });
+    }
+    setSaving(false);
+    load();
+  };
+
+  const handleAddExpense = async () => {
+    if (!selectedClient || !selectedEvent || !expenseForm.amount) return;
+    setSaving(true);
+    await supabase.from("client_expenses").insert({
+      project_id: selectedEvent, client_id: selectedClient,
+      category: expenseForm.category,
+      description: expenseForm.description,
+      amount: parseFloat(expenseForm.amount),
+    });
+    setExpenseForm({ category: "Venue", description: "", amount: "" });
+    setSaving(false);
+    load();
+  };
+
+  const handleDeleteExpense = async (id) => {
+    await supabase.from("client_expenses").delete().eq("id", id);
+    load();
+  };
+
+  const handleUploadInvoice = async () => {
+    if (!selectedClient || !selectedEvent || !invoiceForm.title || !invoiceForm.file_url) return;
+    setSaving(true);
+    await supabase.from("client_invoices").insert({
+      project_id: selectedEvent, client_id: selectedClient,
+      title: invoiceForm.title, file_url: invoiceForm.file_url,
+      uploaded_by: user.id,
+    });
+    setInvoiceForm({ title: "", file_url: "" });
+    setSaving(false);
+    load();
+  };
+
+  const handleDeleteInvoice = async (id) => {
+    await supabase.from("client_invoices").delete().eq("id", id);
+    load();
+  };
+
+  // Sync budget form when event selected
+  useEffect(() => {
+    if (currentBudget) {
+      setBudgetForm({ agreed_budget: currentBudget.agreed_budget, management_fee_pct: currentBudget.management_fee_pct });
+    } else {
+      setBudgetForm({ agreed_budget: "", management_fee_pct: "15" });
+    }
+  }, [selectedEvent, budgets]);
+
+  const totalSpent = currentExpenses.reduce((s, e) => s + (e.amount || 0), 0);
+  const agreedBudget = currentBudget?.agreed_budget || 0;
+  const spentPct = agreedBudget > 0 ? Math.min(100, Math.round((totalSpent / agreedBudget) * 100)) : 0;
+
+  const inputStyle = { width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
+  const labelStyle = { color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5, display: "block" };
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>CEO · Finance</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Client Financials</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Set budgets, record spend and upload invoices per client event</div>
+      </div>
+
+      {/* Client + Event selectors */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 24 }}>
+        <div>
+          <label style={labelStyle}>Select Client</label>
+          <select value={selectedClient || ""} onChange={e => { setSelectedClient(e.target.value); setSelectedEvent(null); }}
+            style={inputStyle}>
+            <option value="">— Choose client —</option>
+            {clients.map(c => <option key={c.id} value={c.id}>{c.company || c.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Select Event</label>
+          <select value={selectedEvent || ""} onChange={e => setSelectedEvent(e.target.value)} style={inputStyle} disabled={!selectedClient}>
+            <option value="">— Choose event —</option>
+            {clientEvents.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {selectedEvent && (
+        <>
+          {/* Summary strip */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
+            {[
+              { label: "Agreed Budget", value: agreedBudget > 0 ? `GHS ${agreedBudget.toLocaleString()}` : "Not set", color: T.cyan },
+              { label: "Total Recorded Spend", value: `GHS ${totalSpent.toLocaleString()}`, color: T.amber },
+              { label: "Utilisation", value: agreedBudget > 0 ? spentPct + "%" : "—", color: spentPct > 90 ? T.red : T.teal },
+            ].map((k, i) => (
+              <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+                <div style={{ color: k.color, fontSize: 18, fontWeight: 900 }}>{k.value}</div>
+                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 4 }}>{k.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Tabs */}
+          <div style={{ display: "flex", gap: 6, marginBottom: 20, borderBottom: `1px solid ${T.border}`, paddingBottom: 0 }}>
+            {["budget", "expenses", "invoices"].map(t => (
+              <button key={t} onClick={() => setTab(t)} style={{
+                padding: "9px 18px", background: "none", border: "none", borderBottom: `2px solid ${tab === t ? T.cyan : "transparent"}`,
+                color: tab === t ? T.cyan : T.textMuted, cursor: "pointer", fontSize: 12, fontWeight: 700,
+                textTransform: "uppercase", letterSpacing: "0.06em", transition: "all 0.15s",
+              }}>{t}</button>
+            ))}
+          </div>
+
+          {/* Budget tab */}
+          {tab === "budget" && (
+            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "22px 24px" }}>
+              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 18 }}>{currentBudget ? "Update Budget" : "Set Budget"}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
+                <div>
+                  <label style={labelStyle}>Agreed Budget (GHS)</label>
+                  <input type="number" value={budgetForm.agreed_budget} onChange={e => setBudgetForm({ ...budgetForm, agreed_budget: e.target.value })} placeholder="e.g. 50000" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Management Fee %</label>
+                  <input type="number" min="15" max="30" value={budgetForm.management_fee_pct} onChange={e => setBudgetForm({ ...budgetForm, management_fee_pct: e.target.value })} placeholder="15–30" style={inputStyle} />
+                </div>
+              </div>
+              {budgetForm.agreed_budget && (
+                <div style={{ padding: "10px 14px", background: T.cyan + "10", border: `1px solid ${T.cyan}30`, borderRadius: 8, marginBottom: 16, fontSize: 12, color: T.cyan }}>
+                  Management Fee: GHS {(parseFloat(budgetForm.agreed_budget) * parseFloat(budgetForm.management_fee_pct) / 100).toLocaleString()} ({budgetForm.management_fee_pct}%)
+                </div>
+              )}
+              <button onClick={handleSaveBudget} disabled={saving || !budgetForm.agreed_budget} style={{
+                background: T.cyan + "20", border: `1px solid ${T.cyan}40`, color: T.cyan,
+                padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, opacity: !budgetForm.agreed_budget ? 0.5 : 1,
+              }}>{saving ? "Saving..." : currentBudget ? "Update Budget" : "Save Budget"}</button>
+            </div>
+          )}
+
+          {/* Expenses tab */}
+          {tab === "expenses" && (
+            <div>
+              <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "22px 24px", marginBottom: 16 }}>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Add Expense Entry</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <label style={labelStyle}>Category</label>
+                    <select value={expenseForm.category} onChange={e => setExpenseForm({ ...expenseForm, category: e.target.value })} style={inputStyle}>
+                      {["Venue","Catering","Production","Logistics","Management Fee","Other"].map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Description</label>
+                    <input value={expenseForm.description} onChange={e => setExpenseForm({ ...expenseForm, description: e.target.value })} placeholder="Brief description" style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Amount (GHS)</label>
+                    <input type="number" value={expenseForm.amount} onChange={e => setExpenseForm({ ...expenseForm, amount: e.target.value })} placeholder="0.00" style={inputStyle} />
+                  </div>
+                </div>
+                <button onClick={handleAddExpense} disabled={saving || !expenseForm.amount} style={{
+                  background: T.teal + "20", border: `1px solid ${T.teal}40`, color: T.teal,
+                  padding: "9px 20px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, opacity: !expenseForm.amount ? 0.5 : 1,
+                }}>+ Add Entry</button>
+              </div>
+
+              {/* Expense list */}
+              {currentExpenses.length === 0 ? (
+                <div style={{ color: T.textMuted, fontSize: 13, fontStyle: "italic", textAlign: "center", padding: 30 }}>No expenses recorded yet.</div>
+              ) : (
+                <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ borderBottom: `1px solid ${T.border}` }}>
+                        {["Category","Description","Amount",""].map((h, i) => (
+                          <th key={i} style={{ padding: "12px 16px", textAlign: i === 2 ? "right" : "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {currentExpenses.map((e, i) => (
+                        <tr key={e.id} style={{ borderBottom: i < currentExpenses.length - 1 ? `1px solid ${T.border}44` : "none" }}>
+                          <td style={{ padding: "12px 16px" }}>
+                            <span style={{ background: (categoryColors[e.category] || T.textMuted) + "20", color: categoryColors[e.category] || T.textMuted, border: `1px solid ${categoryColors[e.category] || T.textMuted}30`, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 700 }}>{e.category}</span>
+                          </td>
+                          <td style={{ padding: "12px 16px", color: T.textPrimary, fontSize: 13 }}>{e.description || "—"}</td>
+                          <td style={{ padding: "12px 16px", color: T.amber, fontWeight: 700, fontSize: 13, textAlign: "right" }}>GHS {parseFloat(e.amount).toLocaleString()}</td>
+                          <td style={{ padding: "12px 16px", textAlign: "right" }}>
+                            <button onClick={() => handleDeleteExpense(e.id)} style={{ background: "none", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 16 }}
+                              onMouseEnter={el => el.currentTarget.style.color = T.red}
+                              onMouseLeave={el => el.currentTarget.style.color = T.textMuted}>×</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ borderTop: `1px solid ${T.border}` }}>
+                        <td colSpan={2} style={{ padding: "12px 16px", color: T.textMuted, fontSize: 12, fontWeight: 700 }}>Total</td>
+                        <td style={{ padding: "12px 16px", color: T.amber, fontWeight: 900, fontSize: 14, textAlign: "right" }}>GHS {totalSpent.toLocaleString()}</td>
+                        <td />
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Invoices tab */}
+          {tab === "invoices" && (
+            <div>
+              <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "22px 24px", marginBottom: 16 }}>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Upload Invoice</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <label style={labelStyle}>Invoice Title</label>
+                    <input value={invoiceForm.title} onChange={e => setInvoiceForm({ ...invoiceForm, title: e.target.value })} placeholder="e.g. Final Invoice — Brand Event 2025" style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>File URL (Supabase Storage / Drive link)</label>
+                    <input value={invoiceForm.file_url} onChange={e => setInvoiceForm({ ...invoiceForm, file_url: e.target.value })} placeholder="https://..." style={inputStyle} />
+                  </div>
+                </div>
+                <button onClick={handleUploadInvoice} disabled={saving || !invoiceForm.title || !invoiceForm.file_url} style={{
+                  background: T.cyan + "20", border: `1px solid ${T.cyan}40`, color: T.cyan,
+                  padding: "9px 20px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, opacity: (!invoiceForm.title || !invoiceForm.file_url) ? 0.5 : 1,
+                }}>Upload Invoice</button>
+              </div>
+
+              {currentInvoices.length === 0 ? (
+                <div style={{ color: T.textMuted, fontSize: 13, fontStyle: "italic", textAlign: "center", padding: 30 }}>No invoices uploaded yet.</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {currentInvoices.map(inv => (
+                    <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ fontSize: 24 }}>📑</div>
+                        <div>
+                          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{inv.title}</div>
+                          <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{new Date(inv.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 10 }}>
+                        <a href={inv.file_url} target="_blank" rel="noopener noreferrer" style={{ background: T.cyan + "18", border: `1px solid ${T.cyan}40`, color: T.cyan, padding: "7px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, textDecoration: "none" }}>View</a>
+                        <button onClick={() => handleDeleteInvoice(inv.id)} style={{ background: T.red + "18", border: `1px solid ${T.red}40`, color: T.red, padding: "7px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
+const ClientFinanceView = ({ user }) => {
+  const [clientInfo, setClientInfo] = useState(null);
+  const [events, setEvents] = useState([]);
+  const [budgets, setBudgets] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+
+  const load = async () => {
+    let clientData = null;
+    const { data: byProfile } = await supabase.from("clients").select("*").eq("profile_id", user.id).single();
+    if (byProfile) { clientData = byProfile; }
+    else {
+      const { data: byEmail } = await supabase.from("clients").select("*").eq("email", user.email).single();
+      if (byEmail) { clientData = byEmail; await supabase.from("clients").update({ profile_id: user.id }).eq("id", byEmail.id); }
+    }
+    if (!clientData) return;
+    setClientInfo(clientData);
+    const [ev, bud, exp, inv] = await Promise.all([
+      supabase.from("projects").select("*").eq("client_id", clientData.id).eq("active_for_client", true),
+      supabase.from("client_budgets").select("*").eq("client_id", clientData.id),
+      supabase.from("client_expenses").select("*").eq("client_id", clientData.id),
+      supabase.from("client_invoices").select("*").eq("client_id", clientData.id).order("created_at", { ascending: false }),
+    ]);
+    setEvents(ev.data || []);
+    setBudgets(bud.data || []);
+    setExpenses(exp.data || []);
+    setInvoices(inv.data || []);
+    if ((ev.data || []).length > 0 && !selectedEvent) setSelectedEvent((ev.data || [])[0].id);
+  };
+
+  useEffect(() => { load(); }, [user.id]);
+
+  const currentBudget = budgets.find(b => b.project_id === selectedEvent);
+  const currentExpenses = expenses.filter(e => e.project_id === selectedEvent);
+  const currentInvoices = invoices.filter(i => i.project_id === selectedEvent);
+  const currentEvent = events.find(e => e.id === selectedEvent);
+
+  const agreedBudget = currentBudget?.agreed_budget || 0;
+  const mgmtFeePct = currentBudget?.management_fee_pct || 15;
+  const mgmtFee = agreedBudget * (mgmtFeePct / 100);
+  const totalSpent = currentExpenses.reduce((s, e) => s + (e.amount || 0), 0);
+  const remaining = agreedBudget - totalSpent;
+  const spentPct = agreedBudget > 0 ? Math.min(100, Math.round((totalSpent / agreedBudget) * 100)) : 0;
+
+  const categoryTotals = currentExpenses.reduce((acc, e) => {
+    acc[e.category] = (acc[e.category] || 0) + (e.amount || 0);
+    return acc;
+  }, {});
+
+  const categoryColors = {
+    "Venue": "#00C8FF", "Catering": "#00E5C8", "Production": "#C9A84C",
+    "Logistics": "#3B7BFF", "Management Fee": "#E879F9", "Other": "#8BA3C7",
+  };
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Client Portal</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Budget & Financials</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Track your event spend and download invoices</div>
+      </div>
+
+      {events.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>💰</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No financial data yet</div>
+          <div style={{ color: T.textMuted, fontSize: 13 }}>Budget information will appear here once your event is set up.</div>
+        </div>
+      ) : (
+        <>
+          {/* Event selector pills */}
+          {events.length > 1 && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
+              {events.map(e => (
+                <button key={e.id} onClick={() => setSelectedEvent(e.id)} style={{
+                  padding: "6px 16px", borderRadius: 20, border: `1px solid ${selectedEvent === e.id ? T.cyan : T.border}`,
+                  background: selectedEvent === e.id ? T.cyan + "20" : "none", color: selectedEvent === e.id ? T.cyan : T.textMuted,
+                  cursor: "pointer", fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", transition: "all 0.15s",
+                }}>{e.name}</button>
+              ))}
+            </div>
+          )}
+
+          {currentEvent && (
+            <>
+              {/* Event title */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18 }}>{currentEvent.name}</div>
+                <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{currentEvent.phase} · Due {currentEvent.deadline || "TBD"}</div>
+              </div>
+
+              {/* KPI strip */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, marginBottom: 24 }}>
+                {[
+                  { label: "Agreed Budget", value: agreedBudget > 0 ? `GHS ${agreedBudget.toLocaleString()}` : "—", color: T.cyan },
+                  { label: "Total Spent", value: totalSpent > 0 ? `GHS ${totalSpent.toLocaleString()}` : "—", color: T.amber },
+                  { label: "Remaining", value: agreedBudget > 0 ? `GHS ${remaining.toLocaleString()}` : "—", color: remaining < 0 ? T.red : T.teal },
+                  { label: "Mgmt Fee", value: agreedBudget > 0 ? `GHS ${mgmtFee.toLocaleString()} (${mgmtFeePct}%)` : "—", color: T.magenta },
+                ].map((k, i) => (
+                  <div key={i} style={{ padding: "16px 18px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+                    <div style={{ color: k.color, fontSize: 16, fontWeight: 900, marginBottom: 4 }}>{k.value}</div>
+                    <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Budget utilisation bar */}
+              {agreedBudget > 0 && (
+                <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 22px", marginBottom: 20 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>Budget Utilisation</div>
+                    <div style={{ color: spentPct > 90 ? T.red : spentPct > 70 ? T.amber : T.teal, fontWeight: 900, fontSize: 18 }}>{spentPct}%</div>
+                  </div>
+                  <div style={{ height: 12, background: T.border + "44", borderRadius: 6, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: spentPct + "%", background: spentPct > 90 ? `linear-gradient(90deg,${T.amber},${T.red})` : `linear-gradient(90deg,${T.cyan},${T.teal})`, borderRadius: 6, transition: "width 0.6s ease" }} />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
+                    <div style={{ color: T.textMuted, fontSize: 11 }}>GHS {totalSpent.toLocaleString()} spent</div>
+                    <div style={{ color: T.textMuted, fontSize: 11 }}>of GHS {agreedBudget.toLocaleString()}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Spend by category */}
+              {Object.keys(categoryTotals).length > 0 && (
+                <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 22px", marginBottom: 20 }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Spend by Category</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {Object.entries(categoryTotals).map(([cat, amt]) => {
+                      const pct = agreedBudget > 0 ? Math.round((amt / agreedBudget) * 100) : 0;
+                      const color = categoryColors[cat] || T.textMuted;
+                      return (
+                        <div key={cat}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <div style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                              <span style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{cat}</span>
+                            </div>
+                            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                              <span style={{ color: T.textMuted, fontSize: 11 }}>{pct}%</span>
+                              <span style={{ color: color, fontWeight: 700, fontSize: 13 }}>GHS {amt.toLocaleString()}</span>
+                            </div>
+                          </div>
+                          <div style={{ height: 5, background: T.border + "44", borderRadius: 3 }}>
+                            <div style={{ height: "100%", width: pct + "%", background: color, borderRadius: 3, transition: "width 0.4s ease" }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Invoices */}
+              <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 22px" }}>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>📄 Invoices</div>
+                {currentInvoices.length === 0 ? (
+                  <div style={{ color: T.textMuted, fontSize: 13, fontStyle: "italic", textAlign: "center", padding: "20px 0" }}>No invoices uploaded yet.</div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {currentInvoices.map(inv => (
+                      <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: T.bg, border: `1px solid ${T.border}44`, borderRadius: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <div style={{ fontSize: 22 }}>📑</div>
+                          <div>
+                            <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{inv.title}</div>
+                            <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{new Date(inv.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>
+                          </div>
+                        </div>
+                        <a href={inv.file_url} target="_blank" rel="noopener noreferrer" style={{
+                          background: T.cyan + "18", border: `1px solid ${T.cyan}40`, color: T.cyan,
+                          padding: "7px 16px", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                          textDecoration: "none", letterSpacing: "0.06em",
+                        }}>Download</a>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 };
@@ -4084,6 +4585,8 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "crm-insights": return ["CEO","Administrator"].includes(currentUser.role) ? <CRMDashboardCEO user={currentUser} /> : <CRMDashboardSM user={currentUser} />;
       case "sm-tasks": return <SMTasksView user={currentUser} />;
       case "strategy-overview": return <StrategyOverviewView />;
+      case "client-financials": return <CEOClientFinanceView user={currentUser} />;
+      case "client-finance": return <ClientFinanceView user={currentUser} />;
       case "feedback-summary": return <FeedbackView userRole={currentUser.role} />;
       case "finance": return <FinanceDashboard user={currentUser} onTab={setActiveTab} />;
       case "finance-approvals": return <FinanceApprovalsView user={currentUser} />;

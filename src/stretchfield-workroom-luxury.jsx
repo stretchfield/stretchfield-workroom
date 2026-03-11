@@ -1238,6 +1238,151 @@ const ClientEventsView = ({ user }) => {
 };
 
 
+const TaskCommentCard = ({ task: t, user, canComment, barColor, statusColor, pct }) => {
+  const [comments, setComments] = React.useState([]);
+  const [newComment, setNewComment] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
+  const [showComments, setShowComments] = React.useState(false);
+
+  const canSeeComments = ["CEO", "Strategy & Events Lead"].includes(user?.role) || user?.id === t.assigned_to;
+
+  const loadComments = async () => {
+    const { data } = await supabase.from("task_comments").select("*").eq("task_id", t.id).order("created_at", { ascending: true });
+    setComments(data || []);
+  };
+
+  React.useEffect(() => {
+    if (showComments) loadComments();
+  }, [showComments]);
+
+  const handleSubmit = async () => {
+    if (!newComment.trim()) return;
+    setSaving(true);
+    await supabase.from("task_comments").insert({
+      task_id: t.id,
+      author_id: user.id,
+      author_name: user.name,
+      author_role: user.role,
+      message: newComment.trim(),
+    });
+    // notify assignee if commenter is CEO or Strategy Lead
+    if (["CEO", "Strategy & Events Lead"].includes(user.role) && t.assigned_to && t.assigned_to !== user.id) {
+      await supabase.from("notifications").insert({
+        user_id: t.assigned_to,
+        title: `${user.name} commented on your task`,
+        message: `"${t.name}" — ${newComment.trim().slice(0, 80)}`,
+        type: "task",
+        resource_id: t.id,
+        read: false,
+      });
+    }
+    // notify CEO + Strategy Lead if assignee replies
+    if (!["CEO", "Strategy & Events Lead"].includes(user.role)) {
+      const recipients = await supabase.from("profiles").select("id").in("role", ["CEO", "Strategy & Events Lead"]);
+      for (const r of (recipients.data || [])) {
+        if (r.id !== user.id) {
+          await supabase.from("notifications").insert({
+            user_id: r.id,
+            title: `${user.name} replied on task`,
+            message: `"${t.name}" — ${newComment.trim().slice(0, 80)}`,
+            type: "task",
+            resource_id: t.id,
+            read: false,
+          });
+        }
+      }
+    }
+    setNewComment("");
+    setSaving(false);
+    loadComments();
+  };
+
+  return (
+    <div style={{ background: T.bg, border: `1px solid ${T.border}44`, borderLeft: `3px solid ${barColor}`, borderRadius: 10, padding: "12px 16px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{t.name}</div>
+          <div style={{ display: "flex", gap: 10, marginTop: 4, flexWrap: "wrap", alignItems: "center" }}>
+            {t.assignee_name && <span style={{ color: T.cyan, fontSize: 11, fontWeight: 600 }}>→ {t.assignee_name}</span>}
+            {t.deadline && <span style={{ color: T.textMuted, fontSize: 11 }}>Due {t.deadline}</span>}
+          </div>
+        </div>
+        <span style={{ background: statusColor + "18", color: statusColor, border: `1px solid ${statusColor}30`, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0, marginLeft: 10 }}>
+          {t.status || "pending"}
+        </span>
+      </div>
+      <div style={{ height: 4, background: T.border + "44", borderRadius: 2, marginBottom: 4 }}>
+        <div style={{ height: "100%", width: pct + "%", background: barColor, borderRadius: 2, transition: "width 0.4s" }} />
+      </div>
+      <div style={{ color: T.textMuted, fontSize: 10, marginBottom: 6 }}>{pct}% complete</div>
+      {t.notes && <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 8, fontStyle: "italic" }}>{t.notes}</div>}
+
+      {/* Comments section — only for CEO, Strategy Lead, and assignee */}
+      {canSeeComments && (
+        <div style={{ marginTop: 10, borderTop: `1px solid ${T.border}44`, paddingTop: 10 }}>
+          <button onClick={() => setShowComments(!showComments)} style={{
+            background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, padding: 0,
+          }}>
+            <div style={{ width: 5, height: 5, borderRadius: "50%", background: comments.length > 0 ? T.cyan : T.textMuted, boxShadow: comments.length > 0 ? `0 0 5px ${T.cyan}` : "none" }} />
+            <span style={{ color: showComments ? T.cyan : T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+              {showComments ? "Hide" : "Comments"} {comments.length > 0 ? `(${comments.length})` : ""}
+            </span>
+          </button>
+
+          {showComments && (
+            <div style={{ marginTop: 10 }}>
+              {/* Comment thread */}
+              {comments.length === 0 ? (
+                <div style={{ color: T.textMuted, fontSize: 11, fontStyle: "italic", marginBottom: 10 }}>No comments yet. Start the conversation.</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
+                  {comments.map(c => {
+                    const isMe = c.author_id === user.id;
+                    const isCEO = c.author_role === "CEO";
+                    const bubbleColor = isCEO ? T.cyan : c.author_role === "Strategy & Events Lead" ? T.teal : T.amber;
+                    return (
+                      <div key={c.id} style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" }}>
+                        <div style={{ maxWidth: "85%", background: isMe ? bubbleColor + "20" : T.surface, border: `1px solid ${bubbleColor}30`, borderRadius: isMe ? "12px 12px 4px 12px" : "12px 12px 12px 4px", padding: "8px 12px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 4 }}>
+                            <span style={{ color: bubbleColor, fontSize: 10, fontWeight: 800 }}>{isMe ? "You" : c.author_name}</span>
+                            <span style={{ color: T.textMuted, fontSize: 9 }}>{new Date(c.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                          </div>
+                          <div style={{ color: T.textPrimary, fontSize: 12 }}>{c.message}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* New comment input */}
+              {(canComment || user?.id === t.assigned_to) && (
+                <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                  <textarea
+                    value={newComment}
+                    onChange={e => setNewComment(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); }}}
+                    placeholder={canComment ? "Add a comment..." : "Reply..."}
+                    rows={2}
+                    style={{ flex: 1, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, padding: "8px 10px", color: T.textPrimary, fontSize: 12, resize: "none", fontFamily: "inherit", outline: "none" }}
+                  />
+                  <button onClick={handleSubmit} disabled={saving || !newComment.trim()} style={{
+                    background: T.cyan + "20", border: `1px solid ${T.cyan}40`, color: T.cyan,
+                    padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700,
+                    opacity: !newComment.trim() ? 0.5 : 1,
+                  }}>
+                    {saving ? "..." : "Send"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const EventsView = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [clients, setClients] = useState([]);
@@ -1430,26 +1575,17 @@ const EventsView = ({ user }) => {
                       const barColor = t.status === "completed" ? T.teal : pct > 66 ? T.cyan : pct > 33 ? T.amber : T.magenta;
                       const statusColors = { completed: T.teal, "in-progress": T.cyan, pending: T.amber, blocked: T.red };
                       const statusColor = statusColors[t.status] || T.textMuted;
+                      const canComment = ["CEO", "Strategy & Events Lead"].includes(user?.role);
                       return (
-                        <div key={t.id} style={{ background: T.bg, border: `1px solid ${T.border}44`, borderLeft: `3px solid ${barColor}`, borderRadius: 10, padding: "12px 16px" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{t.name}</div>
-                              <div style={{ display: "flex", gap: 10, marginTop: 4, flexWrap: "wrap", alignItems: "center" }}>
-                                {t.assignee_name && <span style={{ color: T.cyan, fontSize: 11, fontWeight: 600 }}>→ {t.assignee_name}</span>}
-                                {t.deadline && <span style={{ color: T.textMuted, fontSize: 11 }}>Due {t.deadline}</span>}
-                              </div>
-                            </div>
-                            <span style={{ background: statusColor + "18", color: statusColor, border: `1px solid ${statusColor}30`, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0, marginLeft: 10 }}>
-                              {t.status || "pending"}
-                            </span>
-                          </div>
-                          <div style={{ height: 4, background: T.border + "44", borderRadius: 2, marginBottom: 4 }}>
-                            <div style={{ height: "100%", width: pct + "%", background: barColor, borderRadius: 2, transition: "width 0.4s" }} />
-                          </div>
-                          <div style={{ color: T.textMuted, fontSize: 10 }}>{pct}% complete</div>
-                          {t.notes && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 6, fontStyle: "italic" }}>{t.notes}</div>}
-                        </div>
+                        <TaskCommentCard
+                          key={t.id}
+                          task={t}
+                          user={user}
+                          canComment={canComment}
+                          barColor={barColor}
+                          statusColor={statusColor}
+                          pct={pct}
+                        />
                       );
                     })}
                   </div>
@@ -1490,6 +1626,119 @@ const EventsView = ({ user }) => {
             <Btn variant="ghost" onClick={() => setModal(false)}>Cancel</Btn>
           </div>
         </Modal>
+      )}
+    </div>
+  );
+};
+
+const TaskCommentThread = ({ task, user }) => {
+  const [comments, setComments] = React.useState([]);
+  const [newComment, setNewComment] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
+
+  const canSeeComments = ["CEO", "Strategy & Events Lead"].includes(user?.role) || user?.id === task.assigned_to;
+  const canComment = ["CEO", "Strategy & Events Lead"].includes(user?.role) || user?.id === task.assigned_to;
+
+  const loadComments = async () => {
+    const { data } = await supabase.from("task_comments").select("*").eq("task_id", task.id).order("created_at", { ascending: true });
+    setComments(data || []);
+  };
+
+  React.useEffect(() => { loadComments(); }, [task.id]);
+
+  const handleSubmit = async () => {
+    if (!newComment.trim()) return;
+    setSaving(true);
+    await supabase.from("task_comments").insert({
+      task_id: task.id,
+      author_id: user.id,
+      author_name: user.name,
+      author_role: user.role,
+      message: newComment.trim(),
+    });
+    // Notify assignee if CEO or Strategy Lead comments
+    if (["CEO", "Strategy & Events Lead"].includes(user.role) && task.assigned_to && task.assigned_to !== user.id) {
+      await supabase.from("notifications").insert({
+        user_id: task.assigned_to,
+        title: `${user.name} commented on your task`,
+        message: `"${task.name}" — ${newComment.trim().slice(0, 80)}`,
+        type: "task", resource_id: task.id, read: false,
+      });
+    }
+    // Notify CEO + Strategy Lead if assignee replies
+    if (!["CEO", "Strategy & Events Lead"].includes(user.role)) {
+      const { data: recipients } = await supabase.from("profiles").select("id").in("role", ["CEO", "Strategy & Events Lead"]);
+      for (const r of (recipients || [])) {
+        if (r.id !== user.id) {
+          await supabase.from("notifications").insert({
+            user_id: r.id,
+            title: `${user.name} replied on task`,
+            message: `"${task.name}" — ${newComment.trim().slice(0, 80)}`,
+            type: "task", resource_id: task.id, read: false,
+          });
+        }
+      }
+    }
+    setNewComment("");
+    setSaving(false);
+    loadComments();
+  };
+
+  if (!canSeeComments) return null;
+
+  return (
+    <div style={{ marginTop: 20, borderTop: `1px solid ${T.border}`, paddingTop: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+        <div style={{ width: 5, height: 5, borderRadius: "50%", background: T.cyan, boxShadow: `0 0 6px ${T.cyan}` }} />
+        <span style={{ color: T.textPrimary, fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em" }}>Private Thread</span>
+        <span style={{ color: T.textMuted, fontSize: 10 }}>— CEO · Strategy Lead · You</span>
+      </div>
+
+      {/* Comment bubbles */}
+      {comments.length === 0 ? (
+        <div style={{ color: T.textMuted, fontSize: 12, fontStyle: "italic", marginBottom: 14 }}>No comments yet.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14, maxHeight: 260, overflowY: "auto", paddingRight: 4 }}>
+          {comments.map(c => {
+            const isMe = c.author_id === user.id;
+            const isCEO = c.author_role === "CEO";
+            const bubbleColor = isCEO ? T.cyan : c.author_role === "Strategy & Events Lead" ? T.teal : T.amber;
+            return (
+              <div key={c.id} style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" }}>
+                <div style={{ maxWidth: "85%", background: isMe ? bubbleColor + "20" : T.bg, border: `1px solid ${bubbleColor}30`, borderRadius: isMe ? "12px 12px 4px 12px" : "12px 12px 12px 4px", padding: "10px 14px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 5 }}>
+                    <span style={{ color: bubbleColor, fontSize: 11, fontWeight: 800 }}>{isMe ? "You" : c.author_name}</span>
+                    <span style={{ color: T.textMuted, fontSize: 10 }}>{new Date(c.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                  </div>
+                  <div style={{ color: T.textPrimary, fontSize: 13 }}>{c.message}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Reply input */}
+      {canComment && (
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+          <textarea
+            value={newComment}
+            onChange={e => setNewComment(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); }}}
+            placeholder={["CEO","Strategy & Events Lead"].includes(user?.role) ? "Add a comment..." : "Reply to this thread..."}
+            rows={2}
+            style={{ flex: 1, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "8px 12px", color: T.textPrimary, fontSize: 13, resize: "none", fontFamily: "inherit", outline: "none", transition: "border-color 0.15s" }}
+            onFocus={e => e.target.style.borderColor = T.cyan + "60"}
+            onBlur={e => e.target.style.borderColor = T.border}
+          />
+          <button onClick={handleSubmit} disabled={saving || !newComment.trim()} style={{
+            background: T.cyan + "20", border: `1px solid ${T.cyan}40`, color: T.cyan,
+            padding: "10px 18px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700,
+            opacity: !newComment.trim() ? 0.4 : 1, transition: "opacity 0.15s",
+          }}>
+            {saving ? "..." : "Send"}
+          </button>
+        </div>
       )}
     </div>
   );

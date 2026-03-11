@@ -1743,19 +1743,42 @@ const ClientEventsView = ({ user }) => {
                 onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
               >
                 {/* Event Header */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-                  <div>
-                    <div style={{ color: T.textPrimary, fontSize: 18, fontWeight: 800, marginBottom: 4 }}>{p.name}</div>
-                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                      <span style={{ color: T.textMuted, fontSize: 12 }}>📅 Deadline: {p.deadline || "TBD"}</span>
-                      <span style={{ background: T.cyan + "20", color: T.cyan, padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>{p.phase || "Planning"}</span>
+                {(() => {
+                  const daysLeft = p.deadline ? Math.ceil((new Date(p.deadline) - new Date()) / 86400000) : null;
+                  const isOver = daysLeft !== null && daysLeft < 0;
+                  const isToday = daysLeft === 0;
+                  const isSoon = daysLeft !== null && daysLeft > 0 && daysLeft <= 7;
+                  const countdownColor = isOver ? T.red : isToday ? T.red : isSoon ? T.amber : T.teal;
+                  const countdownBg = isOver ? T.red : isToday ? T.red : isSoon ? T.amber : T.teal;
+                  const countdownLabel = isOver ? `${Math.abs(daysLeft)}d overdue` : isToday ? "Today!" : `${daysLeft} day${daysLeft !== 1 ? "s" : ""} to go`;
+                  return (
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: T.textPrimary, fontSize: 18, fontWeight: 800, marginBottom: 6 }}>{p.name}</div>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                          <span style={{ background: T.cyan + "20", color: T.cyan, padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>{p.phase || "Planning"}</span>
+                          {p.deadline && (
+                            <span style={{ color: T.textMuted, fontSize: 11 }}>📅 {p.deadline}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0, marginLeft: 12 }}>
+                        {/* Completion */}
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: 30, fontWeight: 900, color: p.completion >= 80 ? T.teal : p.completion >= 50 ? T.cyan : T.amber, lineHeight: 1 }}>{p.completion || 0}%</div>
+                          <div style={{ color: T.textMuted, fontSize: 10 }}>Complete</div>
+                        </div>
+                        {/* Countdown pill */}
+                        {daysLeft !== null && (
+                          <div style={{ background: countdownBg + "18", border: `1px solid ${countdownBg}40`, borderRadius: 20, padding: "4px 12px", display: "flex", alignItems: "center", gap: 5 }}>
+                            <div style={{ width: 5, height: 5, borderRadius: "50%", background: countdownColor, boxShadow: `0 0 5px ${countdownColor}`, flexShrink: 0 }} />
+                            <span style={{ color: countdownColor, fontSize: 11, fontWeight: 800 }}>{countdownLabel}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 36, fontWeight: 900, color: p.completion >= 80 ? T.teal : p.completion >= 50 ? T.cyan : T.amber, lineHeight: 1 }}>{p.completion || 0}%</div>
-                    <div style={{ color: T.textMuted, fontSize: 11 }}>Complete</div>
-                  </div>
-                </div>
+                  );
+                })()}
 
                 {/* Event Progress Bar */}
                 <ProgressBar value={p.completion || 0} height={10} color={p.completion >= 80 ? T.teal : p.completion >= 50 ? T.cyan : T.amber} />

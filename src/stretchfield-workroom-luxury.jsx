@@ -557,6 +557,10 @@ const CEODashboard = ({ onTab, user }) => {
   const pendingRffs = rffs.filter(r => r.status === 'pending' && r.approved);
   const wonLeadsAwaitingApproval = leads.filter(l => l.status === 'won' && !l.approved);
   const avgRating = feedback.length ? (feedback.reduce((a, f) => a + f.rating, 0) / feedback.length).toFixed(1) : null;
+  const upcomingEvents = events
+    .filter(e => e.event_date && new Date(e.event_date) >= new Date())
+    .sort((a, b) => new Date(a.event_date) - new Date(b.event_date))
+    .slice(0, 5);
 
   const now2 = new Date();
   const greeting = now2.getHours() < 12 ? 'Good Morning' : now2.getHours() < 17 ? 'Good Afternoon' : 'Good Evening';
@@ -861,6 +865,55 @@ const StaffDashboard = ({ user }) => {
           ))}
         </div>
       )}
+
+      {/* Upcoming Events */}
+      {(() => {
+        const upcoming = events
+          .filter(e => e.event_date && new Date(e.event_date) >= new Date())
+          .sort((a, b) => new Date(a.event_date) - new Date(b.event_date))
+          .slice(0, 5);
+        if (upcoming.length === 0) return null;
+        return (
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 22px", marginBottom: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div>
+                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>Schedule</div>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Upcoming Events</div>
+              </div>
+              <span style={{ background: T.cyan + "18", border: `1px solid ${T.cyan}30`, color: T.cyan, borderRadius: 20, padding: "3px 12px", fontSize: 11, fontWeight: 700 }}>{upcoming.length} upcoming</span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {upcoming.map(e => {
+                const daysLeft = Math.ceil((new Date(e.event_date) - new Date()) / 86400000);
+                const isSoon = daysLeft <= 7;
+                const isNear = daysLeft <= 30;
+                const dotColor = isSoon ? T.red : isNear ? T.amber : T.teal;
+                const phaseBg = e.phase === "Execution" ? T.cyan : e.phase === "Review" ? T.teal : e.phase === "Design" ? T.magenta : T.amber;
+                return (
+                  <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 14px", background: T.bg, border: `1px solid ${T.border}44`, borderLeft: `3px solid ${dotColor}`, borderRadius: 8 }}>
+                    <div style={{ flexShrink: 0, width: 48, height: 48, borderRadius: "50%", background: dotColor + "18", border: `2px solid ${dotColor}40`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                      <div style={{ color: dotColor, fontSize: 14, fontWeight: 900, lineHeight: 1 }}>{daysLeft}</div>
+                      <div style={{ color: dotColor, fontSize: 8, fontWeight: 700, textTransform: "uppercase" }}>days</div>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.name}</div>
+                      <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center" }}>
+                        <span style={{ color: T.textMuted, fontSize: 11 }}>{e.client}</span>
+                        <span style={{ color: T.textMuted, fontSize: 10 }}>·</span>
+                        <span style={{ color: T.textMuted, fontSize: 11 }}>📅 {new Date(e.event_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
+                      </div>
+                    </div>
+                    <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
+                      <span style={{ background: phaseBg + "18", color: phaseBg, border: `1px solid ${phaseBg}30`, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{e.phase || "Planning"}</span>
+                      <span style={{ color: T.textMuted, fontSize: 11 }}>{e.completion || 0}% done</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Tasks */}
       <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 22px" }}>
@@ -1974,7 +2027,7 @@ const EventsView = ({ user }) => {
   const [clients, setClients] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ name: '', client: '', client_id: '', deadline: '', phase: 'Planning' });
+  const [form, setForm] = useState({ name: '', client: '', client_id: '', event_date: '', deadline: '', phase: 'Planning' });
   const [saving, setSaving] = useState(false);
   const [taskModalEvent, setTaskModalEvent] = useState(null);
 
@@ -2002,6 +2055,7 @@ const EventsView = ({ user }) => {
       client: form.client || '',
       client_id: form.client_id || null,
       deadline: form.deadline || null,
+      event_date: form.event_date || null,
       phase: form.phase,
       completion: 0,
       status: 'active',
@@ -2200,7 +2254,8 @@ const EventsView = ({ user }) => {
           ) : (
             <Input label="Client Name" placeholder="Client company name" value={form.client} onChange={v => setForm({ ...form, client: v })} />
           )}
-          <Input label="Deadline" type="date" value={form.deadline} onChange={v => setForm({ ...form, deadline: v })} />
+          <Input label="Date of Event" type="date" value={form.event_date} onChange={v => setForm({ ...form, event_date: v })} />
+          <Input label="Planning Deadline" type="date" value={form.deadline} onChange={v => setForm({ ...form, deadline: v })} />
           <Select label="Phase" options={[
             { value: 'Planning', label: 'Planning' },
             { value: 'Design', label: 'Design' },

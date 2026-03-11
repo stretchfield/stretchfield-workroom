@@ -2030,6 +2030,8 @@ const EventsView = ({ user }) => {
   const [form, setForm] = useState({ name: '', client: '', client_id: '', event_date: '', deadline: '', phase: 'Planning' });
   const [saving, setSaving] = useState(false);
   const [taskModalEvent, setTaskModalEvent] = useState(null);
+  const [editEvent, setEditEvent] = useState(null);
+  const [editForm, setEditForm] = useState({});
 
   const canManage = ['CEO','Administrator'].includes(user?.role);
   const canSeeTasks = ['CEO','Administrator','Strategy & Events Lead','Vendor Manager'].includes(user?.role);
@@ -2066,6 +2068,44 @@ const EventsView = ({ user }) => {
     setModal(false);
     setForm({ name: '', client: '', client_id: '', deadline: '', phase: 'Planning' });
     setSaving(false);
+    load();
+  };
+
+  const handleEdit = (p) => {
+    setEditEvent(p);
+    setEditForm({
+      name: p.name || '',
+      client_id: p.client_id || '',
+      client: p.client || '',
+      event_date: p.event_date || '',
+      deadline: p.deadline || '',
+      phase: p.phase || 'Planning',
+      completion: p.completion || 0,
+      status: p.status || 'active',
+    });
+  };
+
+  const handleUpdate = async () => {
+    if (!editForm.name) return;
+    setSaving(true);
+    await supabase.from('projects').update({
+      name: editForm.name,
+      client: editForm.client,
+      client_id: editForm.client_id || null,
+      event_date: editForm.event_date || null,
+      deadline: editForm.deadline || null,
+      phase: editForm.phase,
+      completion: parseInt(editForm.completion) || 0,
+      status: editForm.status,
+    }).eq('id', editEvent.id);
+    setSaving(false);
+    setEditEvent(null);
+    load();
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this event? This cannot be undone.')) return;
+    await supabase.from('projects').delete().eq('id', id);
     load();
   };
 
@@ -2240,6 +2280,46 @@ const EventsView = ({ user }) => {
           </div>
         );
       })()}
+
+      {/* Edit Event Modal */}
+      {editEvent && canManage && (
+        <Modal title="Edit Event" onClose={() => setEditEvent(null)}>
+          <Input label="Event Name" value={editForm.name} onChange={v => setEditForm({ ...editForm, name: v })} />
+          {clients.length > 0 ? (
+            <Select label="Client" options={[{ value: '', label: 'Select a client...' }, ...clients.map(c => ({ value: c.id, label: c.company || c.name }))]}
+              value={editForm.client_id}
+              onChange={v => {
+                const c = clients.find(cl => cl.id === v);
+                setEditForm({ ...editForm, client_id: v, client: c ? (c.company || c.name) : '' });
+              }} />
+          ) : (
+            <Input label="Client Name" value={editForm.client} onChange={v => setEditForm({ ...editForm, client: v })} />
+          )}
+          <Input label="Date of Event" type="date" value={editForm.event_date} onChange={v => setEditForm({ ...editForm, event_date: v })} />
+          <Input label="Planning Deadline" type="date" value={editForm.deadline} onChange={v => setEditForm({ ...editForm, deadline: v })} />
+          <Select label="Phase" options={[
+            { value: 'Planning', label: 'Planning' },
+            { value: 'Design', label: 'Design' },
+            { value: 'Execution', label: 'Execution' },
+            { value: 'Review', label: 'Review' },
+          ]} value={editForm.phase} onChange={v => setEditForm({ ...editForm, phase: v })} />
+          <Select label="Status" options={[
+            { value: 'active', label: 'Active' },
+            { value: 'completed', label: 'Completed' },
+            { value: 'on-hold', label: 'On Hold' },
+          ]} value={editForm.status} onChange={v => setEditForm({ ...editForm, status: v })} />
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 6 }}>Completion: {editForm.completion}%</label>
+            <input type="range" min="0" max="100" value={editForm.completion}
+              onChange={e => setEditForm({ ...editForm, completion: e.target.value })}
+              style={{ width: "100%", accentColor: T.cyan }} />
+          </div>
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <Btn onClick={handleUpdate} disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</Btn>
+            <Btn variant="ghost" onClick={() => setEditEvent(null)}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
 
       {modal && (
         <Modal title="New Event" onClose={() => setModal(false)}>
@@ -2460,18 +2540,41 @@ const TasksView = ({ userRole, openTaskId, onOpenHandled }) => {
     load();
   };
 
+  const pending = tasks.filter(t => t.status === "pending").length;
+  const inProg = tasks.filter(t => t.status === "in-progress").length;
+  const done = tasks.filter(t => t.status === "completed").length;
+
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <PageHeader title="Tasks" subtitle={`${tasks.length} total tasks`} />
-        <Btn onClick={() => setModal(true)}>+ New Task</Btn>
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Workload</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Event Tasks</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{tasks.length} total · {inProg} in progress · {done} completed</div>
+        </div>
+        {canEdit && <Btn onClick={() => setModal(true)}>+ New Task</Btn>}
       </div>
+
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Pending", value: pending, color: T.amber },
+          { label: "In Progress", value: inProg, color: T.cyan },
+          { label: "Completed", value: done, color: T.teal },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "16px 18px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
       {tasks.length === 0 ? (
-        <Card style={{ textAlign: 'center', padding: 60 }}>
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>✅</div>
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No tasks yet</div>
           <div style={{ color: T.textMuted, fontSize: 13 }}>Click "+ New Task" to get started.</div>
-        </Card>
+        </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
           {tasks.map((t, idx) => {
@@ -6754,8 +6857,26 @@ const RFFApprovalsView = ({ user }) => {
   const declined = rffs.filter(r => r.status === "declined");
 
   return (
-    <div>
-      <PageHeader title="RFF Approval Queue" subtitle={`${pending.length} pending review`} />
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Procurement</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>RFF Approval Queue</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{pending.length} pending review</div>
+      </div>
+
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Pending Review", value: pending.length, color: T.amber },
+          { label: "Approved", value: rffs.filter(r => r.approved).length, color: T.teal },
+          { label: "Declined", value: rffs.filter(r => r.status === "declined").length, color: T.red },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "16px 18px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
 
       {rffs.length === 0 ? (
         <Card style={{ textAlign: "center", padding: 60 }}>

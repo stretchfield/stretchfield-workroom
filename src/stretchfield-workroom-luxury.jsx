@@ -2794,52 +2794,79 @@ const VendorsView = ({ user }) => {
     return acc;
   }, {});
 
+  const totalPending = rffs.filter(r => r.status === 'pending').length;
+  const totalApproved = rffs.filter(r => r.approved).length;
+  const totalQuotes = rffs.filter(r => r.status === 'quote-submitted').length;
+  const totalDeclined = rffs.filter(r => r.status === 'declined').length;
+
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <PageHeader title="Vendors & RFFs" subtitle={`${rffs.length} requests across ${Object.keys(grouped).length} events`} />
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Procurement</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Vendors & RFFs</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{rffs.length} requests across {Object.keys(grouped).length} event{Object.keys(grouped).length !== 1 ? "s" : ""}</div>
+        </div>
         <Btn onClick={() => setModal(true)}>+ New RFF</Btn>
       </div>
 
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Pending Approval", value: totalPending, color: T.amber },
+          { label: "CEO Approved", value: totalApproved, color: T.teal },
+          { label: "Quotes In", value: totalQuotes, color: T.cyan },
+          { label: "Declined", value: totalDeclined, color: T.red },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "16px 18px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
       {Object.keys(grouped).length === 0 ? (
-        <Card style={{ textAlign: 'center', padding: 60 }}>
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>📋</div>
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No RFFs yet</div>
           <div style={{ color: T.textMuted, fontSize: 13 }}>Create an RFF and assign it to a client event.</div>
-        </Card>
-      ) : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 20 }}>{Object.values(grouped).map(({ event: e, rffs: eventRffs }) => (
-        <div key={e.id} style={{ marginBottom: 0 }}>
+        </div>
+      ) : <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>{Object.values(grouped).map(({ event: e, rffs: eventRffs }) => (
+        <div key={e.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
           {/* Event Group Header */}
           <button onClick={() => setExpandedEvent(expandedEvent === e.id ? null : e.id)} style={{
-            width: '100%', background: T.surface, border: `1px solid ${T.border}`,
-            borderRadius: 8, padding: '14px 20px', cursor: 'pointer',
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            marginBottom: expandedEvent === e.id ? 12 : 0,
+            width: "100%", background: expandedEvent === e.id ? T.cyan + "08" : "none",
+            border: "none", borderBottom: expandedEvent === e.id ? `1px solid ${T.border}` : "none",
+            padding: "16px 20px", cursor: "pointer",
+            display: "flex", justifyContent: "space-between", alignItems: "center",
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 3, height: 20, background: T.cyan, borderRadius: 2 }} />
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{e.name}</div>
-                <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{e.client} · {eventRffs.length} RFF{eventRffs.length > 1 ? 's' : ''}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 4, height: 36, background: `linear-gradient(180deg, ${T.cyan}, ${T.teal})`, borderRadius: 2, flexShrink: 0 }} />
+              <div style={{ textAlign: "left" }}>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{e.name}</div>
+                <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{e.client} · {eventRffs.length} RFF{eventRffs.length > 1 ? "s" : ""}</div>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {['pending','quote-submitted','quote-approved'].map(s => {
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", gap: 5 }}>
+                {["pending","quote-submitted","approved","declined"].map(s => {
                   const count = eventRffs.filter(r => r.status === s).length;
                   if (!count) return null;
                   return <Badge key={s} status={s} />;
                 })}
               </div>
-              <span style={{ color: T.textMuted, fontSize: 16 }}>{expandedEvent === e.id ? '▾' : '▸'}</span>
+              <span style={{ color: T.textMuted, fontSize: 16, transition: "transform 0.2s", display: "inline-block", transform: expandedEvent === e.id ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
             </div>
           </button>
 
           {expandedEvent === e.id && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12, paddingLeft: 0, marginTop: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 12, padding: "16px 20px" }}>
               {eventRffs.map(r => (
-                <div key={r.id} style={{ marginBottom: 12 }}>
-                  <Card onClick={() => setExpandedRff(expandedRff === r.id ? null : r.id)} style={{ cursor: 'pointer' }}>
+                <div key={r.id} style={{ marginBottom: 0 }}>
+                  <div onClick={() => setExpandedRff(expandedRff === r.id ? null : r.id)} style={{ cursor: "pointer", background: T.bg, border: `1px solid ${T.border}`, borderTop: `2px solid ${T.cyan}`, borderRadius: 10, padding: "16px 18px", transition: "box-shadow 0.2s" }}
+                    onMouseEnter={e => e.currentTarget.style.boxShadow = `0 4px 20px ${T.cyan}12`}
+                    onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
+                  >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                       <div>
                         <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{r.title}</div>
@@ -2889,7 +2916,7 @@ const VendorsView = ({ user }) => {
                       }}>✓ Approve RFF</button>
                     )}
                     {r.approved && <span style={{ marginLeft: 8, color: T.teal, fontSize: 12, fontWeight: 600 }}>✓ Approved for Vendors</span>}
-                  </Card>
+                  </div>
 
                   {/* Quotes submitted for this RFF */}
                   {expandedRff === r.id && (

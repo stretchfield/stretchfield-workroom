@@ -4991,13 +4991,22 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
   const [showAccountSettings, setShowAccountSettings] = useState(false);
   const isMobile = useIsMobile();
 
-  const currentUser = propProfile ? {
-    id: propProfile.id,
-    name: propProfile.name,
-    role: propProfile.role,
-    email: propProfile.email,
-    avatar: propProfile.avatar,
+  const buildUser = (p) => p ? {
+    id: p.id,
+    name: p.name,
+    role: p.role,
+    email: p.email,
+    avatar: p.avatar,
+    avatar_url: p.avatar_url || null,
+    phone: p.phone || "",
   } : null;
+
+  const [currentUser, setCurrentUser] = useState(() => buildUser(propProfile));
+
+  // Sync if propProfile changes (e.g. on login)
+  React.useEffect(() => {
+    if (propProfile) setCurrentUser(buildUser(propProfile));
+  }, [propProfile?.id]);
 
   useEffect(() => {
     if (!currentUser?.id) return;

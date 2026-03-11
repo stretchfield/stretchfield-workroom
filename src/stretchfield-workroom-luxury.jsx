@@ -1303,11 +1303,11 @@ const EventsView = ({ user }) => {
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
           {events.map((p, idx) => (
-            <div key={p.id} style={{ background: T.surface, border: `1px solid ${expandedEvent === p.id ? T.cyan + "50" : T.border}`, borderRadius: 12, overflow: "hidden", transition: "box-shadow 0.2s, border-color 0.2s", animationDelay: idx * 0.04 + "s", boxShadow: expandedEvent === p.id ? `0 4px 28px ${T.cyan}12` : "none" }}>
+            <div key={p.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", transition: "box-shadow 0.2s, border-color 0.2s", animationDelay: idx * 0.04 + "s" }}>
               {/* Card header — always visible */}
               <div style={{ padding: "20px 22px" }}
-                onMouseEnter={e => { if (expandedEvent !== p.id) { e.currentTarget.parentElement.style.boxShadow = `0 4px 28px ${T.cyan}10`; e.currentTarget.parentElement.style.borderColor = T.cyan + "40"; }}}
-                onMouseLeave={e => { if (expandedEvent !== p.id) { e.currentTarget.parentElement.style.boxShadow = "none"; e.currentTarget.parentElement.style.borderColor = T.border; }}}
+                onMouseEnter={e => { e.currentTarget.parentElement.style.boxShadow = `0 4px 28px ${T.cyan}10`; e.currentTarget.parentElement.style.borderColor = T.cyan + "40"; }}
+                onMouseLeave={e => { e.currentTarget.parentElement.style.boxShadow = "none"; e.currentTarget.parentElement.style.borderColor = T.border; }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>

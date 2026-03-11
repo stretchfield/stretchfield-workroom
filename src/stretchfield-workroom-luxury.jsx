@@ -1244,7 +1244,7 @@ const TaskCommentCard = ({ task: t, user, canComment, barColor, statusColor, pct
   const [saving, setSaving] = React.useState(false);
   const [showComments, setShowComments] = React.useState(false);
 
-  const canSeeComments = ["CEO", "Strategy & Events Lead"].includes(user?.role) || user?.id === t.assigned_to;
+  const canSeeComments = ["CEO", "Strategy & Events Lead"].includes(user?.role) || user?.id === t.assignee_id;
 
   const loadComments = async () => {
     const { data } = await supabase.from("task_comments").select("*").eq("task_id", t.id).order("created_at", { ascending: true });
@@ -1266,9 +1266,9 @@ const TaskCommentCard = ({ task: t, user, canComment, barColor, statusColor, pct
       message: newComment.trim(),
     });
     // notify assignee if commenter is CEO or Strategy Lead
-    if (["CEO", "Strategy & Events Lead"].includes(user.role) && t.assigned_to && t.assigned_to !== user.id) {
+    if (["CEO", "Strategy & Events Lead"].includes(user.role) && t.assignee_id && t.assignee_id !== user.id) {
       await supabase.from("notifications").insert({
-        user_id: t.assigned_to,
+        user_id: t.assignee_id,
         title: `${user.name} commented on your task`,
         message: `"${t.name}" — ${newComment.trim().slice(0, 80)}`,
         type: "task",
@@ -1352,7 +1352,7 @@ const TaskCommentCard = ({ task: t, user, canComment, barColor, statusColor, pct
               )}
 
               {/* New comment input */}
-              {(canComment || user?.id === t.assigned_to) && (
+              {(canComment || user?.id === t.assignee_id) && (
                 <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
                   <textarea
                     value={newComment}
@@ -1632,8 +1632,8 @@ const TaskCommentThread = ({ task, user }) => {
   const [newComment, setNewComment] = React.useState("");
   const [saving, setSaving] = React.useState(false);
 
-  const canSeeComments = ["CEO", "Strategy & Events Lead"].includes(user?.role) || user?.id === task.assigned_to;
-  const canComment = ["CEO", "Strategy & Events Lead"].includes(user?.role) || user?.id === task.assigned_to;
+  const canSeeComments = ["CEO", "Strategy & Events Lead"].includes(user?.role) || user?.id === task.assignee_id;
+  const canComment = ["CEO", "Strategy & Events Lead"].includes(user?.role) || user?.id === task.assignee_id;
 
   const loadComments = async () => {
     const { data } = await supabase.from("task_comments").select("*").eq("task_id", task.id).order("created_at", { ascending: true });
@@ -1653,9 +1653,9 @@ const TaskCommentThread = ({ task, user }) => {
       message: newComment.trim(),
     });
     // Notify assignee if CEO or Strategy Lead comments
-    if (["CEO", "Strategy & Events Lead"].includes(user.role) && task.assigned_to && task.assigned_to !== user.id) {
+    if (["CEO", "Strategy & Events Lead"].includes(user.role) && task.assignee_id && task.assignee_id !== user.id) {
       await supabase.from("notifications").insert({
-        user_id: task.assigned_to,
+        user_id: task.assignee_id,
         title: `${user.name} commented on your task`,
         message: `"${task.name}" — ${newComment.trim().slice(0, 80)}`,
         type: "task",

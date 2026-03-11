@@ -96,33 +96,23 @@ const DARK_THEME = {
 };
 
 const LIGHT_THEME = {
-  bg:           "#F4F6FB",
-  bgDeep:       "#EAECF4",
-  surface:      "#FFFFFF",
-  surfaceRaise: "#F0F3FA",
-  surfaceHigh:  "#E8EDF8",
-  border:       "#D8DEEE",
-  borderLight:  "#C8D0E4",
-  cyan:         "#0088CC",
-  cyanDim:      "#0088CC18",
-  cyanGlow:     "#0088CC",
-  magenta:      "#B020D0",
-  magentaDim:   "#B020D015",
-  teal:         "#009982",
-  tealDim:      "#00998215",
-  blue:         "#2255DD",
-  blueDim:      "#2255DD15",
-  amber:        "#C07800",
-  amberDim:     "#C0780015",
-  red:          "#D42040",
-  redDim:       "#D4204015",
-  gold:         "#9A7020",
-  goldDim:      "#9A702015",
-  textPrimary:  "#0F1A2E",
-  textSecondary:"#3D5478",
-  textMuted:    "#7A94BF",
-  textGhost:    "#B8C8E0",
-  isDark:       false,
+  bg: "#E8EBF4",
+  bgDeep: "#DCE0ED",
+  surface: "#F0F2FA",
+  border: "#C2C9DC",
+  cyan: "#0077BB",
+  teal: "#008870",
+  amber: "#A86000",
+  gold: "#8A6010",
+  textPrimary: "#0A1628",
+  textSecondary: "#2A3F5F",
+  textMuted: "#5A6E8A",
+  textGhost: "#B0BCCC",
+  red: "#C0192A",
+  magenta: "#A020C0",
+  blue: "#2255CC",
+  accent: "#0077BB",
+  orange: "#A86000",
 };
 
 let T = DARK_THEME;
@@ -130,21 +120,28 @@ let T = DARK_THEME;
 const ThemeContext = React.createContext({ T: DARK_THEME, toggleTheme: () => {}, isDark: true });
 
 const ThemeProvider = ({ children }) => {
-  const [isDark, setIsDark] = useState(() => {
-    try { return localStorage.getItem("sf-theme") !== "light"; } catch { return true; }
-  });
-  const theme = isDark ? DARK_THEME : LIGHT_THEME;
-  T = theme;
-  const toggleTheme = () => {
-    setIsDark(d => {
-      const next = !d;
+  const getInitial = () => { try { return localStorage.getItem("sf-theme") !== "light"; } catch { return true; } };
+  const [isDark, setIsDark] = React.useState(getInitial);
+
+  const toggle = () => {
+    setIsDark(prev => {
+      const next = !prev;
       try { localStorage.setItem("sf-theme", next ? "dark" : "light"); } catch {}
       return next;
     });
   };
+
+  React.useEffect(() => {
+    T = isDark ? DARK_THEME : LIGHT_THEME;
+  }, [isDark]);
+
+  T = isDark ? DARK_THEME : LIGHT_THEME;
+
   return (
-    <ThemeContext.Provider value={{ T: theme, toggleTheme, isDark }}>
-      <div style={{ colorScheme: isDark ? "dark" : "light" }}>{children}</div>
+    <ThemeContext.Provider value={{ isDark, toggle }}>
+      <div style={{ minHeight: "100vh", background: T.bg, color: T.textPrimary, transition: "background 0.3s, color 0.3s" }}>
+        {children}
+      </div>
     </ThemeContext.Provider>
   );
 };
@@ -3225,9 +3222,27 @@ const UsersView = ({ user }) => {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <PageHeader title="User Management" subtitle={`${users.length} team members`} />
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Administration</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>User Management</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{users.length} total users</div>
+        </div>
         <Btn onClick={() => setModal(true)}>+ Add User</Btn>
+      </div>
+
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px,1fr))", gap: 12, marginBottom: 24 }}>
+        {[...new Set(users.map(u => u.role))].map((role, i) => {
+          const roleColors = { "CEO": T.cyan, "Administrator": T.teal, "Vendor Manager": T.amber, "Strategy & Events Lead": T.magenta, "Finance Manager": T.gold, "Sales & Marketing": T.blue, "Vendor": T.textSecondary, "Client": "#10B981" };
+          const color = roleColors[role] || T.textMuted;
+          return (
+            <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${color}`, borderRadius: 10 }}>
+              <div style={{ color: color, fontSize: 20, fontWeight: 900 }}>{users.filter(u => u.role === role).length}</div>
+              <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: 4 }}>{role}</div>
+            </div>
+          );
+        })}
       </div>
       {loading ? (
         <div style={{ color: T.textMuted, textAlign: 'center', padding: 60 }}>Loading...</div>

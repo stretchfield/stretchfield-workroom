@@ -1272,8 +1272,6 @@ const TaskCommentCard = ({ task: t, user, canComment, barColor, statusColor, pct
         title: `${user.name} commented on your task`,
         message: `"${t.name}" — ${newComment.trim().slice(0, 80)}`,
         type: "task",
-        resource_id: t.id,
-        read: false,
       });
     }
     // notify CEO + Strategy Lead if assignee replies
@@ -1286,8 +1284,6 @@ const TaskCommentCard = ({ task: t, user, canComment, barColor, statusColor, pct
             title: `${user.name} replied on task`,
             message: `"${t.name}" — ${newComment.trim().slice(0, 80)}`,
             type: "task",
-            resource_id: t.id,
-            read: false,
           });
         }
       }
@@ -1662,7 +1658,7 @@ const TaskCommentThread = ({ task, user }) => {
         user_id: task.assigned_to,
         title: `${user.name} commented on your task`,
         message: `"${task.name}" — ${newComment.trim().slice(0, 80)}`,
-        type: "task", resource_id: task.id, read: false,
+        type: "task",
       });
     }
     // Notify CEO + Strategy Lead if assignee replies
@@ -1674,7 +1670,7 @@ const TaskCommentThread = ({ task, user }) => {
             user_id: r.id,
             title: `${user.name} replied on task`,
             message: `"${task.name}" — ${newComment.trim().slice(0, 80)}`,
-            type: "task", resource_id: task.id, read: false,
+            type: "task",
           });
         }
       }

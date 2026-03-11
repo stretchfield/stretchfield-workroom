@@ -1241,19 +1241,24 @@ const ClientEventsView = ({ user }) => {
 const EventsView = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [clients, setClients] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({ name: '', client: '', client_id: '', deadline: '', phase: 'Planning' });
   const [saving, setSaving] = useState(false);
+  const [expandedEvent, setExpandedEvent] = useState(null);
 
   const canManage = ['CEO','Administrator'].includes(user?.role);
+  const canSeeTasks = ['CEO','Administrator','Strategy & Events Lead','Vendor Manager'].includes(user?.role);
 
   const load = async () => {
-    const [p, c] = await Promise.all([
+    const [p, c, t] = await Promise.all([
       supabase.from('projects').select('*').order('created_at', { ascending: false }),
       supabase.from('clients').select('*').order('name'),
+      supabase.from('tasks').select('*').order('created_at', { ascending: false }),
     ]);
     setEvents(p.data || []);
     setClients(c.data || []);
+    setTasks(t.data || []);
   };
 
   useEffect(() => { load(); }, []);
@@ -1298,49 +1303,111 @@ const EventsView = ({ user }) => {
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
           {events.map((p, idx) => (
-            <div key={p.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 22px", transition: "box-shadow 0.2s, border-color 0.2s", animationDelay: idx * 0.04 + "s" }}
-              onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 4px 28px ${T.cyan}12`; e.currentTarget.style.borderColor = T.cyan + "40"; }}
-              onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = T.border; }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, letterSpacing: "-0.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
-                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>{p.client}</div>
+            <div key={p.id} style={{ background: T.surface, border: `1px solid ${expandedEvent === p.id ? T.cyan + "50" : T.border}`, borderRadius: 12, overflow: "hidden", transition: "box-shadow 0.2s, border-color 0.2s", animationDelay: idx * 0.04 + "s", boxShadow: expandedEvent === p.id ? `0 4px 28px ${T.cyan}12` : "none" }}>
+              {/* Card header — always visible */}
+              <div style={{ padding: "20px 22px" }}
+                onMouseEnter={e => { if (expandedEvent !== p.id) { e.currentTarget.parentElement.style.boxShadow = `0 4px 28px ${T.cyan}10`; e.currentTarget.parentElement.style.borderColor = T.cyan + "40"; }}}
+                onMouseLeave={e => { if (expandedEvent !== p.id) { e.currentTarget.parentElement.style.boxShadow = "none"; e.currentTarget.parentElement.style.borderColor = T.border; }}}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, letterSpacing: "-0.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
+                    <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>{p.client}</div>
+                  </div>
+                  <Badge status={p.status} />
                 </div>
-                <Badge status={p.status} />
+
+                {/* Phase + deadline row */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <div style={{ background: T.cyan + "18", color: T.cyan, padding: "2px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>{p.phase}</div>
+                  {p.deadline && <div style={{ color: T.textMuted, fontSize: 11 }}>Due {p.deadline}</div>}
+                </div>
+
+                {/* Progress bar */}
+                <div style={{ height: 4, background: T.border + "44", borderRadius: 2, marginBottom: 6 }}>
+                  <div style={{ height: "100%", width: (p.completion || 0) + "%", background: `linear-gradient(90deg, ${T.cyan}, ${T.teal})`, borderRadius: 2, transition: "width 0.4s ease" }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ color: T.textMuted, fontSize: 10 }}>{p.completion || 0}% complete</div>
+                  {canManage ? (
+                    <button onClick={async (e) => {
+                      e.stopPropagation();
+                      await supabase.from("projects").update({ active_for_client: !p.active_for_client }).eq("id", p.id);
+                      load();
+                    }} style={{
+                      background: p.active_for_client ? T.teal + "18" : "none",
+                      border: `1px solid ${p.active_for_client ? T.teal + "60" : T.border}`,
+                      color: p.active_for_client ? T.teal : T.textMuted,
+                      padding: "3px 10px", borderRadius: 20, cursor: "pointer", fontSize: 10, fontWeight: 700,
+                    }}>
+                      {p.active_for_client ? "✓ Client Visible" : "○ Hidden"}
+                    </button>
+                  ) : (
+                    <span style={{ color: p.active_for_client ? T.teal : T.textMuted, fontSize: 10, fontWeight: 600 }}>
+                      {p.active_for_client ? "✓ Visible" : "○ Hidden"}
+                    </span>
+                  )}
+                </div>
+
+                {/* Tasks toggle button — only for privileged roles */}
+                {canSeeTasks && (() => {
+                  const eventTasks = tasks.filter(t => t.project_id === p.id);
+                  return (
+                    <button onClick={() => setExpandedEvent(expandedEvent === p.id ? null : p.id)} style={{
+                      marginTop: 14, width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
+                      background: expandedEvent === p.id ? T.cyan + "12" : T.bg,
+                      border: `1px solid ${expandedEvent === p.id ? T.cyan + "40" : T.border + "80"}`,
+                      borderRadius: 8, padding: "7px 12px", cursor: "pointer", transition: "all 0.15s",
+                    }}>
+                      <span style={{ color: expandedEvent === p.id ? T.cyan : T.textMuted, fontSize: 11, fontWeight: 700 }}>
+                        {eventTasks.length} Task{eventTasks.length !== 1 ? "s" : ""}
+                      </span>
+                      <span style={{ color: T.textMuted, fontSize: 12, transition: "transform 0.2s", display: "inline-block", transform: expandedEvent === p.id ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+                    </button>
+                  );
+                })()}
               </div>
 
-              {/* Phase + deadline row */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div style={{ background: T.cyan + "18", color: T.cyan, padding: "2px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>{p.phase}</div>
-                {p.deadline && <div style={{ color: T.textMuted, fontSize: 11 }}>Due {p.deadline}</div>}
-              </div>
-
-              {/* Progress bar */}
-              <div style={{ height: 4, background: T.border + "44", borderRadius: 2, marginBottom: 6 }}>
-                <div style={{ height: "100%", width: (p.completion || 0) + "%", background: `linear-gradient(90deg, ${T.cyan}, ${T.teal})`, borderRadius: 2, transition: "width 0.4s ease" }} />
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ color: T.textMuted, fontSize: 10 }}>{p.completion || 0}% complete</div>
-                {canManage ? (
-                  <button onClick={async (e) => {
-                    e.stopPropagation();
-                    await supabase.from("projects").update({ active_for_client: !p.active_for_client }).eq("id", p.id);
-                    load();
-                  }} style={{
-                    background: p.active_for_client ? T.teal + "18" : "none",
-                    border: `1px solid ${p.active_for_client ? T.teal + "60" : T.border}`,
-                    color: p.active_for_client ? T.teal : T.textMuted,
-                    padding: "3px 10px", borderRadius: 20, cursor: "pointer", fontSize: 10, fontWeight: 700,
-                  }}>
-                    {p.active_for_client ? "✓ Client Visible" : "○ Hidden"}
-                  </button>
-                ) : (
-                  <span style={{ color: p.active_for_client ? T.teal : T.textMuted, fontSize: 10, fontWeight: 600 }}>
-                    {p.active_for_client ? "✓ Visible" : "○ Hidden"}
-                  </span>
-                )}
-              </div>
+              {/* Task panel — expands below */}
+              {canSeeTasks && expandedEvent === p.id && (() => {
+                const eventTasks = tasks.filter(t => t.project_id === p.id);
+                return (
+                  <div style={{ borderTop: `1px solid ${T.cyan}30`, background: T.bg, padding: "14px 22px" }}>
+                    {eventTasks.length === 0 ? (
+                      <div style={{ color: T.textMuted, fontSize: 12, fontStyle: "italic", textAlign: "center", padding: "12px 0" }}>No tasks for this event yet.</div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {eventTasks.map(t => {
+                          const pct = t.progress || 0;
+                          const barColor = t.status === "completed" ? T.teal : pct > 66 ? T.cyan : pct > 33 ? T.amber : T.magenta;
+                          const statusColors = { completed: T.teal, "in-progress": T.cyan, pending: T.amber, blocked: T.red };
+                          const statusColor = statusColors[t.status] || T.textMuted;
+                          return (
+                            <div key={t.id} style={{ background: T.surface, border: `1px solid ${T.border}44`, borderRadius: 8, padding: "10px 14px" }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</div>
+                                  <div style={{ display: "flex", gap: 8, marginTop: 3, flexWrap: "wrap" }}>
+                                    {t.assignee_name && <span style={{ color: T.cyan, fontSize: 10 }}>→ {t.assignee_name}</span>}
+                                    {t.deadline && <span style={{ color: T.textMuted, fontSize: 10 }}>Due {t.deadline}</span>}
+                                  </div>
+                                </div>
+                                <span style={{ background: statusColor + "18", color: statusColor, border: `1px solid ${statusColor}30`, borderRadius: 20, padding: "1px 8px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0, marginLeft: 8 }}>
+                                  {t.status || "pending"}
+                                </span>
+                              </div>
+                              <div style={{ height: 3, background: T.border + "44", borderRadius: 2 }}>
+                                <div style={{ height: "100%", width: pct + "%", background: barColor, borderRadius: 2, transition: "width 0.3s" }} />
+                              </div>
+                              <div style={{ color: T.textMuted, fontSize: 9, marginTop: 3 }}>{pct}% complete</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           ))}
         </div>

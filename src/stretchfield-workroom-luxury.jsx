@@ -1132,6 +1132,11 @@ const CEOClientFinanceView = ({ user }) => {
   const agreedBudget = currentBudget?.agreed_budget || 0;
   const spentPct = agreedBudget > 0 ? Math.min(100, Math.round((totalSpent / agreedBudget) * 100)) : 0;
 
+  const categoryColors = {
+    "Venue": "#00C8FF", "Catering": "#00E5C8", "Production": "#C9A84C",
+    "Logistics": "#3B7BFF", "Management Fee": "#E879F9", "Other": "#8BA3C7",
+  };
+
   const inputStyle = { width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
   const labelStyle = { color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5, display: "block" };
 
@@ -1528,21 +1533,26 @@ const ClientDashboard = ({ user }) => {
   const [tasks, setTasks] = useState([]);
   const [clientInfo, setClientInfo] = useState(null);
 
+  const [budgets, setBudgets] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+
   useEffect(() => {
     supabase.from('clients').select('*').eq('profile_id', user.id).single().then(({ data: clientData }) => {
       if (clientData) {
         setClientInfo(clientData);
         supabase.from('projects').select('*').eq('client_id', clientData.id).eq('active_for_client', true).then(({ data }) => setEvents(data || []));
         supabase.from('tasks').select('*').eq('visible_to_client', true).eq('client_id', clientData.id).then(({ data }) => setTasks(data || []));
+        supabase.from('client_budgets').select('*').eq('client_id', clientData.id).then(({ data }) => setBudgets(data || []));
+        supabase.from('client_invoices').select('*').eq('client_id', clientData.id).order('created_at', { ascending: false }).limit(3).then(({ data }) => setInvoices(data || []));
       } else {
-        // fallback: try matching by email
         supabase.from('clients').select('*').eq('email', user.email).single().then(({ data: clientByEmail }) => {
           if (clientByEmail) {
             setClientInfo(clientByEmail);
-            // Link profile_id for future logins
             supabase.from('clients').update({ profile_id: user.id }).eq('id', clientByEmail.id);
             supabase.from('projects').select('*').eq('client_id', clientByEmail.id).eq('active_for_client', true).then(({ data }) => setEvents(data || []));
             supabase.from('tasks').select('*').eq('visible_to_client', true).eq('client_id', clientByEmail.id).then(({ data }) => setTasks(data || []));
+            supabase.from('client_budgets').select('*').eq('client_id', clientByEmail.id).then(({ data }) => setBudgets(data || []));
+            supabase.from('client_invoices').select('*').eq('client_id', clientByEmail.id).order('created_at', { ascending: false }).limit(3).then(({ data }) => setInvoices(data || []));
           }
         });
       }
@@ -1603,6 +1613,62 @@ const ClientDashboard = ({ user }) => {
               </Card>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* ── Budget & Invoices Summary ── */}
+      {(budgets.length > 0 || invoices.length > 0) && (
+        <div style={{ marginTop: 28 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>💰 Budget & Invoices</div>
+            <span style={{ color: T.cyan, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>See full details in Budget & Invoices tab →</span>
+          </div>
+
+          {/* Budget summary per event */}
+          {budgets.length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12, marginBottom: 16 }}>
+              {budgets.map(b => {
+                const ev = events.find(e => e.id === b.project_id);
+                if (!ev) return null;
+                const agreedBudget = b.agreed_budget || 0;
+                const mgmtFee = agreedBudget * ((b.management_fee_pct || 15) / 100);
+                return (
+                  <div key={b.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${T.cyan}`, borderRadius: 10, padding: "16px 18px" }}>
+                    <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 10 }}>{ev.name}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                      <span style={{ color: T.textMuted, fontSize: 11 }}>Agreed Budget</span>
+                      <span style={{ color: T.cyan, fontWeight: 700, fontSize: 12 }}>GHS {agreedBudget.toLocaleString()}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: T.textMuted, fontSize: 11 }}>Mgmt Fee ({b.management_fee_pct || 15}%)</span>
+                      <span style={{ color: T.magenta, fontWeight: 700, fontSize: 12 }}>GHS {mgmtFee.toLocaleString()}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Recent invoices */}
+          {invoices.length > 0 && (
+            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px" }}>
+              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 12 }}>📄 Recent Invoices</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {invoices.map(inv => (
+                  <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", background: T.bg, border: `1px solid ${T.border}44`, borderRadius: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontSize: 18 }}>📑</span>
+                      <div>
+                        <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>{inv.title}</div>
+                        <div style={{ color: T.textMuted, fontSize: 10 }}>{new Date(inv.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>
+                      </div>
+                    </div>
+                    <a href={inv.file_url} target="_blank" rel="noopener noreferrer" style={{ background: T.cyan + "18", border: `1px solid ${T.cyan}40`, color: T.cyan, padding: "5px 12px", borderRadius: 8, fontSize: 10, fontWeight: 700, textDecoration: "none" }}>Download</a>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

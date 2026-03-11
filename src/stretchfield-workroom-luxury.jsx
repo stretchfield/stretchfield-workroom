@@ -117,29 +117,27 @@ const LIGHT_THEME = {
 
 let T = DARK_THEME;
 
-const ThemeContext = React.createContext({ T: DARK_THEME, toggleTheme: () => {}, isDark: true });
+const ThemeContext = React.createContext({ isDark: true, toggleTheme: () => {} });
 
 const ThemeProvider = ({ children }) => {
   const getInitial = () => { try { return localStorage.getItem("sf-theme") !== "light"; } catch { return true; } };
   const [isDark, setIsDark] = React.useState(getInitial);
 
-  const toggle = () => {
+  const toggleTheme = () => {
     setIsDark(prev => {
       const next = !prev;
       try { localStorage.setItem("sf-theme", next ? "dark" : "light"); } catch {}
+      T = next ? DARK_THEME : LIGHT_THEME;
       return next;
     });
   };
 
-  React.useEffect(() => {
-    T = isDark ? DARK_THEME : LIGHT_THEME;
-  }, [isDark]);
-
+  // Keep global T in sync
   T = isDark ? DARK_THEME : LIGHT_THEME;
 
   return (
-    <ThemeContext.Provider value={{ isDark, toggle }}>
-      <div style={{ minHeight: "100vh", background: T.bg, color: T.textPrimary, transition: "background 0.3s, color 0.3s" }}>
+    <ThemeContext.Provider value={{ isDark, toggleTheme }}>
+      <div key={isDark ? "dark" : "light"} style={{ minHeight: "100vh", background: T.bg, color: T.textPrimary, transition: "background 0.3s, color 0.3s" }}>
         {children}
       </div>
     </ThemeContext.Provider>

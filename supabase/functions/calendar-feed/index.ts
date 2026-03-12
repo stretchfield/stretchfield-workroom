@@ -158,3 +158,4 @@ serve(async (req) => {
     },
   });
 });
+// apikey param accepted for iOS compatibility — already handled by Supabase gateway

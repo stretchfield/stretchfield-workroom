@@ -5367,7 +5367,7 @@ const CalendarView = ({ user, onNavigate }) => {
           )}
           {role === "CEO" && (
             <button onClick={() => {
-              const feedUrl = `https://okbduzenceoknkjqnrha.supabase.co/functions/v1/calendar-feed?user_id=${uid}`;
+              const feedUrl = `https://okbduzenceoknkjqnrha.supabase.co/functions/v1/calendar-feed?user_id=${uid}&apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rYmR1emVuY2Vva25ranFucmhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMzYyMDUsImV4cCI6MjA4NzcxMjIwNX0.rJn54xnpWscM8Y8PIFB50fCyDyyXaNB5y98XYUvzjgU`;
               navigator.clipboard.writeText(feedUrl).then(() => alert(
                 "Calendar URL copied!\n\n" +
                 "To sync to your iPhone:\n" +

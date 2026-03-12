@@ -2580,6 +2580,8 @@ const OpportunitiesView = ({ user, onNavigate }) => {
       notes: `Converted from Opportunities.\n\nEvent Fit: ${opp.event_fit || ""}\n\nNotes: ${opp.notes || ""}`,
       source: "Opportunities Portal",
       created_by: user?.id,
+      assigned_to: user?.id,
+      assigned_name: user?.name || "",
     }).select().single();
     if (!error && lead) {
       await supabase.from("opportunities").update({
@@ -4215,7 +4217,7 @@ const CRMView = ({ user }) => {
 
   const load = async () => {
     const [l, a, p, m, c] = await Promise.all([
-      ["CEO", "Administrator"].includes(user?.role) ? supabase.from("leads").select("*").order("created_at", { ascending: false }) : supabase.from("leads").select("*").or("assigned_to.eq." + user.id + ",created_by.eq." + user.id).order("created_at", { ascending: false }),
+      ["CEO", "Administrator", "Sales & Marketing"].includes(user?.role) ? supabase.from("leads").select("*").order("created_at", { ascending: false }) : supabase.from("leads").select("*").or("assigned_to.eq." + user.id + ",created_by.eq." + user.id).order("created_at", { ascending: false }),
       supabase.from("crm_activities").select("*").order("created_at", { ascending: false }),
       supabase.from("proposals").select("*").order("created_at", { ascending: false }),
       supabase.from('profiles').select('*').not('role', 'in', '("Client","Vendor")'),

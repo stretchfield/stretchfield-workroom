@@ -552,6 +552,7 @@ const getNavItems = (role) => {
   if (!["Vendor","Client","Strategy & Events Lead"].includes(role)) {
     base.push({ id: "feedback", label: "Feedback", icon: "▪" });
   }
+  base.push({ id: "calendar", label: "Calendar", icon: "▪" });
   base.push({ id: "notifications", label: "Notifications", icon: "▪" });
   return base;
 };
@@ -5185,6 +5186,247 @@ const ClientFeedbackForm = ({ event, user }) => {
 };
 
 
+
+const CalendarView = ({ user, onNavigate }) => {
+  const [today] = useState(new Date());
+  const [current, setCurrent] = useState(new Date());
+  const [items, setItems] = useState([]);
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const role = user?.role;
+  const uid = user?.id;
+  const email = user?.email;
+
+  const typeColors = {
+    task: "#00C8FF",
+    event: "#00E5C8",
+    lead: "#F59E0B",
+    rff: "#E879F9",
+    invoice: "#C9A84C",
+    activity: "#3B7BFF",
+    smtask: "#10B981",
+  };
+
+  const load = async () => {
+    setLoading(true);
+    const all = [];
+
+    // ── TASKS ──
+    const taskQ = ["CEO","Administrator"].includes(role)
+      ? supabase.from("tasks").select("*")
+      : supabase.from("tasks").select("*").eq("assignee_id", uid);
+    const { data: tasks } = await taskQ;
+    (tasks || []).forEach(t => {
+      if (t.deadline) all.push({ id: "task-"+t.id, date: t.deadline.slice(0,10), type: "task", label: t.name, sub: t.assignee_name || "", status: t.status, nav: "tasks" });
+    });
+
+    // ── EVENTS (projects) ──
+    if (!["Vendor"].includes(role)) {
+      let evQ;
+      if (["Client"].includes(role)) {
+        const { data: clientData } = await supabase.from("clients").select("id").eq("email", email).single();
+        if (clientData) evQ = await supabase.from("projects").select("*").eq("client_id", clientData.id);
+      } else {
+        evQ = await supabase.from("projects").select("*");
+      }
+      const events = evQ?.data || [];
+      events.forEach(e => {
+        if (e.event_date) all.push({ id: "ev-"+e.id+"-d", date: e.event_date, type: "event", label: e.name, sub: "Event Day", nav: "events" });
+        if (e.deadline) all.push({ id: "ev-"+e.id+"-dl", date: e.deadline.slice(0,10), type: "event", label: e.name, sub: "Planning Deadline", nav: "events" });
+      });
+    }
+
+    // ── LEADS (CEO, Admin, Sales & Marketing) ──
+    if (["CEO","Administrator","Sales & Marketing"].includes(role)) {
+      const { data: leads } = await supabase.from("leads").select("*");
+      (leads || []).forEach(l => {
+        if (l.created_at) all.push({ id: "lead-"+l.id, date: l.created_at.slice(0,10), type: "lead", label: l.company, sub: "Lead Created · " + l.status, nav: "crm" });
+        if (l.closed_date) all.push({ id: "lead-"+l.id+"-c", date: l.closed_date, type: "lead", label: l.company, sub: "Lead Closed · Won", nav: "crm" });
+      });
+    }
+
+    // ── RFFs ──
+    if (["CEO","Administrator","Vendor Manager"].includes(role)) {
+      const { data: rffs } = await supabase.from("rffs").select("*");
+      (rffs || []).forEach(r => {
+        if (r.deadline) all.push({ id: "rff-"+r.id, date: r.deadline.slice(0,10), type: "rff", label: r.title || r.name || "RFF", sub: r.status, nav: "vendors" });
+      });
+    } else if (role === "Vendor") {
+      const { data: assignments } = await supabase.from("rff_vendor_assignments").select("*, rffs(*)").eq("vendor_id", uid);
+      (assignments || []).forEach(a => {
+        const r = a.rffs;
+        if (r?.deadline) all.push({ id: "rff-"+r.id, date: r.deadline.slice(0,10), type: "rff", label: r.title || r.name || "RFF", sub: a.status, nav: "my-rffs" });
+      });
+    }
+
+    // ── S&M TASKS ──
+    if (["CEO","Administrator","Sales & Marketing"].includes(role)) {
+      const smQ = ["CEO","Administrator"].includes(role)
+        ? supabase.from("tasks").select("*").not("assignee_id","is",null)
+        : supabase.from("tasks").select("*").eq("assignee_id", uid);
+      const { data: smTasks } = await smQ;
+      (smTasks || []).forEach(t => {
+        if (t.deadline && !["CEO","Administrator"].includes(role)) {
+          all.push({ id: "smt-"+t.id, date: t.deadline.slice(0,10), type: "smtask", label: t.name, sub: "S&M Task", nav: "sm-tasks" });
+        }
+      });
+    }
+
+    // ── CLIENT INVOICES ──
+    if (role === "Client") {
+      const { data: clientData } = await supabase.from("clients").select("id").eq("email", email).single();
+      if (clientData) {
+        const { data: invs } = await supabase.from("client_invoices").select("*").eq("client_id", clientData.id);
+        (invs || []).forEach(inv => {
+          if (inv.created_at) all.push({ id: "inv-"+inv.id, date: inv.created_at.slice(0,10), type: "invoice", label: inv.title || "Invoice", sub: "Invoice", nav: "client-finance" });
+        });
+      }
+    }
+
+    // ── FINANCE INVOICES ──
+    if (["CEO","Administrator","Finance Manager"].includes(role)) {
+      const { data: invs } = await supabase.from("invoices").select("*");
+      (invs || []).forEach(inv => {
+        if (inv.created_at) all.push({ id: "finv-"+inv.id, date: inv.created_at.slice(0,10), type: "invoice", label: inv.vendor_name || "Invoice", sub: "Invoice · " + (inv.status || ""), nav: "invoices" });
+      });
+    }
+
+    setItems(all);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const year = current.getFullYear();
+  const month = current.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthName = current.toLocaleString("default", { month: "long" });
+  const todayStr = today.toISOString().slice(0,10);
+
+  const itemsByDate = {};
+  items.forEach(item => {
+    if (!itemsByDate[item.date]) itemsByDate[item.date] = [];
+    itemsByDate[item.date].push(item);
+  });
+
+  const dayItems = selectedDay ? (itemsByDate[selectedDay] || []) : [];
+
+  const typeLabel = { task: "Task", event: "Event", lead: "Lead", rff: "RFF", invoice: "Invoice", activity: "Activity", smtask: "S&M Task" };
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Personal</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Calendar</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{items.length} items across all your activities</div>
+        </div>
+        {/* Legend */}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {Object.entries(typeColors).map(([type, color]) => (
+            <div key={type} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
+              <span style={{ color: T.textMuted, fontSize: 10, textTransform: "capitalize" }}>{typeLabel[type]}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: selectedDay ? "1fr 320px" : "1fr", gap: 20 }}>
+        {/* Calendar grid */}
+        <div>
+          {/* Month nav */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <button onClick={() => setCurrent(new Date(year, month - 1, 1))} style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.textPrimary, width: 34, height: 34, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>‹</button>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 18 }}>{monthName} {year}</div>
+            <button onClick={() => setCurrent(new Date(year, month + 1, 1))} style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.textPrimary, width: 34, height: 34, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>›</button>
+          </div>
+
+          {/* Day headers */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
+            {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
+              <div key={d} style={{ textAlign: "center", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", padding: "6px 0" }}>{d}</div>
+            ))}
+          </div>
+
+          {/* Day cells */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+            {Array.from({ length: firstDay }).map((_, i) => <div key={"e"+i} />)}
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const day = i + 1;
+              const dateStr = `${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+              const dayItems = itemsByDate[dateStr] || [];
+              const isToday = dateStr === todayStr;
+              const isSelected = dateStr === selectedDay;
+              const isPast = dateStr < todayStr;
+
+              return (
+                <div key={day} onClick={() => setSelectedDay(isSelected ? null : dateStr)}
+                  style={{
+                    minHeight: 80, padding: "6px 8px", borderRadius: 8, cursor: "pointer",
+                    background: isSelected ? T.cyan + "18" : isToday ? T.teal + "12" : T.surface,
+                    border: `1px solid ${isSelected ? T.cyan + "60" : isToday ? T.teal + "40" : T.border}`,
+                    opacity: isPast && !isToday ? 0.7 : 1,
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.borderColor = T.cyan + "40"; }}
+                  onMouseLeave={e => { if (!isSelected) e.currentTarget.style.borderColor = isToday ? T.teal + "40" : T.border; }}>
+                  <div style={{ color: isToday ? T.teal : T.textPrimary, fontWeight: isToday ? 900 : 600, fontSize: 12, marginBottom: 4 }}>
+                    {isToday ? <span style={{ background: T.teal, color: "#fff", borderRadius: "50%", width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11 }}>{day}</span> : day}
+                  </div>
+                  {dayItems.slice(0,3).map((item, idx) => (
+                    <div key={idx} style={{ background: typeColors[item.type] + "25", borderLeft: `2px solid ${typeColors[item.type]}`, borderRadius: 3, padding: "1px 4px", marginBottom: 2, fontSize: 9, color: typeColors[item.type], fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {item.label}
+                    </div>
+                  ))}
+                  {dayItems.length > 3 && <div style={{ color: T.textMuted, fontSize: 9 }}>+{dayItems.length - 3} more</div>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Day detail panel */}
+        {selectedDay && (
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 20, height: "fit-content", position: "sticky", top: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div>
+                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Selected</div>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 16 }}>{new Date(selectedDay + "T12:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}</div>
+              </div>
+              <button onClick={() => setSelectedDay(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, width: 28, height: 28, borderRadius: 6, cursor: "pointer", fontSize: 16 }}>×</button>
+            </div>
+
+            {dayItems.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "30px 0", color: T.textMuted, fontSize: 13 }}>Nothing scheduled</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {dayItems.map((item, idx) => (
+                  <div key={idx} onClick={() => { if (onNavigate) onNavigate(item.nav); }}
+                    style={{ padding: "10px 12px", background: T.bg, border: `1px solid ${typeColors[item.type]}30`, borderLeft: `3px solid ${typeColors[item.type]}`, borderRadius: 8, cursor: onNavigate ? "pointer" : "default", transition: "box-shadow 0.15s" }}
+                    onMouseEnter={e => e.currentTarget.style.boxShadow = `0 2px 12px ${typeColors[item.type]}20`}
+                    onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13, marginBottom: 2 }}>{item.label}</div>
+                        <div style={{ color: T.textMuted, fontSize: 11 }}>{item.sub}</div>
+                      </div>
+                      <span style={{ background: typeColors[item.type] + "20", color: typeColors[item.type], borderRadius: 20, padding: "2px 8px", fontSize: 9, fontWeight: 800, textTransform: "uppercase", flexShrink: 0, marginLeft: 8 }}>{typeLabel[item.type]}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const NotificationsView = ({ user, onNavigate }) => {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -5404,6 +5646,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "expenses": return <ExpenseView user={currentUser} />;
       case "finance-reports": return <FinanceReportsView user={currentUser} />;
       case "feedback": return <FeedbackView userRole={currentUser.role} />;
+      case "calendar": return <CalendarView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
       case "notifications": return <NotificationsView user={currentUser} onNavigate={(tab, resourceId) => { setActiveTab(tab); if (resourceId) setPendingResourceId(resourceId); }} />;
       case "rffs": return <VendorRFFsView user={currentUser} />;
       case "quotes": return <VendorQuotesView user={currentUser} />;

@@ -5365,18 +5365,21 @@ const CalendarView = ({ user, onNavigate }) => {
           {["CEO","Sales & Marketing"].includes(role) && (
             <button onClick={() => setItinModal(true)} style={{ background: `linear-gradient(135deg, #F472B6, #E879F9)`, border: "none", color: "#fff", padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>+ Create Itinerary</button>
           )}
-          {role === "CEO" && (
+          {["CEO","Strategy & Events Lead","Vendor Manager","Sales & Marketing","Vendor"].includes(role) && (
             <button onClick={() => {
               const feedUrl = `https://stretchfield-workroom.vercel.app/api/calendar-feed?user_id=${uid}`;
               navigator.clipboard.writeText(feedUrl).then(() => alert(
                 "✅ Calendar URL copied!\n\n" +
-                "iPhone Instructions:\n" +
+                "iPhone / Mac Calendar:\n" +
                 "1. Settings → Calendar → Accounts\n" +
                 "2. Add Account → Other\n" +
                 "3. Add Subscribed Calendar\n" +
-                "4. Paste URL → Next → Save\n" +
-                "(Leave username/password blank if asked)\n\n" +
-                "Android / Google Calendar:\n" +
+                "4. Paste URL → Next → Save\n\n" +
+                "Mac Calendar App:\n" +
+                "1. File → New Calendar Subscription\n" +
+                "2. Paste URL → Subscribe\n" +
+                "3. Set refresh to Every Hour → OK\n\n" +
+                "Google Calendar (Android):\n" +
                 "1. Open calendar.google.com on desktop\n" +
                 "2. Other Calendars → + → From URL\n" +
                 "3. Paste URL → Add Calendar"

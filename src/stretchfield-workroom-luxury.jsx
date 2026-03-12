@@ -2515,7 +2515,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
   const [modal, setModal] = useState(false);
   const [editModal, setEditModal] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ company: "", sector: "", presence: "GH", event_fit: "", notes: "", status: "New" });
+  const [form, setForm] = useState({ company: "", sector: "", presence: "GH", event_fit: "", notes: "", status: "New", contact_name: "", contact_email: "", contact_phone: "" });
 
   const canManage = ["CEO", "Sales & Marketing"].includes(user?.role);
 
@@ -2544,6 +2544,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
     if (!form.company) return;
     setSaving(true);
     await supabase.from("opportunities").insert({ ...form });
+    // form already includes contact_name, contact_email, contact_phone
     setSaving(false);
     setModal(false);
     setForm({ company: "", sector: "", presence: "GH", event_fit: "", notes: "", status: "New" });
@@ -2556,6 +2557,9 @@ const OpportunitiesView = ({ user, onNavigate }) => {
       company: editModal.company, sector: editModal.sector,
       presence: editModal.presence, event_fit: editModal.event_fit,
       notes: editModal.notes, status: editModal.status,
+      contact_name: editModal.contact_name || "",
+      contact_email: editModal.contact_email || "",
+      contact_phone: editModal.contact_phone || "",
       updated_at: new Date().toISOString(),
     }).eq("id", editModal.id);
     setSaving(false);
@@ -2574,15 +2578,18 @@ const OpportunitiesView = ({ user, onNavigate }) => {
     setSaving(true);
     const { data: lead, error } = await supabase.from("leads").insert({
       company: opp.company,
-      sector: opp.sector,
+      contact_name: opp.contact_name || "",
+      email: opp.contact_email || "",
+      phone: opp.contact_phone || "",
       status: "new",
       value: 0,
-      notes: `Converted from Opportunities.\n\nEvent Fit: ${opp.event_fit || ""}\n\nNotes: ${opp.notes || ""}`,
+      notes: `Converted from Opportunities Portal.\n\nEvent Fit: ${opp.event_fit || ""}\n\nOpportunity Notes: ${opp.notes || ""}`,
       source: "Opportunities Portal",
       created_by: user?.id,
       assigned_to: user?.id,
       assigned_name: user?.name || "",
     }).select().single();
+    console.log("Lead insert result:", lead, error);
     if (!error && lead) {
       await supabase.from("opportunities").update({
         status: "Converted",
@@ -2685,6 +2692,9 @@ const OpportunitiesView = ({ user, onNavigate }) => {
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                     <td style={{ padding: "12px 16px" }}>
                       <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{o.company}</div>
+                      {o.contact_name && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>👤 {o.contact_name}</div>}
+                      {o.contact_email && <div style={{ color: T.cyan, fontSize: 11 }}>✉ {o.contact_email}</div>}
+                      {o.contact_phone && <div style={{ color: T.textMuted, fontSize: 11 }}>📞 {o.contact_phone}</div>}
                     </td>
                     <td style={{ padding: "12px 16px" }}>
                       <span style={{ color: T.textMuted, fontSize: 12 }}>{o.sector}</span>
@@ -2748,6 +2758,11 @@ const OpportunitiesView = ({ user, onNavigate }) => {
               </div>
             </div>
             <div style={{ marginBottom: 14 }}><label style={labelStyle}>Event Fit</label><input value={form.event_fit} onChange={e => setForm({ ...form, event_fit: e.target.value })} style={inputStyle} placeholder="e.g. Brand activations, product launches" /></div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
+              <div><label style={labelStyle}>Contact Name</label><input value={form.contact_name} onChange={e => setForm({ ...form, contact_name: e.target.value })} style={inputStyle} placeholder="John Mensah" /></div>
+              <div><label style={labelStyle}>Email</label><input value={form.contact_email} onChange={e => setForm({ ...form, contact_email: e.target.value })} style={inputStyle} placeholder="john@company.com" /></div>
+              <div><label style={labelStyle}>Phone</label><input value={form.contact_phone} onChange={e => setForm({ ...form, contact_phone: e.target.value })} style={inputStyle} placeholder="+233 XX XXX XXXX" /></div>
+            </div>
             <div style={{ marginBottom: 20 }}><label style={labelStyle}>Notes</label><textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3} style={{ ...inputStyle, resize: "vertical" }} placeholder="Follow-up notes, strategy, contact info..." /></div>
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={handleAdd} disabled={saving || !form.company} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, opacity: !form.company ? 0.5 : 1 }}>{saving ? "Saving..." : "Add Opportunity"}</button>
@@ -2782,6 +2797,11 @@ const OpportunitiesView = ({ user, onNavigate }) => {
               </div>
             </div>
             <div style={{ marginBottom: 14 }}><label style={labelStyle}>Event Fit</label><input value={editModal.event_fit || ""} onChange={e => setEditModal({ ...editModal, event_fit: e.target.value })} style={inputStyle} /></div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
+              <div><label style={labelStyle}>Contact Name</label><input value={editModal.contact_name || ""} onChange={e => setEditModal({ ...editModal, contact_name: e.target.value })} style={inputStyle} placeholder="John Mensah" /></div>
+              <div><label style={labelStyle}>Email</label><input value={editModal.contact_email || ""} onChange={e => setEditModal({ ...editModal, contact_email: e.target.value })} style={inputStyle} placeholder="john@company.com" /></div>
+              <div><label style={labelStyle}>Phone</label><input value={editModal.contact_phone || ""} onChange={e => setEditModal({ ...editModal, contact_phone: e.target.value })} style={inputStyle} placeholder="+233 XX XXX XXXX" /></div>
+            </div>
             <div style={{ marginBottom: 20 }}><label style={labelStyle}>Notes / Follow-up</label><textarea value={editModal.notes || ""} onChange={e => setEditModal({ ...editModal, notes: e.target.value })} rows={3} style={{ ...inputStyle, resize: "vertical" }} /></div>
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={handleUpdate} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>{saving ? "Saving..." : "Save Changes"}</button>

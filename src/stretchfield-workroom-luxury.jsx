@@ -1259,7 +1259,7 @@ const CEOClientFinanceView = ({ user }) => {
     setInvoices(inv.data || []);
   };
 
-  useEffect(() => { load(); loadLeadsOpps(); }, []);
+  useEffect(() => { load(); }, []);
 
   const clientEvents = events.filter(e => e.client_id === selectedClient);
   const currentBudget = budgets.find(b => b.project_id === selectedEvent && b.client_id === selectedClient);

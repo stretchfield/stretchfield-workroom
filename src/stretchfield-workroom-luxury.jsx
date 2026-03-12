@@ -5369,50 +5369,17 @@ const CalendarView = ({ user, onNavigate }) => {
             <button onClick={() => {
               const feedUrl = `https://okbduzenceoknkjqnrha.supabase.co/functions/v1/calendar-feed?user_id=${uid}&apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rYmR1emVuY2Vva25ranFucmhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMzYyMDUsImV4cCI6MjA4NzcxMjIwNX0.rJn54xnpWscM8Y8PIFB50fCyDyyXaNB5y98XYUvzjgU`;
               navigator.clipboard.writeText(feedUrl).then(() => alert(
-                "Calendar URL copied!\n\n" +
-                "To sync to your iPhone:\n" +
-                "1. Open Settings → Calendar → Accounts\n" +
-                "2. Add Account → Other → Add Subscribed Calendar\n" +
-                "3. Paste the URL and tap Next\n\n" +
-                "To sync to Google Calendar (Android):\n" +
-                "1. Open Google Calendar on desktop\n" +
+                "✅ Calendar URL copied!\n\n" +
+                "iPhone Instructions:\n" +
+                "1. Settings → Calendar → Accounts\n" +
+                "2. Add Account → Other\n" +
+                "3. Add Subscribed Calendar\n" +
+                "4. Paste URL → Next → Save\n" +
+                "(Leave username/password blank if asked)\n\n" +
+                "Android / Google Calendar:\n" +
+                "1. Open calendar.google.com on desktop\n" +
                 "2. Other Calendars → + → From URL\n" +
-                "3. Paste the URL and click Add\n\n" +
-                "Calendar auto-refreshes every hour."
-              ));
-            }} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: "none", color: "#fff", padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>📱 Sync to Phone</button>
-          )}
-          {role === "CEO" && (
-            <button onClick={() => {
-              const feedUrl = `https://okbduzenceoknkjqnrha.supabase.co/functions/v1/calendar-feed?user_id=${uid}`;
-              navigator.clipboard.writeText(feedUrl).then(() => alert(
-                "Calendar URL copied!\n\n" +
-                "To sync to your iPhone:\n" +
-                "1. Open Settings → Calendar → Accounts\n" +
-                "2. Add Account → Other → Add Subscribed Calendar\n" +
-                "3. Paste the URL and tap Next\n\n" +
-                "To sync to Google Calendar (Android):\n" +
-                "1. Open Google Calendar on desktop\n" +
-                "2. Other Calendars → + → From URL\n" +
-                "3. Paste the URL and click Add\n\n" +
-                "Calendar auto-refreshes every hour."
-              ));
-            }} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: "none", color: "#fff", padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>📱 Sync to Phone</button>
-          )}
-          {role === "CEO" && (
-            <button onClick={() => {
-              const feedUrl = `https://okbduzenceoknkjqnrha.supabase.co/functions/v1/calendar-feed?user_id=${uid}`;
-              navigator.clipboard.writeText(feedUrl).then(() => alert(
-                "Calendar URL copied!\n\n" +
-                "To sync to your iPhone:\n" +
-                "1. Open Settings → Calendar → Accounts\n" +
-                "2. Add Account → Other → Add Subscribed Calendar\n" +
-                "3. Paste the URL and tap Next\n\n" +
-                "To sync to Google Calendar (Android):\n" +
-                "1. Open Google Calendar on desktop\n" +
-                "2. Other Calendars → + → From URL\n" +
-                "3. Paste the URL and click Add\n\n" +
-                "Calendar auto-refreshes every hour."
+                "3. Paste URL → Add Calendar"
               ));
             }} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: "none", color: "#fff", padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>📱 Sync to Phone</button>
           )}

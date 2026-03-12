@@ -4448,7 +4448,15 @@ const CRMView = ({ user }) => {
                   <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{lead.company}</div>
                   <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>{lead.contact_name}{lead.phone ? " · " + lead.phone : ""}</div>
                 </div>
-                <span style={{ background: (statusColors[lead.status] || T.cyan) + "20", color: statusColors[lead.status] || T.cyan, padding: "3px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", flexShrink: 0, marginLeft: 8 }}>{lead.status}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, marginLeft: 8 }}>
+                  <span style={{ background: (statusColors[lead.status] || T.cyan) + "20", color: statusColors[lead.status] || T.cyan, padding: "3px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>{lead.status}</span>
+                  {user?.role === "CEO" && (
+                    <button onClick={async (e) => { e.stopPropagation(); if (!window.confirm(`Delete lead "${lead.company}"? This cannot be undone.`)) return; await supabase.from("leads").delete().eq("id", lead.id); if (selectedLead?.id === lead.id) setSelectedLead(null); load(); }}
+                      style={{ background: T.red + "18", border: `1px solid ${T.red}40`, color: T.red, width: 24, height: 24, borderRadius: 6, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, flexShrink: 0 }}
+                      onMouseEnter={e => e.currentTarget.style.background = T.red + "35"}
+                      onMouseLeave={e => e.currentTarget.style.background = T.red + "18"}>×</button>
+                  )}
+                </div>
               </div>
               <div style={{ color: T.gold, fontWeight: 900, fontSize: 16, marginBottom: 10 }}>GHS {(lead.value || 0).toLocaleString()}</div>
               <div style={{ display: "flex", gap: 12, paddingTop: 8, borderTop: `1px solid ${T.border}44` }}>

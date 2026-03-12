@@ -519,11 +519,11 @@ const getNavItems = (role) => {
   if (["Sales & Marketing"].includes(role)) {
     base.push({ id: "events", label: "Events", icon: "▪" });
   }
-  if (["CEO","Administrator","Sales & Marketing"].includes(role)) {
-    base.push({ id: "crm", label: "CRM / Leads", icon: "▪" }, { id: "crm-insights", label: "CRM Insights", icon: "▪" }, { id: "sm-tasks", label: "S&M Tasks", icon: "▪" });
-  }
   if (["CEO","Sales & Marketing"].includes(role)) {
     base.push({ id: "opportunities", label: "Opportunities", icon: "▪" });
+  }
+  if (["CEO","Administrator","Sales & Marketing"].includes(role)) {
+    base.push({ id: "crm", label: "CRM / Leads", icon: "▪" }, { id: "crm-insights", label: "CRM Insights", icon: "▪" }, { id: "sm-tasks", label: "S&M Tasks", icon: "▪" });
   }
   if (["Strategy & Events Lead"].includes(role)) {
     base.push({ id: "strategy-overview", label: "Client Overview", icon: "▪" }, { id: "feedback-summary", label: "Feedback", icon: "▪" });
@@ -2505,7 +2505,7 @@ const EventsView = ({ user }) => {
 };
 
 
-const OpportunitiesView = ({ user }) => {
+const OpportunitiesView = ({ user, onNavigate }) => {
   const [opportunities, setOpportunities] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [search, setSearch] = useState("");
@@ -2570,23 +2570,30 @@ const OpportunitiesView = ({ user }) => {
   };
 
   const handleConvert = async (opp) => {
-    if (!window.confirm(`Convert ${opp.company} to a Lead?`)) return;
+    if (!window.confirm(`Convert ${opp.company} to a Lead? It will appear in the CRM Pipeline.`)) return;
     setSaving(true);
-    const { data: lead } = await supabase.from("leads").insert({
+    const { data: lead, error } = await supabase.from("leads").insert({
       company: opp.company,
       sector: opp.sector,
       status: "new",
       value: 0,
-      notes: opp.notes,
+      notes: `Converted from Opportunities.\n\nEvent Fit: ${opp.event_fit || ""}\n\nNotes: ${opp.notes || ""}`,
+      source: "Opportunities Portal",
       created_by: user?.id,
     }).select().single();
-    await supabase.from("opportunities").update({
-      status: "Converted",
-      converted_lead_id: lead?.id,
-      updated_at: new Date().toISOString(),
-    }).eq("id", opp.id);
-    setSaving(false);
-    load();
+    if (!error && lead) {
+      await supabase.from("opportunities").update({
+        status: "Converted",
+        converted_lead_id: lead.id,
+        updated_at: new Date().toISOString(),
+      }).eq("id", opp.id);
+      setSaving(false);
+      load();
+      // Navigate to CRM tab
+      if (onNavigate) onNavigate("crm");
+    } else {
+      setSaving(false);
+    }
   };
 
   const inputStyle = { width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
@@ -5349,7 +5356,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "crm-insights": return ["CEO","Administrator"].includes(currentUser.role) ? <CRMDashboardCEO user={currentUser} /> : <CRMDashboardSM user={currentUser} />;
       case "sm-tasks": return <SMTasksView user={currentUser} />;
       case "strategy-overview": return <StrategyOverviewView />;
-      case "opportunities": return <OpportunitiesView user={currentUser} />;
+      case "opportunities": return <OpportunitiesView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
       case "client-financials": return <CEOClientFinanceView user={currentUser} />;
       case "client-finance": return <ClientFinanceView user={currentUser} />;
       case "feedback-summary": return <FeedbackView userRole={currentUser.role} />;

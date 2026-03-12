@@ -5365,6 +5365,57 @@ const CalendarView = ({ user, onNavigate }) => {
           {["CEO","Sales & Marketing"].includes(role) && (
             <button onClick={() => setItinModal(true)} style={{ background: `linear-gradient(135deg, #F472B6, #E879F9)`, border: "none", color: "#fff", padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>+ Create Itinerary</button>
           )}
+          {role === "CEO" && (
+            <button onClick={() => {
+              const feedUrl = `https://okbduzenceoknkjqnrha.supabase.co/functions/v1/calendar-feed?user_id=${uid}`;
+              navigator.clipboard.writeText(feedUrl).then(() => alert(
+                "Calendar URL copied!\n\n" +
+                "To sync to your iPhone:\n" +
+                "1. Open Settings → Calendar → Accounts\n" +
+                "2. Add Account → Other → Add Subscribed Calendar\n" +
+                "3. Paste the URL and tap Next\n\n" +
+                "To sync to Google Calendar (Android):\n" +
+                "1. Open Google Calendar on desktop\n" +
+                "2. Other Calendars → + → From URL\n" +
+                "3. Paste the URL and click Add\n\n" +
+                "Calendar auto-refreshes every hour."
+              ));
+            }} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: "none", color: "#fff", padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>📱 Sync to Phone</button>
+          )}
+          {role === "CEO" && (
+            <button onClick={() => {
+              const feedUrl = `https://okbduzenceoknkjqnrha.supabase.co/functions/v1/calendar-feed?user_id=${uid}`;
+              navigator.clipboard.writeText(feedUrl).then(() => alert(
+                "Calendar URL copied!\n\n" +
+                "To sync to your iPhone:\n" +
+                "1. Open Settings → Calendar → Accounts\n" +
+                "2. Add Account → Other → Add Subscribed Calendar\n" +
+                "3. Paste the URL and tap Next\n\n" +
+                "To sync to Google Calendar (Android):\n" +
+                "1. Open Google Calendar on desktop\n" +
+                "2. Other Calendars → + → From URL\n" +
+                "3. Paste the URL and click Add\n\n" +
+                "Calendar auto-refreshes every hour."
+              ));
+            }} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: "none", color: "#fff", padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>📱 Sync to Phone</button>
+          )}
+          {role === "CEO" && (
+            <button onClick={() => {
+              const feedUrl = `https://okbduzenceoknkjqnrha.supabase.co/functions/v1/calendar-feed?user_id=${uid}`;
+              navigator.clipboard.writeText(feedUrl).then(() => alert(
+                "Calendar URL copied!\n\n" +
+                "To sync to your iPhone:\n" +
+                "1. Open Settings → Calendar → Accounts\n" +
+                "2. Add Account → Other → Add Subscribed Calendar\n" +
+                "3. Paste the URL and tap Next\n\n" +
+                "To sync to Google Calendar (Android):\n" +
+                "1. Open Google Calendar on desktop\n" +
+                "2. Other Calendars → + → From URL\n" +
+                "3. Paste the URL and click Add\n\n" +
+                "Calendar auto-refreshes every hour."
+              ));
+            }} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: "none", color: "#fff", padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>📱 Sync to Phone</button>
+          )}
           {/* Legend */}
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
             {Object.entries(typeColors).map(([type, color]) => (

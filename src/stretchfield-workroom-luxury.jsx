@@ -520,7 +520,10 @@ const getNavItems = (role) => {
     base.push({ id: "events", label: "Events", icon: "▪" });
   }
   if (["CEO","Administrator","Sales & Marketing"].includes(role)) {
-    base.push({ id: "crm", label: "CRM", icon: "▪" }, { id: "crm-insights", label: "CRM Insights", icon: "▪" }, { id: "sm-tasks", label: "S&M Tasks", icon: "▪" });
+    base.push({ id: "crm", label: "CRM / Leads", icon: "▪" }, { id: "crm-insights", label: "CRM Insights", icon: "▪" }, { id: "sm-tasks", label: "S&M Tasks", icon: "▪" });
+  }
+  if (["CEO","Sales & Marketing"].includes(role)) {
+    base.push({ id: "opportunities", label: "Opportunities", icon: "▪" });
   }
   if (["Strategy & Events Lead"].includes(role)) {
     base.push({ id: "strategy-overview", label: "Client Overview", icon: "▪" }, { id: "feedback-summary", label: "Feedback", icon: "▪" });
@@ -2496,6 +2499,287 @@ const EventsView = ({ user }) => {
             <Btn variant="ghost" onClick={() => setModal(false)}>Cancel</Btn>
           </div>
         </Modal>
+      )}
+    </div>
+  );
+};
+
+
+const OpportunitiesView = ({ user }) => {
+  const [opportunities, setOpportunities] = useState([]);
+  const [filtered, setFiltered] = useState([]);
+  const [search, setSearch] = useState("");
+  const [sectorFilter, setSectorFilter] = useState("all");
+  const [presenceFilter, setPresenceFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [modal, setModal] = useState(false);
+  const [editModal, setEditModal] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ company: "", sector: "", presence: "GH", event_fit: "", notes: "", status: "New" });
+
+  const canManage = ["CEO", "Sales & Marketing"].includes(user?.role);
+
+  const load = async () => {
+    const { data } = await supabase.from("opportunities").select("*").order("company");
+    setOpportunities(data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    let f = [...opportunities];
+    if (search) f = f.filter(o => o.company.toLowerCase().includes(search.toLowerCase()) || o.sector?.toLowerCase().includes(search.toLowerCase()));
+    if (sectorFilter !== "all") f = f.filter(o => o.sector === sectorFilter);
+    if (presenceFilter !== "all") f = f.filter(o => o.presence === presenceFilter);
+    if (statusFilter !== "all") f = f.filter(o => o.status === statusFilter);
+    setFiltered(f);
+  }, [opportunities, search, sectorFilter, presenceFilter, statusFilter]);
+
+  const sectors = [...new Set(opportunities.map(o => o.sector).filter(Boolean))].sort();
+  const statuses = ["New", "Contacted", "Qualified", "Converted"];
+  const statusColors = { New: T.cyan, Contacted: T.amber, Qualified: T.teal, Converted: "#10B981" };
+  const presenceColors = { GH: T.cyan, NG: T.amber, KE: T.teal };
+
+  const handleAdd = async () => {
+    if (!form.company) return;
+    setSaving(true);
+    await supabase.from("opportunities").insert({ ...form });
+    setSaving(false);
+    setModal(false);
+    setForm({ company: "", sector: "", presence: "GH", event_fit: "", notes: "", status: "New" });
+    load();
+  };
+
+  const handleUpdate = async () => {
+    setSaving(true);
+    await supabase.from("opportunities").update({
+      company: editModal.company, sector: editModal.sector,
+      presence: editModal.presence, event_fit: editModal.event_fit,
+      notes: editModal.notes, status: editModal.status,
+      updated_at: new Date().toISOString(),
+    }).eq("id", editModal.id);
+    setSaving(false);
+    setEditModal(null);
+    load();
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Remove this opportunity?")) return;
+    await supabase.from("opportunities").delete().eq("id", id);
+    load();
+  };
+
+  const handleConvert = async (opp) => {
+    if (!window.confirm(`Convert ${opp.company} to a Lead?`)) return;
+    setSaving(true);
+    const { data: lead } = await supabase.from("leads").insert({
+      company: opp.company,
+      sector: opp.sector,
+      status: "new",
+      value: 0,
+      notes: opp.notes,
+      created_by: user?.id,
+    }).select().single();
+    await supabase.from("opportunities").update({
+      status: "Converted",
+      converted_lead_id: lead?.id,
+      updated_at: new Date().toISOString(),
+    }).eq("id", opp.id);
+    setSaving(false);
+    load();
+  };
+
+  const inputStyle = { width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
+  const labelStyle = { color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 };
+
+  const PresencePills = ({ presence }) => (
+    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+      {(presence || "").split("+").map(p => (
+        <span key={p} style={{ background: (presenceColors[p] || T.textMuted) + "18", color: presenceColors[p] || T.textMuted, border: `1px solid ${presenceColors[p] || T.textMuted}30`, borderRadius: 20, padding: "1px 8px", fontSize: 9, fontWeight: 800 }}>{p}</span>
+      ))}
+    </div>
+  );
+
+  const converted = opportunities.filter(o => o.status === "Converted").length;
+  const qualified = opportunities.filter(o => o.status === "Qualified").length;
+  const contacted = opportunities.filter(o => o.status === "Contacted").length;
+  const panAfrica = opportunities.filter(o => o.presence === "GH+NG+KE").length;
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>CRM</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Opportunities</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{opportunities.length} target companies · {converted} converted to leads</div>
+        </div>
+        {canManage && (
+          <button onClick={() => setModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, letterSpacing: "0.06em" }}>+ Add Opportunity</button>
+        )}
+      </div>
+
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Total", value: opportunities.length, color: T.blue },
+          { label: "Contacted", value: contacted, color: T.amber },
+          { label: "Qualified", value: qualified, color: T.teal },
+          { label: "Converted", value: converted, color: "#10B981" },
+          { label: "Pan-Africa", value: panAfrica, color: T.magenta },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 20, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search company or sector..." style={{ ...inputStyle, width: 220, flex: "none" }} />
+        <select value={sectorFilter} onChange={e => setSectorFilter(e.target.value)} style={{ ...inputStyle, width: "auto", flex: "none" }}>
+          <option value="all">All Sectors</option>
+          {sectors.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={presenceFilter} onChange={e => setPresenceFilter(e.target.value)} style={{ ...inputStyle, width: "auto", flex: "none" }}>
+          <option value="all">All Presence</option>
+          <option value="GH+NG+KE">GH + NG + KE</option>
+          <option value="GH+NG">GH + NG</option>
+          <option value="GH+KE">GH + KE</option>
+          <option value="GH">GH Only</option>
+        </select>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ ...inputStyle, width: "auto", flex: "none" }}>
+          <option value="all">All Status</option>
+          {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <span style={{ color: T.textMuted, fontSize: 11, marginLeft: "auto" }}>{filtered.length} results</span>
+      </div>
+
+      {/* Table */}
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${T.border}`, background: T.bg }}>
+                {["Company", "Sector", "Presence", "Event Fit", "Notes", "Status", ""].map((h, i) => (
+                  <th key={i} style={{ padding: "12px 16px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((o, i) => {
+                const statusColor = statusColors[o.status] || T.textMuted;
+                return (
+                  <tr key={o.id} style={{ borderBottom: i < filtered.length - 1 ? `1px solid ${T.border}44` : "none", transition: "background 0.15s" }}
+                    onMouseEnter={e => e.currentTarget.style.background = T.bg}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                    <td style={{ padding: "12px 16px" }}>
+                      <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{o.company}</div>
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <span style={{ color: T.textMuted, fontSize: 12 }}>{o.sector}</span>
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <PresencePills presence={o.presence} />
+                    </td>
+                    <td style={{ padding: "12px 16px", maxWidth: 200 }}>
+                      <span style={{ color: T.textSecondary, fontSize: 12, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{o.event_fit}</span>
+                    </td>
+                    <td style={{ padding: "12px 16px", maxWidth: 200 }}>
+                      <span style={{ color: T.textMuted, fontSize: 12, fontStyle: "italic", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{o.notes}</span>
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <span style={{ background: statusColor + "18", color: statusColor, border: `1px solid ${statusColor}30`, borderRadius: 20, padding: "3px 10px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap" }}>{o.status}</span>
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      {canManage && (
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button onClick={() => setEditModal({ ...o })} style={{ background: T.cyan + "15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>Edit</button>
+                          {o.status !== "Converted" && (
+                            <button onClick={() => handleConvert(o)} style={{ background: "#10B98115", border: "1px solid #10B98130", color: "#10B981", padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>→ Lead</button>
+                          )}
+                          <button onClick={() => handleDelete(o.id)} style={{ background: T.red + "15", border: `1px solid ${T.red}30`, color: T.red, padding: "4px 8px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>×</button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {filtered.length === 0 && (
+            <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted, fontSize: 13 }}>No opportunities match your filters.</div>
+          )}
+        </div>
+      </div>
+
+      {/* Add Modal */}
+      {modal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setModal(false)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 540, padding: 28, boxShadow: `0 24px 80px rgba(0,0,0,0.4)`, animation: "fadeUp 0.25s ease" }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 20 }}>Add Opportunity</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+              <div><label style={labelStyle}>Company Name</label><input value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} style={inputStyle} placeholder="e.g. Ecobank Ghana" /></div>
+              <div><label style={labelStyle}>Sector</label><input value={form.sector} onChange={e => setForm({ ...form, sector: e.target.value })} style={inputStyle} placeholder="e.g. Banking" /></div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+              <div><label style={labelStyle}>Presence</label>
+                <select value={form.presence} onChange={e => setForm({ ...form, presence: e.target.value })} style={inputStyle}>
+                  <option value="GH">GH Only</option>
+                  <option value="GH+NG">GH + NG</option>
+                  <option value="GH+KE">GH + KE</option>
+                  <option value="GH+NG+KE">GH + NG + KE</option>
+                </select>
+              </div>
+              <div><label style={labelStyle}>Status</label>
+                <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} style={inputStyle}>
+                  {statuses.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Event Fit</label><input value={form.event_fit} onChange={e => setForm({ ...form, event_fit: e.target.value })} style={inputStyle} placeholder="e.g. Brand activations, product launches" /></div>
+            <div style={{ marginBottom: 20 }}><label style={labelStyle}>Notes</label><textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3} style={{ ...inputStyle, resize: "vertical" }} placeholder="Follow-up notes, strategy, contact info..." /></div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={handleAdd} disabled={saving || !form.company} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, opacity: !form.company ? 0.5 : 1 }}>{saving ? "Saving..." : "Add Opportunity"}</button>
+              <button onClick={() => setModal(false)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setEditModal(null)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 540, padding: 28, boxShadow: `0 24px 80px rgba(0,0,0,0.4)`, animation: "fadeUp 0.25s ease" }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 20 }}>Edit — {editModal.company}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+              <div><label style={labelStyle}>Company Name</label><input value={editModal.company} onChange={e => setEditModal({ ...editModal, company: e.target.value })} style={inputStyle} /></div>
+              <div><label style={labelStyle}>Sector</label><input value={editModal.sector || ""} onChange={e => setEditModal({ ...editModal, sector: e.target.value })} style={inputStyle} /></div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+              <div><label style={labelStyle}>Presence</label>
+                <select value={editModal.presence || "GH"} onChange={e => setEditModal({ ...editModal, presence: e.target.value })} style={inputStyle}>
+                  <option value="GH">GH Only</option>
+                  <option value="GH+NG">GH + NG</option>
+                  <option value="GH+KE">GH + KE</option>
+                  <option value="GH+NG+KE">GH + NG + KE</option>
+                </select>
+              </div>
+              <div><label style={labelStyle}>Status</label>
+                <select value={editModal.status || "New"} onChange={e => setEditModal({ ...editModal, status: e.target.value })} style={inputStyle}>
+                  {statuses.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Event Fit</label><input value={editModal.event_fit || ""} onChange={e => setEditModal({ ...editModal, event_fit: e.target.value })} style={inputStyle} /></div>
+            <div style={{ marginBottom: 20 }}><label style={labelStyle}>Notes / Follow-up</label><textarea value={editModal.notes || ""} onChange={e => setEditModal({ ...editModal, notes: e.target.value })} rows={3} style={{ ...inputStyle, resize: "vertical" }} /></div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={handleUpdate} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>{saving ? "Saving..." : "Save Changes"}</button>
+              <button onClick={() => setEditModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -5065,6 +5349,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "crm-insights": return ["CEO","Administrator"].includes(currentUser.role) ? <CRMDashboardCEO user={currentUser} /> : <CRMDashboardSM user={currentUser} />;
       case "sm-tasks": return <SMTasksView user={currentUser} />;
       case "strategy-overview": return <StrategyOverviewView />;
+      case "opportunities": return <OpportunitiesView user={currentUser} />;
       case "client-financials": return <CEOClientFinanceView user={currentUser} />;
       case "client-finance": return <ClientFinanceView user={currentUser} />;
       case "feedback-summary": return <FeedbackView userRole={currentUser.role} />;

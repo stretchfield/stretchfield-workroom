@@ -5217,16 +5217,14 @@ const CalendarView = ({ user, onNavigate }) => {
   };
 
   const loadLeadsOpps = async () => {
-    if (["CEO","Sales & Marketing"].includes(role)) {
-      const [{ data: l }, { data: o }, { data: itins }] = await Promise.all([
-        supabase.from("leads").select("id, company, contact_name, status"),
-        supabase.from("opportunities").select("id, company, sector, status").neq("status","Converted"),
-        supabase.from("itineraries").select("*").eq("created_by", uid).order("created_at", { ascending: false }),
-      ]);
-      setLeads(l || []);
-      setOpps(o || []);
-      setItineraries(itins || []);
-    }
+    const [{ data: l }, { data: o }, { data: itins }] = await Promise.all([
+      supabase.from("leads").select("id, company, contact_name, status"),
+      supabase.from("opportunities").select("id, company, sector, status").neq("status","Converted"),
+      uid ? supabase.from("itineraries").select("*").eq("created_by", uid).order("created_at", { ascending: false }) : Promise.resolve({ data: [] }),
+    ]);
+    setLeads(l || []);
+    setOpps(o || []);
+    setItineraries(itins || []);
   };
 
   const load = async () => {

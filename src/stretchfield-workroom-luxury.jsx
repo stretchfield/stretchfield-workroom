@@ -537,7 +537,7 @@ const getNavItems = (role) => {
   if (["CEO","Administrator","Vendor Manager","Finance Manager"].includes(role)) {
     base.push({ id: "invoices", label: "Invoices", icon: "▪" });
   }
-  if (["CEO"].includes(role)) {
+  if (["CEO", "Finance Manager"].includes(role)) {
     base.push({ id: "zoho-books", label: "Zoho Books", icon: "▪" });
   }
   if (["CEO","Administrator","Finance Manager"].includes(role)) {

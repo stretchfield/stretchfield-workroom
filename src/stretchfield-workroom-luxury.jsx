@@ -1538,6 +1538,12 @@ const CEOClientFinanceView = ({ user }) => {
                   ))}
                 </div>
               )}
+              {data.length > 0 && (
+                <div style={{ padding: "12px 16px", borderTop: `1px solid ${T.border}`, background: T.bg, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ color: T.textMuted, fontSize: 11 }}>{data.length} records · Read-only view · Create and edit in Zoho Books</span>
+                  <a href="https://books.zoho.com" target="_blank" rel="noopener noreferrer" style={{ color: "#E67E22", fontSize: 11, fontWeight: 700, textDecoration: "none" }}>Open Zoho Books ↗</a>
+                </div>
+              )}
             </div>
           )}
         </>
@@ -5348,6 +5354,7 @@ const ZohoBooksView = ({ user }) => {
             <a href="/api/zoho-auth" style={{ background: `linear-gradient(135deg, #E67E22, #F39C12)`, border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, textDecoration: "none" }}>Connect Zoho Books</a>
           )}
           {connected && <button onClick={() => { if (tab !== "sync") fetchTab(tab); }} style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.textMuted, padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>↻ Refresh</button>}
+          {connected && <a href="https://books.zoho.com" target="_blank" rel="noopener noreferrer" style={{ background: `linear-gradient(135deg, #E67E22, #F39C12)`, color: "#fff", padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>Open Zoho Books ↗</a>}
         </div>
       </div>
 
@@ -5423,7 +5430,7 @@ const ZohoBooksView = ({ user }) => {
               {loading ? (
                 <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted }}>Loading from Zoho Books...</div>
               ) : data.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted, fontSize: 13 }}>No {tab} found in Zoho Books.</div>
+                <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted, fontSize: 13 }}>No {tab} found in Zoho Books. <a href="https://books.zoho.com" target="_blank" rel="noopener noreferrer" style={{ color: "#E67E22", fontWeight: 700 }}>Create one in Zoho Books ↗</a></div>
               ) : (
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>

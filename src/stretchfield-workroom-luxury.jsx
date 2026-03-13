@@ -537,6 +537,9 @@ const getNavItems = (role) => {
   if (["CEO","Administrator","Vendor Manager","Finance Manager"].includes(role)) {
     base.push({ id: "invoices", label: "Invoices", icon: "▪" });
   }
+  if (["CEO"].includes(role)) {
+    base.push({ id: "zoho-books", label: "Zoho Books", icon: "▪" });
+  }
   if (["CEO","Administrator","Finance Manager"].includes(role)) {
     base.push({ id: "finance", label: "Finance", icon: "▪" });
   }
@@ -5187,6 +5190,281 @@ const ClientFeedbackForm = ({ event, user }) => {
 
 
 
+
+const ZohoBooksView = ({ user }) => {
+  const [connected, setConnected] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [tab, setTab] = useState("invoices");
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState("");
+  const [clients, setClients] = useState([]);
+  const [vendors, setVendors] = useState([]);
+
+  const tabs = [
+    { id: "invoices", label: "Invoices" },
+    { id: "estimates", label: "Quotes / Estimates" },
+    { id: "payments", label: "Payments Received" },
+    { id: "expenses", label: "Expenses" },
+    { id: "bills", label: "Bills" },
+    { id: "purchaseorders", label: "Purchase Orders" },
+    { id: "contacts", label: "Contacts" },
+    { id: "sync", label: "⟳ Sync" },
+  ];
+
+  const checkConnection = async () => {
+    setChecking(true);
+    try {
+      const res = await fetch("/api/zoho-sync?action=status");
+      const json = await res.json();
+      setConnected(!!json.connected);
+    } catch {
+      setConnected(false);
+    }
+    setChecking(false);
+  };
+
+  const fetchTab = async (t) => {
+    setLoading(true);
+    setData([]);
+    try {
+      const res = await fetch(`/api/zoho-sync?action=${t}`);
+      const json = await res.json();
+      const key = Object.keys(json).find(k => Array.isArray(json[k]));
+      setData(key ? json[key] : []);
+    } catch {
+      setData([]);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    checkConnection();
+    // Check if just connected via OAuth callback
+    if (window.location.search.includes("zoho=connected")) {
+      setSyncMsg("✅ Zoho Books connected successfully!");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (connected && tab !== "sync") fetchTab(tab);
+  }, [connected, tab]);
+
+  const loadLocalData = async () => {
+    const [{ data: cl }, { data: vn }] = await Promise.all([
+      supabase.from("clients").select("*").order("name"),
+      supabase.from("profiles").select("*").eq("role", "Vendor"),
+    ]);
+    setClients(cl || []);
+    setVendors(vn || []);
+  };
+
+  useEffect(() => { loadLocalData(); }, []);
+
+  const syncClient = async (client) => {
+    setSyncing(true);
+    setSyncMsg("");
+    try {
+      const res = await fetch("/api/zoho-sync?action=sync-client", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client }),
+      });
+      const json = await res.json();
+      if (json.contact) setSyncMsg(`✅ ${client.name} synced to Zoho Books`);
+      else setSyncMsg(`⚠ ${json.message || "Sync failed"}`);
+    } catch (e) {
+      setSyncMsg("❌ Error: " + e.message);
+    }
+    setSyncing(false);
+  };
+
+  const syncVendor = async (vendor) => {
+    setSyncing(true);
+    setSyncMsg("");
+    try {
+      const res = await fetch("/api/zoho-sync?action=sync-vendor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vendor }),
+      });
+      const json = await res.json();
+      if (json.contact) setSyncMsg(`✅ ${vendor.name} synced to Zoho Books`);
+      else setSyncMsg(`⚠ ${json.message || "Sync failed"}`);
+    } catch (e) {
+      setSyncMsg("❌ Error: " + e.message);
+    }
+    setSyncing(false);
+  };
+
+  // Column definitions per tab
+  const columns = {
+    invoices: ["Invoice #", "Customer", "Date", "Due Date", "Amount", "Status"],
+    estimates: ["Estimate #", "Customer", "Date", "Expiry", "Amount", "Status"],
+    payments: ["Payment #", "Customer", "Date", "Amount", "Mode"],
+    expenses: ["Date", "Category", "Description", "Amount", "Status"],
+    bills: ["Bill #", "Vendor", "Date", "Due Date", "Amount", "Status"],
+    purchaseorders: ["PO #", "Vendor", "Date", "Expected", "Amount", "Status"],
+    contacts: ["Name", "Type", "Email", "Phone", "Balance"],
+  };
+
+  const getRow = (item, t) => {
+    if (t === "invoices") return [item.invoice_number, item.customer_name, item.date, item.due_date, `${item.currency_code} ${(item.total || 0).toLocaleString()}`, item.status];
+    if (t === "estimates") return [item.estimate_number, item.customer_name, item.date, item.expiry_date, `${item.currency_code} ${(item.total || 0).toLocaleString()}`, item.status];
+    if (t === "payments") return [item.payment_number, item.customer_name, item.date, `${item.currency_code} ${(item.amount || 0).toLocaleString()}`, item.payment_mode];
+    if (t === "expenses") return [item.date, item.account_name, item.description || item.reference_number, `${item.currency_code} ${(item.total || 0).toLocaleString()}`, item.status];
+    if (t === "bills") return [item.bill_number, item.vendor_name, item.date, item.due_date, `${item.currency_code} ${(item.total || 0).toLocaleString()}`, item.status];
+    if (t === "purchaseorders") return [item.purchaseorder_number, item.vendor_name, item.date, item.delivery_date, `${item.currency_code} ${(item.total || 0).toLocaleString()}`, item.status];
+    if (t === "contacts") return [item.contact_name, item.contact_type, item.email, item.phone, `${item.currency_code || ""} ${(item.outstanding_receivable_amount || 0).toLocaleString()}`];
+    return [];
+  };
+
+  const statusColor = (s) => {
+    if (!s) return T.textMuted;
+    const sl = s.toLowerCase();
+    if (["paid","accepted","received","open"].includes(sl)) return T.teal;
+    if (["overdue","expired"].includes(sl)) return T.red;
+    if (["draft","pending","sent"].includes(sl)) return T.amber;
+    return T.textMuted;
+  };
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Zoho Books</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Live sync with your Zoho Books Professional account</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {checking ? (
+            <span style={{ color: T.textMuted, fontSize: 12 }}>Checking connection...</span>
+          ) : connected ? (
+            <span style={{ background: T.teal + "18", color: T.teal, border: `1px solid ${T.teal}30`, borderRadius: 20, padding: "4px 14px", fontSize: 11, fontWeight: 700 }}>● Connected</span>
+          ) : (
+            <a href="/api/zoho-auth" style={{ background: `linear-gradient(135deg, #E67E22, #F39C12)`, border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, textDecoration: "none" }}>Connect Zoho Books</a>
+          )}
+          {connected && <button onClick={() => { if (tab !== "sync") fetchTab(tab); }} style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.textMuted, padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>↻ Refresh</button>}
+        </div>
+      </div>
+
+      {!connected && !checking && (
+        <div style={{ textAlign: "center", padding: "60px 0", background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>📚</div>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 18, marginBottom: 8 }}>Connect Zoho Books</div>
+          <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 24 }}>Click "Connect Zoho Books" above to authorise access to your account.</div>
+          <a href="/api/zoho-auth" style={{ background: `linear-gradient(135deg, #E67E22, #F39C12)`, color: "#fff", padding: "12px 28px", borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: "none" }}>Connect Now</a>
+        </div>
+      )}
+
+      {connected && (
+        <>
+          {/* Tabs */}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
+            {tabs.map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)} style={{
+                padding: "6px 16px", borderRadius: 20, cursor: "pointer", fontSize: 11, fontWeight: 700,
+                border: `1px solid ${tab === t.id ? "#E67E22" : T.border}`,
+                background: tab === t.id ? "#E67E2220" : "none",
+                color: tab === t.id ? "#E67E22" : T.textMuted,
+                letterSpacing: "0.04em", textTransform: "uppercase", transition: "all 0.15s",
+              }}>{t.label}</button>
+            ))}
+          </div>
+
+          {/* Sync tab */}
+          {tab === "sync" && (
+            <div>
+              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 16, marginBottom: 16 }}>Sync WorkRoom Data to Zoho Books</div>
+              {syncMsg && <div style={{ padding: "10px 14px", background: T.teal + "12", border: `1px solid ${T.teal}30`, borderRadius: 8, color: T.teal, fontSize: 13, marginBottom: 16 }}>{syncMsg}</div>}
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                {/* Clients */}
+                <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 20 }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Clients → Zoho Customers</div>
+                  <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 14 }}>Push WorkRoom clients to Zoho Books as customer contacts</div>
+                  {clients.map(c => (
+                    <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: `1px solid ${T.border}44` }}>
+                      <div>
+                        <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{c.name}</div>
+                        <div style={{ color: T.textMuted, fontSize: 11 }}>{c.email}</div>
+                      </div>
+                      <button onClick={() => syncClient(c)} disabled={syncing} style={{ background: "#E67E2218", border: "1px solid #E67E2230", color: "#E67E22", padding: "4px 12px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
+                        {c.zoho_contact_id ? "Re-sync" : "→ Zoho"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Vendors */}
+                <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 20 }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Vendors → Zoho Vendors</div>
+                  <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 14 }}>Push WorkRoom vendors to Zoho Books as vendor contacts</div>
+                  {vendors.map(v => (
+                    <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: `1px solid ${T.border}44` }}>
+                      <div>
+                        <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{v.name}</div>
+                        <div style={{ color: T.textMuted, fontSize: 11 }}>{v.email}</div>
+                      </div>
+                      <button onClick={() => syncVendor(v)} disabled={syncing} style={{ background: "#E67E2218", border: "1px solid #E67E2230", color: "#E67E22", padding: "4px 12px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>→ Zoho</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Data table */}
+          {tab !== "sync" && (
+            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+              {loading ? (
+                <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted }}>Loading from Zoho Books...</div>
+              ) : data.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted, fontSize: 13 }}>No {tab} found in Zoho Books.</div>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
+                    <thead>
+                      <tr style={{ borderBottom: `1px solid ${T.border}`, background: T.bg }}>
+                        {(columns[tab] || []).map((h, i) => (
+                          <th key={i} style={{ padding: "12px 16px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.map((item, idx) => {
+                        const row = getRow(item, tab);
+                        return (
+                          <tr key={idx} style={{ borderBottom: idx < data.length - 1 ? `1px solid ${T.border}44` : "none" }}
+                            onMouseEnter={e => e.currentTarget.style.background = T.bg}
+                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                            {row.map((cell, ci) => (
+                              <td key={ci} style={{ padding: "11px 16px", fontSize: 12 }}>
+                                {ci === row.length - 1 && tab !== "contacts" && tab !== "payments" ? (
+                                  <span style={{ background: statusColor(cell) + "18", color: statusColor(cell), border: `1px solid ${statusColor(cell)}30`, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{cell}</span>
+                                ) : (
+                                  <span style={{ color: ci === 0 ? T.textPrimary : T.textSecondary, fontWeight: ci === 0 ? 700 : 400 }}>{cell}</span>
+                                )}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
 const CalendarView = ({ user, onNavigate }) => {
   const [today] = useState(new Date());
   const [current, setCurrent] = useState(new Date());
@@ -5825,6 +6103,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "finance-reports": return <FinanceReportsView user={currentUser} />;
       case "feedback": return <FeedbackView userRole={currentUser.role} />;
       case "calendar": return <CalendarView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
+      case "zoho-books": return <ZohoBooksView user={currentUser} />;
       case "notifications": return <NotificationsView user={currentUser} onNavigate={(tab, resourceId) => { setActiveTab(tab); if (resourceId) setPendingResourceId(resourceId); }} />;
       case "rffs": return <VendorRFFsView user={currentUser} />;
       case "quotes": return <VendorQuotesView user={currentUser} />;

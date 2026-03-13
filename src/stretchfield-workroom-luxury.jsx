@@ -8254,8 +8254,13 @@ const VendorAssignmentView = ({ user }) => {
   // ── Upcoming Events Assignment Dashboard ──
   const today = new Date().toISOString().slice(0,10);
   const upcomingEvents = events
-    .filter(e => e.event_date && e.event_date >= today)
-    .sort((a,b) => a.event_date > b.event_date ? 1 : -1)
+    .filter(e => !e.event_date || e.event_date >= today)
+    .sort((a,b) => {
+      if (!a.event_date && !b.event_date) return 0;
+      if (!a.event_date) return 1;
+      if (!b.event_date) return -1;
+      return a.event_date > b.event_date ? 1 : -1;
+    })
     .slice(0, 3);
 
   const getEventVendorMap = (eventId) => {

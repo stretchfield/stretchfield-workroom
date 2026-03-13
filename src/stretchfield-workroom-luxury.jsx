@@ -546,7 +546,7 @@ const getNavItems = (role) => {
   if (["CEO"].includes(role)) {
     base.push({ id: "client-financials", label: "Client Financials", icon: "▪" });
   }
-  if (["CEO","Head of Operations"].includes(role)) {
+  if (["CEO"].includes(role)) {
     base.push({ id: "clients", label: "Clients", icon: "▪" }, { id: "users", label: "User Management", icon: "▪" });
   }
   if (role === "Vendor") {

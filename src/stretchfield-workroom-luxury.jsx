@@ -8251,6 +8251,26 @@ const VendorAssignmentView = ({ user }) => {
 
   useEffect(() => { load(); }, []);
 
+  // ── Upcoming Events Assignment Dashboard ──
+  const today = new Date().toISOString().slice(0,10);
+  const upcomingEvents = events
+    .filter(e => e.event_date && e.event_date >= today)
+    .sort((a,b) => a.event_date > b.event_date ? 1 : -1)
+    .slice(0, 3);
+
+  const getEventVendorMap = (eventId) => {
+    const eventRffs = rffs.filter(r => r.project_id === eventId);
+    return eventRffs.map(rff => {
+      const rffAssignments = assignments.filter(a => a.rff_id === rff.id);
+      return { rff, vendors: rffAssignments };
+    }).filter(x => x.vendors.length > 0);
+  };
+
+  const daysUntil = (dateStr) => {
+    const diff = Math.ceil((new Date(dateStr) - new Date()) / (1000*60*60*24));
+    return diff;
+  };
+
   const assignedVendorIds = (rffId) => assignments.filter(a => a.rff_id === rffId).map(a => a.vendor_id);
 
   const addVendor = async (rff, vendor) => {

@@ -522,7 +522,7 @@ const getNavItems = (role) => {
   if (["CEO","Sales & Marketing"].includes(role)) {
     base.push({ id: "opportunities", label: "Opportunities", icon: "▪" });
   }
-  if (["CEO","Head of Operations","Sales & Marketing"].includes(role)) {
+  if (["CEO","Sales & Marketing"].includes(role)) {
     base.push({ id: "crm", label: "CRM / Leads", icon: "▪" }, { id: "crm-insights", label: "CRM Insights", icon: "▪" }, { id: "sm-tasks", label: "S&M Tasks", icon: "▪" });
   }
   if (["Strategy & Events Lead"].includes(role)) {
@@ -537,17 +537,17 @@ const getNavItems = (role) => {
   if (["CEO","Head of Operations","Vendor Manager","Finance Manager"].includes(role)) {
     base.push({ id: "invoices", label: "Invoices", icon: "▪" });
   }
-  if (["CEO", "Finance Manager"].includes(role)) {
+  if (["CEO","Finance Manager"].includes(role)) {
     base.push({ id: "zoho-books", label: "Zoho Books", icon: "▪" });
-  }
-  if (["Head of Operations"].includes(role)) {
-    base.push({ id: "invoices", label: "Invoices", icon: "▪" });
   }
   if (["CEO","Head of Operations","Finance Manager"].includes(role)) {
     base.push({ id: "finance", label: "Finance", icon: "▪" });
   }
+  if (["CEO"].includes(role)) {
+    base.push({ id: "client-financials", label: "Client Financials", icon: "▪" });
+  }
   if (["CEO","Head of Operations"].includes(role)) {
-    base.push({ id: "client-financials", label: "Client Financials", icon: "▪" }, { id: "clients", label: "Clients", icon: "▪" }, { id: "users", label: "User Management", icon: "▪" });
+    base.push({ id: "clients", label: "Clients", icon: "▪" }, { id: "users", label: "User Management", icon: "▪" });
   }
   if (role === "Vendor") {
     base.push({ id: "rffs", label: "My RFFs", icon: "▪" }, { id: "quotes", label: "Quotes", icon: "▪" }, { id: "vendor-tasks", label: "My Tasks", icon: "▪" });

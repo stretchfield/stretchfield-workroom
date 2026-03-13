@@ -8,7 +8,7 @@ const LOGO_SRC = "data:image/png;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QBMRXhpZgAA
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const USERS = {
   ceo: { id: "ceo", name: "David Osei", role: "CEO", email: "david@stretchfield.com", avatar: "DO" },
-  admin: { id: "admin", name: "Ama Mensah", role: "Administrator", email: "ama@stretchfield.com", avatar: "AM" },
+  admin: { id: "admin", name: "Ama Mensah", role: "Head of Operations", email: "ama@stretchfield.com", avatar: "AM" },
   vendorMgr: { id: "vendorMgr", name: "Kofi Asante", role: "Vendor Manager", email: "kofi@stretchfield.com", avatar: "KA" },
   events: { id: "events", name: "Abena Boateng", role: "Strategy & Events Lead", email: "abena@stretchfield.com", avatar: "AB" },
   marketing: { id: "marketing", name: "Kwame Darko", role: "Sales & Marketing", email: "kwame@stretchfield.com", avatar: "KD" },
@@ -513,7 +513,7 @@ const Btn = ({ children, onClick, variant = "primary", small }) => {
 // ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 const getNavItems = (role) => {
   const base = [{ id: "dashboard", label: "Dashboard", icon: "▪" }];
-  if (["CEO","Administrator","Vendor Manager","Strategy & Events Lead","Finance Manager"].includes(role)) {
+  if (["CEO","Head of Operations","Vendor Manager","Strategy & Events Lead","Finance Manager"].includes(role)) {
     base.push({ id: "events", label: "Events", icon: "▪" }, { id: "tasks", label: "Event Tasks", icon: "▪" });
   }
   if (["Sales & Marketing"].includes(role)) {
@@ -522,28 +522,31 @@ const getNavItems = (role) => {
   if (["CEO","Sales & Marketing"].includes(role)) {
     base.push({ id: "opportunities", label: "Opportunities", icon: "▪" });
   }
-  if (["CEO","Administrator","Sales & Marketing"].includes(role)) {
+  if (["CEO","Head of Operations","Sales & Marketing"].includes(role)) {
     base.push({ id: "crm", label: "CRM / Leads", icon: "▪" }, { id: "crm-insights", label: "CRM Insights", icon: "▪" }, { id: "sm-tasks", label: "S&M Tasks", icon: "▪" });
   }
   if (["Strategy & Events Lead"].includes(role)) {
     base.push({ id: "strategy-overview", label: "Client Overview", icon: "▪" }, { id: "feedback-summary", label: "Feedback", icon: "▪" });
   }
-  if (["CEO","Administrator"].includes(role)) {
+  if (["CEO","Head of Operations"].includes(role)) {
     base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "rff-approvals", label: "RFF Approvals", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" });
   }
   if (role === "Vendor Manager") {
     base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" });
   }
-  if (["CEO","Administrator","Vendor Manager","Finance Manager"].includes(role)) {
+  if (["CEO","Head of Operations","Vendor Manager","Finance Manager"].includes(role)) {
     base.push({ id: "invoices", label: "Invoices", icon: "▪" });
   }
   if (["CEO", "Finance Manager"].includes(role)) {
     base.push({ id: "zoho-books", label: "Zoho Books", icon: "▪" });
   }
-  if (["CEO","Administrator","Finance Manager"].includes(role)) {
+  if (["Head of Operations"].includes(role)) {
+    base.push({ id: "invoices", label: "Invoices", icon: "▪" });
+  }
+  if (["CEO","Head of Operations","Finance Manager"].includes(role)) {
     base.push({ id: "finance", label: "Finance", icon: "▪" });
   }
-  if (["CEO","Administrator"].includes(role)) {
+  if (["CEO","Head of Operations"].includes(role)) {
     base.push({ id: "client-financials", label: "Client Financials", icon: "▪" }, { id: "clients", label: "Clients", icon: "▪" }, { id: "users", label: "User Management", icon: "▪" });
   }
   if (role === "Vendor") {
@@ -2195,8 +2198,8 @@ const EventsView = ({ user }) => {
   const [editEvent, setEditEvent] = useState(null);
   const [editForm, setEditForm] = useState({});
 
-  const canManage = ['CEO','Administrator'].includes(user?.role);
-  const canSeeTasks = ['CEO','Administrator','Strategy & Events Lead','Vendor Manager'].includes(user?.role);
+  const canManage = ['CEO','Head of Operations'].includes(user?.role);
+  const canSeeTasks = ['CEO','Head of Operations','Strategy & Events Lead','Vendor Manager'].includes(user?.role);
 
   const load = async () => {
     const [p, c, t] = await Promise.all([
@@ -2949,8 +2952,8 @@ const TasksView = ({ userRole, openTaskId, onOpenHandled }) => {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', project_id: '', deadline: '', status: 'pending', assignee_id: '', assignee_name: '', assigned_by: '' });
 
-  const canEdit = ['CEO', 'Administrator', 'Strategy & Events Lead', 'Vendor Manager', 'Vendor', 'Sales & Marketing'].includes(userRole);
-  const canToggleVisibility = ['CEO','Administrator'].includes(userRole);
+  const canEdit = ['CEO', 'Head of Operations', 'Strategy & Events Lead', 'Vendor Manager', 'Vendor', 'Sales & Marketing'].includes(userRole);
+  const canToggleVisibility = ['CEO','Head of Operations'].includes(userRole);
 
   const openDetail = (task) => {
     setDetailTask(task);
@@ -3269,7 +3272,7 @@ const VendorsView = ({ user }) => {
       status_notes: resubmitNotes,
     }).eq('id', resubmitModal.id);
     // Notify CEO
-    const { data: ceos } = await supabase.from('profiles').select('id').in('role', ['CEO', 'Administrator']);
+    const { data: ceos } = await supabase.from('profiles').select('id').in('role', ['CEO', 'Head of Operations']);
     if (ceos) await Promise.all(ceos.map(c => supabase.from('notifications').insert({ user_id: c.id, title: 'RFF Resubmitted', message: `RFF "${resubmitModal.title}" has been revised and resubmitted for approval.`, type: 'rff' })));
     setResubmitModal(null); setResubmitFile(null); setResubmitNotes('');
     setSaving(false); load();
@@ -3397,7 +3400,7 @@ const VendorsView = ({ user }) => {
                         border: `1px solid ${T.cyan}33`,
                       }}>📄 {r.document_name || 'Download RFF'}</a>
                     )}
-                    {['CEO','Administrator'].includes(user?.role) && !r.approved && (
+                    {['CEO','Head of Operations'].includes(user?.role) && !r.approved && (
                       <button onClick={async (e) => { e.stopPropagation(); await supabase.from('rffs').update({ approved: true, approved_by: user.id }).eq('id', r.id); load(); }} style={{
                         marginLeft: 8, background: T.teal + '20', border: `1px solid ${T.teal}`, color: T.teal,
                         padding: '5px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600,
@@ -3693,12 +3696,12 @@ const UsersView = ({ user }) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', role: 'Administrator', password: '' });
+  const [form, setForm] = useState({ name: '', email: '', role: 'Head of Operations', password: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const roleColors = {
-    'CEO': T.cyan, 'Administrator': T.blue, 'Vendor Manager': T.magenta,
+    'CEO': T.cyan, 'Head of Operations': T.blue, 'Vendor Manager': T.magenta,
     'Strategy & Events Lead': T.amber, 'Sales & Marketing': '#EC4899',
     'Vendor': '#06B6D4', 'Client': '#84CC16',
   };
@@ -3721,7 +3724,7 @@ const UsersView = ({ user }) => {
     const initials = form.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
     await supabase.from('profiles').insert({ id: uid, name: form.name, email: form.email, role: form.role, avatar: initials });
     setModal(false);
-    setForm({ name: '', email: '', role: 'Administrator', password: '' });
+    setForm({ name: '', email: '', role: 'Head of Operations', password: '' });
     setSaving(false);
     load();
   };
@@ -3763,7 +3766,7 @@ const UsersView = ({ user }) => {
       {/* KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px,1fr))", gap: 12, marginBottom: 24 }}>
         {[...new Set(users.map(u => u.role))].map((role, i) => {
-          const roleColors = { "CEO": T.cyan, "Administrator": T.teal, "Vendor Manager": T.amber, "Strategy & Events Lead": T.magenta, "Finance Manager": T.gold, "Sales & Marketing": T.blue, "Vendor": T.textSecondary, "Client": "#10B981" };
+          const roleColors = { "CEO": T.cyan, "Head of Operations": T.teal, "Vendor Manager": T.amber, "Strategy & Events Lead": T.magenta, "Finance Manager": T.gold, "Sales & Marketing": T.blue, "Vendor": T.textSecondary, "Client": "#10B981" };
           const color = roleColors[role] || T.textMuted;
           return (
             <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${color}`, borderRadius: 10 }}>
@@ -3802,7 +3805,7 @@ const UsersView = ({ user }) => {
           <Input label="Email" type="email" placeholder="user@stretchfield.com" value={form.email} onChange={v => setForm({ ...form, email: v })} />
           <Input label="Password" type="password" placeholder="Temporary password" value={form.password} onChange={v => setForm({ ...form, password: v })} />
           <Select label="Role" options={[
-            { value: 'Administrator', label: 'Administrator' },
+            { value: 'Head of Operations', label: 'Head of Operations' },
             { value: 'Vendor Manager', label: 'Vendor Manager' },
             { value: 'Strategy & Events Lead', label: 'Strategy & Events Lead' },
             { value: 'Sales & Marketing', label: 'Sales & Marketing' },
@@ -3886,7 +3889,7 @@ const ClientsView = ({ user }) => {
     load();
   };
 
-  const isCEOorAdmin = ['CEO', 'Administrator'].includes(user?.role);
+  const isCEOorAdmin = ['CEO', 'Head of Operations'].includes(user?.role);
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
@@ -4240,14 +4243,14 @@ const CRMView = ({ user }) => {
   const [createLogin, setCreateLogin] = useState(false);
   const [loginPassword, setLoginPassword] = useState("");
 
-  const canEdit = ["CEO", "Administrator", "Sales & Marketing"].includes(user?.role);
-  const canApprove = ["CEO", "Administrator"].includes(user?.role);
+  const canEdit = ["CEO", "Head of Operations", "Sales & Marketing"].includes(user?.role);
+  const canApprove = ["CEO", "Head of Operations"].includes(user?.role);
   const statusColors = { new: T.cyan, contacted: T.blue, qualified: T.amber, proposal: T.magenta, won: T.teal, lost: "#F43F5E" };
   const statusOrder = ["new", "contacted", "qualified", "proposal", "won", "lost"];
 
   const load = async () => {
     const [l, a, p, m, c] = await Promise.all([
-      ["CEO", "Administrator", "Sales & Marketing"].includes(user?.role) ? supabase.from("leads").select("*").order("created_at", { ascending: false }) : supabase.from("leads").select("*").or("assigned_to.eq." + user.id + ",created_by.eq." + user.id).order("created_at", { ascending: false }),
+      ["CEO", "Head of Operations", "Sales & Marketing"].includes(user?.role) ? supabase.from("leads").select("*").order("created_at", { ascending: false }) : supabase.from("leads").select("*").or("assigned_to.eq." + user.id + ",created_by.eq." + user.id).order("created_at", { ascending: false }),
       supabase.from("crm_activities").select("*").order("created_at", { ascending: false }),
       supabase.from("proposals").select("*").order("created_at", { ascending: false }),
       supabase.from('profiles').select('*').not('role', 'in', '("Client","Vendor")'),
@@ -4722,12 +4725,12 @@ const SMTasksView = ({ user }) => {
   const [members, setMembers] = useState([]);
   const [saving, setSaving] = useState(false);
 
-  const canCreate = ["CEO", "Administrator", "Sales & Marketing"].includes(user?.role);
+  const canCreate = ["CEO", "Head of Operations", "Sales & Marketing"].includes(user?.role);
 
   const load = async () => {
     const [t, m] = await Promise.all([
       supabase.from("tasks").select("*").eq("task_type", "sm").order("created_at", { ascending: false }),
-      supabase.from("profiles").select("*").in("role", ["CEO", "Administrator", "Sales & Marketing"]),
+      supabase.from("profiles").select("*").in("role", ["CEO", "Head of Operations", "Sales & Marketing"]),
     ]);
     setTasks(t.data || []);
     setMembers(m.data || []);
@@ -4870,7 +4873,7 @@ const FeedbackView = ({ userRole }) => {
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState("all");
   const [loading, setLoading] = useState(true);
-  const canSeeDetailed = ["CEO", "Administrator", "Strategy & Events Lead", "Vendor Manager"].includes(userRole);
+  const canSeeDetailed = ["CEO", "Head of Operations", "Strategy & Events Lead", "Vendor Manager"].includes(userRole);
 
   useEffect(() => {
     Promise.all([
@@ -5517,7 +5520,7 @@ const CalendarView = ({ user, onNavigate }) => {
     const all = [];
 
     // ── TASKS ──
-    const taskQ = ["CEO","Administrator"].includes(role)
+    const taskQ = ["CEO","Head of Operations"].includes(role)
       ? supabase.from("tasks").select("*")
       : supabase.from("tasks").select("*").eq("assignee_id", uid);
     const { data: tasks } = await taskQ;
@@ -5542,7 +5545,7 @@ const CalendarView = ({ user, onNavigate }) => {
     }
 
     // ── LEADS (CEO, Admin, Sales & Marketing) ──
-    if (["CEO","Administrator","Sales & Marketing"].includes(role)) {
+    if (["CEO","Head of Operations","Sales & Marketing"].includes(role)) {
       const { data: leads } = await supabase.from("leads").select("*");
       (leads || []).forEach(l => {
         if (l.created_at) all.push({ id: "lead-"+l.id, date: l.created_at.slice(0,10), type: "lead", label: l.company, sub: "Lead Created · " + l.status, nav: "crm" });
@@ -5551,7 +5554,7 @@ const CalendarView = ({ user, onNavigate }) => {
     }
 
     // ── RFFs ──
-    if (["CEO","Administrator","Vendor Manager"].includes(role)) {
+    if (["CEO","Head of Operations","Vendor Manager"].includes(role)) {
       const { data: rffs } = await supabase.from("rffs").select("*");
       (rffs || []).filter(r => r.deadline).forEach(r => {
         const dl = r.deadline.slice(0,10);
@@ -5566,13 +5569,13 @@ const CalendarView = ({ user, onNavigate }) => {
     }
 
     // ── S&M TASKS ──
-    if (["CEO","Administrator","Sales & Marketing"].includes(role)) {
-      const smQ = ["CEO","Administrator"].includes(role)
+    if (["CEO","Head of Operations","Sales & Marketing"].includes(role)) {
+      const smQ = ["CEO","Head of Operations"].includes(role)
         ? supabase.from("tasks").select("*").not("assignee_id","is",null)
         : supabase.from("tasks").select("*").eq("assignee_id", uid);
       const { data: smTasks } = await smQ;
       (smTasks || []).forEach(t => {
-        if (t.deadline && !["CEO","Administrator"].includes(role)) {
+        if (t.deadline && !["CEO","Head of Operations"].includes(role)) {
           all.push({ id: "smt-"+t.id, date: t.deadline.slice(0,10), type: "smtask", label: t.name, sub: "S&M Task", nav: "sm-tasks" });
         }
       });
@@ -5590,7 +5593,7 @@ const CalendarView = ({ user, onNavigate }) => {
     }
 
     // ── FINANCE INVOICES ──
-    if (["CEO","Administrator","Finance Manager"].includes(role)) {
+    if (["CEO","Head of Operations","Finance Manager"].includes(role)) {
       const { data: invs } = await supabase.from("invoices").select("*");
       (invs || []).forEach(inv => {
         if (inv.created_at) all.push({ id: "finv-"+inv.id, date: inv.created_at.slice(0,10), type: "invoice", label: inv.vendor_name || "Invoice", sub: "Invoice · " + (inv.status || ""), nav: "invoices" });
@@ -6073,7 +6076,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
     switch (activeTab) {
       case "dashboard":
         if (role === "CEO") return <CEODashboard onTab={setActiveTab} user={currentUser} />;
-        if (role === "Administrator") return <CEODashboard onTab={setActiveTab} user={currentUser} />;
+        if (role === "Head of Operations") return <StaffDashboard user={currentUser} />;
         if (role === "Vendor") return <VendorDashboard user={currentUser} />;
         if (role === "Client") return <ClientDashboard user={currentUser} />;
         if (role === "Finance Manager") return <FinanceDashboard user={currentUser} onTab={setActiveTab} />;
@@ -6088,7 +6091,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "clients": return <ClientsView user={currentUser} />;
       case "users": return <UsersView user={currentUser} />;
       case "crm": return <CRMView user={currentUser} />;
-      case "crm-insights": return ["CEO","Administrator"].includes(currentUser.role) ? <CRMDashboardCEO user={currentUser} /> : <CRMDashboardSM user={currentUser} />;
+      case "crm-insights": return ["CEO","Head of Operations"].includes(currentUser.role) ? <CRMDashboardCEO user={currentUser} /> : <CRMDashboardSM user={currentUser} />;
       case "sm-tasks": return <SMTasksView user={currentUser} />;
       case "strategy-overview": return <StrategyOverviewView />;
       case "opportunities": return <OpportunitiesView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
@@ -6345,7 +6348,7 @@ const CRMDashboardCEO = ({ user }) => {
     const [l, t, m] = await Promise.all([
       supabase.from("leads").select("*"),
       supabase.from("sales_targets").select("*").order("created_at", { ascending: false }),
-      supabase.from("profiles").select("*").in("role", ["CEO", "Administrator", "Sales & Marketing"]),
+      supabase.from("profiles").select("*").in("role", ["CEO", "Head of Operations", "Sales & Marketing"]),
     ]);
     setLeads(l.data || []);
     setTargets(t.data || []);
@@ -6743,7 +6746,7 @@ const FinanceDashboard = ({ user, onTab }) => {
     return { ...ev, budget: budget?.total_budget || 0, spent, invoiced, pct };
   }).filter(e => e.budget > 0 || e.spent > 0).slice(0, 5);
 
-  const canApprove = ["CEO", "Administrator"].includes(user?.role);
+  const canApprove = ["CEO", "Head of Operations"].includes(user?.role);
 
   const [financeTab, setFinanceTab] = useState("overview");
 
@@ -6993,7 +6996,7 @@ const BudgetView = ({ user }) => {
   const [form, setForm] = useState({ project_id: "", event_name: "", total_budget: "", notes: "" });
   const [requestForm, setRequestForm] = useState({ requested_amount: "", reason: "" });
   const [saving, setSaving] = useState(false);
-  const canEdit = ["CEO", "Administrator", "Finance Manager"].includes(user?.role);
+  const canEdit = ["CEO", "Head of Operations", "Finance Manager"].includes(user?.role);
 
   const load = async () => {
     const [b, ev, ex, inv] = await Promise.all([
@@ -7104,10 +7107,10 @@ const BudgetView = ({ user }) => {
             ))}
           </div>
           {ev.budget.notes && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 12, fontStyle: "italic", borderTop: `1px solid ${T.border}44`, paddingTop: 10 }}>{ev.budget.notes}</div>}
-          {ev.pct >= 70 && canEdit && !["CEO","Administrator"].includes(user?.role) && (
+          {ev.pct >= 70 && canEdit && !["CEO","Head of Operations"].includes(user?.role) && (
             <button onClick={() => setRequestModal(ev)} style={{ marginTop: 12, width: "100%", background: T.magenta + "15", border: `1px solid ${T.magenta}50`, color: T.magenta, padding: "9px", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>Request Budget Increase</button>
           )}
-          {["CEO","Administrator"].includes(user?.role) && ev.pct >= 90 && (
+          {["CEO","Head of Operations"].includes(user?.role) && ev.pct >= 90 && (
             <div style={{ marginTop: 12, padding: "8px 14px", background: T.red + "12", borderRadius: 8, border: `1px solid ${T.red}30`, display: "flex", alignItems: "center", gap: 8 }}>
               <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.red, boxShadow: `0 0 6px ${T.red}` }} />
               <span style={{ color: T.red, fontSize: 11, fontWeight: 700 }}>Budget {ev.pct >= 100 ? "exceeded" : "nearly exhausted"}</span>
@@ -7170,8 +7173,8 @@ const ExpenseView = ({ user }) => {
   const [form, setForm] = useState({ project_id: "", event_name: "", category: "", description: "", amount: "", date: "", vendor: "" });
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState("all");
-  const canEdit = ["CEO", "Administrator", "Finance Manager"].includes(user?.role);
-  const canApprove = ["CEO", "Administrator"].includes(user?.role);
+  const canEdit = ["CEO", "Head of Operations", "Finance Manager"].includes(user?.role);
+  const canApprove = ["CEO", "Head of Operations"].includes(user?.role);
 
   const categories = ["Venue", "Catering", "Equipment", "Staffing", "Marketing", "Transport", "Accommodation", "Decor", "Technology", "Miscellaneous"];
 
@@ -7676,7 +7679,7 @@ const VendorScorecardsView = ({ user }) => {
   const [scoreModal, setScoreModal] = useState(null);
   const [historyVendor, setHistoryVendor] = useState(null);
 
-  const canScore = ["CEO", "Administrator", "Vendor Manager"].includes(user?.role);
+  const canScore = ["CEO", "Head of Operations", "Vendor Manager"].includes(user?.role);
 
   const load = async () => {
     const [v, e, s] = await Promise.all([
@@ -8408,7 +8411,7 @@ const FinanceApprovalsView = ({ user }) => {
   const [budgetRequests, setBudgetRequests] = useState([]);
   const [paymentRequests, setPaymentRequests] = useState([]);
   const [saving, setSaving] = useState(null);
-  const canApprove = ["CEO", "Administrator"].includes(user?.role);
+  const canApprove = ["CEO", "Head of Operations"].includes(user?.role);
 
   const load = async () => {
     const [ex, br, pr] = await Promise.all([

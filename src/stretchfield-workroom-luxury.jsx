@@ -531,8 +531,11 @@ const getNavItems = (role) => {
   if (["CEO","Head of Operations"].includes(role)) {
     base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "rff-approvals", label: "RFF Approvals", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" });
   }
+  if (role === "CEO") {
+    base.push({ id: "vendor-onboarding", label: "Vendor Applications", icon: "▪" });
+  }
   if (role === "Vendor Manager") {
-    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" });
+    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" });
   }
   if (["CEO","Head of Operations","Vendor Manager","Finance Manager"].includes(role)) {
     base.push({ id: "invoices", label: "Invoices", icon: "▪" });
@@ -6149,6 +6152,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "feedback": return <FeedbackView userRole={currentUser.role} />;
       case "calendar": return <CalendarView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
       case "zoho-books": return <ZohoBooksView user={currentUser} />;
+      case "vendor-onboarding": return <VendorOnboardingView user={currentUser} />;
       case "notifications": return <NotificationsView user={currentUser} onNavigate={(tab, resourceId) => { setActiveTab(tab); if (resourceId) setPendingResourceId(resourceId); }} />;
       case "rffs": return <VendorRFFsView user={currentUser} />;
       case "quotes": return <VendorQuotesView user={currentUser} />;

@@ -9283,7 +9283,10 @@ const RFFApprovalsView = ({ user }) => {
                 </div>
                 {budgetLines.map((line, idx) => (
                   <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 32px", gap: 8, marginBottom: 8 }}>
-                    <input value={line.category} onChange={e => { const l = [...budgetLines]; l[idx].category = e.target.value; setBudgetLines(l); }} placeholder="e.g. Catering" style={{ padding: "7px 10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+                    <select value={line.category} onChange={e => { const l = [...budgetLines]; l[idx].category = e.target.value; setBudgetLines(l); }} style={{ padding: "7px 10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: line.category ? T.textPrimary : T.textMuted, fontSize: 12, fontFamily: "inherit", outline: "none" }}>
+                      <option value="">Select category...</option>
+                      {["Audio Visual","Catering","Decoration & Floral","Entertainment","Photography & Videography","Printing & Branding","Security","Transportation","Venue","Other"].map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
                     <input type="number" value={line.proposed_amount} onChange={e => { const l = [...budgetLines]; l[idx].proposed_amount = e.target.value; setBudgetLines(l); }} placeholder="0.00" style={{ padding: "7px 10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
                     <input value={line.notes} onChange={e => { const l = [...budgetLines]; l[idx].notes = e.target.value; setBudgetLines(l); }} placeholder="Notes..." style={{ padding: "7px 10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
                     <button onClick={() => setBudgetLines(budgetLines.filter((_,i) => i !== idx))} style={{ background: T.red+"18", border: `1px solid ${T.red}30`, color: T.red, borderRadius: 6, cursor: "pointer", fontSize: 14, fontWeight: 700 }}>×</button>
@@ -9958,6 +9961,7 @@ const VendorAssignmentView = ({ user }) => {
     ]);
     setRffs(r.data || []);
     setEvents(e.data || []);
+    // Include vendors from profiles (all with role=Vendor)
     setVendors(v.data || []);
     setAssignments(a.data || []);
   };

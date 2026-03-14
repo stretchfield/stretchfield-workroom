@@ -9264,23 +9264,7 @@ const RFFApprovalsView = ({ user }) => {
         </div>
       )}
 
-      {actionModal && (
-        <Modal title={actionModal.action === "approve" ? "Approve RFF" : "Decline RFF"} onClose={() => setActionModal(null)}>
-          <div style={{ padding: "10px 14px", background: T.surface, borderRadius: 8, border: "1px solid " + T.border, marginBottom: 16 }}>
-            <div style={{ color: T.textPrimary, fontWeight: 700 }}>{actionModal.rff.title}</div>
-            <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{actionModal.rff.event_name} · {actionModal.rff.client_name}</div>
-          </div>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>{actionModal.action === "decline" ? "Decline Notes (Required)" : "Notes (Optional)"}</div>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder={actionModal.action === "decline" ? "Explain why this RFF needs revision..." : "Any notes for the Vendor Manager..."}
-              style={{ width: "100%", minHeight: 100, padding: 10, background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, resize: "vertical", fontFamily: "inherit" }} />
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            {actionModal.action === "approve" ? <Btn onClick={() => handleApprove(actionModal.rff)} disabled={saving}>{saving ? "Approving..." : "✓ Approve RFF"}</Btn> : <Btn onClick={() => handleDecline(actionModal.rff)} disabled={saving}>{saving ? "Declining..." : "✕ Decline RFF"}</Btn>}
-            <Btn variant="ghost" onClick={() => setActionModal(null)}>Cancel</Btn>
-          </div>
-        </Modal>
-      )}
+
     </div>
   );
 };

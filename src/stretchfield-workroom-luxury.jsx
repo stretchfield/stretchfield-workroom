@@ -9265,6 +9265,50 @@ const RFFApprovalsView = ({ user }) => {
       )}
 
 
+      {/* RFF Action Modal with Budget Template */}
+      {actionModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setActionModal(null)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 600, maxHeight: "90vh", overflow: "auto", padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>{actionModal.action === "approve" ? "Approve RFF + Set Budget" : "Decline RFF"}</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>{actionModal.rff.title} · {actionModal.rff.event_name}</div>
+
+            {actionModal.action === "approve" && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ color: T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8, paddingBottom: 6, borderBottom: `1px solid ${T.cyan}30` }}>Proposed Budget Template</div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 10 }}>Add budget line items for this RFF. These will be used to compare vendor quotes.</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 32px", gap: 8, marginBottom: 6 }}>
+                  {["Category","Proposed Amount (GHS)","Notes",""].map((h,i) => (
+                    <div key={i} style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</div>
+                  ))}
+                </div>
+                {budgetLines.map((line, idx) => (
+                  <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 32px", gap: 8, marginBottom: 8 }}>
+                    <input value={line.category} onChange={e => { const l = [...budgetLines]; l[idx].category = e.target.value; setBudgetLines(l); }} placeholder="e.g. Catering" style={{ padding: "7px 10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+                    <input type="number" value={line.proposed_amount} onChange={e => { const l = [...budgetLines]; l[idx].proposed_amount = e.target.value; setBudgetLines(l); }} placeholder="0.00" style={{ padding: "7px 10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+                    <input value={line.notes} onChange={e => { const l = [...budgetLines]; l[idx].notes = e.target.value; setBudgetLines(l); }} placeholder="Notes..." style={{ padding: "7px 10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+                    <button onClick={() => setBudgetLines(budgetLines.filter((_,i) => i !== idx))} style={{ background: T.red+"18", border: `1px solid ${T.red}30`, color: T.red, borderRadius: 6, cursor: "pointer", fontSize: 14, fontWeight: 700 }}>×</button>
+                  </div>
+                ))}
+                <button onClick={() => setBudgetLines([...budgetLines, { category: "", proposed_amount: "", notes: "" }])} style={{ background: "none", border: `1px dashed ${T.border}`, color: T.textMuted, padding: "6px 16px", borderRadius: 6, cursor: "pointer", fontSize: 12, width: "100%", marginTop: 4 }}>+ Add Line Item</button>
+              </div>
+            )}
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>{actionModal.action === "approve" ? "Approval Notes (optional)" : "Reason for Decline *"}</label>
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Add notes..." style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", resize: "vertical" }} />
+            </div>
+
+            <div style={{ display: "flex", gap: 10 }}>
+              {actionModal.action === "approve" ? (
+                <button onClick={() => handleApprove(actionModal.rff)} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.teal}, #10B981)`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Approving..." : "✓ Approve & Send Budget"}</button>
+              ) : (
+                <button onClick={() => handleDecline(actionModal.rff)} disabled={saving} style={{ background: T.red+"18", border: `1px solid ${T.red}40`, color: T.red, padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Declining..." : "✕ Decline RFF"}</button>
+              )}
+              <button onClick={() => setActionModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

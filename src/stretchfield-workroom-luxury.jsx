@@ -8569,6 +8569,105 @@ const VendorApprovalsPanel = ({ user, onLoginCreated }) => {
   );
 };
 
+
+const VendorOnboardingView = ({ user }) => {
+  const [tab, setTab] = useState(user?.role === "CEO" ? "applications" : "form");
+  const [apps, setApps] = useState([]);
+  const [submitted, setSubmitted] = useState(false);
+
+  const load = async () => {
+    const { data } = await supabase.from("vendor_applications").select("*").order("created_at", { ascending: false });
+    setApps(data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const tabs = user?.role === "CEO"
+    ? [{ id: "applications", label: "Applications" }]
+    : [{ id: "form", label: "New Vendor Form" }, { id: "submitted", label: "Submitted Applications" }];
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Procurement</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>
+          {user?.role === "CEO" ? "Vendor Applications" : "Add New Vendor"}
+        </h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>
+          {user?.role === "CEO" ? `${apps.filter(a => a.status === "pending").length} pending approval` : "Submit a new vendor for CEO approval"}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      {tabs.length > 1 && (
+        <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} style={{
+              padding: "6px 18px", borderRadius: 20, cursor: "pointer", fontSize: 11, fontWeight: 700,
+              border: `1px solid ${tab === t.id ? T.cyan : T.border}`,
+              background: tab === t.id ? T.cyan + "20" : "none",
+              color: tab === t.id ? T.cyan : T.textMuted,
+              textTransform: "uppercase", letterSpacing: "0.06em",
+            }}>{t.label}</button>
+          ))}
+        </div>
+      )}
+
+      {/* New Vendor Form */}
+      {tab === "form" && !submitted && (
+        <VendorApplicationModal
+          user={user}
+          onClose={() => {}}
+          inline={true}
+          onSubmitted={() => { setSubmitted(true); load(); setTab("submitted"); }}
+        />
+      )}
+
+      {submitted && tab === "form" && (
+        <div style={{ textAlign: "center", padding: "60px 0", background: T.surface, borderRadius: 12, border: `1px solid ${T.teal}30` }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 18, marginBottom: 8 }}>Application Submitted!</div>
+          <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 20 }}>The CEO has been notified and will review the application.</div>
+          <button onClick={() => { setSubmitted(false); }} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>Submit Another</button>
+        </div>
+      )}
+
+      {/* Submitted Applications — Vendor Manager */}
+      {tab === "submitted" && (
+        <div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {apps.filter(a => a.submitted_by === user?.id).length === 0 && (
+              <div style={{ textAlign: "center", padding: 40, color: T.textMuted, fontSize: 13 }}>No applications submitted yet.</div>
+            )}
+            {apps.filter(a => a.submitted_by === user?.id).map(app => {
+              const statusColor = { pending: T.amber, approved: T.teal, declined: T.red, "login-created": "#10B981" };
+              const statusLabel = { pending: "Pending CEO Approval", approved: "Approved", declined: "Declined", "login-created": "Portal Access Granted" };
+              return (
+                <div key={app.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderLeft: `3px solid ${statusColor[app.status] || T.textMuted}`, borderRadius: 10, padding: "16px 18px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{app.vendor_name}</div>
+                      <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{app.vendor_type} · {app.contact_person} · {app.contact_email}</div>
+                      <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{app.country} · Submitted {new Date(app.created_at).toLocaleDateString("en-GB")}</div>
+                    </div>
+                    <span style={{ background: (statusColor[app.status] || T.textMuted) + "18", color: statusColor[app.status] || T.textMuted, border: `1px solid ${(statusColor[app.status] || T.textMuted)}30`, borderRadius: 20, padding: "3px 12px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{statusLabel[app.status] || app.status}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* CEO — All Applications */}
+      {tab === "applications" && (
+        <VendorApprovalsPanel user={user} onLoginCreated={load} />
+      )}
+    </div>
+  );
+};
+
 const VendorAssignmentView = ({ user }) => {
   const [rffs, setRffs] = useState([]);
   const [events, setEvents] = useState([]);

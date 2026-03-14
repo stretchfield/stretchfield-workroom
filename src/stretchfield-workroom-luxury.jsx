@@ -3999,6 +3999,98 @@ const ClientsView = ({ user }) => {
         </Modal>
       )}
 
+      {/* Preview Modal */}
+      {previewApp && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 700, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setPreviewApp(null)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 680, maxHeight: "90vh", overflow: "auto", padding: 28 }} onClick={e => e.stopPropagation()}>
+            
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+              <div>
+                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>Vendor Application</div>
+                <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 20 }}>{previewApp.vendor_name}</div>
+                <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{previewApp.vendor_type} · Submitted {new Date(previewApp.created_at).toLocaleDateString("en-GB")}</div>
+              </div>
+              <button onClick={() => setPreviewApp(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 18 }}>×</button>
+            </div>
+
+            {/* Vendor Details */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
+              {[
+                ["Contact Person", previewApp.contact_person],
+                ["Email", previewApp.contact_email],
+                ["Phone", previewApp.phone],
+                ["Country", previewApp.country],
+                ["Address", previewApp.address],
+                ["Vendor Type", previewApp.vendor_type],
+              ].map(([label, val]) => val ? (
+                <div key={label}>
+                  <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>{label}</div>
+                  <div style={{ color: T.textPrimary, fontSize: 13 }}>{val}</div>
+                </div>
+              ) : null)}
+            </div>
+
+            {/* Bank Details */}
+            {previewApp.bank_name && (
+              <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
+                <div style={{ color: T.cyan, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Bank Details</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  {[
+                    ["Bank Name", previewApp.bank_name],
+                    ["Account Name", previewApp.bank_account_name],
+                    ["Account No", previewApp.account_no],
+                    ["Swift Code", previewApp.swift_code],
+                    ["Bank Address", previewApp.bank_address],
+                    ["Payment Terms", previewApp.payment_terms],
+                  ].map(([label, val]) => val ? (
+                    <div key={label}>
+                      <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 2 }}>{label}</div>
+                      <div style={{ color: T.textPrimary, fontSize: 12 }}>{val}</div>
+                    </div>
+                  ) : null)}
+                </div>
+              </div>
+            )}
+
+            {/* Documents */}
+            {(previewApp.business_reg_url || previewApp.vat_cert_url) && (
+              <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+                {previewApp.business_reg_url && <a href={previewApp.business_reg_url} target="_blank" rel="noopener noreferrer" style={{ background: T.cyan + "15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>📄 Business Reg Certificate</a>}
+                {previewApp.vat_cert_url && <a href={previewApp.vat_cert_url} target="_blank" rel="noopener noreferrer" style={{ background: T.cyan + "15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>📄 VAT Certificate</a>}
+              </div>
+            )}
+
+            {/* CEO Notes */}
+            {user?.role === "CEO" && (
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 6 }}>CEO Notes / Reason for Decline</label>
+                <textarea value={ceoNotes} onChange={e => setCeoNotes(e.target.value)} rows={3} placeholder="Add notes for the Vendor Manager..." style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", resize: "vertical" }} />
+              </div>
+            )}
+
+            {/* Show CEO notes to Vendor Manager */}
+            {user?.role !== "CEO" && previewApp.ceo_notes && (
+              <div style={{ background: T.red + "10", border: `1px solid ${T.red}30`, borderRadius: 8, padding: "12px 14px", marginBottom: 16 }}>
+                <div style={{ color: T.red, fontSize: 11, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>CEO Feedback</div>
+                <div style={{ color: T.textSecondary, fontSize: 13 }}>{previewApp.ceo_notes}</div>
+              </div>
+            )}
+
+            {/* Actions */}
+            {user?.role === "CEO" && previewApp.status === "pending" && (
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={() => handleApprove(previewApp)} style={{ background: `linear-gradient(135deg, ${T.teal}, #10B981)`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>✓ Approve</button>
+                <button onClick={() => handleDecline(previewApp, ceoNotes)} style={{ background: T.red + "18", border: `1px solid ${T.red}40`, color: T.red, padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>✗ Decline</button>
+                <button onClick={() => setPreviewApp(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+              </div>
+            )}
+            {(user?.role !== "CEO" || previewApp.status !== "pending") && (
+              <button onClick={() => setPreviewApp(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Close</button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Create Login Modal */}
       {loginModal && (
         <Modal title={`Create Login for ${loginModal.name}`} onClose={() => { setLoginModal(null); setError(''); setSuccess(''); }}>
@@ -8409,20 +8501,7 @@ const VendorApplicationModal = ({ user, onClose, onSubmitted }) => {
           <div><label style={labelStyle}>Payment Terms</label><input value={form.payment_terms} onChange={e => setForm({...form, payment_terms: e.target.value})} style={inputStyle} placeholder="e.g. Net 30, 50% upfront" /></div>
         </div>
 
-        {/* Declaration */}
-        <div style={sectionStyle}>Declaration</div>
-        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "12px 14px", marginBottom: 14 }}>
-          <div style={{ color: T.textMuted, fontSize: 12, fontStyle: "italic", lineHeight: 1.6 }}>I certify that the information on this sheet is correct and I authorise STRETCHFIELD to use this information for the purposes of administering any future trading relationship between the company named above and the company.</div>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
-          <div><label style={labelStyle}>Form Completed By</label><input value={form.form_completed_by} onChange={e => setForm({...form, form_completed_by: e.target.value})} style={inputStyle} placeholder="Full name" /></div>
-          <div><label style={labelStyle}>Position in Company</label><input value={form.position_in_company} onChange={e => setForm({...form, position_in_company: e.target.value})} style={inputStyle} placeholder="Job title" /></div>
-          <div><label style={labelStyle}>Signature (Initials)</label><input value={form.signature} onChange={e => setForm({...form, signature: e.target.value})} style={inputStyle} placeholder="e.g. K.A" /></div>
-        </div>
-        <div style={{ marginBottom: 20 }}>
-          <label style={labelStyle}>Date (dd/mm/yyyy)</label>
-          <input type="date" value={form.date_submitted} onChange={e => setForm({...form, date_submitted: e.target.value})} style={{...inputStyle, width: "50%"}} />
-        </div>
+
 
         {error && <div style={{ color: T.red, fontSize: 12, marginBottom: 12, padding: "8px 12px", background: T.red + "12", borderRadius: 8 }}>{error}</div>}
 
@@ -8437,7 +8516,10 @@ const VendorApplicationModal = ({ user, onClose, onSubmitted }) => {
 
 const VendorApprovalsPanel = ({ user, onLoginCreated }) => {
   const [apps, setApps] = useState([]);
+  const [previewApp, setPreviewApp] = useState(null);
   const [loginModal, setLoginModal] = useState(null);
+  const [declineModal, setDeclineModal] = useState(null);
+  const [ceoNotes, setCeoNotes] = useState("");
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [createdCreds, setCreatedCreds] = useState(null);
@@ -8451,12 +8533,36 @@ const VendorApprovalsPanel = ({ user, onLoginCreated }) => {
 
   const handleApprove = async (app) => {
     await supabase.from("vendor_applications").update({ status: "approved", approved_by: user.id }).eq("id", app.id);
+    // Notify vendor manager who submitted
+    if (app.submitted_by) {
+      await supabase.from("notifications").insert({
+        user_id: app.submitted_by,
+        title: "Vendor Application Approved",
+        message: `${app.vendor_name} has been approved by the CEO. You can now create their login.`,
+        type: "task",
+      });
+    }
+    setPreviewApp(null);
     load();
   };
 
-  const handleDecline = async (app) => {
-    if (!window.confirm("Decline this vendor application?")) return;
-    await supabase.from("vendor_applications").update({ status: "declined" }).eq("id", app.id);
+  const handleDecline = async () => {
+    if (!ceoNotes.trim()) { alert("Please add notes explaining the decline reason."); return; }
+    setSaving(true);
+    await supabase.from("vendor_applications").update({ status: "declined", ceo_notes: ceoNotes }).eq("id", declineModal.id);
+    // Notify vendor manager
+    if (declineModal.submitted_by) {
+      await supabase.from("notifications").insert({
+        user_id: declineModal.submitted_by,
+        title: "Vendor Application Declined",
+        message: `${declineModal.vendor_name} was declined. CEO notes: ${ceoNotes.slice(0, 100)}`,
+        type: "task",
+      });
+    }
+    setSaving(false);
+    setDeclineModal(null);
+    setCeoNotes("");
+    setPreviewApp(null);
     load();
   };
 
@@ -8464,32 +8570,19 @@ const VendorApprovalsPanel = ({ user, onLoginCreated }) => {
     if (!password || password.length < 8) { alert("Password must be at least 8 characters."); return; }
     setSaving(true);
     const app = loginModal;
-
-    // Create auth user
-    const { data: authData, error: authErr } = await supabase.auth.admin ? 
-      { data: null, error: { message: "Use edge function" } } :
-      { data: null, error: { message: "Use edge function" } };
-
-    // Use edge function to create user
     const { data: { session } } = await supabase.auth.getSession();
     const res = await fetch("https://okbduzenceoknkjqnrha.supabase.co/functions/v1/create-vendor-login", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
       body: JSON.stringify({
-        email: app.contact_email,
-        password,
-        name: app.vendor_name,
-        phone: app.phone,
-        company_name: app.vendor_name,
-        service_category: app.vendor_type,
+        email: app.contact_email, password,
+        name: app.vendor_name, phone: app.phone,
+        company_name: app.vendor_name, service_category: app.vendor_type,
         application_id: app.id,
       }),
     });
     const result = await res.json();
-
     if (result.error) { alert("Failed: " + result.error); setSaving(false); return; }
-
-    await supabase.from("vendor_applications").update({ status: "login-created", profile_id: result.user_id }).eq("id", app.id);
     setCreatedCreds({ email: app.contact_email, password });
     setLoginModal(null);
     setSaving(false);
@@ -8498,7 +8591,14 @@ const VendorApprovalsPanel = ({ user, onLoginCreated }) => {
   };
 
   const statusColor = { pending: T.amber, approved: T.teal, declined: T.red, "login-created": "#10B981" };
-  const statusLabel = { pending: "Pending", approved: "Approved", declined: "Declined", "login-created": "Login Created" };
+  const statusLabel = { pending: "Pending Review", approved: "Approved", declined: "Declined", "login-created": "Login Created" };
+
+  const FieldRow = ({ label, value }) => value ? (
+    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 8, padding: "7px 0", borderBottom: `1px solid ${T.border}44` }}>
+      <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</div>
+      <div style={{ color: T.textPrimary, fontSize: 12 }}>{value}</div>
+    </div>
+  ) : null;
 
   return (
     <div>
@@ -8512,52 +8612,132 @@ const VendorApprovalsPanel = ({ user, onLoginCreated }) => {
         </div>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {apps.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: 30 }}>No vendor applications yet.</div>}
         {apps.map(app => (
-          <div key={app.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-              <div>
-                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{app.vendor_name}</div>
+          <div key={app.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderLeft: `3px solid ${statusColor[app.status] || T.textMuted}`, borderRadius: 10, padding: "14px 18px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{app.vendor_name}</div>
                 <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{app.vendor_type} · {app.contact_person} · {app.contact_email}</div>
-                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{app.country} · {app.phone}</div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{app.country} · Submitted {new Date(app.created_at).toLocaleDateString("en-GB")}</div>
+                {app.ceo_notes && app.status === "declined" && (
+                  <div style={{ marginTop: 8, padding: "8px 10px", background: T.red + "12", border: `1px solid ${T.red}30`, borderRadius: 6 }}>
+                    <div style={{ color: T.red, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>CEO Notes</div>
+                    <div style={{ color: T.textSecondary, fontSize: 12 }}>{app.ceo_notes}</div>
+                  </div>
+                )}
               </div>
-              <span style={{ background: (statusColor[app.status] || T.textMuted) + "18", color: statusColor[app.status] || T.textMuted, border: `1px solid ${(statusColor[app.status] || T.textMuted)}30`, borderRadius: 20, padding: "3px 12px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{statusLabel[app.status] || app.status}</span>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, marginLeft: 12 }}>
+                <span style={{ background: (statusColor[app.status] || T.textMuted) + "18", color: statusColor[app.status] || T.textMuted, border: `1px solid ${(statusColor[app.status] || T.textMuted)}30`, borderRadius: 20, padding: "3px 12px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{statusLabel[app.status] || app.status}</span>
+                <button onClick={() => setPreviewApp(app)} style={{ background: T.cyan + "15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "5px 14px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>Preview Form</button>
+              </div>
             </div>
-
-            {/* Bank & docs summary */}
-            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 12 }}>
-              {app.bank_name && <span style={{ color: T.textMuted, fontSize: 11 }}>🏦 {app.bank_name} · {app.account_no}</span>}
-              {app.payment_terms && <span style={{ color: T.textMuted, fontSize: 11 }}>💳 {app.payment_terms}</span>}
-              {app.business_reg_url && <a href={app.business_reg_url} target="_blank" rel="noopener noreferrer" style={{ color: T.cyan, fontSize: 11, fontWeight: 700 }}>📄 Reg Certificate</a>}
-              {app.vat_cert_url && <a href={app.vat_cert_url} target="_blank" rel="noopener noreferrer" style={{ color: T.cyan, fontSize: 11, fontWeight: 700 }}>📄 VAT Certificate</a>}
-            </div>
-
-            {/* Actions */}
             {user?.role === "CEO" && (
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                 {app.status === "pending" && (
                   <>
                     <button onClick={() => handleApprove(app)} style={{ background: T.teal + "18", border: `1px solid ${T.teal}40`, color: T.teal, padding: "6px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>✓ Approve</button>
-                    <button onClick={() => handleDecline(app)} style={{ background: T.red + "18", border: `1px solid ${T.red}40`, color: T.red, padding: "6px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>✗ Decline</button>
+                    <button onClick={() => { setDeclineModal(app); setCeoNotes(""); }} style={{ background: T.red + "18", border: `1px solid ${T.red}40`, color: T.red, padding: "6px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>✗ Decline with Notes</button>
                   </>
                 )}
                 {app.status === "approved" && (
                   <button onClick={() => { setLoginModal(app); setPassword(""); }} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "6px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>🔑 Create Login</button>
                 )}
-                {app.status === "login-created" && (
-                  <span style={{ color: "#10B981", fontSize: 12, fontWeight: 700 }}>✓ Portal access granted</span>
-                )}
+                {app.status === "login-created" && <span style={{ color: "#10B981", fontSize: 12, fontWeight: 700 }}>✓ Portal access granted</span>}
               </div>
             )}
           </div>
         ))}
       </div>
 
+      {/* Preview Modal */}
+      {previewApp && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 700, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setPreviewApp(null)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 680, maxHeight: "90vh", overflow: "auto", padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+              <div>
+                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>Vendor Application</div>
+                <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 20 }}>{previewApp.vendor_name}</div>
+                <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>Submitted {new Date(previewApp.created_at).toLocaleDateString("en-GB")}</div>
+              </div>
+              <button onClick={() => setPreviewApp(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 18, display:"flex", alignItems:"center", justifyContent:"center" }}>×</button>
+            </div>
+
+            {/* Vendor Info */}
+            <div style={{ color: T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10, paddingBottom: 6, borderBottom: `1px solid ${T.cyan}30` }}>Vendor Information</div>
+            <FieldRow label="Vendor Name" value={previewApp.vendor_name} />
+            <FieldRow label="Vendor Type" value={previewApp.vendor_type} />
+            <FieldRow label="Contact Person" value={previewApp.contact_person} />
+            <FieldRow label="Contact Email" value={previewApp.contact_email} />
+            <FieldRow label="Phone" value={previewApp.phone} />
+            <FieldRow label="Address" value={previewApp.address} />
+            <FieldRow label="Country" value={previewApp.country} />
+
+            {/* Documents */}
+            <div style={{ color: T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", margin: "16px 0 10px", paddingBottom: 6, borderBottom: `1px solid ${T.cyan}30` }}>Documents</div>
+            <div style={{ display: "flex", gap: 12, marginBottom: 8 }}>
+              {previewApp.business_reg_url ? <a href={previewApp.business_reg_url} target="_blank" rel="noopener noreferrer" style={{ color: T.cyan, fontSize: 12, fontWeight: 700 }}>📄 Business Registration</a> : <span style={{ color: T.textMuted, fontSize: 12 }}>No business registration uploaded</span>}
+              {previewApp.vat_cert_url && <a href={previewApp.vat_cert_url} target="_blank" rel="noopener noreferrer" style={{ color: T.cyan, fontSize: 12, fontWeight: 700 }}>📄 VAT Certificate</a>}
+            </div>
+
+            {/* Bank Details */}
+            <div style={{ color: T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", margin: "16px 0 10px", paddingBottom: 6, borderBottom: `1px solid ${T.cyan}30` }}>Bank Details</div>
+            <FieldRow label="Bank Name" value={previewApp.bank_name} />
+            <FieldRow label="Account Name" value={previewApp.bank_account_name} />
+            <FieldRow label="Account Number" value={previewApp.account_no} />
+            <FieldRow label="Swift Code" value={previewApp.swift_code} />
+            <FieldRow label="Bank Address" value={previewApp.bank_address} />
+            <FieldRow label="Bank Phone" value={previewApp.bank_phone} />
+            <FieldRow label="Bank Email" value={previewApp.bank_email} />
+            <FieldRow label="Payment Terms" value={previewApp.payment_terms} />
+
+            {/* CEO Notes if declined */}
+            {previewApp.ceo_notes && (
+              <div style={{ marginTop: 16, padding: "12px 14px", background: T.red + "12", border: `1px solid ${T.red}30`, borderRadius: 8 }}>
+                <div style={{ color: T.red, fontSize: 11, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>CEO Decline Notes</div>
+                <div style={{ color: T.textSecondary, fontSize: 13 }}>{previewApp.ceo_notes}</div>
+              </div>
+            )}
+
+            {/* Action buttons in preview */}
+            {user?.role === "CEO" && previewApp.status === "pending" && (
+              <div style={{ display: "flex", gap: 10, marginTop: 20, paddingTop: 16, borderTop: `1px solid ${T.border}` }}>
+                <button onClick={() => handleApprove(previewApp)} style={{ background: `linear-gradient(135deg, ${T.teal}, #10B981)`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>✓ Approve</button>
+                <button onClick={() => { setDeclineModal(previewApp); setCeoNotes(""); setPreviewApp(null); }} style={{ background: T.red + "18", border: `1px solid ${T.red}40`, color: T.red, padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>✗ Decline with Notes</button>
+                <button onClick={() => setPreviewApp(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Close</button>
+              </div>
+            )}
+            {user?.role === "CEO" && previewApp.status === "approved" && (
+              <div style={{ display: "flex", gap: 10, marginTop: 20, paddingTop: 16, borderTop: `1px solid ${T.border}` }}>
+                <button onClick={() => { setLoginModal(previewApp); setPassword(""); setPreviewApp(null); }} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>🔑 Create Login</button>
+                <button onClick={() => setPreviewApp(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Close</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Decline with Notes Modal */}
+      {declineModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 800, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setDeclineModal(null)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.red}30`, borderRadius: 16, padding: 28, width: "100%", maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Decline Application</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>{declineModal.vendor_name} — Add notes for the Vendor Manager</div>
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Reason / Notes *</label>
+            <textarea value={ceoNotes} onChange={e => setCeoNotes(e.target.value)} rows={4} placeholder="Explain what needs to be corrected or why this is being declined..." style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", resize: "vertical", marginBottom: 20 }} />
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={handleDecline} disabled={saving || !ceoNotes.trim()} style={{ background: `linear-gradient(135deg, ${T.red}, #C0192A)`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13, opacity: !ceoNotes.trim() ? 0.5 : 1 }}>{saving ? "Declining..." : "Decline & Notify"}</button>
+              <button onClick={() => setDeclineModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Create Login Modal */}
       {loginModal && (
         <div style={{ position: "fixed", inset: 0, zIndex: 700, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setLoginModal(null)}>
-          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, padding: 28, width: 400, boxShadow: "0 24px 80px rgba(0,0,0,0.4)" }} onClick={e => e.stopPropagation()}>
+          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, padding: 28, width: 400 }} onClick={e => e.stopPropagation()}>
             <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Create Vendor Login</div>
             <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>{loginModal.vendor_name} · {loginModal.contact_email}</div>
             <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Set Password</label>
@@ -8574,10 +8754,123 @@ const VendorApprovalsPanel = ({ user, onLoginCreated }) => {
 };
 
 
+
+const EditVendorAppModal = ({ app, user, onClose, onResubmitted }) => {
+  const [form, setForm] = useState({
+    vendor_name: app.vendor_name || "",
+    vendor_type: app.vendor_type || "",
+    contact_person: app.contact_person || "",
+    contact_email: app.contact_email || "",
+    phone: app.phone || "",
+    address: app.address || "",
+    country: app.country || "",
+    bank_name: app.bank_name || "",
+    bank_address: app.bank_address || "",
+    bank_account_name: app.bank_account_name || "",
+    account_no: app.account_no || "",
+    swift_code: app.swift_code || "",
+    bank_phone: app.bank_phone || "",
+    bank_email: app.bank_email || "",
+    payment_terms: app.payment_terms || "",
+  });
+  const [saving, setSaving] = useState(false);
+
+  const vendorTypes = ["Audio Visual","Catering","Decoration & Floral","Entertainment","Photography & Videography","Printing & Branding","Security","Transportation","Venue","Other"];
+  const inputStyle = { width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
+  const labelStyle = { color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 };
+  const sectionStyle = { color: T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12, marginTop: 20, paddingBottom: 6, borderBottom: `1px solid ${T.cyan}30` };
+
+  const handleResubmit = async () => {
+    setSaving(true);
+    await supabase.from("vendor_applications").update({
+      ...form,
+      status: "pending",
+      ceo_notes: null,
+    }).eq("id", app.id);
+
+    // Notify CEO
+    const { data: ceos } = await supabase.from("profiles").select("id").eq("role", "CEO");
+    for (const ceo of ceos || []) {
+      await supabase.from("notifications").insert({
+        user_id: ceo.id,
+        title: "Vendor Application Resubmitted",
+        message: `${form.vendor_name} application has been updated and resubmitted for approval.`,
+        type: "task",
+      });
+    }
+    setSaving(false);
+    onResubmitted();
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 700, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
+      <div style={{ background: T.surface, border: `1px solid ${T.amber}40`, borderRadius: 16, width: "100%", maxWidth: 700, maxHeight: "90vh", overflow: "auto", padding: 28 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+          <div>
+            <div style={{ color: T.amber, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>Edit & Resubmit</div>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 20 }}>{app.vendor_name}</div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 18 }}>×</button>
+        </div>
+
+        {/* CEO Notes */}
+        {app.ceo_notes && (
+          <div style={{ background: T.red + "10", border: `1px solid ${T.red}30`, borderRadius: 8, padding: "12px 14px", marginBottom: 20 }}>
+            <div style={{ color: T.red, fontSize: 11, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>CEO Feedback — Please address before resubmitting</div>
+            <div style={{ color: T.textSecondary, fontSize: 13 }}>{app.ceo_notes}</div>
+          </div>
+        )}
+
+        {/* Vendor Info */}
+        <div style={sectionStyle}>Vendor Information</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+          <div><label style={labelStyle}>Vendor Name</label><input value={form.vendor_name} onChange={e => setForm({...form, vendor_name: e.target.value})} style={inputStyle} /></div>
+          <div><label style={labelStyle}>Vendor Type</label>
+            <select value={form.vendor_type} onChange={e => setForm({...form, vendor_type: e.target.value})} style={inputStyle}>
+              <option value="">Select type...</option>
+              {vendorTypes.map(t => <option key={t}>{t}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+          <div><label style={labelStyle}>Contact Person</label><input value={form.contact_person} onChange={e => setForm({...form, contact_person: e.target.value})} style={inputStyle} /></div>
+          <div><label style={labelStyle}>Contact Email</label><input value={form.contact_email} onChange={e => setForm({...form, contact_email: e.target.value})} style={inputStyle} /></div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+          <div><label style={labelStyle}>Phone</label><input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} style={inputStyle} /></div>
+          <div><label style={labelStyle}>Country</label><input value={form.country} onChange={e => setForm({...form, country: e.target.value})} style={inputStyle} /></div>
+        </div>
+        <div style={{ marginBottom: 14 }}><label style={labelStyle}>Address</label><textarea value={form.address} onChange={e => setForm({...form, address: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} /></div>
+
+        {/* Bank Details */}
+        <div style={sectionStyle}>Bank Details</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+          <div><label style={labelStyle}>Bank Name</label><input value={form.bank_name} onChange={e => setForm({...form, bank_name: e.target.value})} style={inputStyle} /></div>
+          <div><label style={labelStyle}>Account Name</label><input value={form.bank_account_name} onChange={e => setForm({...form, bank_account_name: e.target.value})} style={inputStyle} /></div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+          <div><label style={labelStyle}>Account Number</label><input value={form.account_no} onChange={e => setForm({...form, account_no: e.target.value})} style={inputStyle} /></div>
+          <div><label style={labelStyle}>Swift Code</label><input value={form.swift_code} onChange={e => setForm({...form, swift_code: e.target.value})} style={inputStyle} /></div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+          <div><label style={labelStyle}>Bank Address</label><input value={form.bank_address} onChange={e => setForm({...form, bank_address: e.target.value})} style={inputStyle} /></div>
+          <div><label style={labelStyle}>Payment Terms</label><input value={form.payment_terms} onChange={e => setForm({...form, payment_terms: e.target.value})} style={inputStyle} /></div>
+        </div>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
+          <button onClick={handleResubmit} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.amber}, ${T.gold})`, border: "none", color: "#fff", padding: "11px 28px", borderRadius: 8, cursor: saving ? "not-allowed" : "pointer", fontWeight: 800, fontSize: 13, opacity: saving ? 0.7 : 1 }}>{saving ? "Resubmitting..." : "Resubmit for Approval"}</button>
+          <button onClick={onClose} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "11px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const VendorOnboardingView = ({ user }) => {
   const [tab, setTab] = useState(user?.role === "CEO" ? "applications" : "form");
   const [apps, setApps] = useState([]);
   const [submitted, setSubmitted] = useState(false);
+  const [editApp, setEditApp] = useState(null);
 
   const load = async () => {
     const { data } = await supabase.from("vendor_applications").select("*").order("created_at", { ascending: false });
@@ -8646,17 +8939,26 @@ const VendorOnboardingView = ({ user }) => {
             )}
             {apps.filter(a => a.submitted_by === user?.id).map(app => {
               const statusColor = { pending: T.amber, approved: T.teal, declined: T.red, "login-created": "#10B981" };
-              const statusLabel = { pending: "Pending CEO Approval", approved: "Approved", declined: "Declined", "login-created": "Portal Access Granted" };
+              const statusLabel = { pending: "Pending CEO Approval", approved: "Approved", declined: "Declined — Edit & Resubmit", "login-created": "Portal Access Granted" };
               return (
-                <div key={app.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderLeft: `3px solid ${statusColor[app.status] || T.textMuted}`, borderRadius: 10, padding: "16px 18px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div key={app.id} style={{ background: T.surface, border: `1px solid ${statusColor[app.status] || T.border}22`, borderLeft: `3px solid ${statusColor[app.status] || T.textMuted}`, borderRadius: 10, padding: "16px 18px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: app.ceo_notes ? 10 : 0 }}>
                     <div>
                       <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{app.vendor_name}</div>
                       <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{app.vendor_type} · {app.contact_person} · {app.contact_email}</div>
                       <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{app.country} · Submitted {new Date(app.created_at).toLocaleDateString("en-GB")}</div>
                     </div>
-                    <span style={{ background: (statusColor[app.status] || T.textMuted) + "18", color: statusColor[app.status] || T.textMuted, border: `1px solid ${(statusColor[app.status] || T.textMuted)}30`, borderRadius: 20, padding: "3px 12px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{statusLabel[app.status] || app.status}</span>
+                    <span style={{ background: (statusColor[app.status] || T.textMuted) + "18", color: statusColor[app.status] || T.textMuted, border: `1px solid ${(statusColor[app.status] || T.textMuted)}30`, borderRadius: 20, padding: "3px 12px", fontSize: 10, fontWeight: 800, textTransform: "uppercase", whiteSpace: "nowrap" }}>{statusLabel[app.status] || app.status}</span>
                   </div>
+                  {app.ceo_notes && (
+                    <div style={{ background: T.red + "10", border: `1px solid ${T.red}25`, borderRadius: 8, padding: "8px 12px", marginBottom: 10 }}>
+                      <div style={{ color: T.red, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>CEO Feedback</div>
+                      <div style={{ color: T.textSecondary, fontSize: 12 }}>{app.ceo_notes}</div>
+                    </div>
+                  )}
+                  {app.status === "declined" && (
+                    <button onClick={() => setEditApp(app)} style={{ background: T.amber + "18", border: `1px solid ${T.amber}40`, color: T.amber, padding: "6px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>✎ Edit & Resubmit</button>
+                  )}
                 </div>
               );
             })}
@@ -8667,6 +8969,16 @@ const VendorOnboardingView = ({ user }) => {
       {/* CEO — All Applications */}
       {tab === "applications" && (
         <VendorApprovalsPanel user={user} onLoginCreated={load} />
+      )}
+
+      {/* Edit & Resubmit Modal */}
+      {editApp && (
+        <EditVendorAppModal
+          app={editApp}
+          user={user}
+          onClose={() => setEditApp(null)}
+          onResubmitted={() => { setEditApp(null); load(); alert("✓ Application resubmitted for CEO approval."); }}
+        />
       )}
     </div>
   );

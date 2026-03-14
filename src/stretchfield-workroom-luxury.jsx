@@ -3301,6 +3301,36 @@ const VendorsView = ({ user }) => {
         <Btn onClick={() => setModal(true)}>+ New RFF</Btn>
       </div>
 
+      {/* Vendor Applications Panel — CEO */}
+      {showApprovalsPanel && user?.role === "CEO" && (
+        <div style={{ marginBottom: 24, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 20 }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 16, marginBottom: 16 }}>Vendor Applications</div>
+          <VendorApprovalsPanel user={user} onLoginCreated={load} />
+        </div>
+      )}
+
+      {/* Vendor Manager — approved vendors with account status */}
+      {user?.role === "Vendor Manager" && vendorApps.filter(a => ["approved","login-created"].includes(a.status)).length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 12 }}>Approved Vendors — Account Status</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+            {vendorApps.filter(a => ["approved","login-created"].includes(a.status)).map(app => (
+              <div key={app.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${app.status === "login-created" ? "#10B981" : T.amber}`, borderRadius: 10, padding: "14px 16px" }}>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 2 }}>{app.vendor_name}</div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 6 }}>{app.vendor_type} · {app.contact_person}</div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 8 }}>{app.contact_email}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: app.status === "login-created" ? "#10B981" : T.amber }} />
+                  <span style={{ color: app.status === "login-created" ? "#10B981" : T.amber, fontSize: 11, fontWeight: 700 }}>
+                    {app.status === "login-created" ? "Portal Access Granted" : "Awaiting Login Creation"}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
         {[
@@ -8227,6 +8257,313 @@ const RFFApprovalsView = ({ user }) => {
 };
 
 // ─── VENDOR ASSIGNMENT TAB ────────────────────────────────────────────────────
+
+const VendorApplicationModal = ({ user, onClose, onSubmitted }) => {
+  const [form, setForm] = useState({
+    vendor_name: "", vendor_type: "", contact_person: "", contact_email: "",
+    phone: "", address: "", country: "", bank_name: "", bank_address: "",
+    bank_account_name: "", account_no: "", swift_code: "", bank_phone: "",
+    bank_email: "", payment_terms: "", form_completed_by: "", position_in_company: "",
+    signature: "", date_submitted: new Date().toISOString().slice(0,10),
+  });
+  const [busRegFile, setBusRegFile] = useState(null);
+  const [vatFile, setVatFile] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const busRegRef = React.useRef();
+  const vatRef = React.useRef();
+
+  const vendorTypes = ["Audio Visual","Catering","Decoration & Floral","Entertainment","Photography & Videography","Printing & Branding","Security","Transportation","Venue","Other"];
+
+  const inputStyle = { width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
+  const labelStyle = { color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 };
+  const sectionStyle = { color: T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12, marginTop: 20, paddingBottom: 6, borderBottom: `1px solid ${T.cyan}30` };
+
+  const uploadFile = async (file, bucket) => {
+    if (!file) return null;
+    const ext = file.name.split(".").pop();
+    const filename = `${bucket}_${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("vendor-docs").upload(filename, file, { upsert: true });
+    if (error) return null;
+    const { data } = supabase.storage.from("vendor-docs").getPublicUrl(filename);
+    return data.publicUrl;
+  };
+
+  const handleSubmit = async () => {
+    if (!form.vendor_name || !form.contact_email || !form.contact_person) {
+      setError("Please fill in Vendor Name, Contact Person and Email.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+
+    const busRegUrl = await uploadFile(busRegFile, "bus_reg");
+    const vatUrl = await uploadFile(vatFile, "vat");
+
+    const { error: insErr } = await supabase.from("vendor_applications").insert({
+      ...form,
+      business_reg_url: busRegUrl,
+      vat_cert_url: vatUrl,
+      submitted_by: user.id,
+      status: "pending",
+    });
+
+    if (insErr) { setError("Submit failed: " + insErr.message); setSaving(false); return; }
+
+    // Notify CEO
+    const { data: ceos } = await supabase.from("profiles").select("id").eq("role", "CEO");
+    for (const ceo of ceos || []) {
+      await supabase.from("notifications").insert({
+        user_id: ceo.id,
+        title: "New Vendor Application",
+        message: `${form.vendor_name} has been submitted for approval by ${user.name}.`,
+        type: "task",
+      });
+    }
+
+    setSaving(false);
+    onSubmitted();
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
+      <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 700, maxHeight: "90vh", overflow: "auto", padding: 28, boxShadow: "0 24px 80px rgba(0,0,0,0.5)" }} onClick={e => e.stopPropagation()}>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+          <div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>Vendor Onboarding</div>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 20 }}>New Vendor Application</div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 18 }}>×</button>
+        </div>
+
+        {/* Vendor Info */}
+        <div style={sectionStyle}>Vendor Information</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+          <div><label style={labelStyle}>Vendor Name *</label><input value={form.vendor_name} onChange={e => setForm({...form, vendor_name: e.target.value})} style={inputStyle} placeholder="Company / Vendor name" /></div>
+          <div><label style={labelStyle}>Vendor Type</label>
+            <select value={form.vendor_type} onChange={e => setForm({...form, vendor_type: e.target.value})} style={inputStyle}>
+              <option value="">Select type...</option>
+              {vendorTypes.map(t => <option key={t}>{t}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+          <div><label style={labelStyle}>Contact Person *</label><input value={form.contact_person} onChange={e => setForm({...form, contact_person: e.target.value})} style={inputStyle} placeholder="Full name" /></div>
+          <div><label style={labelStyle}>Contact Email *</label><input type="email" value={form.contact_email} onChange={e => setForm({...form, contact_email: e.target.value})} style={inputStyle} placeholder="email@company.com" /></div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+          <div><label style={labelStyle}>Phone Number</label><input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} style={inputStyle} placeholder="+233 XX XXX XXXX" /></div>
+          <div><label style={labelStyle}>Country</label><input value={form.country} onChange={e => setForm({...form, country: e.target.value})} style={inputStyle} placeholder="Ghana" /></div>
+        </div>
+        <div style={{ marginBottom: 14 }}><label style={labelStyle}>Address</label><textarea value={form.address} onChange={e => setForm({...form, address: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} placeholder="Full address" /></div>
+
+        {/* Documents */}
+        <div style={sectionStyle}>Documents</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+          <div>
+            <label style={labelStyle}>Business Registration Certificate</label>
+            <div onClick={() => busRegRef.current.click()} style={{ border: `2px dashed ${T.border}`, borderRadius: 8, padding: "14px", textAlign: "center", cursor: "pointer", background: T.bg }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = T.cyan + "60"}
+              onMouseLeave={e => e.currentTarget.style.borderColor = T.border}>
+              <div style={{ color: T.textMuted, fontSize: 12 }}>{busRegFile ? `✓ ${busRegFile.name}` : "Drop file here or browse"}</div>
+            </div>
+            <input ref={busRegRef} type="file" onChange={e => setBusRegFile(e.target.files[0])} style={{ display: "none" }} />
+          </div>
+          <div>
+            <label style={labelStyle}>VAT Certificate (if any)</label>
+            <div onClick={() => vatRef.current.click()} style={{ border: `2px dashed ${T.border}`, borderRadius: 8, padding: "14px", textAlign: "center", cursor: "pointer", background: T.bg }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = T.cyan + "60"}
+              onMouseLeave={e => e.currentTarget.style.borderColor = T.border}>
+              <div style={{ color: T.textMuted, fontSize: 12 }}>{vatFile ? `✓ ${vatFile.name}` : "Drop file here or browse"}</div>
+            </div>
+            <input ref={vatRef} type="file" onChange={e => setVatFile(e.target.files[0])} style={{ display: "none" }} />
+          </div>
+        </div>
+
+        {/* Bank Details */}
+        <div style={sectionStyle}>Bank Details</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+          <div><label style={labelStyle}>Bank Name</label><input value={form.bank_name} onChange={e => setForm({...form, bank_name: e.target.value})} style={inputStyle} placeholder="Bank name" /></div>
+          <div><label style={labelStyle}>Bank Account Name</label><input value={form.bank_account_name} onChange={e => setForm({...form, bank_account_name: e.target.value})} style={inputStyle} placeholder="Account name" /></div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+          <div><label style={labelStyle}>Account Number</label><input value={form.account_no} onChange={e => setForm({...form, account_no: e.target.value})} style={inputStyle} placeholder="Account number" /></div>
+          <div><label style={labelStyle}>Swift Code</label><input value={form.swift_code} onChange={e => setForm({...form, swift_code: e.target.value})} style={inputStyle} placeholder="SWIFT/BIC code" /></div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+          <div><label style={labelStyle}>Bank Address</label><input value={form.bank_address} onChange={e => setForm({...form, bank_address: e.target.value})} style={inputStyle} placeholder="Bank branch address" /></div>
+          <div><label style={labelStyle}>Bank Telephone</label><input value={form.bank_phone} onChange={e => setForm({...form, bank_phone: e.target.value})} style={inputStyle} placeholder="+233 XX XXX XXXX" /></div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+          <div><label style={labelStyle}>Bank Email</label><input value={form.bank_email} onChange={e => setForm({...form, bank_email: e.target.value})} style={inputStyle} placeholder="bank@email.com" /></div>
+          <div><label style={labelStyle}>Payment Terms</label><input value={form.payment_terms} onChange={e => setForm({...form, payment_terms: e.target.value})} style={inputStyle} placeholder="e.g. Net 30, 50% upfront" /></div>
+        </div>
+
+        {/* Declaration */}
+        <div style={sectionStyle}>Declaration</div>
+        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "12px 14px", marginBottom: 14 }}>
+          <div style={{ color: T.textMuted, fontSize: 12, fontStyle: "italic", lineHeight: 1.6 }}>I certify that the information on this sheet is correct and I authorise STRETCHFIELD to use this information for the purposes of administering any future trading relationship between the company named above and the company.</div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
+          <div><label style={labelStyle}>Form Completed By</label><input value={form.form_completed_by} onChange={e => setForm({...form, form_completed_by: e.target.value})} style={inputStyle} placeholder="Full name" /></div>
+          <div><label style={labelStyle}>Position in Company</label><input value={form.position_in_company} onChange={e => setForm({...form, position_in_company: e.target.value})} style={inputStyle} placeholder="Job title" /></div>
+          <div><label style={labelStyle}>Signature (Initials)</label><input value={form.signature} onChange={e => setForm({...form, signature: e.target.value})} style={inputStyle} placeholder="e.g. K.A" /></div>
+        </div>
+        <div style={{ marginBottom: 20 }}>
+          <label style={labelStyle}>Date (dd/mm/yyyy)</label>
+          <input type="date" value={form.date_submitted} onChange={e => setForm({...form, date_submitted: e.target.value})} style={{...inputStyle, width: "50%"}} />
+        </div>
+
+        {error && <div style={{ color: T.red, fontSize: 12, marginBottom: 12, padding: "8px 12px", background: T.red + "12", borderRadius: 8 }}>{error}</div>}
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={handleSubmit} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "11px 28px", borderRadius: 8, cursor: saving ? "not-allowed" : "pointer", fontWeight: 800, fontSize: 13, opacity: saving ? 0.7 : 1 }}>{saving ? "Submitting..." : "Submit for CEO Approval"}</button>
+          <button onClick={onClose} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "11px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const VendorApprovalsPanel = ({ user, onLoginCreated }) => {
+  const [apps, setApps] = useState([]);
+  const [loginModal, setLoginModal] = useState(null);
+  const [password, setPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [createdCreds, setCreatedCreds] = useState(null);
+
+  const load = async () => {
+    const { data } = await supabase.from("vendor_applications").select("*").order("created_at", { ascending: false });
+    setApps(data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleApprove = async (app) => {
+    await supabase.from("vendor_applications").update({ status: "approved", approved_by: user.id }).eq("id", app.id);
+    load();
+  };
+
+  const handleDecline = async (app) => {
+    if (!window.confirm("Decline this vendor application?")) return;
+    await supabase.from("vendor_applications").update({ status: "declined" }).eq("id", app.id);
+    load();
+  };
+
+  const handleCreateLogin = async () => {
+    if (!password || password.length < 8) { alert("Password must be at least 8 characters."); return; }
+    setSaving(true);
+    const app = loginModal;
+
+    // Create auth user
+    const { data: authData, error: authErr } = await supabase.auth.admin ? 
+      { data: null, error: { message: "Use edge function" } } :
+      { data: null, error: { message: "Use edge function" } };
+
+    // Use edge function to create user
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch("https://okbduzenceoknkjqnrha.supabase.co/functions/v1/create-vendor-login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
+      body: JSON.stringify({
+        email: app.contact_email,
+        password,
+        name: app.vendor_name,
+        phone: app.phone,
+        company_name: app.vendor_name,
+        service_category: app.vendor_type,
+        application_id: app.id,
+      }),
+    });
+    const result = await res.json();
+
+    if (result.error) { alert("Failed: " + result.error); setSaving(false); return; }
+
+    await supabase.from("vendor_applications").update({ status: "login-created", profile_id: result.user_id }).eq("id", app.id);
+    setCreatedCreds({ email: app.contact_email, password });
+    setLoginModal(null);
+    setSaving(false);
+    load();
+    if (onLoginCreated) onLoginCreated();
+  };
+
+  const statusColor = { pending: T.amber, approved: T.teal, declined: T.red, "login-created": "#10B981" };
+  const statusLabel = { pending: "Pending", approved: "Approved", declined: "Declined", "login-created": "Login Created" };
+
+  return (
+    <div>
+      {createdCreds && (
+        <div style={{ background: T.teal + "15", border: `1px solid ${T.teal}40`, borderRadius: 10, padding: "14px 18px", marginBottom: 20 }}>
+          <div style={{ color: T.teal, fontWeight: 800, fontSize: 14, marginBottom: 8 }}>✓ Vendor Login Created</div>
+          <div style={{ color: T.textPrimary, fontSize: 13 }}>Email: <strong>{createdCreds.email}</strong></div>
+          <div style={{ color: T.textPrimary, fontSize: 13 }}>Password: <strong>{createdCreds.password}</strong></div>
+          <div style={{ color: T.textMuted, fontSize: 11, marginTop: 6 }}>Share these credentials with the vendor securely.</div>
+          <button onClick={() => setCreatedCreds(null)} style={{ marginTop: 8, background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "4px 12px", borderRadius: 6, cursor: "pointer", fontSize: 11 }}>Dismiss</button>
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {apps.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: 30 }}>No vendor applications yet.</div>}
+        {apps.map(app => (
+          <div key={app.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+              <div>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{app.vendor_name}</div>
+                <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{app.vendor_type} · {app.contact_person} · {app.contact_email}</div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{app.country} · {app.phone}</div>
+              </div>
+              <span style={{ background: (statusColor[app.status] || T.textMuted) + "18", color: statusColor[app.status] || T.textMuted, border: `1px solid ${(statusColor[app.status] || T.textMuted)}30`, borderRadius: 20, padding: "3px 12px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{statusLabel[app.status] || app.status}</span>
+            </div>
+
+            {/* Bank & docs summary */}
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 12 }}>
+              {app.bank_name && <span style={{ color: T.textMuted, fontSize: 11 }}>🏦 {app.bank_name} · {app.account_no}</span>}
+              {app.payment_terms && <span style={{ color: T.textMuted, fontSize: 11 }}>💳 {app.payment_terms}</span>}
+              {app.business_reg_url && <a href={app.business_reg_url} target="_blank" rel="noopener noreferrer" style={{ color: T.cyan, fontSize: 11, fontWeight: 700 }}>📄 Reg Certificate</a>}
+              {app.vat_cert_url && <a href={app.vat_cert_url} target="_blank" rel="noopener noreferrer" style={{ color: T.cyan, fontSize: 11, fontWeight: 700 }}>📄 VAT Certificate</a>}
+            </div>
+
+            {/* Actions */}
+            {user?.role === "CEO" && (
+              <div style={{ display: "flex", gap: 8 }}>
+                {app.status === "pending" && (
+                  <>
+                    <button onClick={() => handleApprove(app)} style={{ background: T.teal + "18", border: `1px solid ${T.teal}40`, color: T.teal, padding: "6px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>✓ Approve</button>
+                    <button onClick={() => handleDecline(app)} style={{ background: T.red + "18", border: `1px solid ${T.red}40`, color: T.red, padding: "6px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>✗ Decline</button>
+                  </>
+                )}
+                {app.status === "approved" && (
+                  <button onClick={() => { setLoginModal(app); setPassword(""); }} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "6px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>🔑 Create Login</button>
+                )}
+                {app.status === "login-created" && (
+                  <span style={{ color: "#10B981", fontSize: 12, fontWeight: 700 }}>✓ Portal access granted</span>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Create Login Modal */}
+      {loginModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 700, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setLoginModal(null)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, padding: 28, width: 400, boxShadow: "0 24px 80px rgba(0,0,0,0.4)" }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Create Vendor Login</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>{loginModal.vendor_name} · {loginModal.contact_email}</div>
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Set Password</label>
+            <input type="text" value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 8 characters" style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 20 }} />
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={handleCreateLogin} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Creating..." : "Create Login"}</button>
+              <button onClick={() => setLoginModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const VendorAssignmentView = ({ user }) => {
   const [rffs, setRffs] = useState([]);
   const [events, setEvents] = useState([]);

@@ -3198,6 +3198,9 @@ const VendorsView = ({ user }) => {
   const [clients, setClients] = useState([]);
   const [modal, setModal] = useState(false);
   const [expandedEvent, setExpandedEvent] = useState(null);
+  const [showAppModal, setShowAppModal] = useState(false);
+  const [showApprovalsPanel, setShowApprovalsPanel] = useState(false);
+  const [vendorApps, setVendorApps] = useState([]);
   const [expandedRff, setExpandedRff] = useState(null);
   const [form, setForm] = useState({ title: '', description: '', client_id: '', client_name: '', project_id: '', event_name: '', deadline: '' });
   const [file, setFile] = useState(null);
@@ -3209,15 +3212,17 @@ const VendorsView = ({ user }) => {
   const isVendorManager = user?.role === 'Vendor Manager';
 
   const load = async () => {
-    const [r, e, c] = await Promise.all([
+    const [r, e, c, apps] = await Promise.all([
       supabase.from('rffs').select('*').order('created_at', { ascending: false }),
       supabase.from('projects').select('*'),
       supabase.from('clients').select('*'),
+      supabase.from('vendor_applications').select('*').order('created_at', { ascending: false }),
     ]);
     // Show all RFFs for Vendor Manager/CEO/Admin
     setRffs(r.data || []);
     setEvents(e.data || []);
     setClients(c.data || []);
+    setVendorApps(apps.data || []);
   };
 
   useEffect(() => { load(); }, []);

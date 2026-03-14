@@ -529,13 +529,14 @@ const getNavItems = (role) => {
     base.push({ id: "strategy-overview", label: "Client Overview", icon: "▪" }, { id: "feedback-summary", label: "Feedback", icon: "▪" });
   }
   if (["CEO","Head of Operations"].includes(role)) {
-    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "rff-approvals", label: "RFF Approvals", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" });
+    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "rff-approvals", label: "RFF Approvals", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" });
   }
   if (role === "CEO") {
     base.push({ id: "vendor-onboarding", label: "Vendor Applications", icon: "▪" });
+    base.push({ id: "contract-awards", label: "Contract Awards", icon: "▪" });
   }
   if (role === "Vendor Manager") {
-    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" });
+    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "gig-confirmation", label: "Confirm Gigs", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" });
   }
   if (["CEO","Head of Operations","Vendor Manager","Finance Manager"].includes(role)) {
     base.push({ id: "invoices", label: "Invoices", icon: "▪" });
@@ -546,6 +547,10 @@ const getNavItems = (role) => {
   if (["CEO","Head of Operations","Finance Manager"].includes(role)) {
     base.push({ id: "finance", label: "Finance", icon: "▪" });
   }
+  if (["Finance Manager","CEO"].includes(role)) {
+    base.push({ id: "purchase-orders", label: "Purchase Orders", icon: "▪" });
+    base.push({ id: "vendor-invoices", label: "Vendor Invoices", icon: "▪" });
+  }
   if (["CEO"].includes(role)) {
     base.push({ id: "client-financials", label: "Client Financials", icon: "▪" });
   }
@@ -553,7 +558,7 @@ const getNavItems = (role) => {
     base.push({ id: "clients", label: "Clients", icon: "▪" }, { id: "users", label: "User Management", icon: "▪" });
   }
   if (role === "Vendor") {
-    base.push({ id: "rffs", label: "My RFFs", icon: "▪" }, { id: "quotes", label: "Quotes", icon: "▪" }, { id: "vendor-tasks", label: "My Tasks", icon: "▪" });
+    base.push({ id: "rffs", label: "My RFFs", icon: "▪" }, { id: "quotes", label: "Quotes", icon: "▪" }, { id: "vendor-invoices-submit", label: "My Invoices", icon: "▪" }, { id: "vendor-tasks", label: "My Tasks", icon: "▪" });
   }
   if (role === "Client") {
     base.push({ id: "client-events", label: "My Events", icon: "▪" }, { id: "client-finance", label: "Budget & Invoices", icon: "▪" }, { id: "client-docs", label: "Documents", icon: "▪" });
@@ -3649,13 +3654,30 @@ const VendorRFFsView = ({ user }) => {
       quote_filename = quoteFile.name;
     }
 
+    // Save quote to rff_vendor_assignments
+    await supabase.from('rff_vendor_assignments').update({
+      quote_amount: parseFloat(quoteAmount),
+      quote_document_url: quote_url,
+      quote_submitted_at: new Date().toISOString(),
+      quote_notes: quoteFile?.name || "",
+      status: 'quote-submitted',
+    }).eq('rff_id', quoteModal.id).eq('vendor_id', user.id);
+
+    // Also update RFF status
     await supabase.from('rffs').update({
       status: 'quote-submitted',
-      amount: parseFloat(quoteAmount),
       quote_url,
       quote_filename,
-      vendor: user?.name || 'Vendor',
     }).eq('id', quoteModal.id);
+
+    // Notify Vendor Manager
+    const { data: vms } = await supabase.from('profiles').select('id').eq('role', 'Vendor Manager');
+    if (vms) await Promise.all(vms.map(vm => supabase.from('notifications').insert({
+      user_id: vm.id,
+      title: 'Quote Submitted',
+      message: `${user.name} submitted a quote of GHS ${parseFloat(quoteAmount).toLocaleString()} for "${quoteModal.title}"`,
+      type: 'rff',
+    })));
 
     setQuoteModal(null);
     setQuoteAmount('');
@@ -6245,6 +6267,12 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "calendar": return <CalendarView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
       case "zoho-books": return <ZohoBooksView user={currentUser} />;
       case "vendor-onboarding": return <VendorOnboardingView user={currentUser} />;
+      case "quote-comparison": return <QuoteComparisonView user={currentUser} />;
+      case "contract-awards": return <ContractAwardApprovalView user={currentUser} />;
+      case "gig-confirmation": return <GigConfirmationView user={currentUser} />;
+      case "purchase-orders": return <PurchaseOrderView user={currentUser} />;
+      case "vendor-invoices": return <FinanceInvoicesView user={currentUser} />;
+      case "vendor-invoices-submit": return <VendorInvoiceView user={currentUser} />;
       case "notifications": return <NotificationsView user={currentUser} onNavigate={(tab, resourceId) => { setActiveTab(tab); if (resourceId) setPendingResourceId(resourceId); }} />;
       case "rffs": return <VendorRFFsView user={currentUser} />;
       case "quotes": return <VendorQuotesView user={currentUser} />;
@@ -8228,11 +8256,900 @@ const VendorRatingsView = ({ user }) => {
 
 
 // ─── RFF APPROVAL QUEUE (CEO) ─────────────────────────────────────────────────
+
+
+const ContractAwardApprovalView = ({ user }) => {
+  const [awards, setAwards] = useState([]);
+  const [previewAward, setPreviewAward] = useState(null);
+  const [ceoNotes, setCeoNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [rffs, setRffs] = useState([]);
+  const [budgets, setBudgets] = useState([]);
+
+  const load = async () => {
+    const { data: aw } = await supabase.from("rff_awards").select("*").order("created_at", { ascending: false });
+    const { data: rf } = await supabase.from("rffs").select("*");
+    const { data: bud } = await supabase.from("rff_budgets").select("*");
+    setAwards(aw || []);
+    setRffs(rf || []);
+    setBudgets(bud || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleApprove = async (award) => {
+    setSaving(true);
+    await supabase.from("rff_awards").update({ status: "approved_ceo", approved_by: user.id, ceo_notes: ceoNotes }).eq("id", award.id);
+    // Notify Vendor Manager
+    const { data: vms } = await supabase.from("profiles").select("id").eq("role", "Vendor Manager");
+    for (const vm of vms || []) {
+      await supabase.from("notifications").insert({
+        user_id: vm.id,
+        title: "Contract Award Approved",
+        message: `CEO approved awarding ${award.vendor_name} the contract. Please confirm the gig.`,
+        type: "rff",
+      });
+    }
+    setSaving(false); setPreviewAward(null); setCeoNotes(""); load();
+  };
+
+  const handleDecline = async (award) => {
+    if (!ceoNotes) { alert("Please add notes explaining the decline."); return; }
+    setSaving(true);
+    await supabase.from("rff_awards").update({ status: "declined_ceo", ceo_notes: ceoNotes }).eq("id", award.id);
+    const { data: vms } = await supabase.from("profiles").select("id").eq("role", "Vendor Manager");
+    for (const vm of vms || []) {
+      await supabase.from("notifications").insert({
+        user_id: vm.id,
+        title: "Contract Award Declined",
+        message: `CEO declined the award for ${award.vendor_name}. Notes: ${ceoNotes.slice(0,100)}`,
+        type: "rff",
+      });
+    }
+    setSaving(false); setPreviewAward(null); setCeoNotes(""); load();
+  };
+
+  const statusColor = { pending_ceo: T.amber, approved_ceo: T.teal, declined_ceo: T.red, confirmed: "#10B981", po_created: T.cyan };
+  const statusLabel = { pending_ceo: "Pending CEO Approval", approved_ceo: "Approved — Awaiting Confirmation", declined_ceo: "Declined by CEO", confirmed: "Confirmed", po_created: "PO Created" };
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Procurement</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Contract Awards</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{awards.filter(a => a.status === "pending_ceo").length} pending your approval</div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Pending Approval", value: awards.filter(a => a.status === "pending_ceo").length, color: T.amber },
+          { label: "Approved", value: awards.filter(a => ["approved_ceo","confirmed","po_created"].includes(a.status)).length, color: T.teal },
+          { label: "Confirmed", value: awards.filter(a => a.status === "confirmed").length, color: "#10B981" },
+          { label: "PO Created", value: awards.filter(a => a.status === "po_created").length, color: T.cyan },
+        ].map((k,i) => (
+          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 20, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginTop: 4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {awards.length === 0 && <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>No contract awards yet.</div>}
+        {awards.map(award => {
+          const rff = rffs.find(r => r.id === award.rff_id);
+          const rffBudgets = budgets.filter(b => b.rff_id === award.rff_id);
+          const totalBudget = rffBudgets.reduce((s, b) => s + (b.proposed_amount || 0), 0);
+          return (
+            <div key={award.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderLeft: `3px solid ${statusColor[award.status] || T.textMuted}`, borderRadius: 12, padding: "18px 20px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                <div>
+                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{award.vendor_name}</div>
+                  <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{rff?.title} · {rff?.event_name}</div>
+                  <div style={{ display: "flex", gap: 16, marginTop: 6 }}>
+                    <span style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>Quote: GHS {(award.quoted_amount || 0).toLocaleString()}</span>
+                    {totalBudget > 0 && <span style={{ color: T.cyan, fontSize: 13 }}>Budget: GHS {totalBudget.toLocaleString()}</span>}
+                  </div>
+                  {award.vendor_manager_notes && <div style={{ color: T.textMuted, fontSize: 12, marginTop: 6, fontStyle: "italic" }}>VM Notes: {award.vendor_manager_notes}</div>}
+                </div>
+                <span style={{ background: (statusColor[award.status] || T.textMuted) + "18", color: statusColor[award.status] || T.textMuted, border: `1px solid ${(statusColor[award.status] || T.textMuted)}30`, borderRadius: 20, padding: "3px 12px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{statusLabel[award.status] || award.status}</span>
+              </div>
+              <button onClick={() => { setPreviewAward(award); setCeoNotes(award.ceo_notes || ""); }} style={{ background: T.cyan + "15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "6px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>👁 Review</button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Preview Modal */}
+      {previewAward && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setPreviewAward(null)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 560, padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Contract Award Review</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>{previewAward.vendor_name}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, background: T.bg, borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
+              {[
+                ["Vendor", previewAward.vendor_name],
+                ["Quoted Amount", `GHS ${(previewAward.quoted_amount||0).toLocaleString()}`],
+                ["Proposed Budget", `GHS ${(previewAward.proposed_budget||0).toLocaleString()}`],
+                ["Variance", previewAward.quoted_amount <= (previewAward.proposed_budget||0) ? "✓ Within budget" : `⚠ Over by GHS ${((previewAward.quoted_amount||0)-(previewAward.proposed_budget||0)).toLocaleString()}`],
+              ].map(([l,v]) => (
+                <div key={l}><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{l}</div><div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600, marginTop: 3 }}>{v}</div></div>
+              ))}
+            </div>
+            {previewAward.vendor_manager_notes && (
+              <div style={{ background: T.cyan + "10", border: `1px solid ${T.cyan}25`, borderRadius: 8, padding: "10px 14px", marginBottom: 16 }}>
+                <div style={{ color: T.cyan, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>Vendor Manager Notes</div>
+                <div style={{ color: T.textSecondary, fontSize: 13 }}>{previewAward.vendor_manager_notes}</div>
+              </div>
+            )}
+            {previewAward.status === "pending_ceo" && (
+              <>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>CEO Notes</label>
+                  <textarea value={ceoNotes} onChange={e => setCeoNotes(e.target.value)} rows={3} placeholder="Add notes..." style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", resize: "vertical" }} />
+                </div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button onClick={() => handleApprove(previewAward)} disabled={saving} style={{ background: "linear-gradient(135deg, #10B981, #059669)", border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>✓ Approve Award</button>
+                  <button onClick={() => handleDecline(previewAward)} disabled={saving} style={{ background: T.red + "18", border: `1px solid ${T.red}40`, color: T.red, padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>✗ Decline</button>
+                  <button onClick={() => setPreviewAward(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+                </div>
+              </>
+            )}
+            {previewAward.status !== "pending_ceo" && (
+              <button onClick={() => setPreviewAward(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Close</button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const GigConfirmationView = ({ user }) => {
+  const [awards, setAwards] = useState([]);
+  const [rffs, setRffs] = useState([]);
+  const [saving, setSaving] = useState(false);
+
+  const load = async () => {
+    const { data: aw } = await supabase.from("rff_awards").select("*").in("status", ["approved_ceo","confirmed"]).order("created_at", { ascending: false });
+    const { data: rf } = await supabase.from("rffs").select("*");
+    setAwards(aw || []);
+    setRffs(rf || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleConfirm = async (award) => {
+    if (!window.confirm(`Confirm gig for ${award.vendor_name}? This will notify Finance to create a Purchase Order.`)) return;
+    setSaving(true);
+    await supabase.from("rff_awards").update({ status: "confirmed", confirmed_at: new Date().toISOString() }).eq("id", award.id);
+    // Notify Finance Manager
+    const { data: fms } = await supabase.from("profiles").select("id").in("role", ["Finance Manager","CEO"]);
+    for (const fm of fms || []) {
+      await supabase.from("notifications").insert({
+        user_id: fm.id,
+        title: "Gig Confirmed — Create PO",
+        message: `${award.vendor_name} confirmed for "${rffs.find(r => r.id === award.rff_id)?.title}". Please create a Purchase Order.`,
+        type: "rff",
+      });
+    }
+    setSaving(false); load();
+  };
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Procurement</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Confirm Gigs</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{awards.filter(a => a.status === "approved_ceo").length} awaiting your confirmation</div>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {awards.length === 0 && <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>No approved awards to confirm.</div>}
+        {awards.map(award => {
+          const rff = rffs.find(r => r.id === award.rff_id);
+          return (
+            <div key={award.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderLeft: `3px solid ${award.status === "confirmed" ? "#10B981" : T.teal}`, borderRadius: 12, padding: "18px 20px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{award.vendor_name}</div>
+                  <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{rff?.title} · {rff?.event_name}</div>
+                  <div style={{ color: T.amber, fontWeight: 700, fontSize: 13, marginTop: 4 }}>GHS {(award.quoted_amount || 0).toLocaleString()}</div>
+                  {award.ceo_notes && <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4, fontStyle: "italic" }}>CEO: {award.ceo_notes}</div>}
+                </div>
+                {award.status === "approved_ceo" && (
+                  <button onClick={() => handleConfirm(award)} disabled={saving} style={{ background: "linear-gradient(135deg, #10B981, #059669)", border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>✓ Confirm Gig</button>
+                )}
+                {award.status === "confirmed" && <span style={{ color: "#10B981", fontWeight: 700, fontSize: 13 }}>✓ Confirmed</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const PurchaseOrderView = ({ user }) => {
+  const [awards, setAwards] = useState([]);
+  const [pos, setPOs] = useState([]);
+  const [rffs, setRffs] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [poModal, setPoModal] = useState(null);
+  const [poForm, setPoForm] = useState({ currency: "GHS", notes: "" });
+  const [saving, setSaving] = useState(false);
+  const [zohoStatus, setZohoStatus] = useState("");
+
+  const load = async () => {
+    const [{ data: aw }, { data: po }, { data: rf }, { data: ev }] = await Promise.all([
+      supabase.from("rff_awards").select("*").eq("status", "confirmed"),
+      supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }),
+      supabase.from("rffs").select("*"),
+      supabase.from("projects").select("*"),
+    ]);
+    setAwards(aw || []);
+    setPOs(po || []);
+    setRffs(rf || []);
+    setEvents(ev || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleCreatePO = async () => {
+    if (!poModal) return;
+    setSaving(true);
+    setZohoStatus("");
+    const rff = rffs.find(r => r.id === poModal.rff_id);
+    const event = events.find(e => e.id === rff?.project_id);
+
+    // Create PO in Supabase
+    const { data: po } = await supabase.from("purchase_orders").insert({
+      rff_id: poModal.rff_id,
+      rff_award_id: poModal.id,
+      vendor_id: poModal.vendor_id,
+      vendor_name: poModal.vendor_name,
+      event_id: rff?.project_id,
+      event_name: rff?.event_name || event?.name,
+      amount: poModal.quoted_amount,
+      currency: poForm.currency,
+      notes: poForm.notes,
+      status: "draft",
+      created_by: user.id,
+    }).select().single();
+
+    // Push to Zoho Books
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const zohoRes = await fetch("/api/zoho-sync?action=create-po", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
+        body: JSON.stringify({
+          vendor_name: poModal.vendor_name,
+          amount: poModal.quoted_amount,
+          currency: poForm.currency,
+          notes: poForm.notes,
+          rff_title: rff?.title,
+          event_name: rff?.event_name,
+          po_id: po?.id,
+        }),
+      });
+      const zohoData = await zohoRes.json();
+      if (zohoData.purchaseorder) {
+        await supabase.from("purchase_orders").update({
+          zoho_po_id: zohoData.purchaseorder.purchaseorder_id,
+          zoho_po_number: zohoData.purchaseorder.purchaseorder_number,
+          status: "sent",
+        }).eq("id", po.id);
+        setZohoStatus(`✅ PO ${zohoData.purchaseorder.purchaseorder_number} created in Zoho Books`);
+      }
+    } catch (e) {
+      setZohoStatus("⚠ PO saved locally. Zoho sync failed: " + e.message);
+    }
+
+    // Update award status
+    await supabase.from("rff_awards").update({ status: "po_created" }).eq("id", poModal.id);
+
+    // Notify vendor
+    if (poModal.vendor_id) {
+      await supabase.from("notifications").insert({
+        user_id: poModal.vendor_id,
+        title: "Purchase Order Created",
+        message: `A Purchase Order has been raised for your services on "${rff?.event_name}". Please submit your invoice.`,
+        type: "rff",
+      });
+    }
+
+    setSaving(false);
+    setPoModal(null);
+    load();
+  };
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Purchase Orders</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{awards.length} confirmed gigs awaiting PO · {pos.length} POs created</div>
+      </div>
+
+      {zohoStatus && <div style={{ padding: "10px 14px", background: T.teal + "12", border: `1px solid ${T.teal}30`, borderRadius: 8, color: T.teal, fontSize: 13, marginBottom: 16 }}>{zohoStatus}</div>}
+
+      {/* Confirmed gigs needing PO */}
+      {awards.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ color: T.amber, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>⚠ Confirmed Gigs — Create PO</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {awards.map(award => {
+              const rff = rffs.find(r => r.id === award.rff_id);
+              return (
+                <div key={award.id} style={{ background: T.surface, border: `1px solid ${T.amber}30`, borderLeft: `3px solid ${T.amber}`, borderRadius: 12, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{award.vendor_name}</div>
+                    <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{rff?.title} · {rff?.event_name}</div>
+                    <div style={{ color: T.amber, fontWeight: 700, fontSize: 13, marginTop: 4 }}>GHS {(award.quoted_amount || 0).toLocaleString()}</div>
+                  </div>
+                  <button onClick={() => { setPoModal(award); setPoForm({ currency: "GHS", notes: "" }); }} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>Create PO</button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Existing POs */}
+      {pos.length > 0 && (
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Purchase Orders</div>
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
+                  {["PO Number","Vendor","Event","Amount","Zoho Status","Status"].map(h => (
+                    <th key={h} style={{ padding: "10px 14px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {pos.map((po, i) => (
+                  <tr key={po.id} style={{ borderBottom: i < pos.length-1 ? `1px solid ${T.border}44` : "none" }}
+                    onMouseEnter={e => e.currentTarget.style.background = T.bg}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                    <td style={{ padding: "10px 14px", color: T.cyan, fontSize: 12, fontWeight: 700 }}>{po.zoho_po_number || "—"}</td>
+                    <td style={{ padding: "10px 14px", color: T.textPrimary, fontSize: 12, fontWeight: 600 }}>{po.vendor_name}</td>
+                    <td style={{ padding: "10px 14px", color: T.textSecondary, fontSize: 12 }}>{po.event_name}</td>
+                    <td style={{ padding: "10px 14px", color: T.amber, fontSize: 12, fontWeight: 700 }}>{po.currency} {(po.amount||0).toLocaleString()}</td>
+                    <td style={{ padding: "10px 14px" }}><span style={{ color: po.zoho_po_id ? T.teal : T.textMuted, fontSize: 11, fontWeight: 600 }}>{po.zoho_po_id ? "✓ In Zoho" : "Local only"}</span></td>
+                    <td style={{ padding: "10px 14px" }}><span style={{ background: T.teal + "18", color: T.teal, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{po.status}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Create PO Modal */}
+      {poModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setPoModal(null)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 480, padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Create Purchase Order</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>{poModal.vendor_name}</div>
+            <div style={{ background: T.bg, borderRadius: 10, padding: "12px 16px", marginBottom: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {[["Vendor", poModal.vendor_name], ["Amount", `GHS ${(poModal.quoted_amount||0).toLocaleString()}`]].map(([l,v]) => (
+                  <div key={l}><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{l}</div><div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600, marginTop: 3 }}>{v}</div></div>
+                ))}
+              </div>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Currency</label>
+              <select value={poForm.currency} onChange={e => setPoForm({...poForm, currency: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                {["GHS","USD","EUR","GBP","NGN","KES"].map(c => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Notes</label>
+              <textarea value={poForm.notes} onChange={e => setPoForm({...poForm, notes: e.target.value})} rows={3} placeholder="PO notes, delivery terms..." style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", resize: "vertical" }} />
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={handleCreatePO} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Creating..." : "Create PO + Sync to Zoho"}</button>
+              <button onClick={() => setPoModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const VendorInvoiceView = ({ user }) => {
+  const [invoices, setInvoices] = useState([]);
+  const [pos, setPOs] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [form, setForm] = useState({ event_id: "", purchase_order_id: "", amount: "", notes: "" });
+  const [invoiceFile, setInvoiceFile] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const fileRef = React.useRef();
+
+  const load = async () => {
+    const [{ data: inv }, { data: po }, { data: ev }] = await Promise.all([
+      supabase.from("vendor_invoices").select("*").eq("vendor_id", user.id).order("created_at", { ascending: false }),
+      supabase.from("purchase_orders").select("*").eq("vendor_id", user.id),
+      supabase.from("projects").select("*"),
+    ]);
+    setInvoices(inv || []);
+    setPOs(po || []);
+    setEvents(ev || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleSubmit = async () => {
+    if (!form.event_id || !form.amount) { alert("Please select an event and enter the amount."); return; }
+    setSaving(true);
+    let invoice_url = "", invoice_filename = "";
+    if (invoiceFile) {
+      const ext = invoiceFile.name.split(".").pop();
+      const filename = `invoice_${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("rffs").upload(filename, invoiceFile, { upsert: true });
+      if (!error) {
+        const { data } = supabase.storage.from("rffs").getPublicUrl(filename);
+        invoice_url = data.publicUrl;
+        invoice_filename = invoiceFile.name;
+      }
+    }
+    const event = events.find(e => e.id === form.event_id);
+    const po = pos.find(p => p.id === form.purchase_order_id);
+    await supabase.from("vendor_invoices").insert({
+      vendor_id: user.id,
+      vendor_name: user.name,
+      event_id: form.event_id,
+      event_name: event?.name || "",
+      purchase_order_id: form.purchase_order_id || null,
+      amount: parseFloat(form.amount) || 0,
+      invoice_url,
+      invoice_filename,
+      notes: form.notes,
+      status: "submitted",
+    });
+    // Notify Finance
+    const { data: fms } = await supabase.from("profiles").select("id").in("role", ["Finance Manager","CEO"]);
+    for (const fm of fms || []) {
+      await supabase.from("notifications").insert({
+        user_id: fm.id,
+        title: "Invoice Received",
+        message: `${user.name} submitted an invoice of GHS ${parseFloat(form.amount).toLocaleString()} for "${event?.name}".`,
+        type: "rff",
+      });
+    }
+    setSaving(false);
+    setModal(false);
+    setForm({ event_id: "", purchase_order_id: "", amount: "", notes: "" });
+    setInvoiceFile(null);
+    load();
+  };
+
+  const statusColor = { submitted: T.amber, reviewed: T.teal, paid: "#10B981" };
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>My Invoices</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Submit invoices per event</div>
+        </div>
+        <button onClick={() => setModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>+ Submit Invoice</button>
+      </div>
+
+      {invoices.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>🧾</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No invoices submitted</div>
+          <div style={{ color: T.textMuted, fontSize: 13 }}>Submit your first invoice using the button above.</div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {invoices.map(inv => (
+            <div key={inv.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderLeft: `3px solid ${statusColor[inv.status] || T.textMuted}`, borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{inv.event_name}</div>
+                <div style={{ color: T.amber, fontWeight: 700, fontSize: 13, marginTop: 3 }}>GHS {(inv.amount||0).toLocaleString()}</div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{new Date(inv.created_at).toLocaleDateString("en-GB")}</div>
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                {inv.invoice_url && <a href={inv.invoice_url} target="_blank" rel="noopener noreferrer" style={{ color: T.cyan, fontSize: 12, fontWeight: 700 }}>📄 View</a>}
+                <span style={{ background: (statusColor[inv.status]||T.textMuted)+"18", color: statusColor[inv.status]||T.textMuted, border: `1px solid ${(statusColor[inv.status]||T.textMuted)}30`, borderRadius: 20, padding: "3px 12px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{inv.status}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {modal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setModal(false)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 480, padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 20 }}>Submit Invoice</div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Event</label>
+              <select value={form.event_id} onChange={e => setForm({...form, event_id: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                <option value="">Select event...</option>
+                {events.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+              </select>
+            </div>
+            {pos.length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Purchase Order (if any)</label>
+                <select value={form.purchase_order_id} onChange={e => setForm({...form, purchase_order_id: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                  <option value="">No PO / Select PO...</option>
+                  {pos.map(p => <option key={p.id} value={p.id}>{p.zoho_po_number || "PO"} · {p.event_name} · GHS {(p.amount||0).toLocaleString()}</option>)}
+                </select>
+              </div>
+            )}
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Invoice Amount (GHS)</label>
+              <input type="number" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} placeholder="0.00" style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Upload Invoice Document</label>
+              <div onClick={() => fileRef.current.click()} style={{ border: `2px dashed ${T.border}`, borderRadius: 8, padding: "14px", textAlign: "center", cursor: "pointer", background: T.bg }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = T.cyan + "60"}
+                onMouseLeave={e => e.currentTarget.style.borderColor = T.border}>
+                <div style={{ color: T.textMuted, fontSize: 12 }}>{invoiceFile ? `✓ ${invoiceFile.name}` : "Drop file here or browse"}</div>
+              </div>
+              <input ref={fileRef} type="file" onChange={e => setInvoiceFile(e.target.files[0])} style={{ display: "none" }} />
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Notes</label>
+              <textarea value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} rows={2} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", resize: "vertical" }} />
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={handleSubmit} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Submitting..." : "Submit Invoice"}</button>
+              <button onClick={() => setModal(false)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const FinanceInvoicesView = ({ user }) => {
+  const [invoices, setInvoices] = useState([]);
+  const [saving, setSaving] = useState(false);
+
+  const load = async () => {
+    const { data } = await supabase.from("vendor_invoices").select("*").order("created_at", { ascending: false });
+    setInvoices(data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const updateStatus = async (id, status) => {
+    await supabase.from("vendor_invoices").update({ status, reviewed_by: user.id }).eq("id", id);
+    load();
+  };
+
+  const statusColor = { submitted: T.amber, reviewed: T.teal, paid: "#10B981" };
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Vendor Invoices</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{invoices.filter(i => i.status === "submitted").length} new invoices to review</div>
+      </div>
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+        {invoices.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>No invoices received yet.</div>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
+                {["Vendor","Event","Amount","Document","Date","Status","Actions"].map(h => (
+                  <th key={h} style={{ padding: "10px 14px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.map((inv, i) => (
+                <tr key={inv.id} style={{ borderBottom: i < invoices.length-1 ? `1px solid ${T.border}44` : "none" }}
+                  onMouseEnter={e => e.currentTarget.style.background = T.bg}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  <td style={{ padding: "10px 14px", color: T.textPrimary, fontSize: 12, fontWeight: 700 }}>{inv.vendor_name}</td>
+                  <td style={{ padding: "10px 14px", color: T.textSecondary, fontSize: 12 }}>{inv.event_name}</td>
+                  <td style={{ padding: "10px 14px", color: T.amber, fontSize: 12, fontWeight: 700 }}>GHS {(inv.amount||0).toLocaleString()}</td>
+                  <td style={{ padding: "10px 14px" }}>{inv.invoice_url ? <a href={inv.invoice_url} target="_blank" rel="noopener noreferrer" style={{ color: T.cyan, fontSize: 12, fontWeight: 700 }}>📄 View</a> : <span style={{ color: T.textMuted, fontSize: 11 }}>No doc</span>}</td>
+                  <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 11 }}>{new Date(inv.created_at).toLocaleDateString("en-GB")}</td>
+                  <td style={{ padding: "10px 14px" }}><span style={{ background: (statusColor[inv.status]||T.textMuted)+"18", color: statusColor[inv.status]||T.textMuted, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{inv.status}</span></td>
+                  <td style={{ padding: "10px 14px" }}>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {inv.status === "submitted" && <button onClick={() => updateStatus(inv.id, "reviewed")} style={{ background: T.teal + "18", border: `1px solid ${T.teal}30`, color: T.teal, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>Review</button>}
+                      {inv.status === "reviewed" && <button onClick={() => updateStatus(inv.id, "paid")} style={{ background: "#10B98118", border: "1px solid #10B98130", color: "#10B981", padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>Mark Paid</button>}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const QuoteComparisonView = ({ user }) => {
+  const [events, setEvents] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState("");
+  const [rffs, setRffs] = useState([]);
+  const [selectedRff, setSelectedRff] = useState("");
+  const [assignments, setAssignments] = useState([]);
+  const [budgets, setBudgets] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [compareVendors, setCompareVendors] = useState([]);
+  const [awardModal, setAwardModal] = useState(null);
+  const [awardNotes, setAwardNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [awards, setAwards] = useState([]);
+
+  const load = async () => {
+    const { data: ev } = await supabase.from("projects").select("*").order("name");
+    setEvents(ev || []);
+    const { data: aw } = await supabase.from("rff_awards").select("*");
+    setAwards(aw || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const loadRffs = async (eventId) => {
+    const { data } = await supabase.from("rffs").select("*").eq("project_id", eventId).in("status", ["quote-submitted","quote-approved","vendor-assigned"]);
+    setRffs(data || []);
+    setSelectedRff("");
+    setAssignments([]);
+    setBudgets([]);
+  };
+
+  const loadQuotes = async (rffId) => {
+    const [{ data: asn }, { data: bud }] = await Promise.all([
+      supabase.from("rff_vendor_assignments").select("*, profiles(name, email)").eq("rff_id", rffId),
+      supabase.from("rff_budgets").select("*").eq("rff_id", rffId),
+    ]);
+    setAssignments(asn || []);
+    setBudgets(bud || []);
+    setSelectedCategory("all");
+    setCompareVendors([]);
+  };
+
+  const categories = [...new Set(budgets.map(b => b.category))];
+  const totalBudget = budgets.reduce((sum, b) => sum + (b.proposed_amount || 0), 0);
+  const quotedAssignments = assignments.filter(a => a.quote_amount);
+  const filteredAssignments = selectedCategory === "all" ? quotedAssignments : quotedAssignments;
+
+  const toggleCompare = (id) => {
+    setCompareVendors(prev => prev.includes(id) ? prev.filter(v => v !== id) : prev.length < 2 ? [...prev, id] : [prev[1], id]);
+  };
+
+  const handleAward = async () => {
+    if (!awardModal) return;
+    setSaving(true);
+    const assignment = assignments.find(a => a.id === awardModal.id);
+    const rff = rffs.find(r => r.id === selectedRff);
+    await supabase.from("rff_awards").insert({
+      rff_id: selectedRff,
+      vendor_id: awardModal.vendor_id,
+      vendor_name: awardModal.vendor_name,
+      quoted_amount: awardModal.quote_amount,
+      proposed_budget: totalBudget,
+      vendor_manager_notes: awardNotes,
+      status: "pending_ceo",
+      awarded_by: user.id,
+    });
+    // Notify CEO
+    const { data: ceos } = await supabase.from("profiles").select("id").eq("role", "CEO");
+    for (const ceo of ceos || []) {
+      await supabase.from("notifications").insert({
+        user_id: ceo.id,
+        title: "Contract Award Pending Approval",
+        message: `${user.name} has nominated ${awardModal.vendor_name} for "${rff?.title}". Quote: GHS ${awardModal.quote_amount?.toLocaleString()}. Please review.`,
+        type: "rff",
+      });
+    }
+    setSaving(false);
+    setAwardModal(null);
+    setAwardNotes("");
+    load();
+    loadQuotes(selectedRff);
+  };
+
+  const selectedRffData = rffs.find(r => r.id === selectedRff);
+  const compareData = compareVendors.map(id => assignments.find(a => a.id === id)).filter(Boolean);
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Procurement</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Quote Comparison</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Compare vendor quotes against proposed budgets per event</div>
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 24 }}>
+        <div>
+          <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Select Event</label>
+          <select value={selectedEvent} onChange={e => { setSelectedEvent(e.target.value); loadRffs(e.target.value); }} style={{ width: "100%", padding: "9px 12px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+            <option value="">Choose event...</option>
+            {events.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Select RFF</label>
+          <select value={selectedRff} onChange={e => { setSelectedRff(e.target.value); loadQuotes(e.target.value); }} style={{ width: "100%", padding: "9px 12px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} disabled={!selectedEvent}>
+            <option value="">Choose RFF...</option>
+            {rffs.map(r => <option key={r.id} value={r.id}>{r.title}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Filter by Category</label>
+          <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} style={{ width: "100%", padding: "9px 12px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} disabled={!selectedRff}>
+            <option value="all">All Categories</option>
+            {categories.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {selectedRff && (
+        <>
+          {/* Budget vs Quotes KPI */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
+            {[
+              { label: "Proposed Budget", value: `GHS ${totalBudget.toLocaleString()}`, color: T.cyan },
+              { label: "Quotes Received", value: quotedAssignments.length, color: T.teal },
+              { label: "Lowest Quote", value: quotedAssignments.length > 0 ? `GHS ${Math.min(...quotedAssignments.map(a => a.quote_amount)).toLocaleString()}` : "—", color: "#10B981" },
+              { label: "Highest Quote", value: quotedAssignments.length > 0 ? `GHS ${Math.max(...quotedAssignments.map(a => a.quote_amount)).toLocaleString()}` : "—", color: T.amber },
+            ].map((k, i) => (
+              <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+                <div style={{ color: k.color, fontSize: 18, fontWeight: 900 }}>{k.value}</div>
+                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginTop: 4 }}>{k.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Budget Lines */}
+          {budgets.length > 0 && (
+            <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 12, padding: "16px 20px", marginBottom: 20 }}>
+              <div style={{ color: T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>CEO Proposed Budget Breakdown</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
+                {budgets.map(b => (
+                  <div key={b.id} style={{ background: T.bg, borderRadius: 8, padding: "10px 14px", border: `1px solid ${T.border}` }}>
+                    <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{b.category}</div>
+                    <div style={{ color: T.cyan, fontWeight: 900, fontSize: 16, marginTop: 4 }}>GHS {(b.proposed_amount || 0).toLocaleString()}</div>
+                    {b.notes && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{b.notes}</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Quote Comparison Chart */}
+          {quotedAssignments.length > 0 && (
+            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px", marginBottom: 20 }}>
+              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 16 }}>Quote Comparison Chart</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {/* Budget line */}
+                {totalBudget > 0 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ width: 120, color: T.cyan, fontSize: 11, fontWeight: 700, textAlign: "right", flexShrink: 0 }}>Proposed Budget</div>
+                    <div style={{ flex: 1, height: 28, background: T.border + "44", borderRadius: 4, overflow: "hidden", position: "relative" }}>
+                      <div style={{ height: "100%", width: "100%", background: `linear-gradient(90deg, ${T.cyan}40, ${T.cyan}20)`, borderRadius: 4, border: `2px dashed ${T.cyan}`, boxSizing: "border-box" }} />
+                    </div>
+                    <div style={{ width: 120, color: T.cyan, fontSize: 12, fontWeight: 700, flexShrink: 0 }}>GHS {totalBudget.toLocaleString()}</div>
+                  </div>
+                )}
+                {quotedAssignments.map((a, idx) => {
+                  const pct = totalBudget > 0 ? Math.min((a.quote_amount / totalBudget) * 100, 150) : 50;
+                  const barColor = a.quote_amount <= totalBudget ? T.teal : T.red;
+                  const isSelected = compareVendors.includes(a.id);
+                  const isAwarded = awards.some(aw => aw.rff_id === selectedRff && aw.vendor_id === a.vendor_id);
+                  return (
+                    <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ width: 120, color: isSelected ? T.amber : T.textSecondary, fontSize: 11, fontWeight: isSelected ? 800 : 400, textAlign: "right", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.vendor_name}</div>
+                      <div style={{ flex: 1, height: 28, background: T.border + "44", borderRadius: 4, overflow: "hidden", position: "relative", cursor: "pointer" }} onClick={() => toggleCompare(a.id)}>
+                        <div style={{ height: "100%", width: `${pct}%`, background: `linear-gradient(90deg, ${barColor}, ${barColor}99)`, borderRadius: 4, transition: "width 0.4s ease", border: isSelected ? `2px solid ${T.amber}` : "none", boxSizing: "border-box" }} />
+                      </div>
+                      <div style={{ width: 120, color: barColor, fontSize: 12, fontWeight: 700, flexShrink: 0 }}>GHS {(a.quote_amount || 0).toLocaleString()}</div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button onClick={() => toggleCompare(a.id)} style={{ background: isSelected ? T.amber + "20" : T.surface, border: `1px solid ${isSelected ? T.amber : T.border}`, color: isSelected ? T.amber : T.textMuted, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>{isSelected ? "✓ Selected" : "Compare"}</button>
+                        {a.quote_document_url && <a href={a.quote_document_url} target="_blank" rel="noopener noreferrer" style={{ background: T.cyan + "15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 700, textDecoration: "none" }}>📄 Doc</a>}
+                        {!isAwarded && user?.role === "Vendor Manager" && (
+                          <button onClick={() => setAwardModal(a)} style={{ background: "#10B98115", border: "1px solid #10B98130", color: "#10B981", padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>🏆 Award</button>
+                        )}
+                        {isAwarded && <span style={{ color: "#10B981", fontSize: 10, fontWeight: 700 }}>✓ Awarded</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Side by Side Comparison */}
+          {compareData.length === 2 && (
+            <div style={{ background: T.surface, border: `1px solid ${T.amber}30`, borderRadius: 12, padding: "20px", marginBottom: 20 }}>
+              <div style={{ color: T.amber, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Side-by-Side Comparison</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0 }}>
+                <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}></div>
+                {compareData.map(a => (
+                  <div key={a.id} style={{ padding: "10px 14px", background: T.amber + "10", borderRadius: 8, textAlign: "center", margin: "0 6px" }}>
+                    <div style={{ color: T.amber, fontWeight: 900, fontSize: 14 }}>{a.vendor_name}</div>
+                  </div>
+                ))}
+                {[
+                  ["Total Quote", (a) => `GHS ${(a.quote_amount || 0).toLocaleString()}`],
+                  ["vs Budget", (a) => totalBudget > 0 ? `${a.quote_amount <= totalBudget ? "✓ Within" : "⚠ Over"} by GHS ${Math.abs(a.quote_amount - totalBudget).toLocaleString()}` : "No budget set"],
+                  ["Submitted", (a) => a.quote_submitted_at ? new Date(a.quote_submitted_at).toLocaleDateString("en-GB") : "—"],
+                  ["Document", (a) => a.quote_document_url ? "📄 Available" : "No doc"],
+                ].map(([label, fn]) => (
+                  <React.Fragment key={label}>
+                    <div style={{ padding: "10px 0", color: T.textMuted, fontSize: 12, display: "flex", alignItems: "center" }}>{label}</div>
+                    {compareData.map(a => (
+                      <div key={a.id} style={{ padding: "10px 14px", textAlign: "center", borderBottom: `1px solid ${T.border}44` }}>
+                        <span style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{fn(a)}</span>
+                      </div>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {quotedAssignments.length === 0 && (
+            <div style={{ textAlign: "center", padding: "40px 0", background: T.surface, borderRadius: 12, border: `1px solid ${T.border}`, color: T.textMuted, fontSize: 13 }}>No quotes submitted for this RFF yet.</div>
+          )}
+        </>
+      )}
+
+      {!selectedRff && (
+        <div style={{ textAlign: "center", padding: "60px 0", background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>📊</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>Select an Event and RFF</div>
+          <div style={{ color: T.textMuted, fontSize: 13 }}>Choose an event and RFF above to compare vendor quotes.</div>
+        </div>
+      )}
+
+      {/* Award Modal */}
+      {awardModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setAwardModal(null)}>
+          <div style={{ background: T.surface, border: `1px solid #10B98140`, borderRadius: 16, width: "100%", maxWidth: 500, padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Award Contract</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>Nominate {awardModal.vendor_name} for this RFF</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16, background: T.bg, borderRadius: 8, padding: "12px 14px" }}>
+              <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Vendor</div><div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13, marginTop: 3 }}>{awardModal.vendor_name}</div></div>
+              <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Quote</div><div style={{ color: "#10B981", fontWeight: 900, fontSize: 16, marginTop: 3 }}>GHS {(awardModal.quote_amount || 0).toLocaleString()}</div></div>
+              <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Proposed Budget</div><div style={{ color: T.cyan, fontWeight: 700, fontSize: 13, marginTop: 3 }}>GHS {totalBudget.toLocaleString()}</div></div>
+              <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Variance</div><div style={{ color: awardModal.quote_amount <= totalBudget ? T.teal : T.red, fontWeight: 700, fontSize: 13, marginTop: 3 }}>{awardModal.quote_amount <= totalBudget ? "✓ Within budget" : `⚠ Over by GHS ${(awardModal.quote_amount - totalBudget).toLocaleString()}`}</div></div>
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Award Notes (sent to CEO)</label>
+              <textarea value={awardNotes} onChange={e => setAwardNotes(e.target.value)} rows={3} placeholder="Reason for selection, notes for CEO..." style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", resize: "vertical" }} />
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={handleAward} disabled={saving} style={{ background: "linear-gradient(135deg, #10B981, #059669)", border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Submitting..." : "🏆 Nominate & Send to CEO"}</button>
+              <button onClick={() => setAwardModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const RFFApprovalsView = ({ user }) => {
   const [rffs, setRffs] = useState([]);
   const [actionModal, setActionModal] = useState(null);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [budgetLines, setBudgetLines] = useState([{ category: "", proposed_amount: "", notes: "" }]);
 
   const load = () => {
     supabase.from("rffs").select("*").in("status", ["pending", "declined"]).eq("approved", false).order("created_at", { ascending: false }).then(({ data }) => setRffs(data || []));
@@ -8243,10 +9160,21 @@ const RFFApprovalsView = ({ user }) => {
   const handleApprove = async (rff) => {
     setSaving(true);
     await supabase.from("rffs").update({ approved: true, status: "approved", status_notes: notes }).eq("id", rff.id);
+    // Save budget lines
+    const validLines = budgetLines.filter(l => l.category && l.proposed_amount);
+    if (validLines.length > 0) {
+      await supabase.from("rff_budgets").insert(validLines.map(l => ({
+        rff_id: rff.id,
+        category: l.category,
+        proposed_amount: parseFloat(l.proposed_amount) || 0,
+        notes: l.notes || "",
+        created_by: user.id,
+      })));
+    }
     // Notify Vendor Manager
     const { data: vms } = await supabase.from("profiles").select("id").eq("role", "Vendor Manager");
-    if (vms) await Promise.all(vms.map(vm => supabase.from("notifications").insert({ user_id: vm.id, title: "RFF Approved", message: `RFF "${rff.title}" for ${rff.event_name} has been approved. Proceed to vendor assignment.`, type: "rff" })));
-    setSaving(false); setActionModal(null); setNotes(""); load();
+    if (vms) await Promise.all(vms.map(vm => supabase.from("notifications").insert({ user_id: vm.id, title: "RFF Approved with Budget", message: `RFF "${rff.title}" for ${rff.event_name} has been approved with proposed budget. Proceed to vendor assignment.`, type: "rff" })));
+    setSaving(false); setActionModal(null); setNotes(""); setBudgetLines([{ category: "", proposed_amount: "", notes: "" }]); load();
   };
 
   const handleDecline = async (rff) => {
@@ -8309,7 +9237,7 @@ const RFFApprovalsView = ({ user }) => {
                     </div>
                     {r.document_url && <a href={r.document_url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.cyan, fontSize: 12, fontWeight: 600, textDecoration: "none", background: T.cyan + "15", padding: "5px 12px", borderRadius: 6, border: "1px solid " + T.cyan + "33", marginBottom: 12 }}>📄 View RFF Document</a>}
                     <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                      <button onClick={() => { setActionModal({ rff: r, action: "approve" }); setNotes(""); }} style={{ flex: 1, padding: "8px", background: T.teal + "20", border: "1px solid " + T.teal + "44", borderRadius: 8, cursor: "pointer", color: T.teal, fontSize: 12, fontWeight: 700 }}>✓ Approve</button>
+                      <button onClick={() => { setActionModal({ rff: r, action: "approve" }); setNotes(""); setBudgetLines([{ category: "", proposed_amount: "", notes: "" }]); }} style={{ flex: 1, padding: "8px", background: T.teal + "20", border: "1px solid " + T.teal + "44", borderRadius: 8, cursor: "pointer", color: T.teal, fontSize: 12, fontWeight: 700 }}>✓ Approve + Budget</button>
                       <button onClick={() => { setActionModal({ rff: r, action: "decline" }); setNotes(""); }} style={{ flex: 1, padding: "8px", background: "#F43F5E15", border: "1px solid #F43F5E44", borderRadius: 8, cursor: "pointer", color: "#F43F5E", fontSize: 12, fontWeight: 700 }}>✕ Decline</button>
                     </div>
                   </Card>

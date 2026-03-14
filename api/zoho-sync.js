@@ -121,8 +121,32 @@ module.exports = async (req, res) => {
       }
     }
 
+    if (action === "create-po") {
+      const { vendor_name, amount, currency, notes, rff_title, event_name } = req.body;
+      // Find or create vendor contact in Zoho
+      const contactsData = await zohoGet(token, `/contacts?contact_name=${encodeURIComponent(vendor_name)}&contact_type=vendor`);
+      let vendorId = contactsData.contacts?.[0]?.contact_id;
+      if (!vendorId) {
+        const newContact = await zohoPost(token, "/contacts", { contact_name: vendor_name, contact_type: "vendor" });
+        vendorId = newContact.contact?.contact_id;
+      }
+      const poData = {
+        vendor_id: vendorId,
+        line_items: [{
+          description: `${rff_title || "Services"} — ${event_name || ""}`,
+          rate: amount,
+          quantity: 1,
+        }],
+        notes: notes || "",
+        currency_code: currency || "GHS",
+      };
+      const data = await zohoPost(token, "/purchaseorders", poData);
+      return res.json(data);
+    }
+
     res.status(400).json({ error: "Unknown action" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
+// This file already has the handler — the create-po action needs to be added

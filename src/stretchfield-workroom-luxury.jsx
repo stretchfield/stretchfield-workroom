@@ -2905,9 +2905,14 @@ const EventsView = ({ user, userRole }) => {
                   <Badge status={p.status} />
                 </div>
 
-                {/* Phase + deadline row */}
+                {/* Category badge + Phase row */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                  <div style={{ background: T.cyan + "18", color: T.cyan, padding: "2px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>{p.phase}</div>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <div style={{ background: T.cyan + "18", color: T.cyan, padding: "2px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>{p.phase}</div>
+                    {p.event_category && (
+                      <div style={{ background: (EVENT_ARCHETYPES[p.event_category]?.color||T.teal)+"18", color: EVENT_ARCHETYPES[p.event_category]?.color||T.teal, border: `1px solid ${(EVENT_ARCHETYPES[p.event_category]?.color||T.teal)}30`, padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 800 }}>{p.event_category}</div>
+                    )}
+                  </div>
                   {p.deadline && <div style={{ color: T.textMuted, fontSize: 11 }}>Due {p.deadline}</div>}
                 </div>
 

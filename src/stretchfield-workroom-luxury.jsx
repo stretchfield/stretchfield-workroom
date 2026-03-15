@@ -8992,7 +8992,7 @@ const VendorScorecardModal = ({ vendor, events, user, onClose, onSaved }) => {
         const avgScore = last2.reduce((sum, s) => sum + (s.total_pct || 0), 0) / last2.length;
         await supabase.from("profiles").update({
           vendor_score: Math.round(avgScore * 10) / 10,
-          vendor_tier: getTier(latestScore).label,
+          vendor_tier: getTier(avgScore).label,
           vendor_scorecard_count: allScores.length,
         }).eq("id", vendor.id);
       }
@@ -9098,15 +9098,19 @@ const VendorScorecardsView = ({ user }) => {
 
   const canScore = ["CEO", "Head of Operations", "Vendor Manager"].includes(user?.role);
 
+  const [awards, setAwards] = useState([]);
+
   const load = async () => {
-    const [v, e, s] = await Promise.all([
+    const [v, e, s, aw] = await Promise.all([
       supabase.from("profiles").select("*").eq("role", "Vendor"),
       supabase.from("projects").select("*"),
       supabase.from("vendor_scorecards").select("*").order("created_at", { ascending: false }),
+      supabase.from("rff_awards").select("*, rffs(project_id, event_name)").in("status", ["confirmed","po_created"]),
     ]);
     setVendors(v.data || []);
     setEvents(e.data || []);
     setScorecards(s.data || []);
+    setAwards(aw.data || []);
   };
 
   useEffect(() => { load(); }, []);
@@ -9241,7 +9245,11 @@ const VendorScorecardsView = ({ user }) => {
       {scoreModal && (
         <VendorScorecardModal
           vendor={scoreModal}
-          events={events}
+          events={events.filter(e => {
+            const vendorAwards = awards.filter(a => a.vendor_id === scoreModal.id);
+            const awardedEventIds = vendorAwards.map(a => a.rffs?.project_id).filter(Boolean);
+            return awardedEventIds.includes(e.id);
+          })}
           user={user}
           onClose={() => setScoreModal(null)}
           onSaved={load}
@@ -10425,7 +10433,12 @@ const QuoteComparisonView = ({ user }) => {
   const categories = [...new Set(budgets.map(b => b.category))];
   const totalBudget = budgets.reduce((sum, b) => sum + (b.proposed_amount || 0), 0);
   const quotedAssignments = assignments.filter(a => a.quote_amount);
-  const filteredAssignments = selectedCategory === "all" ? quotedAssignments : quotedAssignments;
+  // Filter assignments by selected budget category
+  // Match vendor service_category to budget category
+  const filteredAssignments = selectedCategory === "all" ? quotedAssignments : quotedAssignments.filter(a => {
+    const vProfile = vendorProfiles.find(v => v.id === a.vendor_id);
+    return vProfile?.service_category === selectedCategory;
+  });
 
   const toggleCompare = (id) => {
     setCompareVendors(prev => prev.includes(id) ? prev.filter(v => v !== id) : prev.length < 2 ? [...prev, id] : [prev[1], id]);
@@ -10495,7 +10508,7 @@ const QuoteComparisonView = ({ user }) => {
           <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Filter by Category</label>
           <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} style={{ width: "100%", padding: "9px 12px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} disabled={!selectedRff}>
             <option value="all">All Categories</option>
-            {categories.map(c => <option key={c} value={c}>{c}</option>)}
+            {budgets.map(b => <option key={b.id} value={b.category}>{b.category} — GHS {(b.proposed_amount||0).toLocaleString()} budget</option>)}
           </select>
         </div>
       </div>

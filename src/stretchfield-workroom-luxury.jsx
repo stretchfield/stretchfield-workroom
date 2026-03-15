@@ -8493,22 +8493,25 @@ const PurchaseOrderView = ({ user }) => {
   const [pos, setPOs] = useState([]);
   const [rffs, setRffs] = useState([]);
   const [events, setEvents] = useState([]);
+  const [vendorProfiles, setVendorProfiles] = useState([]);
   const [poModal, setPoModal] = useState(null);
-  const [poForm, setPoForm] = useState({ currency: "GHS", notes: "" });
+  const [poForm, setPoForm] = useState({ currency: "GHS", notes: "", vendor_email: "" });
   const [saving, setSaving] = useState(false);
   const [zohoStatus, setZohoStatus] = useState("");
 
   const load = async () => {
-    const [{ data: aw }, { data: po }, { data: rf }, { data: ev }] = await Promise.all([
+    const [{ data: aw }, { data: po }, { data: rf }, { data: ev }, { data: vp }] = await Promise.all([
       supabase.from("rff_awards").select("*").in("status", ["confirmed"]),
       supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }),
       supabase.from("rffs").select("*"),
       supabase.from("projects").select("*"),
+      supabase.from("profiles").select("id, name, email, phone, company_name, service_category").eq("role", "Vendor"),
     ]);
     setAwards(aw || []);
     setPOs(po || []);
     setRffs(rf || []);
     setEvents(ev || []);
+    setVendorProfiles(vp || []);
   };
 
   useEffect(() => { load(); }, []);
@@ -8605,8 +8608,18 @@ const PurchaseOrderView = ({ user }) => {
                     <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{award.vendor_name}</div>
                     <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{rff?.title} · {rff?.event_name}</div>
                     <div style={{ color: T.amber, fontWeight: 700, fontSize: 13, marginTop: 4 }}>GHS {(award.quoted_amount || 0).toLocaleString()}</div>
+                    {vendorProfiles.find(v => v.id === award.vendor_id)?.email && (
+                      <div style={{ color: T.cyan, fontSize: 11, marginTop: 3 }}>✉ {vendorProfiles.find(v => v.id === award.vendor_id)?.email}</div>
+                    )}
+                    {vendorProfiles.find(v => v.id === award.vendor_id)?.phone && (
+                      <div style={{ color: T.textMuted, fontSize: 11 }}>📞 {vendorProfiles.find(v => v.id === award.vendor_id)?.phone}</div>
+                    )}
                   </div>
-                  <button onClick={() => { setPoModal(award); setPoForm({ currency: "GHS", notes: "" }); }} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>Create PO</button>
+                  <button onClick={() => {
+                    const vp = vendorProfiles.find(v => v.id === award.vendor_id);
+                    setPoModal(award);
+                    setPoForm({ currency: "GHS", notes: "", vendor_email: vp?.email || "" });
+                  }} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>Create PO</button>
                 </div>
               );
             })}
@@ -8658,6 +8671,10 @@ const PurchaseOrderView = ({ user }) => {
                   <div key={l}><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{l}</div><div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600, marginTop: 3 }}>{v}</div></div>
                 ))}
               </div>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Vendor Email (for PO delivery)</label>
+              <input type="email" value={poForm.vendor_email} onChange={e => setPoForm({...poForm, vendor_email: e.target.value})} placeholder="vendor@company.com" style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
             </div>
             <div style={{ marginBottom: 14 }}>
               <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Currency</label>

@@ -122,14 +122,28 @@ module.exports = async (req, res) => {
     }
 
     if (action === "create-po") {
-      const { vendor_name, amount, currency, notes, rff_title, event_name } = req.body;
+      const { vendor_name, vendor_email, amount, currency, notes, rff_title, event_name, po_id } = req.body;
+
       // Find or create vendor contact in Zoho
-      const contactsData = await zohoGet(token, `/contacts?contact_name=${encodeURIComponent(vendor_name)}&contact_type=vendor`);
-      let vendorId = contactsData.contacts?.[0]?.contact_id;
+      let vendorId = null;
+      if (vendor_email) {
+        const byEmail = await zohoGet(token, `/contacts?email=${encodeURIComponent(vendor_email)}&contact_type=vendor`);
+        vendorId = byEmail.contacts?.[0]?.contact_id;
+      }
       if (!vendorId) {
-        const newContact = await zohoPost(token, "/contacts", { contact_name: vendor_name, contact_type: "vendor" });
+        const byName = await zohoGet(token, `/contacts?contact_name=${encodeURIComponent(vendor_name)}&contact_type=vendor`);
+        vendorId = byName.contacts?.[0]?.contact_id;
+      }
+      if (!vendorId) {
+        const newContact = await zohoPost(token, "/contacts", {
+          contact_name: vendor_name,
+          contact_type: "vendor",
+          email: vendor_email || "",
+        });
         vendorId = newContact.contact?.contact_id;
       }
+
+      // Create PO in Zoho
       const poData = {
         vendor_id: vendorId,
         line_items: [{
@@ -141,6 +155,33 @@ module.exports = async (req, res) => {
         currency_code: currency || "GHS",
       };
       const data = await zohoPost(token, "/purchaseorders", poData);
+
+      // Send PO to vendor email via Zoho if PO created successfully
+      if (data.purchaseorder?.purchaseorder_id && vendor_email) {
+        try {
+          const poId = data.purchaseorder.purchaseorder_id;
+          await fetch(`${BASE}/purchaseorders/${poId}/email?organization_id=${ORG_ID}`, {
+            method: "POST",
+            headers: { Authorization: `Zoho-oauthtoken ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to_mail_ids: [vendor_email],
+              subject: `Purchase Order — ${rff_title || "Services"} | ${event_name || ""}`,
+              body: `Dear ${vendor_name},
+
+Please find attached your Purchase Order from Stretchfield for ${rff_title || "services"} at ${event_name || "the upcoming event"}.
+
+Kindly review and submit your invoice upon completion of services.
+
+Regards,
+Stretchfield Finance Team`,
+              send_from_org_email_id: true,
+            }),
+          });
+        } catch (emailErr) {
+          console.log("PO email send failed:", emailErr.message);
+        }
+      }
+
       return res.json(data);
     }
 

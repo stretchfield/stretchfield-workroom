@@ -2843,6 +2843,7 @@ const EventsView = ({ user, userRole }) => {
       phase: p.phase || 'Planning',
       completion: p.completion || 0,
       status: p.status || 'active',
+      event_category: p.event_category || '',
     });
   };
 
@@ -2858,6 +2859,7 @@ const EventsView = ({ user, userRole }) => {
       phase: editForm.phase,
       completion: parseInt(editForm.completion) || 0,
       status: editForm.status,
+      event_category: editForm.event_category || null,
     }).eq('id', editEvent.id);
     setSaving(false);
     setEditEvent(null);
@@ -3046,6 +3048,16 @@ const EventsView = ({ user, userRole }) => {
       {editEvent && canManage && (
         <Modal title="Edit Event" onClose={() => setEditEvent(null)}>
           <Input label="Event Name" value={editForm.name} onChange={v => setEditForm({ ...editForm, name: v })} />
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>Event Category</div>
+            <select value={editForm.event_category || ""} onChange={e => setEditForm({...editForm, event_category: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+              <option value="">Select category...</option>
+              <option value="Conference/Seminar">Conference / Seminar</option>
+              <option value="Product Launch">Product Launch</option>
+              <option value="Awards Ceremony">Awards Ceremony</option>
+              <option value="Corporate Party">Corporate Party</option>
+            </select>
+          </div>
           {clients.length > 0 ? (
             <Select label="Client" options={[{ value: '', label: 'Select a client...' }, ...clients.map(c => ({ value: c.id, label: c.company || c.name }))]}
               value={editForm.client_id}
@@ -3085,6 +3097,16 @@ const EventsView = ({ user, userRole }) => {
       {modal && (
         <Modal title="New Event" onClose={() => setModal(false)}>
           <Input label="Event Name" placeholder="e.g. Brand Campaign" value={form.name} onChange={v => setForm({ ...form, name: v })} />
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>Event Category *</div>
+            <select value={form.event_category} onChange={e => setForm({...form, event_category: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${form.event_category ? T.border : "#F59E0B"}`, borderRadius: 8, color: form.event_category ? T.textPrimary : T.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+              <option value="">Select event category...</option>
+              <option value="Conference/Seminar">Conference / Seminar</option>
+              <option value="Product Launch">Product Launch</option>
+              <option value="Awards Ceremony">Awards Ceremony</option>
+              <option value="Corporate Party">Corporate Party</option>
+            </select>
+          </div>
           {clients.length > 0 ? (
             <Select label="Client" options={[{ value: '', label: 'Select a client...' }, ...clients.map(c => ({ value: c.id, label: c.company || c.name }))]}
               value={form.client_id}

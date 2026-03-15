@@ -7732,9 +7732,11 @@ const VendorScorecardModal = ({ vendor, events, user, onClose, onSaved }) => {
       // Update vendor profile with most recent score
       const { data: allScores } = await supabase.from("vendor_scorecards").select("total_pct, created_at").eq("vendor_id", vendor.id).order("created_at", { ascending: false });
       if (allScores && allScores.length > 0) {
-        const latestScore = allScores[0].total_pct; // Use most recent event score
+        // Average last 2 scorecards
+        const last2 = allScores.slice(0, 2);
+        const avgScore = last2.reduce((sum, s) => sum + (s.total_pct || 0), 0) / last2.length;
         await supabase.from("profiles").update({
-          vendor_score: Math.round(latestScore * 10) / 10,
+          vendor_score: Math.round(avgScore * 10) / 10,
           vendor_tier: getTier(latestScore).label,
           vendor_scorecard_count: allScores.length,
         }).eq("id", vendor.id);
@@ -10039,7 +10041,7 @@ const VendorOnboardingView = ({ user }) => {
       {tab === "form" && !submitted && (
         <VendorApplicationModal
           user={user}
-          onClose={() => {}}
+          onClose={() => setTab("submitted")}
           inline={true}
           onSubmitted={() => { setSubmitted(true); load(); setTab("submitted"); }}
         />
@@ -10290,7 +10292,11 @@ const VendorAssignmentView = ({ user }) => {
                 <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid " + T.border + "66", opacity: isPoor ? 0.5 : 1 }}>
                   <div>
                     <div style={{ color: isPoor ? T.textMuted : T.textPrimary, fontWeight: 600, fontSize: 14 }}>{v.name}</div>
-                    <div style={{ marginTop: 4 }}><TierBadge vendor={v} /></div>
+                    <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                    <TierBadge vendor={v} />
+                    {v.vendor_scorecard_count >= 2 && <span style={{ color: T.textMuted, fontSize: 9 }}>(avg 2 events)</span>}
+                    {v.vendor_scorecard_count === 1 && <span style={{ color: T.textMuted, fontSize: 9 }}>(1 event)</span>}
+                  </div>
                   </div>
                   {isPoor ? (
                     <span style={{ color: "#F43F5E", fontSize: 11, fontWeight: 600 }}>⛔ Cannot assign</span>

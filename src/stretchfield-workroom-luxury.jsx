@@ -10432,9 +10432,12 @@ const QuoteComparisonView = ({ user }) => {
 
   const categories = [...new Set(budgets.map(b => b.category))];
   const totalBudget = budgets.reduce((sum, b) => sum + (b.proposed_amount || 0), 0);
+  // When category selected, use only that category budget for comparison
+  const activeBudget = selectedCategory === "all"
+    ? totalBudget
+    : (budgets.find(b => b.category === selectedCategory)?.proposed_amount || 0);
   const quotedAssignments = assignments.filter(a => a.quote_amount);
-  // Filter assignments by selected budget category
-  // Match vendor service_category to budget category
+  // Filter assignments by selected budget category — match vendor service_category
   const filteredAssignments = selectedCategory === "all" ? quotedAssignments : quotedAssignments.filter(a => {
     const vProfile = vendorProfiles.find(v => v.id === a.vendor_id);
     return vProfile?.service_category === selectedCategory;
@@ -10518,7 +10521,7 @@ const QuoteComparisonView = ({ user }) => {
           {/* Budget vs Quotes KPI */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
             {[
-              { label: "Proposed Budget", value: `GHS ${totalBudget.toLocaleString()}`, color: T.cyan },
+              { label: selectedCategory === "all" ? "Total Budget" : selectedCategory + " Budget", value: `GHS ${activeBudget.toLocaleString()}`, color: T.cyan },
               { label: "Quotes Received", value: quotedAssignments.length, color: T.teal },
               { label: "Lowest Quote", value: quotedAssignments.length > 0 ? `GHS ${Math.min(...quotedAssignments.map(a => a.quote_amount)).toLocaleString()}` : "—", color: "#10B981" },
               { label: "Highest Quote", value: quotedAssignments.length > 0 ? `GHS ${Math.max(...quotedAssignments.map(a => a.quote_amount)).toLocaleString()}` : "—", color: T.amber },
@@ -10562,15 +10565,15 @@ const QuoteComparisonView = ({ user }) => {
                   </div>
                 )}
                 {quotedAssignments.map((a, idx) => {
-                  const pct = totalBudget > 0 ? Math.min((a.quote_amount / totalBudget) * 100, 150) : 50;
-                  const barColor = a.quote_amount <= totalBudget ? T.teal : T.red;
+                  const pct = activeBudget > 0 ? Math.min((a.quote_amount / activeBudget) * 100, 150) : 50;
+                  const barColor = a.quote_amount <= activeBudget ? T.teal : T.red;
                   const isSelected = compareVendors.includes(a.id);
                   const isAwarded = awards.some(aw => aw.rff_id === selectedRff && aw.vendor_id === a.vendor_id);
                   const vProfile = vendorProfiles.find(v => v.id === a.vendor_id);
                   const vApp = vendorApps.find(v => v.vendor_name === a.vendor_name);
                   const tier = vProfile ? getTier(vProfile.vendor_score || 0) : null;
                   const expCount = pastEvents.filter(e => e.vendor_id === a.vendor_id && e.quote_submitted_at).length;
-                  const variancePct = totalBudget > 0 ? (((a.quote_amount - totalBudget) / totalBudget) * 100).toFixed(1) : null;
+                  const variancePct = activeBudget > 0 ? (((a.quote_amount - activeBudget) / activeBudget) * 100).toFixed(1) : null;
                   const daysToRespond = a.quote_submitted_at && a.created_at ? Math.ceil((new Date(a.quote_submitted_at) - new Date(a.created_at)) / (1000*60*60*24)) : null;
                   return (
                     <div key={a.id} style={{ background: isSelected ? T.amber+"08" : "transparent", border: isSelected ? `1px solid ${T.amber}30` : "1px solid transparent", borderRadius: 8, padding: "8px 0" }}>
@@ -10630,7 +10633,7 @@ const QuoteComparisonView = ({ user }) => {
                 ))}
                 {[
                   ["Total Quote", (a) => `GHS ${(a.quote_amount || 0).toLocaleString()}`],
-                  ["vs Budget", (a) => { if (!totalBudget) return "No budget set"; const v = (((a.quote_amount - totalBudget) / totalBudget) * 100).toFixed(1); return parseFloat(v) <= 0 ? `✓ ${Math.abs(v)}% under budget` : `⚠ ${v}% over budget`; }],
+                  ["vs Budget", (a) => { if (!activeBudget) return "No budget set"; const v = (((a.quote_amount - activeBudget) / activeBudget) * 100).toFixed(1); return parseFloat(v) <= 0 ? `✓ ${Math.abs(v)}% under budget` : `⚠ ${v}% over budget`; }],
                   ["Vendor Rating", (a) => { const vp = vendorProfiles.find(v => v.id === a.vendor_id); if (!vp || !vp.vendor_scorecard_count) return "Unrated"; const t = getTier(vp.vendor_score || 0); return `${t.label} (${vp.vendor_score}%)`; }],
                   ["Experience", (a) => { const c = pastEvents.filter(e => e.vendor_id === a.vendor_id && e.quote_submitted_at).length; return c > 0 ? `${c} event${c>1?"s":""} with Stretchfield` : "New vendor"; }],
                   ["Response Speed", (a) => { if (!a.quote_submitted_at || !a.created_at) return "—"; const d = Math.ceil((new Date(a.quote_submitted_at) - new Date(a.created_at))/(1000*60*60*24)); return `${d} day${d!==1?"s":""}`; }],

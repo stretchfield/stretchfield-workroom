@@ -1,6 +1,14 @@
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  // Basic protection — only allow calls from same origin or with internal secret
+  const secret = req.headers['x-internal-secret'];
+  const allowedOrigin = req.headers['origin'] || req.headers['referer'] || '';
+  const isInternal = allowedOrigin.includes('stretchfield-workroom.vercel.app') || 
+                     allowedOrigin.includes('localhost') ||
+                     secret === process.env.INTERNAL_SECRET;
+  if (!isInternal) return res.status(403).json({ error: 'Forbidden' });
+
   const { to, subject, html, type } = req.body;
   if (!to || !subject || !html) return res.status(400).json({ error: 'Missing required fields' });
 

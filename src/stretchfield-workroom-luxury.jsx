@@ -3039,6 +3039,7 @@ const TasksView = ({ userRole, openTaskId, onOpenHandled }) => {
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [members, setMembers] = useState([]);
+  const [awardedVendors, setAwardedVendors] = useState([]);
   const [modal, setModal] = useState(false);
   const [detailTask, setDetailTask] = useState(null);
   const [editForm, setEditForm] = useState({});
@@ -3078,14 +3079,28 @@ const TasksView = ({ userRole, openTaskId, onOpenHandled }) => {
   };
 
   const load = async () => {
-    const [t, p, m] = await Promise.all([
+    const [t, p, m, awards] = await Promise.all([
       supabase.from('tasks').select('*').order('created_at', { ascending: false }),
       supabase.from('projects').select('*'),
-      supabase.from('profiles').select('*').not('role', 'eq', 'Client'),
+      supabase.from('profiles').select('*').not('role', 'in', '("Client","Vendor")'),
+      supabase.from('rff_awards').select('*, rffs(project_id, event_name)').in('status', ['confirmed','po_created']),
     ]);
     setTasks(t.data || []);
     setProjects(p.data || []);
     setMembers(m.data || []);
+    // Build awarded vendors list with their event
+    const vendorIds = [...new Set((awards.data || []).map(a => a.vendor_id))];
+    if (vendorIds.length > 0) {
+      const { data: vendorProfiles } = await supabase.from('profiles').select('*').in('id', vendorIds);
+      // Attach event info to each vendor
+      const vendorsWithEvents = (vendorProfiles || []).map(v => ({
+        ...v,
+        awardedEventIds: (awards.data || []).filter(a => a.vendor_id === v.id).map(a => a.rffs?.project_id).filter(Boolean),
+      }));
+      setAwardedVendors(vendorsWithEvents);
+    } else {
+      setAwardedVendors([]);
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -6582,7 +6597,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
         if (role === "Client") return <ClientDashboard user={currentUser} />;
         if (role === "Finance Manager") return <FinanceDashboard user={currentUser} onTab={setActiveTab} />;
         if (role === "Sales & Marketing") return <CRMDashboardSM user={currentUser} />;
-        if (role === "Strategy & Events Lead") return <StrategyOverviewView />;
+        if (role === "Strategy & Events Lead") return <StaffDashboard user={currentUser} />;
         if (role === "Vendor Manager") return <StaffDashboard user={currentUser} />;
         return <StaffDashboard user={currentUser} />;
       case "events": return <EventsView user={currentUser} />;

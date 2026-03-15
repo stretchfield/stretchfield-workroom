@@ -9051,12 +9051,23 @@ const QuoteComparisonView = ({ user }) => {
   const [awardNotes, setAwardNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [awards, setAwards] = useState([]);
+  const [vendorProfiles, setVendorProfiles] = useState([]);
+  const [vendorApps, setVendorApps] = useState([]);
+  const [pastEvents, setPastEvents] = useState([]);
 
   const load = async () => {
-    const { data: ev } = await supabase.from("projects").select("*").order("name");
+    const [{ data: ev }, { data: aw }, { data: vp }, { data: va }, { data: pe }] = await Promise.all([
+      supabase.from("projects").select("*").order("name"),
+      supabase.from("rff_awards").select("*"),
+      supabase.from("profiles").select("*").eq("role", "Vendor"),
+      supabase.from("vendor_applications").select("*").eq("status", "login-created"),
+      supabase.from("rff_vendor_assignments").select("*"),
+    ]);
     setEvents(ev || []);
-    const { data: aw } = await supabase.from("rff_awards").select("*");
     setAwards(aw || []);
+    setVendorProfiles(vp || []);
+    setVendorApps(va || []);
+    setPastEvents(pe || []);
   };
 
   useEffect(() => { load(); }, []);
@@ -9218,20 +9229,49 @@ const QuoteComparisonView = ({ user }) => {
                   const barColor = a.quote_amount <= totalBudget ? T.teal : T.red;
                   const isSelected = compareVendors.includes(a.id);
                   const isAwarded = awards.some(aw => aw.rff_id === selectedRff && aw.vendor_id === a.vendor_id);
+                  const vProfile = vendorProfiles.find(v => v.id === a.vendor_id);
+                  const vApp = vendorApps.find(v => v.vendor_name === a.vendor_name);
+                  const tier = vProfile ? getTier(vProfile.vendor_score || 0) : null;
+                  const expCount = pastEvents.filter(e => e.vendor_id === a.vendor_id && e.quote_submitted_at).length;
+                  const variancePct = totalBudget > 0 ? (((a.quote_amount - totalBudget) / totalBudget) * 100).toFixed(1) : null;
+                  const daysToRespond = a.quote_submitted_at && a.created_at ? Math.ceil((new Date(a.quote_submitted_at) - new Date(a.created_at)) / (1000*60*60*24)) : null;
                   return (
-                    <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div style={{ width: 120, color: isSelected ? T.amber : T.textSecondary, fontSize: 11, fontWeight: isSelected ? 800 : 400, textAlign: "right", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.vendor_name}</div>
-                      <div style={{ flex: 1, height: 28, background: T.border + "44", borderRadius: 4, overflow: "hidden", position: "relative", cursor: "pointer" }} onClick={() => toggleCompare(a.id)}>
-                        <div style={{ height: "100%", width: `${pct}%`, background: `linear-gradient(90deg, ${barColor}, ${barColor}99)`, borderRadius: 4, transition: "width 0.4s ease", border: isSelected ? `2px solid ${T.amber}` : "none", boxSizing: "border-box" }} />
-                      </div>
-                      <div style={{ width: 120, color: barColor, fontSize: 12, fontWeight: 700, flexShrink: 0 }}>GHS {(a.quote_amount || 0).toLocaleString()}</div>
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <button onClick={() => toggleCompare(a.id)} style={{ background: isSelected ? T.amber + "20" : T.surface, border: `1px solid ${isSelected ? T.amber : T.border}`, color: isSelected ? T.amber : T.textMuted, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>{isSelected ? "✓ Selected" : "Compare"}</button>
-                        {a.quote_document_url && <a href={a.quote_document_url} target="_blank" rel="noopener noreferrer" style={{ background: T.cyan + "15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 700, textDecoration: "none" }}>📄 Doc</a>}
-                        {!isAwarded && user?.role === "Vendor Manager" && (
-                          <button onClick={() => setAwardModal(a)} style={{ background: "#10B98115", border: "1px solid #10B98130", color: "#10B981", padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>🏆 Award</button>
-                        )}
-                        {isAwarded && <span style={{ color: "#10B981", fontSize: 10, fontWeight: 700 }}>✓ Awarded</span>}
+                    <div key={a.id} style={{ background: isSelected ? T.amber+"08" : "transparent", border: isSelected ? `1px solid ${T.amber}30` : "1px solid transparent", borderRadius: 8, padding: "8px 0" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ width: 140, flexShrink: 0, textAlign: "right" }}>
+                          <div style={{ color: isSelected ? T.amber : T.textPrimary, fontSize: 12, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.vendor_name}</div>
+                          {tier && vProfile?.vendor_scorecard_count > 0 && (
+                            <span style={{ background: tier.color+"20", color: tier.color, border: `1px solid ${tier.color}40`, borderRadius: 20, padding: "1px 6px", fontSize: 9, fontWeight: 800 }}>{tier.label}</span>
+                          )}
+                          {(!vProfile || vProfile.vendor_scorecard_count === 0) && (
+                            <span style={{ color: T.textMuted, fontSize: 9 }}>Unrated</span>
+                          )}
+                        </div>
+                        <div style={{ flex: 1, height: 28, background: T.border + "44", borderRadius: 4, overflow: "hidden", position: "relative", cursor: "pointer" }} onClick={() => toggleCompare(a.id)}>
+                          <div style={{ height: "100%", width: `${pct}%`, background: `linear-gradient(90deg, ${barColor}, ${barColor}99)`, borderRadius: 4, transition: "width 0.4s ease", border: isSelected ? `2px solid ${T.amber}` : "none", boxSizing: "border-box" }} />
+                        </div>
+                        <div style={{ width: 130, flexShrink: 0 }}>
+                          <div style={{ color: barColor, fontSize: 12, fontWeight: 700 }}>GHS {(a.quote_amount || 0).toLocaleString()}</div>
+                          {variancePct !== null && (
+                            <div style={{ color: parseFloat(variancePct) <= 0 ? T.teal : T.red, fontSize: 10, fontWeight: 700 }}>
+                              {parseFloat(variancePct) <= 0 ? `✓ ${Math.abs(variancePct)}% under` : `⚠ ${variancePct}% over`}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, width: 200, flexShrink: 0 }}>
+                          {expCount > 0 && <span style={{ background: T.blue+"15", color: T.blue, borderRadius: 20, padding: "1px 7px", fontSize: 9, fontWeight: 700 }}>📋 {expCount} event{expCount>1?"s":""}</span>}
+                          {daysToRespond !== null && <span style={{ background: daysToRespond <= 2 ? T.teal+"15" : T.amber+"15", color: daysToRespond <= 2 ? T.teal : T.amber, borderRadius: 20, padding: "1px 7px", fontSize: 9, fontWeight: 700 }}>⚡ {daysToRespond}d response</span>}
+                          {a.quote_document_url ? <span style={{ background: T.teal+"15", color: T.teal, borderRadius: 20, padding: "1px 7px", fontSize: 9, fontWeight: 700 }}>📄 Doc ✓</span> : <span style={{ background: T.red+"15", color: T.red, borderRadius: 20, padding: "1px 7px", fontSize: 9, fontWeight: 700 }}>No doc</span>}
+                          {vApp?.payment_terms && <span style={{ background: T.gold+"15", color: T.gold, borderRadius: 20, padding: "1px 7px", fontSize: 9, fontWeight: 700 }}>💳 {vApp.payment_terms.slice(0,15)}</span>}
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                          <button onClick={() => toggleCompare(a.id)} style={{ background: isSelected ? T.amber+"20" : T.surface, border: `1px solid ${isSelected ? T.amber : T.border}`, color: isSelected ? T.amber : T.textMuted, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>{isSelected ? "✓ Selected" : "Compare"}</button>
+                          {a.quote_document_url && <a href={a.quote_document_url} target="_blank" rel="noopener noreferrer" style={{ background: T.cyan+"15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 700, textDecoration: "none" }}>View</a>}
+                          {!isAwarded && user?.role === "Vendor Manager" && (
+                            <button onClick={() => setAwardModal(a)} style={{ background: "#10B98115", border: "1px solid #10B98130", color: "#10B981", padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>🏆 Award</button>
+                          )}
+                          {isAwarded && <span style={{ color: "#10B981", fontSize: 10, fontWeight: 700 }}>✓ Awarded</span>}
+                        </div>
                       </div>
                     </div>
                   );
@@ -9253,9 +9293,13 @@ const QuoteComparisonView = ({ user }) => {
                 ))}
                 {[
                   ["Total Quote", (a) => `GHS ${(a.quote_amount || 0).toLocaleString()}`],
-                  ["vs Budget", (a) => totalBudget > 0 ? `${a.quote_amount <= totalBudget ? "✓ Within" : "⚠ Over"} by GHS ${Math.abs(a.quote_amount - totalBudget).toLocaleString()}` : "No budget set"],
+                  ["vs Budget", (a) => { if (!totalBudget) return "No budget set"; const v = (((a.quote_amount - totalBudget) / totalBudget) * 100).toFixed(1); return parseFloat(v) <= 0 ? `✓ ${Math.abs(v)}% under budget` : `⚠ ${v}% over budget`; }],
+                  ["Vendor Rating", (a) => { const vp = vendorProfiles.find(v => v.id === a.vendor_id); if (!vp || !vp.vendor_scorecard_count) return "Unrated"; const t = getTier(vp.vendor_score || 0); return `${t.label} (${vp.vendor_score}%)`; }],
+                  ["Experience", (a) => { const c = pastEvents.filter(e => e.vendor_id === a.vendor_id && e.quote_submitted_at).length; return c > 0 ? `${c} event${c>1?"s":""} with Stretchfield` : "New vendor"; }],
+                  ["Response Speed", (a) => { if (!a.quote_submitted_at || !a.created_at) return "—"; const d = Math.ceil((new Date(a.quote_submitted_at) - new Date(a.created_at))/(1000*60*60*24)); return `${d} day${d!==1?"s":""}`; }],
+                  ["Document", (a) => a.quote_document_url ? "✓ Submitted" : "✗ Not submitted"],
+                  ["Payment Terms", (a) => { const va = vendorApps.find(v => v.vendor_name === a.vendor_name); return va?.payment_terms || "Not specified"; }],
                   ["Submitted", (a) => a.quote_submitted_at ? new Date(a.quote_submitted_at).toLocaleDateString("en-GB") : "—"],
-                  ["Document", (a) => a.quote_document_url ? "📄 Available" : "No doc"],
                 ].map(([label, fn]) => (
                   <React.Fragment key={label}>
                     <div style={{ padding: "10px 0", color: T.textMuted, fontSize: 12, display: "flex", alignItems: "center" }}>{label}</div>

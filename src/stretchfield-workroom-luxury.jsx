@@ -536,7 +536,7 @@ const getNavItems = (role) => {
     base.push({ id: "contract-awards", label: "Contract Awards", icon: "▪" });
   }
   if (role === "Vendor Manager") {
-    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "gig-confirmation", label: "Confirm Gigs", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" });
+    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quotes-received", label: "Quotes Received", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "gig-confirmation", label: "Confirm Gigs", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" });
   }
   if (["CEO","Head of Operations","Vendor Manager","Finance Manager"].includes(role)) {
     base.push({ id: "invoices", label: "Invoices", icon: "▪" });
@@ -6267,6 +6267,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "calendar": return <CalendarView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
       case "zoho-books": return <ZohoBooksView user={currentUser} />;
       case "vendor-onboarding": return <VendorOnboardingView user={currentUser} />;
+      case "quotes-received": return <QuotesReceivedView user={currentUser} />;
       case "quote-comparison": return <QuoteComparisonView user={currentUser} />;
       case "contract-awards": return <ContractAwardApprovalView user={currentUser} />;
       case "gig-confirmation": return <GigConfirmationView user={currentUser} />;
@@ -8878,6 +8879,149 @@ const FinanceInvoicesView = ({ user }) => {
   );
 };
 
+
+const QuotesReceivedView = ({ user }) => {
+  const [events, setEvents] = useState([]);
+  const [rffs, setRffs] = useState([]);
+  const [assignments, setAssignments] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState("all");
+  const [selectedRff, setSelectedRff] = useState(null);
+
+  const load = async () => {
+    const [{ data: ev }, { data: rf }, { data: asn }] = await Promise.all([
+      supabase.from("projects").select("*").order("name"),
+      supabase.from("rffs").select("*").eq("approved", true).order("created_at", { ascending: false }),
+      supabase.from("rff_vendor_assignments").select("*").order("created_at", { ascending: false }),
+    ]);
+    setEvents(ev || []);
+    setRffs(rf || []);
+    setAssignments(asn || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const filteredRffs = selectedEvent === "all" ? rffs : rffs.filter(r => r.project_id === selectedEvent);
+  const rffsWithQuotes = filteredRffs.filter(r => {
+    const rffAssignments = assignments.filter(a => a.rff_id === r.id);
+    return rffAssignments.some(a => a.quote_amount);
+  });
+  const totalQuotes = assignments.filter(a => a.quote_amount).length;
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Procurement</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Quotes Received</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{totalQuotes} quotes received across {rffsWithQuotes.length} RFFs</div>
+        </div>
+        <select value={selectedEvent} onChange={e => setSelectedEvent(e.target.value)} style={{ padding: "9px 14px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+          <option value="all">All Events</option>
+          {events.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+        </select>
+      </div>
+
+      {/* KPI Strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Total RFFs", value: filteredRffs.length, color: T.cyan },
+          { label: "RFFs with Quotes", value: rffsWithQuotes.length, color: T.teal },
+          { label: "Total Quotes", value: totalQuotes, color: T.amber },
+          { label: "Pending Quotes", value: assignments.filter(a => !a.quote_amount).length, color: T.textMuted },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 20, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginTop: 4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* RFF Cards grouped by event */}
+      {filteredRffs.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>📋</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16 }}>No RFFs found</div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {filteredRffs.map(rff => {
+            const rffAssignments = assignments.filter(a => a.rff_id === rff.id);
+            const quotedAssignments = rffAssignments.filter(a => a.quote_amount);
+            const event = events.find(e => e.id === rff.project_id);
+            const isExpanded = selectedRff === rff.id;
+
+            return (
+              <div key={rff.id} style={{ background: T.surface, border: `1px solid ${isExpanded ? T.cyan + "60" : T.border}`, borderRadius: 12, overflow: "hidden", transition: "border-color 0.2s" }}>
+                {/* RFF Header */}
+                <div onClick={() => setSelectedRff(isExpanded ? null : rff.id)} style={{ padding: "16px 20px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                  onMouseEnter={e => e.currentTarget.style.background = T.bg}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  <div>
+                    <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{rff.title}</div>
+                    <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{event?.name || rff.event_name} · {rff.client_name}</div>
+                    <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Deadline: {rff.deadline ? new Date(rff.deadline).toLocaleDateString("en-GB") : "—"}</div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ color: quotedAssignments.length > 0 ? T.teal : T.amber, fontWeight: 900, fontSize: 18 }}>{quotedAssignments.length}</div>
+                      <div style={{ color: T.textMuted, fontSize: 10, textTransform: "uppercase" }}>of {rffAssignments.length} quoted</div>
+                    </div>
+                    <div style={{ color: T.textMuted, fontSize: 18, transition: "transform 0.2s", transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)" }}>›</div>
+                  </div>
+                </div>
+
+                {/* Expanded Quotes */}
+                {isExpanded && (
+                  <div style={{ borderTop: `1px solid ${T.border}`, padding: "16px 20px" }}>
+                    {rffAssignments.length === 0 ? (
+                      <div style={{ color: T.textMuted, fontSize: 13 }}>No vendors assigned yet.</div>
+                    ) : (
+                      <div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+                          {["Vendor","Category","Quote Amount","Document","Submitted"].map(h => (
+                            <div key={h} style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</div>
+                          ))}
+                        </div>
+                        {rffAssignments.map(a => (
+                          <div key={a.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 8, padding: "10px 0", borderBottom: `1px solid ${T.border}44`, alignItems: "center" }}>
+                            <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{a.vendor_name}</div>
+                            <div style={{ color: T.textMuted, fontSize: 12 }}>—</div>
+                            <div style={{ color: a.quote_amount ? T.amber : T.textMuted, fontWeight: a.quote_amount ? 800 : 400, fontSize: 13 }}>
+                              {a.quote_amount ? `GHS ${parseFloat(a.quote_amount).toLocaleString()}` : "Pending"}
+                            </div>
+                            <div>
+                              {a.quote_document_url ? (
+                                <a href={a.quote_document_url} target="_blank" rel="noopener noreferrer" style={{ color: T.cyan, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>📄 View</a>
+                              ) : <span style={{ color: T.textMuted, fontSize: 12 }}>No doc</span>}
+                            </div>
+                            <div style={{ color: T.textMuted, fontSize: 11 }}>
+                              {a.quote_submitted_at ? new Date(a.quote_submitted_at).toLocaleDateString("en-GB") : "—"}
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Summary */}
+                        {quotedAssignments.length > 0 && (
+                          <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${T.border}44`, display: "flex", gap: 20 }}>
+                            <span style={{ color: T.textMuted, fontSize: 12 }}>Lowest: <strong style={{ color: T.teal }}>GHS {Math.min(...quotedAssignments.map(a => a.quote_amount)).toLocaleString()}</strong></span>
+                            <span style={{ color: T.textMuted, fontSize: 12 }}>Highest: <strong style={{ color: T.amber }}>GHS {Math.max(...quotedAssignments.map(a => a.quote_amount)).toLocaleString()}</strong></span>
+                            <span style={{ color: T.textMuted, fontSize: 12 }}>Avg: <strong style={{ color: T.cyan }}>GHS {Math.round(quotedAssignments.reduce((s,a) => s + a.quote_amount, 0) / quotedAssignments.length).toLocaleString()}</strong></span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const QuoteComparisonView = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState("");
@@ -8902,7 +9046,7 @@ const QuoteComparisonView = ({ user }) => {
   useEffect(() => { load(); }, []);
 
   const loadRffs = async (eventId) => {
-    const { data } = await supabase.from("rffs").select("*").eq("project_id", eventId).in("status", ["quote-submitted","quote-approved","vendor-assigned"]);
+    const { data } = await supabase.from("rffs").select("*").eq("project_id", eventId).eq("approved", true);
     setRffs(data || []);
     setSelectedRff("");
     setAssignments([]);
@@ -8910,11 +9054,18 @@ const QuoteComparisonView = ({ user }) => {
   };
 
   const loadQuotes = async (rffId) => {
-    const [{ data: asn }, { data: bud }] = await Promise.all([
-      supabase.from("rff_vendor_assignments").select("*, profiles(name, email)").eq("rff_id", rffId),
+    const [{ data: asn }, { data: bud }, { data: rff }] = await Promise.all([
+      supabase.from("rff_vendor_assignments").select("*").eq("rff_id", rffId),
       supabase.from("rff_budgets").select("*").eq("rff_id", rffId),
+      supabase.from("rffs").select("*").eq("id", rffId).single(),
     ]);
-    setAssignments(asn || []);
+    // Merge rff-level quote data as fallback for old submissions
+    const enriched = (asn || []).map(a => ({
+      ...a,
+      quote_amount: a.quote_amount || (rff?.amount && rff?.vendor === a.vendor_name ? rff.amount : null),
+      quote_document_url: a.quote_document_url || rff?.quote_url || null,
+    }));
+    setAssignments(enriched);
     setBudgets(bud || []);
     setSelectedCategory("all");
     setCompareVendors([]);

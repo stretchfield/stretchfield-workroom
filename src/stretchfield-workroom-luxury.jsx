@@ -1,4 +1,88 @@
 import { supabase } from "./supabase";
+
+// ── Email helper ──
+const sendEmail = async (to, subject, html) => {
+  if (!to) return;
+  try {
+    await fetch("/api/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to, subject, html }),
+    });
+  } catch (e) {
+    console.log("Email send failed:", e.message);
+  }
+};
+
+const BASE_URL = "https://stretchfield-workroom.vercel.app";
+
+const emailHeader = (title) => `<div style="background:#060B14;padding:28px 32px;border-radius:8px 8px 0 0;"><div style="color:#00C8FF;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;margin-bottom:4px;">STRETCHFIELD</div><div style="color:#E8F0FF;font-size:20px;font-weight:800;">${title}</div></div>`;
+const emailFooter = () => `<div style="background:#060B14;padding:20px 32px;border-radius:0 0 8px 8px;text-align:center;"><div style="color:#3D5478;font-size:11px;font-style:italic;margin-bottom:6px;">We don't plan events. We engineer impact.</div><div style="color:#1A2E4A;font-size:10px;">© ${new Date().getFullYear()} Stretchfield · www.stretchfield.com</div></div>`;
+const emailBtn = (text, url) => `<a href="${url}" style="display:inline-block;background:linear-gradient(135deg,#00C8FF,#00E5C8);color:#060B14;padding:12px 28px;border-radius:8px;font-weight:800;font-size:13px;text-decoration:none;margin:16px 0;">${text}</a>`;
+const emailRow = (label, value) => `<tr><td style="padding:8px 0;color:#5A6E8A;font-size:12px;font-weight:700;text-transform:uppercase;width:140px;">${label}</td><td style="padding:8px 0;color:#0A1628;font-size:13px;font-weight:600;">${value}</td></tr>`;
+const emailWrap = (header, body) => `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;">${header}<div style="padding:28px 32px;background:#F0F2FA;">${body}</div>${emailFooter()}</div>`;
+
+const welcomeEmailHtml = ({ name, email, password, role }) => emailWrap(
+  emailHeader(`Welcome, ${name}!`),
+  `<p style="color:#0A1628;font-size:14px;margin:0 0 16px;">Your Stretchfield WorkRoom account has been created.</p>
+  <div style="background:#fff;border:1px solid #C2C9DC;border-radius:8px;padding:20px 24px;margin-bottom:20px;">
+    <table style="width:100%;border-collapse:collapse;">${emailRow("Role", role)}${emailRow("Email", email)}${emailRow("Password", `<code style="background:#E8EBF4;padding:2px 8px;border-radius:4px;">${password}</code>`)}</table>
+  </div>
+  <div style="background:#FFF3CD;border:1px solid #F59E0B;border-radius:6px;padding:10px 14px;margin-bottom:20px;color:#A86000;font-size:12px;">⚠ Please change your password after first login via Account Settings.</div>
+  ${emailBtn("Log In to WorkRoom", BASE_URL)}`
+);
+
+const notifEmailHtml = ({ name, title, message, actionUrl, actionLabel = "View in WorkRoom" }) => emailWrap(
+  emailHeader(title),
+  `<p style="color:#0A1628;font-size:14px;margin:0 0 20px;">Hi ${name || "there"},</p>
+  <div style="background:#fff;border:1px solid #C2C9DC;border-left:4px solid #00C8FF;border-radius:8px;padding:16px 20px;margin-bottom:20px;">
+    <p style="color:#0A1628;font-size:14px;margin:0;line-height:1.6;">${message}</p>
+  </div>
+  ${actionUrl ? emailBtn(actionLabel, actionUrl) : ""}
+  <p style="color:#5A6E8A;font-size:12px;margin-top:20px;">You're receiving this because you have an active Stretchfield WorkRoom account.</p>`
+);
+
+const poEmailHtml = ({ vendorName, poNumber, eventName, amount, currency, notes }) => emailWrap(
+  emailHeader(`Purchase Order — ${poNumber}`),
+  `<p style="color:#0A1628;font-size:14px;margin:0 0 16px;">Dear <strong>${vendorName}</strong>,</p>
+  <p style="color:#0A1628;font-size:14px;margin:0 0 20px;">A Purchase Order has been raised for your services. Please submit your invoice upon completion.</p>
+  <div style="background:#fff;border:1px solid #C2C9DC;border-radius:8px;padding:20px 24px;margin-bottom:20px;">
+    <table style="width:100%;border-collapse:collapse;">${emailRow("PO Number", `<strong style="color:#00C8FF;">${poNumber}</strong>`)}${emailRow("Event", eventName || "—")}${emailRow("Amount", `<strong>${currency} ${parseFloat(amount || 0).toLocaleString()}</strong>`)}${notes ? emailRow("Notes", notes) : ""}</table>
+  </div>
+  ${emailBtn("Submit Invoice in WorkRoom", BASE_URL)}`
+);
+
+
+
+const sendNotificationEmail = async (userId, title, message, actionTab) => {
+  try {
+    const { data: profile } = await supabase.from("profiles").select("name, email").eq("id", userId).single();
+    if (!profile?.email) return;
+    const actionUrl = actionTab ? `https://stretchfield-workroom.vercel.app?tab=${actionTab}` : "https://stretchfield-workroom.vercel.app";
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+        <div style="background:#060B14;padding:28px 32px;border-radius:8px 8px 0 0;">
+          <div style="color:#00C8FF;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;margin-bottom:4px;">STRETCHFIELD</div>
+          <div style="color:#E8F0FF;font-size:20px;font-weight:800;">${title}</div>
+        </div>
+        <div style="padding:28px 32px;background:#F0F2FA;">
+          <p style="color:#0A1628;font-size:14px;margin:0 0 20px;">Hi ${profile.name || "there"},</p>
+          <div style="background:#ffffff;border:1px solid #C2C9DC;border-left:4px solid #00C8FF;border-radius:8px;padding:16px 20px;margin-bottom:20px;">
+            <p style="color:#0A1628;font-size:14px;margin:0;line-height:1.6;">${message}</p>
+          </div>
+          <a href="${actionUrl}" style="display:inline-block;background:linear-gradient(135deg,#00C8FF,#00E5C8);color:#060B14;padding:12px 28px;border-radius:8px;font-weight:800;font-size:13px;text-decoration:none;">View in WorkRoom</a>
+          <p style="color:#5A6E8A;font-size:12px;margin-top:20px;">You're receiving this because you have an active account on Stretchfield WorkRoom.</p>
+        </div>
+        <div style="background:#060B14;padding:20px 32px;border-radius:0 0 8px 8px;text-align:center;">
+          <div style="color:#3D5478;font-size:11px;font-style:italic;margin-bottom:6px;">We don't plan events. We engineer impact.</div>
+          <div style="color:#1A2E4A;font-size:10px;">© ${new Date().getFullYear()} Stretchfield · www.stretchfield.com</div>
+        </div>
+      </div>`;
+    await sendEmail(profile.email, `Stretchfield — ${title}`, html);
+  } catch (e) {
+    console.warn("Notification email failed:", e.message);
+  }
+};
 import React, { useState, useEffect, useContext } from "react";
 import { getEvents, createEvent, updateEvent, getTasks, createTask, getProfiles, deleteProfile, updateTask, getInvoices, createInvoice, updateInvoice, getRFFs, createRFF, updateRFF, uploadRFFDocument } from "./dataService";
 
@@ -6334,8 +6418,23 @@ const NotificationsView = ({ user, onNavigate }) => {
     // Navigate to source
     const target = getNavTarget(note);
     if (target && onNavigate) {
-      // For task notifications, always route to tasks tab with the task id
-      const resolvedTarget = note.type === "task" ? "tasks" : target;
+      // Deep-link routing by notification title keywords
+      let resolvedTarget = "notifications";
+      const t = note.title?.toLowerCase() || "";
+      const m = note.message?.toLowerCase() || "";
+      if (t.includes("task") || t.includes("comment") || t.includes("replied")) resolvedTarget = "tasks";
+      else if (t.includes("rff approved") || t.includes("rff declined") || t.includes("rff resubmitted")) resolvedTarget = "vendors";
+      else if (t.includes("vendor application") || t.includes("vendor onboarding")) resolvedTarget = "vendor-onboarding";
+      else if (t.includes("quote submitted")) resolvedTarget = "quotes-received";
+      else if (t.includes("contract award") && t.includes("pending")) resolvedTarget = "contract-awards";
+      else if (t.includes("contract award confirmed") || t.includes("gig confirmed")) resolvedTarget = "purchase-orders";
+      else if (t.includes("purchase order")) resolvedTarget = "vendor-invoices-submit";
+      else if (t.includes("invoice received")) resolvedTarget = "vendor-invoices";
+      else if (t.includes("lead") || t.includes("crm")) resolvedTarget = "crm";
+      else if (t.includes("opportunity") || t.includes("converted")) resolvedTarget = "opportunities";
+      else if (t.includes("vendor assigned") || t.includes("new rff assignment")) resolvedTarget = "rffs";
+      else if (note.type === "rff") resolvedTarget = "vendors";
+      else if (note.type === "task") resolvedTarget = "tasks";
       onNavigate(resolvedTarget, note.resource_id || null);
     }
   };
@@ -8541,7 +8640,7 @@ const ContractAwardApprovalView = ({ user }) => {
       confirmed_at: new Date().toISOString(),
     }).eq("id", award.id);
     // Notify Finance Manager
-    const { data: fms } = await supabase.from("profiles").select("id").in("role", ["Finance Manager"]);
+    const { data: fms } = await supabase.from("profiles").select("id, email, name").in("role", ["Finance Manager"]);
     for (const fm of fms || []) {
       await supabase.from("notifications").insert({
         user_id: fm.id,
@@ -8549,9 +8648,10 @@ const ContractAwardApprovalView = ({ user }) => {
         message: `CEO confirmed ${award.vendor_name} for this gig. Please create a Purchase Order.`,
         type: "rff",
       });
+      if (fm.email) await sendEmail(fm.email, `Gig Confirmed — Create PO for ${award.vendor_name}`, notifEmailHtml({ name: fm.name, title: "Gig Confirmed — Action Required", message: `CEO has confirmed <strong>${award.vendor_name}</strong> for a gig. Please log in to create a Purchase Order.`, actionUrl: BASE_URL, actionLabel: "Create Purchase Order" }));
     }
     // Notify Vendor Manager
-    const { data: vms } = await supabase.from("profiles").select("id").eq("role", "Vendor Manager");
+    const { data: vms } = await supabase.from("profiles").select("id, email, name").eq("role", "Vendor Manager");
     for (const vm of vms || []) {
       await supabase.from("notifications").insert({
         user_id: vm.id,
@@ -8559,6 +8659,7 @@ const ContractAwardApprovalView = ({ user }) => {
         message: `CEO approved and confirmed ${award.vendor_name} for the gig. Finance has been notified to create a PO.`,
         type: "rff",
       });
+      if (vm.email) await sendEmail(vm.email, `Contract Award Confirmed — ${award.vendor_name}`, notifEmailHtml({ name: vm.name, title: "Contract Award Confirmed", message: `CEO has approved and confirmed <strong>${award.vendor_name}</strong> for the gig. Finance has been notified to create a Purchase Order.`, actionUrl: BASE_URL, actionLabel: "View in WorkRoom" }));
     }
     setSaving(false); setPreviewAward(null); setCeoNotes(""); load();
   };
@@ -8839,6 +8940,21 @@ const PurchaseOrderView = ({ user }) => {
         message: `A Purchase Order has been raised for your services on "${rff?.event_name}". Please submit your invoice.`,
         type: "rff",
       });
+      // Send PO email to vendor
+      if (poForm.vendor_email) {
+        await sendEmail(
+          poForm.vendor_email,
+          `Purchase Order ${internalPoNumber} — Stretchfield`,
+          poEmailHtml({
+            vendorName: poModal.vendor_name,
+            poNumber: internalPoNumber,
+            eventName: rff?.event_name || "",
+            amount: poModal.quoted_amount,
+            currency: poForm.currency,
+            notes: poForm.notes,
+          })
+        );
+      }
     }
 
     setSaving(false);
@@ -9692,7 +9808,11 @@ const RFFApprovalsView = ({ user }) => {
     }
     // Notify Vendor Manager
     const { data: vms } = await supabase.from("profiles").select("id").eq("role", "Vendor Manager");
-    if (vms) await Promise.all(vms.map(vm => supabase.from("notifications").insert({ user_id: vm.id, title: "RFF Approved with Budget", message: `RFF "${rff.title}" for ${rff.event_name} has been approved with proposed budget. Proceed to vendor assignment.`, type: "rff" })));
+    if (vms) await Promise.all(vms.map(async vm => {
+      await supabase.from("notifications").insert({ user_id: vm.id, title: "RFF Approved with Budget", message: `RFF "${rff.title}" for ${rff.event_name} has been approved with proposed budget. Proceed to vendor assignment.`, type: "rff" });
+      const { data: vmProfile } = await supabase.from("profiles").select("email, name").eq("id", vm.id).single();
+      if (vmProfile?.email) await sendEmail(vmProfile.email, `RFF Approved — ${rff.title}`, notifEmailHtml({ name: vmProfile.name, title: "RFF Approved with Budget", message: `RFF "${rff.title}" for ${rff.event_name} has been approved with proposed budget. You may now proceed to vendor assignment.`, actionUrl: BASE_URL, actionLabel: "Go to Vendor Assignment" }));
+    }));
     setSaving(false); setActionModal(null); setNotes(""); setBudgetLines([{ category: "", proposed_amount: "", notes: "" }]); load();
   };
 
@@ -9702,7 +9822,11 @@ const RFFApprovalsView = ({ user }) => {
     await supabase.from("rffs").update({ approved: false, status: "declined", declined_notes: notes }).eq("id", rff.id);
     // Notify Vendor Manager
     const { data: vms } = await supabase.from("profiles").select("id").eq("role", "Vendor Manager");
-    if (vms) await Promise.all(vms.map(vm => supabase.from("notifications").insert({ user_id: vm.id, title: "RFF Declined", message: `RFF "${rff.title}" was declined. Notes: ${notes}`, type: "rff" })));
+    if (vms) await Promise.all(vms.map(async vm => {
+      await supabase.from("notifications").insert({ user_id: vm.id, title: "RFF Declined", message: `RFF "${rff.title}" was declined. Notes: ${notes}`, type: "rff" });
+      const { data: vmProfile } = await supabase.from("profiles").select("email, name").eq("id", vm.id).single();
+      if (vmProfile?.email) await sendEmail(vmProfile.email, `RFF Declined — ${rff.title}`, notifEmailHtml({ name: vmProfile.name, title: "RFF Declined", message: `RFF "${rff.title}" was declined by the CEO.<br><br><strong>Notes:</strong> ${notes}`, actionUrl: BASE_URL, actionLabel: "View RFF" }));
+    }));
     setSaving(false); setActionModal(null); setNotes(""); load();
   };
 
@@ -9995,7 +10119,7 @@ const VendorApplicationModal = ({ user, onClose, onSubmitted }) => {
     if (insErr) { setError("Submit failed: " + insErr.message); setSaving(false); return; }
 
     // Notify CEO
-    const { data: ceos } = await supabase.from("profiles").select("id").eq("role", "CEO");
+    const { data: ceos } = await supabase.from("profiles").select("id, email, name").eq("role", "CEO");
     for (const ceo of ceos || []) {
       await supabase.from("notifications").insert({
         user_id: ceo.id,
@@ -10003,6 +10127,7 @@ const VendorApplicationModal = ({ user, onClose, onSubmitted }) => {
         message: `${form.vendor_name} has been submitted for approval by ${user.name}.`,
         type: "task",
       });
+      if (ceo.email) await sendEmail(ceo.email, `New Vendor Application — ${form.vendor_name}`, notifEmailHtml({ name: ceo.name, title: "New Vendor Application", message: `<strong>${form.vendor_name}</strong> has been submitted for approval by ${user.name}. Please log in to review the application.`, actionUrl: BASE_URL, actionLabel: "Review Application" }));
     }
 
     setSaving(false);
@@ -10167,6 +10292,12 @@ const VendorApprovalsPanel = ({ user, onLoginCreated }) => {
     const result = await res.json();
     if (result.error) { alert("Failed: " + result.error); setSaving(false); return; }
     setCreatedCreds({ email: app.contact_email, password });
+    // Send welcome email to vendor
+    await sendEmail(
+      app.contact_email,
+      "Welcome to Stretchfield WorkRoom — Your Vendor Portal Access",
+      welcomeEmailHtml({ name: app.vendor_name, email: app.contact_email, password, role: "Vendor" })
+    );
     setLoginModal(null);
     setSaving(false);
     load();

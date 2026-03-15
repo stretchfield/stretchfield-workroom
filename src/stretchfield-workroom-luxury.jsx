@@ -2785,7 +2785,7 @@ const EventsView = ({ user, userRole }) => {
   const [clients, setClients] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ name: '', client: '', client_id: '', event_date: '', deadline: '', phase: 'Planning' });
+  const [form, setForm] = useState({ name: '', client: '', client_id: '', event_date: '', deadline: '', phase: 'Planning', event_category: '' });
   const [saving, setSaving] = useState(false);
   const [taskModalEvent, setTaskModalEvent] = useState(null);
   const [impactEvent, setImpactEvent] = useState(null);
@@ -2811,6 +2811,7 @@ const EventsView = ({ user, userRole }) => {
   const handleCreate = async () => {
     if (!form.name) { alert('Event name is required'); return; }
     setSaving(true);
+    if (!form.event_category) { alert('Please select an event category.'); setSaving(false); return; }
     const { error } = await supabase.from('projects').insert({
       name: form.name,
       client: form.client || '',
@@ -2822,10 +2823,11 @@ const EventsView = ({ user, userRole }) => {
       status: 'active',
       tasks: 0,
       completed: 0,
+      event_category: form.event_category,
     });
     if (error) { alert('Error: ' + error.message); setSaving(false); return; }
     setModal(false);
-    setForm({ name: '', client: '', client_id: '', deadline: '', phase: 'Planning' });
+    setForm({ name: '', client: '', client_id: '', deadline: '', phase: 'Planning', event_category: '' });
     setSaving(false);
     load();
   };

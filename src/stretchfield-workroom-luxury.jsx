@@ -9317,9 +9317,14 @@ const RFFApprovalsView = ({ user }) => {
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [budgetLines, setBudgetLines] = useState([{ category: "", proposed_amount: "", notes: "" }]);
+  const [budgetEditModal, setBudgetEditModal] = useState(null);
+  const [existingBudgets, setExistingBudgets] = useState([]);
+  const [allRffs, setAllRffs] = useState([]);
 
   const load = () => {
     supabase.from("rffs").select("*").in("status", ["pending", "declined"]).eq("approved", false).order("created_at", { ascending: false }).then(({ data }) => setRffs(data || []));
+    supabase.from("rffs").select("*").eq("approved", true).order("created_at", { ascending: false }).then(({ data }) => setAllRffs(data || []));
+    supabase.from("rff_budgets").select("*").then(({ data }) => setExistingBudgets(data || []));
   };
 
   useEffect(() => { load(); }, []);
@@ -9431,6 +9436,111 @@ const RFFApprovalsView = ({ user }) => {
         </div>
       )}
 
+
+      {/* ── Approved RFFs — CEO can edit budgets ── */}
+      {allRffs.length > 0 && (
+        <div style={{ marginTop: 32 }}>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 12 }}>Approved RFFs — Edit Budgets</div>
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
+                  {["RFF Title","Event","Budget Lines","Total Budget",""].map((h,i) => (
+                    <th key={i} style={{ padding: "10px 14px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {allRffs.map((rff, i) => {
+                  const rfBudgets = existingBudgets.filter(b => b.rff_id === rff.id);
+                  const total = rfBudgets.reduce((s, b) => s + (b.proposed_amount || 0), 0);
+                  return (
+                    <tr key={rff.id} style={{ borderBottom: i < allRffs.length-1 ? `1px solid ${T.border}44` : "none" }}
+                      onMouseEnter={e => e.currentTarget.style.background = T.bg}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                      <td style={{ padding: "10px 14px", color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{rff.title}</td>
+                      <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 12 }}>{rff.event_name}</td>
+                      <td style={{ padding: "10px 14px" }}>
+                        {rfBudgets.length === 0 ? (
+                          <span style={{ color: T.amber, fontSize: 11, fontWeight: 700 }}>No budget set</span>
+                        ) : (
+                          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                            {rfBudgets.map(b => (
+                              <span key={b.id} style={{ background: T.cyan+"15", color: T.cyan, border: `1px solid ${T.cyan}30`, borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>{b.category}: GHS {(b.proposed_amount||0).toLocaleString()}</span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ padding: "10px 14px", color: total > 0 ? T.teal : T.textMuted, fontWeight: 700, fontSize: 13 }}>{total > 0 ? `GHS ${total.toLocaleString()}` : "—"}</td>
+                      <td style={{ padding: "10px 14px" }}>
+                        <button onClick={() => {
+                          const existing = existingBudgets.filter(b => b.rff_id === rff.id);
+                          setBudgetEditModal(rff);
+                          setBudgetLines(existing.length > 0 ? existing.map(b => ({ id: b.id, category: b.category, proposed_amount: b.proposed_amount, notes: b.notes || "" })) : [{ category: "", proposed_amount: "", notes: "" }]);
+                        }} style={{ background: T.cyan+"15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "5px 14px", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
+                          {existingBudgets.filter(b => b.rff_id === rff.id).length > 0 ? "✎ Edit Budget" : "+ Add Budget"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Budget Edit Modal */}
+      {budgetEditModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setBudgetEditModal(null)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 620, maxHeight: "85vh", overflow: "auto", padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Edit Budget — {budgetEditModal.title}</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>{budgetEditModal.event_name} · {budgetEditModal.client_name}</div>
+
+            <div style={{ color: T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8, paddingBottom: 6, borderBottom: `1px solid ${T.cyan}30` }}>Budget Line Items</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 32px", gap: 8, marginBottom: 6 }}>
+              {["Category","Proposed Amount (GHS)","Notes",""].map((h,i) => (
+                <div key={i} style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</div>
+              ))}
+            </div>
+            {budgetLines.map((line, idx) => (
+              <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 32px", gap: 8, marginBottom: 8 }}>
+                <select value={line.category} onChange={e => { const l = [...budgetLines]; l[idx].category = e.target.value; setBudgetLines(l); }} style={{ padding: "7px 10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: line.category ? T.textPrimary : T.textMuted, fontSize: 12, fontFamily: "inherit", outline: "none" }}>
+                  <option value="">Select category...</option>
+                  {["Audio Visual","Catering","Decoration & Floral","Entertainment","Photography & Videography","Printing & Branding","Security","Transportation","Venue","Other"].map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <input type="number" value={line.proposed_amount} onChange={e => { const l = [...budgetLines]; l[idx].proposed_amount = e.target.value; setBudgetLines(l); }} placeholder="0.00" style={{ padding: "7px 10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+                <input value={line.notes || ""} onChange={e => { const l = [...budgetLines]; l[idx].notes = e.target.value; setBudgetLines(l); }} placeholder="Notes..." style={{ padding: "7px 10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+                <button onClick={() => setBudgetLines(budgetLines.filter((_,i) => i !== idx))} style={{ background: T.red+"18", border: `1px solid ${T.red}30`, color: T.red, borderRadius: 6, cursor: "pointer", fontSize: 14, fontWeight: 700 }}>×</button>
+              </div>
+            ))}
+            <button onClick={() => setBudgetLines([...budgetLines, { category: "", proposed_amount: "", notes: "" }])} style={{ background: "none", border: `1px dashed ${T.border}`, color: T.textMuted, padding: "6px 16px", borderRadius: 6, cursor: "pointer", fontSize: 12, width: "100%", marginTop: 4, marginBottom: 20 }}>+ Add Line Item</button>
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={async () => {
+                setSaving(true);
+                const validLines = budgetLines.filter(l => l.category && l.proposed_amount);
+                // Delete existing budgets for this RFF
+                await supabase.from("rff_budgets").delete().eq("rff_id", budgetEditModal.id);
+                // Insert new ones
+                if (validLines.length > 0) {
+                  await supabase.from("rff_budgets").insert(validLines.map(l => ({
+                    rff_id: budgetEditModal.id,
+                    category: l.category,
+                    proposed_amount: parseFloat(l.proposed_amount) || 0,
+                    notes: l.notes || "",
+                    created_by: user.id,
+                  })));
+                }
+                setSaving(false);
+                setBudgetEditModal(null);
+                load();
+              }} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Save Budget"}</button>
+              <button onClick={() => setBudgetEditModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* RFF Action Modal with Budget Template */}
       {actionModal && (

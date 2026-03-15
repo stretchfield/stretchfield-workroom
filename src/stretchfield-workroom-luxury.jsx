@@ -558,7 +558,7 @@ const getNavItems = (role) => {
     base.push({ id: "clients", label: "Clients", icon: "▪" }, { id: "users", label: "User Management", icon: "▪" });
   }
   if (role === "Vendor") {
-    base.push({ id: "rffs", label: "My RFFs", icon: "▪" }, { id: "quotes", label: "Quotes", icon: "▪" }, { id: "vendor-invoices-submit", label: "My Invoices", icon: "▪" }, { id: "vendor-tasks", label: "My Tasks", icon: "▪" });
+    base.push({ id: "rffs", label: "My RFFs", icon: "▪" }, { id: "quotes", label: "Quotes", icon: "▪" }, { id: "vendor-invoices-submit", label: "Invoices", icon: "▪" }, { id: "vendor-tasks", label: "My Tasks", icon: "▪" });
   }
   if (role === "Client") {
     base.push({ id: "client-events", label: "My Events", icon: "▪" }, { id: "client-finance", label: "Budget & Invoices", icon: "▪" }, { id: "client-docs", label: "Documents", icon: "▪" });
@@ -8673,14 +8673,28 @@ const VendorInvoiceView = ({ user }) => {
   const fileRef = React.useRef();
 
   const load = async () => {
-    const [{ data: inv }, { data: po }, { data: ev }] = await Promise.all([
+    const [{ data: inv }, { data: po }, { data: awards }] = await Promise.all([
       supabase.from("vendor_invoices").select("*").eq("vendor_id", user.id).order("created_at", { ascending: false }),
       supabase.from("purchase_orders").select("*").eq("vendor_id", user.id),
-      supabase.from("projects").select("*"),
+      supabase.from("rff_awards").select("*, rffs(project_id, event_name, title)").eq("vendor_id", user.id).in("status", ["confirmed","po_created"]),
     ]);
     setInvoices(inv || []);
     setPOs(po || []);
-    setEvents(ev || []);
+    // Only show events where vendor has a confirmed/awarded gig
+    const awardedEventIds = [...new Set((awards || []).map(a => a.rffs?.project_id).filter(Boolean))];
+    if (awardedEventIds.length > 0) {
+      const { data: ev } = await supabase.from("projects").select("*").in("id", awardedEventIds);
+      setEvents(ev || []);
+    } else {
+      // Fallback: show events from purchase orders
+      const poEventIds = [...new Set((po || []).map(p => p.event_id).filter(Boolean))];
+      if (poEventIds.length > 0) {
+        const { data: ev } = await supabase.from("projects").select("*").in("id", poEventIds);
+        setEvents(ev || []);
+      } else {
+        setEvents([]);
+      }
+    }
   };
 
   useEffect(() => { load(); }, []);

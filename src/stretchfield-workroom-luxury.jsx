@@ -600,8 +600,11 @@ const getNavItems = (role) => {
   if (["CEO","Head of Operations","Vendor Manager","Strategy & Events Lead","Finance Manager"].includes(role)) {
     base.push({ id: "events", label: "Events", icon: "▪" }, { id: "tasks", label: "Event Tasks", icon: "▪" });
   }
-  if (["CEO","Strategy & Events Lead"].includes(role)) {
+  if (role === "CEO") {
     base.push({ id: "impact-intelligence", label: "Impact Intelligence", icon: "▪" });
+  }
+  if (["Strategy & Events Lead", "Vendor Manager"].includes(role)) {
+    base.push({ id: "strategy-map", label: "Strategy Map", icon: "▪" });
   }
   if (["Sales & Marketing"].includes(role)) {
     base.push({ id: "events", label: "Events", icon: "▪" });
@@ -6507,6 +6510,217 @@ const EventTypeAnalysisView = ({ user }) => {
 };
 
 
+
+const StrategyMapView = ({ user }) => {
+  const [events, setEvents] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [brief, setBrief] = useState(null);
+  const [scorecard, setScorecard] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const load = async () => {
+    const { data: ev } = await supabase.from("projects").select("*").order("event_date", { ascending: false });
+    setEvents(ev || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const loadEventData = async (eventId) => {
+    setLoading(true);
+    const [{ data: b }, { data: sc }] = await Promise.all([
+      supabase.from("event_impact_briefs").select("*").eq("project_id", eventId).single(),
+      supabase.from("event_scorecards").select("*").eq("project_id", eventId).single(),
+    ]);
+    setBrief(b || null);
+    setScorecard(sc || null);
+    setLoading(false);
+  };
+
+  const archetype = selectedEvent ? EVENT_ARCHETYPES[selectedEvent.event_category] : null;
+
+  const toolStatus = (val) => {
+    if (val === "Yes") return { color: "#10B981", icon: "✓" };
+    if (val === "No") return { color: T.red, icon: "✗" };
+    return { color: T.textMuted, icon: "—" };
+  };
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Strategic</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Strategy Map</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Event impact briefs and strategic parameters to inform your planning</div>
+      </div>
+
+      {/* Event selector */}
+      <div style={{ marginBottom: 24 }}>
+        <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 8 }}>Select Event</label>
+        <select value={selectedEvent?.id || ""} onChange={e => {
+          const ev = events.find(x => x.id === e.target.value);
+          setSelectedEvent(ev || null);
+          if (ev) loadEventData(ev.id);
+        }} style={{ width: "100%", maxWidth: 400, padding: "10px 14px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+          <option value="">Choose an event...</option>
+          {events.map(ev => (
+            <option key={ev.id} value={ev.id}>{ev.name} {ev.event_category ? `— ${ev.event_category}` : ""}</option>
+          ))}
+        </select>
+      </div>
+
+      {!selectedEvent && (
+        <div style={{ textAlign: "center", padding: "60px 0", background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>🗺</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>Select an event to view its strategy map</div>
+          <div style={{ color: T.textMuted, fontSize: 13 }}>The strategy map shows the impact brief, KPIs and scorecard parameters defined by the CEO.</div>
+        </div>
+      )}
+
+      {selectedEvent && loading && (
+        <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>Loading strategy data...</div>
+      )}
+
+      {selectedEvent && !loading && (
+        <div>
+          {/* Event header card */}
+          <div style={{ background: archetype ? archetype.color+"12" : T.surface, border: `1px solid ${archetype ? archetype.color+"40" : T.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <div style={{ color: archetype?.color || T.cyan, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>{selectedEvent.event_category || "Event"}</div>
+                <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 20 }}>{selectedEvent.name}</div>
+                <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{selectedEvent.client} · {selectedEvent.phase}</div>
+                {selectedEvent.event_date && <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>📅 {new Date(selectedEvent.event_date+"T12:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>}
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 4 }}>Completion</div>
+                <div style={{ color: archetype?.color || T.cyan, fontWeight: 900, fontSize: 24 }}>{selectedEvent.completion || 0}%</div>
+              </div>
+            </div>
+          </div>
+
+          {!brief && (
+            <div style={{ background: T.amber+"12", border: `1px solid ${T.amber}30`, borderRadius: 10, padding: "14px 18px", marginBottom: 20 }}>
+              <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>⚠ No Impact Brief set for this event yet</div>
+              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>The CEO or Strategy Lead needs to complete the Impact Brief in the Impact Intelligence tab first.</div>
+            </div>
+          )}
+
+          {brief && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+
+              {/* Impact Objective */}
+              <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
+                <div style={{ color: archetype?.color || T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>🎯 Impact Objective</div>
+                {brief.impact_objective && (
+                  <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
+                    <div style={{ color: T.textPrimary, fontSize: 13, lineHeight: 1.6 }}>{brief.impact_objective}</div>
+                  </div>
+                )}
+                {brief.target_audience && <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 4 }}><strong style={{ color: T.textSecondary }}>Who:</strong> {brief.target_audience}</div>}
+                {brief.observable_signal && <div style={{ color: T.textMuted, fontSize: 12 }}><strong style={{ color: T.textSecondary }}>Signal:</strong> {brief.observable_signal}</div>}
+              </div>
+
+              {/* Measurement Tools */}
+              <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
+                <div style={{ color: archetype?.color || T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>🔧 Measurement Tools</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {[
+                    ["Pre-Event Survey", brief.tool_pre_survey],
+                    ["Digital Tracking", brief.tool_digital_tracking],
+                    ["Live Monitoring", brief.tool_live_monitoring],
+                    ["Post-Event Survey", brief.tool_post_survey],
+                    ["30-Day Follow-Up", brief.tool_30day_survey],
+                    ["90-Day Tracking", brief.tool_90day_tracking],
+                    ["Social Listening", brief.tool_social_listening],
+                    ["Commercial Data", brief.tool_commercial_data],
+                  ].map(([label, val]) => {
+                    const s = toolStatus(val);
+                    return (
+                      <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: `1px solid ${T.border}33` }}>
+                        <span style={{ color: T.textSecondary, fontSize: 12 }}>{label}</span>
+                        <span style={{ color: s.color, fontSize: 12, fontWeight: 700 }}>{s.icon} {val || "—"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* KPIs */}
+          {brief && (brief.kpi1_name || brief.kpi2_name || brief.kpi3_name) && (
+            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px", marginBottom: 20 }}>
+              <div style={{ color: archetype?.color || T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>📊 Success KPIs</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
+                {[1,2,3].map(n => {
+                  const name = brief[`kpi${n}_name`];
+                  const target = brief[`kpi${n}_target`];
+                  const method = brief[`kpi${n}_method`];
+                  const timing = brief[`kpi${n}_timing`];
+                  if (!name) return null;
+                  return (
+                    <div key={n} style={{ background: T.bg, border: `1px solid ${archetype?.color || T.cyan}25`, borderTop: `2px solid ${archetype?.color || T.cyan}`, borderRadius: 8, padding: "12px 14px" }}>
+                      <div style={{ color: archetype?.color || T.cyan, fontSize: 10, fontWeight: 800, textTransform: "uppercase", marginBottom: 6 }}>KPI {n}</div>
+                      <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13, marginBottom: 6 }}>{name}</div>
+                      <div style={{ color: "#10B981", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Target: {target}</div>
+                      <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 2 }}>Method: {method}</div>
+                      <div style={{ color: T.textMuted, fontSize: 11 }}>When: {timing}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Scorecard dimensions */}
+          {archetype && (
+            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px", marginBottom: 20 }}>
+              <div style={{ color: archetype.color, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>⚖️ Impact Dimensions — What We Are Measuring</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {archetype.dimensions.map((dim, i) => {
+                  const score = scorecard ? scorecard[dim.key+"_score"] : null;
+                  return (
+                    <div key={dim.key} style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 14px", background: T.bg, borderRadius: 8, border: `1px solid ${T.border}` }}>
+                      <div style={{ width: 36, height: 36, borderRadius: "50%", background: archetype.color+"20", border: `2px solid ${archetype.color}40`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <span style={{ color: archetype.color, fontWeight: 900, fontSize: 12 }}>{Math.round(dim.weight*100)}%</span>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{dim.label}</div>
+                        <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{dim.description}</div>
+                        <div style={{ color: archetype.color, fontSize: 10, marginTop: 2 }}>Benchmark: {dim.benchmark}</div>
+                      </div>
+                      {score !== null && score !== undefined && parseFloat(score) > 0 ? (
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div style={{ color: getScoreLabel(parseFloat(score)).color, fontWeight: 900, fontSize: 20 }}>{score}</div>
+                          <div style={{ color: T.textMuted, fontSize: 9 }}>/10</div>
+                        </div>
+                      ) : (
+                        <div style={{ color: T.textMuted, fontSize: 11, flexShrink: 0 }}>Not scored</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Story intent */}
+          {brief && (brief.story_before || brief.story_design || brief.story_outcome) && (
+            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
+              <div style={{ color: archetype?.color || T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>✍️ Impact Story We Are Engineering</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {brief.story_before && <div style={{ background: T.bg, borderLeft: `3px solid ${T.red}`, borderRadius: 6, padding: "10px 14px" }}><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>Before Stretchfield</div><div style={{ color: T.textSecondary, fontSize: 13 }}>{brief.story_before}</div></div>}
+                {brief.story_design && <div style={{ background: T.bg, borderLeft: `3px solid ${archetype?.color||T.cyan}`, borderRadius: 6, padding: "10px 14px" }}><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>What We Are Engineering</div><div style={{ color: T.textSecondary, fontSize: 13 }}>{brief.story_design}</div></div>}
+                {brief.story_outcome && <div style={{ background: T.bg, borderLeft: `3px solid #10B981`, borderRadius: 6, padding: "10px 14px" }}><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>Intended Outcome</div><div style={{ color: T.textSecondary, fontSize: 13 }}>{brief.story_outcome}</div></div>}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ImpactIntelligenceSummary = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [scorecards, setScorecardsData] = useState([]);
@@ -7307,6 +7521,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "vendor-onboarding": return <VendorOnboardingView user={currentUser} />;
       case "event-analysis": return <EventTypeAnalysisView user={currentUser} />;
       case "impact-intelligence": return <ImpactIntelligenceSummary user={currentUser} />;
+      case "strategy-map": return <StrategyMapView user={currentUser} />;
       case "quotes-received": return <QuotesReceivedView user={currentUser} />;
       case "quote-comparison": return <QuoteComparisonView user={currentUser} />;
       case "contract-awards": return <ContractAwardApprovalView user={currentUser} />;

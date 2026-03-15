@@ -3253,7 +3253,7 @@ const VendorsView = ({ user }) => {
   };
 
   const handleCreate = async () => {
-    if (!form.title || !form.client_id || !form.project_id) { setError('Title, client and event are required.'); return; }
+    if (!form.client_id || !form.project_id) { setError('Client and event are required.'); return; }
     if (!form.event_type) { setError('Please select an event type.'); return; }
     setSaving(true); setError('');
     let document_url = '';

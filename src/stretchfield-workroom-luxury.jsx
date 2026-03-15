@@ -536,7 +536,7 @@ const getNavItems = (role) => {
     base.push({ id: "contract-awards", label: "Contract Awards", icon: "▪" });
   }
   if (role === "Vendor Manager") {
-    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quotes-received", label: "Quotes Received", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "gig-confirmation", label: "Confirm Gigs", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" });
+    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quotes-received", label: "Quotes Received", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" });
   }
   if (["CEO","Head of Operations","Vendor Manager","Finance Manager"].includes(role)) {
     base.push({ id: "invoices", label: "Invoices", icon: "▪" });
@@ -8282,14 +8282,30 @@ const ContractAwardApprovalView = ({ user }) => {
 
   const handleApprove = async (award) => {
     setSaving(true);
-    await supabase.from("rff_awards").update({ status: "approved_ceo", approved_by: user.id, ceo_notes: ceoNotes }).eq("id", award.id);
+    // CEO approves AND confirms in one step
+    await supabase.from("rff_awards").update({
+      status: "confirmed",
+      approved_by: user.id,
+      ceo_notes: ceoNotes,
+      confirmed_at: new Date().toISOString(),
+    }).eq("id", award.id);
+    // Notify Finance Manager
+    const { data: fms } = await supabase.from("profiles").select("id").in("role", ["Finance Manager"]);
+    for (const fm of fms || []) {
+      await supabase.from("notifications").insert({
+        user_id: fm.id,
+        title: "Gig Confirmed — Create PO",
+        message: `CEO confirmed ${award.vendor_name} for this gig. Please create a Purchase Order.`,
+        type: "rff",
+      });
+    }
     // Notify Vendor Manager
     const { data: vms } = await supabase.from("profiles").select("id").eq("role", "Vendor Manager");
     for (const vm of vms || []) {
       await supabase.from("notifications").insert({
         user_id: vm.id,
-        title: "Contract Award Approved",
-        message: `CEO approved awarding ${award.vendor_name} the contract. Please confirm the gig.`,
+        title: "Contract Award Confirmed",
+        message: `CEO approved and confirmed ${award.vendor_name} for the gig. Finance has been notified to create a PO.`,
         type: "rff",
       });
     }
@@ -8313,7 +8329,7 @@ const ContractAwardApprovalView = ({ user }) => {
   };
 
   const statusColor = { pending_ceo: T.amber, approved_ceo: T.teal, declined_ceo: T.red, confirmed: "#10B981", po_created: T.cyan };
-  const statusLabel = { pending_ceo: "Pending CEO Approval", approved_ceo: "Approved — Awaiting Confirmation", declined_ceo: "Declined by CEO", confirmed: "Confirmed", po_created: "PO Created" };
+  const statusLabel = { pending_ceo: "Pending CEO Approval", declined_ceo: "Declined by CEO", confirmed: "Confirmed by CEO", po_created: "PO Created" };
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
@@ -8392,7 +8408,7 @@ const ContractAwardApprovalView = ({ user }) => {
                   <textarea value={ceoNotes} onChange={e => setCeoNotes(e.target.value)} rows={3} placeholder="Add notes..." style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", resize: "vertical" }} />
                 </div>
                 <div style={{ display: "flex", gap: 10 }}>
-                  <button onClick={() => handleApprove(previewAward)} disabled={saving} style={{ background: "linear-gradient(135deg, #10B981, #059669)", border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>✓ Approve Award</button>
+                  <button onClick={() => handleApprove(previewAward)} disabled={saving} style={{ background: "linear-gradient(135deg, #10B981, #059669)", border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>✓ Approve & Confirm Gig</button>
                   <button onClick={() => handleDecline(previewAward)} disabled={saving} style={{ background: T.red + "18", border: `1px solid ${T.red}40`, color: T.red, padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>✗ Decline</button>
                   <button onClick={() => setPreviewAward(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
                 </div>
@@ -8484,7 +8500,7 @@ const PurchaseOrderView = ({ user }) => {
 
   const load = async () => {
     const [{ data: aw }, { data: po }, { data: rf }, { data: ev }] = await Promise.all([
-      supabase.from("rff_awards").select("*").eq("status", "confirmed"),
+      supabase.from("rff_awards").select("*").in("status", ["confirmed"]),
       supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }),
       supabase.from("rffs").select("*"),
       supabase.from("projects").select("*"),

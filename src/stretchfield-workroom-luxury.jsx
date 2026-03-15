@@ -534,6 +534,7 @@ const getNavItems = (role) => {
   if (role === "CEO") {
     base.push({ id: "vendor-onboarding", label: "Vendor Applications", icon: "▪" });
     base.push({ id: "contract-awards", label: "Contract Awards", icon: "▪" });
+    base.push({ id: "event-analysis", label: "Event Analysis", icon: "▪" });
   }
   if (role === "Vendor Manager") {
     base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quotes-received", label: "Quotes Received", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" });
@@ -3210,7 +3211,7 @@ const VendorsView = ({ user }) => {
   const [showApprovalsPanel, setShowApprovalsPanel] = useState(false);
   const [vendorApps, setVendorApps] = useState([]);
   const [expandedRff, setExpandedRff] = useState(null);
-  const [form, setForm] = useState({ title: '', description: '', client_id: '', client_name: '', project_id: '', event_name: '', deadline: '' });
+  const [form, setForm] = useState({ title: '', description: '', client_id: '', client_name: '', project_id: '', event_name: '', deadline: '', event_type: '' });
   const [file, setFile] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -3235,8 +3236,25 @@ const VendorsView = ({ user }) => {
 
   useEffect(() => { load(); }, []);
 
+  const generateRffCode = async (eventType) => {
+    const typeMap = { "Conference/Seminar": "CS", "Product Launch": "PL", "Awards Ceremony": "AWD", "Corporate Party": "CP" };
+    const prefix = typeMap[eventType] || "GEN";
+    const year = new Date().getFullYear().toString().slice(-2);
+    // Get or create sequence for this type+year
+    const { data: seq } = await supabase.from("rff_sequences").select("*").eq("event_type", prefix).eq("year", parseInt("20"+year)).single();
+    let nextSeq = 1;
+    if (seq) {
+      nextSeq = (seq.last_sequence || 0) + 1;
+      await supabase.from("rff_sequences").update({ last_sequence: nextSeq }).eq("id", seq.id);
+    } else {
+      await supabase.from("rff_sequences").insert({ event_type: prefix, year: parseInt("20"+year), last_sequence: 1 });
+    }
+    return `ST/${prefix}/${year}/${String(nextSeq).padStart(3, "0")}`;
+  };
+
   const handleCreate = async () => {
     if (!form.title || !form.client_id || !form.project_id) { setError('Title, client and event are required.'); return; }
+    if (!form.event_type) { setError('Please select an event type.'); return; }
     setSaving(true); setError('');
     let document_url = '';
     let document_name = '';
@@ -3249,15 +3267,18 @@ const VendorsView = ({ user }) => {
       document_url = urlData.publicUrl;
       document_name = file.name;
     }
+    const rffCode = await generateRffCode(form.event_type);
     const { error } = await supabase.from('rffs').insert({
-      title: form.title, description: form.description,
+      title: rffCode, description: form.description,
       client_id: form.client_id, client_name: form.client_name,
       project_id: form.project_id, event_name: form.event_name,
-      deadline: form.deadline || null, document_url, document_name, status: 'pending', submitted_for_approval: true, approved: false,
+      deadline: form.deadline || null, document_url, document_name,
+      status: 'pending', submitted_for_approval: true, approved: false,
+      event_type: form.event_type, rff_code: rffCode,
     });
     if (error) { setError(error.message); setSaving(false); return; }
     setModal(false);
-    setForm({ title: '', description: '', client_id: '', client_name: '', project_id: '', event_name: '', deadline: '' });
+    setForm({ title: '', description: '', client_id: '', client_name: '', project_id: '', event_name: '', deadline: '', event_type: '' });
     setFile(null); setSaving(false); load();
   };
 
@@ -3506,7 +3527,22 @@ const VendorsView = ({ user }) => {
 
       }{modal && (
         <Modal title="New RFF" onClose={() => { setModal(false); setError(''); }}>
-          <Input label="RFF Title" placeholder="e.g. Photography Services" value={form.title} onChange={v => setForm({ ...form, title: v })} />
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>Event Type *</div>
+            <select value={form.event_type} onChange={e => setForm({ ...form, event_type: e.target.value })} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${form.event_type ? T.border : T.amber}`, borderRadius: 8, color: form.event_type ? T.textPrimary : T.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+              <option value="">Select event type...</option>
+              <option value="Conference/Seminar">Conference / Seminar (ST/CS)</option>
+              <option value="Product Launch">Product Launch (ST/PL)</option>
+              <option value="Awards Ceremony">Awards Ceremony (ST/AWD)</option>
+              <option value="Corporate Party">Corporate Party (ST/CP)</option>
+            </select>
+          </div>
+          {form.event_type && (
+            <div style={{ marginBottom: 14, padding: "8px 12px", background: T.cyan+"12", border: `1px solid ${T.cyan}30`, borderRadius: 8 }}>
+              <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>RFF Code Preview</div>
+              <div style={{ color: T.cyan, fontWeight: 900, fontSize: 16 }}>ST/{{"Conference/Seminar":"CS","Product Launch":"PL","Awards Ceremony":"AWD","Corporate Party":"CP"}[form.event_type]}/{new Date().getFullYear().toString().slice(-2)}/###</div>
+            </div>
+          )}
           <Input label="Description" placeholder="Brief description of what's needed" value={form.description} onChange={v => setForm({ ...form, description: v })} />
           <Select label="Client" options={[{ value: '', label: 'Select client...' }, ...clients.map(c => ({ value: c.id, label: c.company || c.name }))]}
             value={form.client_id}
@@ -5627,6 +5663,220 @@ const ZohoBooksView = ({ user }) => {
   );
 };
 
+
+const EventTypeAnalysisView = ({ user }) => {
+  const [rffs, setRffs] = useState([]);
+  const [pos, setPOs] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [periodType, setPeriodType] = useState("year");
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const eventTypes = [
+    { key: "Conference/Seminar", code: "CS", color: "#00C8FF", label: "Conference / Seminar" },
+    { key: "Product Launch", code: "PL", color: "#E879F9", label: "Product Launch" },
+    { key: "Awards Ceremony", code: "AWD", color: "#F59E0B", label: "Awards Ceremony" },
+    { key: "Corporate Party", code: "CP", color: "#10B981", label: "Corporate Party" },
+  ];
+
+  const load = async () => {
+    setLoading(true);
+    const [{ data: rf }, { data: po }, { data: inv }] = await Promise.all([
+      supabase.from("rffs").select("*").not("event_type", "is", null),
+      supabase.from("purchase_orders").select("*"),
+      supabase.from("vendor_invoices").select("*"),
+    ]);
+    setRffs(rf || []);
+    setPOs(po || []);
+    setInvoices(inv || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const getDateRange = () => {
+    if (periodType === "year") {
+      return { from: `${selectedYear}-01-01`, to: `${selectedYear}-12-31` };
+    }
+    return { from: startDate, to: endDate };
+  };
+
+  const { from, to } = getDateRange();
+
+  const filteredRffs = rffs.filter(r => {
+    if (!r.created_at) return false;
+    const d = r.created_at.slice(0, 10);
+    return (!from || d >= from) && (!to || d <= to);
+  });
+
+  const totalRffs = filteredRffs.length;
+  const totalBudget = filteredRffs.reduce((s, r) => s + (r.amount || 0), 0);
+
+  const typeStats = eventTypes.map(et => {
+    const typeRffs = filteredRffs.filter(r => r.event_type === et.key);
+    const typePOs = pos.filter(p => p.internal_po_number?.includes(`/ST/${et.code}/`));
+    const typeInvoices = invoices.filter(i => i.invoice_number?.includes(`/ST/${et.code}/`));
+    const totalAmt = typeRffs.reduce((s, r) => s + (r.amount || 0), 0);
+    const pct = totalRffs > 0 ? Math.round((typeRffs.length / totalRffs) * 100) : 0;
+    return { ...et, count: typeRffs.length, pct, totalAmt, poCount: typePOs.length, invoiceCount: typeInvoices.length, rffs: typeRffs };
+  });
+
+  const years = ["2024", "2025", "2026", "2027", "2028"];
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>CEO</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Event Type Analysis</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Distribution of RFFs, POs and invoices by event category</div>
+      </div>
+
+      {/* Period Selector */}
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px", marginBottom: 24 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 6 }}>
+            {["year", "custom"].map(pt => (
+              <button key={pt} onClick={() => setPeriodType(pt)} style={{ padding: "6px 16px", borderRadius: 20, cursor: "pointer", fontSize: 11, fontWeight: 700, border: `1px solid ${periodType === pt ? T.cyan : T.border}`, background: periodType === pt ? T.cyan+"20" : "none", color: periodType === pt ? T.cyan : T.textMuted, textTransform: "uppercase" }}>{pt === "year" ? "By Year" : "Custom Range"}</button>
+            ))}
+          </div>
+          {periodType === "year" ? (
+            <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} style={{ padding: "7px 14px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+              {years.map(y => <option key={y}>{y}</option>)}
+            </select>
+          ) : (
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ padding: "7px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+              <span style={{ color: T.textMuted }}>to</span>
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ padding: "7px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+            </div>
+          )}
+          <div style={{ marginLeft: "auto", color: T.textMuted, fontSize: 12 }}>{filteredRffs.length} RFFs in period</div>
+        </div>
+      </div>
+
+      {/* Summary KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Total RFFs", value: totalRffs, color: T.cyan },
+          { label: "Total POs", value: pos.length, color: T.teal },
+          { label: "Total Invoices", value: invoices.length, color: T.amber },
+          { label: "Most Active Type", value: typeStats.sort((a,b)=>b.count-a.count)[0]?.label?.split("/")[0] || "—", color: "#10B981" },
+        ].map((k,i) => (
+          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: i===3?16:20, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginTop: 4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Distribution Chart */}
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 24 }}>
+        <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 20 }}>RFF Distribution by Event Type</div>
+        {typeStats.sort((a,b) => b.count - a.count).map((et, i) => (
+          <div key={et.key} style={{ marginBottom: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 12, height: 12, borderRadius: "50%", background: et.color, flexShrink: 0 }} />
+                <span style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{et.label}</span>
+                <span style={{ background: et.color+"18", color: et.color, borderRadius: 20, padding: "1px 8px", fontSize: 10, fontWeight: 800 }}>ST/{et.code}</span>
+              </div>
+              <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
+                <span style={{ color: T.textMuted, fontSize: 12 }}>{et.count} RFF{et.count!==1?"s":""}</span>
+                <span style={{ color: et.color, fontWeight: 800, fontSize: 14 }}>{et.pct}%</span>
+              </div>
+            </div>
+            <div style={{ height: 28, background: T.border+"44", borderRadius: 6, overflow: "hidden", position: "relative" }}>
+              <div style={{ height: "100%", width: `${et.pct}%`, background: `linear-gradient(90deg, ${et.color}, ${et.color}99)`, borderRadius: 6, transition: "width 0.6s ease", minWidth: et.count > 0 ? 4 : 0 }} />
+              {et.count > 0 && <div style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#fff", fontSize: 11, fontWeight: 700 }}>{et.count} RFF{et.count!==1?"s":""}</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Detailed breakdown table */}
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
+        <div style={{ padding: "16px 20px", borderBottom: `1px solid ${T.border}` }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Detailed Breakdown</div>
+        </div>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
+              {["Event Type","Code Prefix","RFFs","POs Created","Invoices","% Share"].map(h => (
+                <th key={h} style={{ padding: "10px 16px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {typeStats.map((et, i) => (
+              <tr key={et.key} style={{ borderBottom: i < typeStats.length-1 ? `1px solid ${T.border}44` : "none" }}
+                onMouseEnter={e => e.currentTarget.style.background = T.bg}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                <td style={{ padding: "12px 16px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: et.color }} />
+                    <span style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{et.label}</span>
+                  </div>
+                </td>
+                <td style={{ padding: "12px 16px" }}><span style={{ background: et.color+"18", color: et.color, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 800 }}>ST/{et.code}/YY/###</span></td>
+                <td style={{ padding: "12px 16px", color: et.count > 0 ? T.textPrimary : T.textMuted, fontWeight: et.count > 0 ? 700 : 400, fontSize: 13 }}>{et.count}</td>
+                <td style={{ padding: "12px 16px", color: T.textPrimary, fontSize: 13 }}>{et.poCount}</td>
+                <td style={{ padding: "12px 16px", color: T.textPrimary, fontSize: 13 }}>{et.invoiceCount}</td>
+                <td style={{ padding: "12px 16px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ width: 60, height: 6, background: T.border+"44", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${et.pct}%`, background: et.color, borderRadius: 3 }} />
+                    </div>
+                    <span style={{ color: et.color, fontWeight: 800, fontSize: 12 }}>{et.pct}%</span>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {/* Totals row */}
+            <tr style={{ background: T.bg, borderTop: `2px solid ${T.border}` }}>
+              <td style={{ padding: "12px 16px", color: T.textPrimary, fontWeight: 900, fontSize: 13 }}>TOTAL</td>
+              <td style={{ padding: "12px 16px" }} />
+              <td style={{ padding: "12px 16px", color: T.cyan, fontWeight: 900, fontSize: 13 }}>{totalRffs}</td>
+              <td style={{ padding: "12px 16px", color: T.cyan, fontWeight: 900, fontSize: 13 }}>{pos.length}</td>
+              <td style={{ padding: "12px 16px", color: T.cyan, fontWeight: 900, fontSize: 13 }}>{invoices.length}</td>
+              <td style={{ padding: "12px 16px", color: T.cyan, fontWeight: 900, fontSize: 13 }}>100%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Monthly trend for selected year */}
+      {periodType === "year" && (
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 24px" }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 16 }}>Monthly Activity — {selectedYear}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(12,1fr)", gap: 6 }}>
+            {Array.from({length:12},(_,i)=>i+1).map(month => {
+              const monthRffs = filteredRffs.filter(r => {
+                const d = new Date(r.created_at);
+                return d.getFullYear() === parseInt(selectedYear) && d.getMonth()+1 === month;
+              });
+              const maxCount = Math.max(...Array.from({length:12},(_,i)=>filteredRffs.filter(r=>new Date(r.created_at).getMonth()===i).length), 1);
+              const heightPct = monthRffs.length > 0 ? Math.max((monthRffs.length/maxCount)*80, 10) : 0;
+              const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+              return (
+                <div key={month} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                  <div style={{ height: 80, display: "flex", alignItems: "flex-end", width: "100%" }}>
+                    <div style={{ width: "100%", height: `${heightPct}%`, background: monthRffs.length > 0 ? `linear-gradient(180deg, ${T.cyan}, ${T.teal})` : T.border+"44", borderRadius: "4px 4px 0 0", transition: "height 0.4s ease" }} />
+                  </div>
+                  {monthRffs.length > 0 && <div style={{ color: T.cyan, fontSize: 10, fontWeight: 800 }}>{monthRffs.length}</div>}
+                  <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 600 }}>{months[month-1]}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const CalendarView = ({ user, onNavigate }) => {
   const [today] = useState(new Date());
   const [current, setCurrent] = useState(new Date());
@@ -6267,6 +6517,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "calendar": return <CalendarView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
       case "zoho-books": return <ZohoBooksView user={currentUser} />;
       case "vendor-onboarding": return <VendorOnboardingView user={currentUser} />;
+      case "event-analysis": return <EventTypeAnalysisView user={currentUser} />;
       case "quotes-received": return <QuotesReceivedView user={currentUser} />;
       case "quote-comparison": return <QuoteComparisonView user={currentUser} />;
       case "contract-awards": return <ContractAwardApprovalView user={currentUser} />;
@@ -8523,6 +8774,15 @@ const PurchaseOrderView = ({ user }) => {
     const rff = rffs.find(r => r.id === poModal.rff_id);
     const event = events.find(e => e.id === rff?.project_id);
 
+    // Generate internal PO number from RFF code
+    let internalPoNumber = "";
+    if (rff?.rff_code) {
+      // Count existing POs for this RFF to determine vendor suffix
+      const { data: existingPos } = await supabase.from("purchase_orders").select("id").eq("rff_id", poModal.rff_id);
+      const vendorSuffix = (existingPos?.length || 0) === 0 ? "" : String(existingPos.length + 1);
+      internalPoNumber = `PO/${rff.rff_code}${vendorSuffix}`;
+    }
+
     // Create PO in Supabase
     const { data: po } = await supabase.from("purchase_orders").insert({
       rff_id: poModal.rff_id,
@@ -8536,6 +8796,7 @@ const PurchaseOrderView = ({ user }) => {
       notes: poForm.notes,
       status: "draft",
       created_by: user.id,
+      internal_po_number: internalPoNumber,
     }).select().single();
 
     // Push to Zoho Books
@@ -8645,7 +8906,10 @@ const PurchaseOrderView = ({ user }) => {
                   <tr key={po.id} style={{ borderBottom: i < pos.length-1 ? `1px solid ${T.border}44` : "none" }}
                     onMouseEnter={e => e.currentTarget.style.background = T.bg}
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                    <td style={{ padding: "10px 14px", color: T.cyan, fontSize: 12, fontWeight: 700 }}>{po.zoho_po_number || "—"}</td>
+                    <td style={{ padding: "10px 14px" }}>
+                      <div style={{ color: T.cyan, fontSize: 12, fontWeight: 700 }}>{po.internal_po_number || po.zoho_po_number || "—"}</div>
+                      {po.zoho_po_number && po.internal_po_number && <div style={{ color: T.textMuted, fontSize: 10 }}>Zoho: {po.zoho_po_number}</div>}
+                    </td>
                     <td style={{ padding: "10px 14px", color: T.textPrimary, fontSize: 12, fontWeight: 600 }}>{po.vendor_name}</td>
                     <td style={{ padding: "10px 14px", color: T.textSecondary, fontSize: 12 }}>{po.event_name}</td>
                     <td style={{ padding: "10px 14px", color: T.amber, fontSize: 12, fontWeight: 700 }}>{po.currency} {(po.amount||0).toLocaleString()}</td>
@@ -8750,6 +9014,11 @@ const VendorInvoiceView = ({ user }) => {
     }
     const event = events.find(e => e.id === form.event_id);
     const po = pos.find(p => p.id === form.purchase_order_id);
+    // Generate invoice number from PO internal number
+    let invoiceNumber = "";
+    if (po?.internal_po_number) {
+      invoiceNumber = po.internal_po_number.replace("PO/", "INV/");
+    }
     await supabase.from("vendor_invoices").insert({
       vendor_id: user.id,
       vendor_name: user.name,
@@ -8761,6 +9030,7 @@ const VendorInvoiceView = ({ user }) => {
       invoice_filename,
       notes: form.notes,
       status: "submitted",
+      invoice_number: invoiceNumber,
     });
     // Notify Finance
     const { data: fms } = await supabase.from("profiles").select("id").in("role", ["Finance Manager","CEO"]);

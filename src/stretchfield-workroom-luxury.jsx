@@ -4787,7 +4787,7 @@ const ClientsView = ({ user }) => {
                   <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.company || c.company_name || c.name || "—"}</div>
                   {(c.company || c.company_name) && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{c.name}</div>}
                 </div>
-                {isCEOorAdmin && profileEmails.includes(c.email) && (
+                {isCEOorAdmin && c.source === 'profile' && (
                   <div style={{ color: T.teal, fontSize: 10, fontWeight: 700, background: T.teal + "18", border: `1px solid ${T.teal}40`, padding: "2px 8px", borderRadius: 20, flexShrink: 0 }}>✓ Portal</div>
                 )}
               </div>
@@ -4797,8 +4797,8 @@ const ClientsView = ({ user }) => {
                 {c.notes && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 8, fontStyle: "italic", lineHeight: 1.5 }}>{c.notes}</div>}
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                {isCEOorAdmin && !profileEmails.includes(c.email) && (
-                  <Btn small onClick={() => { setLoginModal(c); setError(""); setSuccess(""); }}>🔑 Create Login</Btn>
+                {isCEOorAdmin && c.source !== 'profile' && c.email && (
+                  <Btn small onClick={() => { setLoginModal(c); setLoginForm({ password: generatePassword(c.email) }); setError(""); setSuccess(""); }}>🔑 Create Login</Btn>
                 )}
                 <Btn small variant="ghost" onClick={() => handleDelete(c.id)}>Remove</Btn>
               </div>

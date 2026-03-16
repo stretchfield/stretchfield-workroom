@@ -4568,11 +4568,19 @@ const ClientsView = ({ user }) => {
   const load = async () => {
     setLoading(true);
     const [c, p] = await Promise.all([
+      supabase.from('profiles').select('*').eq('role', 'Client').order('created_at', { ascending: false }),
       supabase.from('clients').select('*').order('created_at', { ascending: false }),
-      supabase.from('profiles').select('email').eq('role', 'Client'),
     ]);
-    setClients(c.data || []);
-    setProfileEmails((p.data || []).map(x => x.email));
+    // Merge both sources — profiles are the source of truth for portal users
+    // clients table has additional CRM data
+    const profileClients = (c.data || []).map(p => ({
+      ...p,
+      company: p.company_name || p.company || "",
+    }));
+    // Add any clients from clients table not already in profiles
+    const clientsData = (p.data || []).filter(cl => !profileClients.find(pc => pc.email === cl.email));
+    setClients([...profileClients, ...clientsData]);
+    setProfileEmails((c.data || []).map(x => x.email));
     setLoading(false);
   };
 
@@ -4581,7 +4589,11 @@ const ClientsView = ({ user }) => {
   const handleCreate = async () => {
     if (!form.name) { setError('Client name is required.'); return; }
     setSaving(true); setError('');
-    await supabase.from('clients').insert(form);
+    // Insert into clients table for CRM reference
+    await supabase.from('clients').insert({
+      name: form.name, company: form.company, email: form.email,
+      phone: form.phone, notes: form.notes,
+    });
     setModal(false);
     setForm({ name: '', company: '', email: '', phone: '', notes: '' });
     setSaving(false);
@@ -4613,7 +4625,9 @@ const ClientsView = ({ user }) => {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Remove this client?')) return;
+    // Try deleting from both tables
     await supabase.from('clients').delete().eq('id', id);
+    await supabase.from('profiles').delete().eq('id', id);
     load();
   };
 

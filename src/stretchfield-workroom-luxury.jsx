@@ -4893,26 +4893,28 @@ const ClientsView = ({ user }) => {
   const load = async () => {
     setLoading(true);
     try {
-      const [{ data: profileData }, { data: clientData }] = await Promise.all([
-        supabase.from('profiles').select('*').eq('role', 'Client').order('created_at', { ascending: false }),
+      // Get current session first
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setLoading(false); return; }
+
+      const [{ data: profileData, error: pe }, { data: clientData, error: ce }] = await Promise.all([
+        supabase.from('profiles').select('id, name, email, phone, company_name, role, avatar, created_at').eq('role', 'Client').order('created_at', { ascending: false }),
         supabase.from('clients').select('*').order('created_at', { ascending: false }),
       ]);
+
+      if (pe) console.error('Profiles error:', pe.message);
+      if (ce) console.error('Clients error:', ce.message);
+
       const profileEmails = (profileData || []).map(p => p.email);
-      // Clients from profiles — have portal login
       const profiles = (profileData || []).map(p => ({
         ...p,
-        company: p.company_name || p.company || "",
+        company: p.company_name || "",
         has_portal: true,
         source: 'profile',
       }));
-      // Clients from clients table — no portal login yet
       const extraClients = (clientData || [])
         .filter(c => c.email && !profileEmails.includes(c.email))
         .map(c => ({ ...c, has_portal: false, source: 'clients' }));
-      // Also mark clients table entries that DO have profiles
-      const linkedClients = (clientData || [])
-        .filter(c => c.email && profileEmails.includes(c.email))
-        .map(c => ({ ...c, has_portal: true, source: 'clients_linked' }));
       setClients([...profiles, ...extraClients]);
       setProfileEmails(profileEmails);
     } catch (e) {

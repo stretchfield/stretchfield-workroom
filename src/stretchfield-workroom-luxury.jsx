@@ -8418,652 +8418,812 @@ const CRMDashboardSM = ({ user }) => {
 
 // ─── FINANCE DASHBOARD ────────────────────────────────────────────────────────
 const FinanceDashboard = ({ user, onTab }) => {
-  const [invoices, setInvoices] = useState([]);
-  const [expenses, setExpenses] = useState([]);
-  const [budgets, setBudgets] = useState([]);
-  const [leads, setLeads] = useState([]);
+  const [financeTab, setFinanceTab] = useState("overview");
+  const [vouchers, setVouchers] = useState([]);
+  const [estimates, setEstimates] = useState([]);
+  const [pettyCash, setPettyCash] = useState(null);
+  const [pettyCashVouchers, setPettyCashVouchers] = useState([]);
+  const [dailyBalances, setDailyBalances] = useState([]);
   const [events, setEvents] = useState([]);
-  const [budgetRequests, setBudgetRequests] = useState([]);
-  const [paymentRequests, setPaymentRequests] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [pos, setPOs] = useState([]);
+  const [clientInvoices, setClientInvoices] = useState([]);
+  const [vendorInvoices, setVendorInvoices] = useState([]);
+  const [saving, setSaving] = useState(false);
 
-  const load = () => {
-    Promise.all([
-      supabase.from("invoices").select("*").order("created_at", { ascending: false }),
-      supabase.from("expenses").select("*").order("created_at", { ascending: false }),
-      supabase.from("budgets").select("*"),
-      supabase.from("leads").select("*").eq("status", "won"),
-      supabase.from("projects").select("*"),
-      supabase.from("budget_requests").select("*").eq("status", "pending"),
-      supabase.from("invoice_payments").select("*").eq("status", "pending"),
-    ]).then(([inv, exp, bud, l, ev, br, pr]) => {
-      setInvoices(inv.data || []);
-      setExpenses(exp.data || []);
-      setBudgets(bud.data || []);
-      setLeads(l.data || []);
-      setEvents(ev.data || []);
-      setBudgetRequests(br.data || []);
-      setPaymentRequests(pr.data || []);
-    });
+  // Voucher form
+  const [voucherModal, setVoucherModal] = useState(null);
+  const [vForm, setVForm] = useState({ payment_type: 'project', payee: '', description: '', amount: '', currency: 'GHS', project_id: '', event_name: '', invoice_ref: '', department: '', welfare_type: '', admin_type: '', statutory_type: '', due_date: '', notes: '' });
+
+  // Estimate form
+  const [estimateModal, setEstimateModal] = useState(null);
+  const [eForm, setEForm] = useState({ client_name: '', project_id: '', event_name: '', line_items: [{ description: '', qty: 1, unit_price: '' }], tax_pct: 0, notes: '' });
+
+  // Petty cash voucher form
+  const [pcModal, setPcModal] = useState(false);
+  const [pcForm, setPcForm] = useState({ payee: '', purpose: '', amount: '' });
+
+  // Daily balance form
+  const [dbModal, setDbModal] = useState(false);
+  const [dbForm, setDbForm] = useState({ report_date: new Date().toISOString().slice(0,10), opening_balance: '', expected_inflows: '', expected_expenditure: '', actual_inflows: '', actual_payments: '', notes: '' });
+
+  const canApprove = ['CEO', 'Head of Operations'].includes(user?.role);
+  const isFinance = ['Finance Manager', 'CEO'].includes(user?.role);
+
+  const load = async () => {
+    const [v, est, pc, pcv, db, ev, cl, po, ci, vi] = await Promise.all([
+      supabase.from('payment_vouchers').select('*').order('created_at', { ascending: false }),
+      supabase.from('estimates').select('*').order('created_at', { ascending: false }),
+      supabase.from('petty_cash').select('*').limit(1).single(),
+      supabase.from('petty_cash_vouchers').select('*').order('created_at', { ascending: false }),
+      supabase.from('daily_balances').select('*').order('report_date', { ascending: false }),
+      supabase.from('projects').select('*').order('name'),
+      supabase.from('profiles').select('*').eq('role', 'Client'),
+      supabase.from('purchase_orders').select('*'),
+      supabase.from('client_invoices').select('*'),
+      supabase.from('vendor_invoices').select('*'),
+    ]);
+    setVouchers(v.data || []);
+    setEstimates(est.data || []);
+    setPettyCash(pc.data || null);
+    setPettyCashVouchers(pcv.data || []);
+    setDailyBalances(db.data || []);
+    setEvents(ev.data || []);
+    setClients(cl.data || []);
+    setPOs(po.data || []);
+    setClientInvoices(ci.data || []);
+    setVendorInvoices(vi.data || []);
   };
 
   useEffect(() => { load(); }, []);
 
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  // Auto-generate voucher number
+  const genVoucherNumber = (type) => {
+    const prefixes = { project: 'PV', cheque: 'CHQ', petty_cash: 'PC', staff_welfare: 'SW', administrative: 'ADM', statutory: 'STAT' };
+    const prefix = prefixes[type] || 'PV';
+    const year = new Date().getFullYear().toString().slice(-2);
+    const count = vouchers.filter(v => v.payment_type === type).length + 1;
+    return `${prefix}/${year}/${String(count).padStart(3,'0')}`;
+  };
 
-  const totalRevenue = leads.reduce((a, l) => a + (l.value || 0), 0);
-  const mtdRevenue = leads.filter(l => l.closed_date && new Date(l.closed_date) >= startOfMonth).reduce((a, l) => a + (l.value || 0), 0);
-  const ytdRevenue = leads.filter(l => l.closed_date && new Date(l.closed_date) >= startOfYear).reduce((a, l) => a + (l.value || 0), 0);
+  const genEstimateNumber = () => {
+    const year = new Date().getFullYear().toString().slice(-2);
+    return `EST/${year}/${String(estimates.length + 1).padStart(3,'0')}`;
+  };
 
-  const totalExpenses = expenses.reduce((a, e) => a + (e.amount || 0), 0);
-  const mtdExpenses = expenses.filter(e => e.date && new Date(e.date) >= startOfMonth).reduce((a, e) => a + (e.amount || 0), 0);
-  const ytdExpenses = expenses.filter(e => e.date && new Date(e.date) >= startOfYear).reduce((a, e) => a + (e.amount || 0), 0);
+  // Save voucher
+  const saveVoucher = async () => {
+    if (!vForm.payee || !vForm.amount) { alert('Payee and amount are required.'); return; }
+    setSaving(true);
+    const voucherNumber = genVoucherNumber(vForm.payment_type);
+    await supabase.from('payment_vouchers').insert({
+      ...vForm,
+      voucher_number: voucherNumber,
+      amount: parseFloat(vForm.amount) || 0,
+      raised_by: user.id,
+      status: 'pending_approval',
+    });
+    // Notify CEO for approval
+    const { data: ceos } = await supabase.from('profiles').select('id, email, name').eq('role', 'CEO');
+    for (const ceo of ceos || []) {
+      await supabase.from('notifications').insert({ user_id: ceo.id, title: 'Payment Voucher Raised', message: `${user.name} raised voucher ${voucherNumber} for GHS ${parseFloat(vForm.amount).toLocaleString()} — ${vForm.description}`, type: 'rff' });
+      if (ceo.email) await sendEmail(ceo.email, `Payment Voucher — ${voucherNumber}`, notifEmailHtml({ name: ceo.name, title: 'Payment Voucher Raised', message: `Finance Manager raised voucher <strong>${voucherNumber}</strong> for <strong>GHS ${parseFloat(vForm.amount).toLocaleString()}</strong>.<br><br>Payee: ${vForm.payee}<br>Description: ${vForm.description}<br>Type: ${vForm.payment_type}`, actionUrl: 'https://stretchfield-workroom.vercel.app', actionLabel: 'Review Voucher' }));
+    }
+    setSaving(false);
+    setVoucherModal(null);
+    setVForm({ payment_type: 'project', payee: '', description: '', amount: '', currency: 'GHS', project_id: '', event_name: '', invoice_ref: '', department: '', welfare_type: '', admin_type: '', statutory_type: '', due_date: '', notes: '' });
+    load();
+  };
 
-  const pendingInvoices = invoices.filter(i => i.status === "pending");
-  const paidInvoices = invoices.filter(i => i.status === "paid");
-  const totalInvoiced = invoices.reduce((a, i) => a + (i.amount || 0), 0);
-  const totalPaid = paidInvoices.reduce((a, i) => a + (i.amount || 0), 0);
-  const totalPending = pendingInvoices.reduce((a, i) => a + (i.amount || 0), 0);
+  // Approve voucher (CEO)
+  const approveVoucher = async (v) => {
+    await supabase.from('payment_vouchers').update({ status: 'approved', approved_by: user.id, approved_at: new Date().toISOString() }).eq('id', v.id);
+    // Notify Finance Manager
+    const { data: fms } = await supabase.from('profiles').select('id, email, name').eq('role', 'Finance Manager');
+    for (const fm of fms || []) {
+      await supabase.from('notifications').insert({ user_id: fm.id, title: 'Voucher Approved', message: `Voucher ${v.voucher_number} has been approved. Proceed with payment.`, type: 'rff' });
+      if (fm.email) await sendEmail(fm.email, `Voucher Approved — ${v.voucher_number}`, notifEmailHtml({ name: fm.name, title: 'Voucher Approved — Action Required', message: `Voucher <strong>${v.voucher_number}</strong> for <strong>GHS ${(v.amount||0).toLocaleString()}</strong> has been approved by CEO. Please proceed with payment within 3 working days.`, actionUrl: 'https://stretchfield-workroom.vercel.app', actionLabel: 'View Voucher' }));
+    }
+    load();
+  };
 
-  const grossProfit = totalRevenue - totalExpenses;
-  const profitMargin = totalRevenue ? Math.round((grossProfit / totalRevenue) * 100) : 0;
+  // Mark voucher paid
+  const markPaid = async (v) => {
+    await supabase.from('payment_vouchers').update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', v.id);
+    load();
+  };
 
-  const pendingExpenseApprovals = expenses.filter(e => e.approval_required && e.approval_status === "pending");
-  const totalPendingApprovals = pendingExpenseApprovals.length + budgetRequests.length + paymentRequests.length;
+  // Reject voucher
+  const rejectVoucher = async (v) => {
+    const reason = window.prompt('Reason for rejection:');
+    if (!reason) return;
+    await supabase.from('payment_vouchers').update({ status: 'rejected', notes: (v.notes||'') + ' | Rejected: ' + reason }).eq('id', v.id);
+    load();
+  };
 
-  const expensesByCategory = expenses.reduce((acc, e) => {
-    acc[e.category] = (acc[e.category] || 0) + (e.amount || 0);
-    return acc;
-  }, {});
+  // Save estimate
+  const saveEstimate = async () => {
+    if (!eForm.client_name) { alert('Client name is required.'); return; }
+    setSaving(true);
+    const lineItems = eForm.line_items.filter(l => l.description && l.unit_price);
+    const subtotal = lineItems.reduce((s,l) => s + (parseFloat(l.unit_price)||0) * (parseInt(l.qty)||1), 0);
+    const tax = subtotal * ((parseFloat(eForm.tax_pct)||0) / 100);
+    const total = subtotal + tax;
+    await supabase.from('estimates').insert({
+      estimate_number: genEstimateNumber(),
+      client_name: eForm.client_name,
+      project_id: eForm.project_id || null,
+      event_name: eForm.event_name,
+      line_items: lineItems,
+      subtotal, tax_pct: parseFloat(eForm.tax_pct)||0,
+      total, notes: eForm.notes,
+      status: 'draft',
+      created_by: user.id,
+    });
+    setSaving(false);
+    setEstimateModal(null);
+    setEForm({ client_name: '', project_id: '', event_name: '', line_items: [{ description: '', qty: 1, unit_price: '' }], tax_pct: 0, notes: '' });
+    load();
+  };
 
-  const eventBudgetSummary = events.map(ev => {
-    const budget = budgets.find(b => b.project_id === ev.id);
-    const spent = expenses.filter(e => e.project_id === ev.id).reduce((a, e) => a + (e.amount || 0), 0);
-    const invoiced = invoices.filter(i => i.project_id === ev.id).reduce((a, i) => a + (i.amount || 0), 0);
-    const pct = budget ? Math.min(100, Math.round(((spent + invoiced) / budget.total_budget) * 100)) : 0;
-    return { ...ev, budget: budget?.total_budget || 0, spent, invoiced, pct };
-  }).filter(e => e.budget > 0 || e.spent > 0).slice(0, 5);
+  // Convert estimate to invoice
+  const convertEstimate = async (est) => {
+    if (!window.confirm(`Convert estimate ${est.estimate_number} to invoice? This confirms client approval.`)) return;
+    const invoiceNum = est.estimate_number.replace('EST/', 'INV/');
+    const { data: inv } = await supabase.from('client_invoices').insert({
+      title: invoiceNum,
+      client_name: est.client_name,
+      project_id: est.project_id,
+      event_name: est.event_name,
+      amount: est.total,
+      status: 'pending',
+      created_by: user.id,
+    }).select().single();
+    await supabase.from('estimates').update({ status: 'converted', converted_invoice_id: inv?.id }).eq('id', est.id);
+    load();
+  };
 
-  const canApprove = ["CEO", "Head of Operations"].includes(user?.role);
+  // Petty cash voucher
+  const savePCVoucher = async () => {
+    if (!pcForm.payee || !pcForm.amount) { alert('Payee and amount required.'); return; }
+    const amt = parseFloat(pcForm.amount);
+    if (amt > 200) { alert('Single petty cash payment cannot exceed GHS 200. Use cheque payment for amounts over GHS 200.'); return; }
+    setSaving(true);
+    const year = new Date().getFullYear().toString().slice(-2);
+    const count = pettyCashVouchers.length + 1;
+    await supabase.from('petty_cash_vouchers').insert({
+      voucher_number: `PC/${year}/${String(count).padStart(3,'0')}`,
+      payee: pcForm.payee, purpose: pcForm.purpose, amount: amt,
+      created_by: user.id, status: 'pending',
+    });
+    // Update petty cash float
+    const currentBalance = pettyCash?.float_balance || 0;
+    const newBalance = currentBalance - amt;
+    const totalFloat = pettyCash?.total_float || 200;
+    if (pettyCash) {
+      await supabase.from('petty_cash').update({ float_balance: newBalance }).eq('id', pettyCash.id);
+    } else {
+      await supabase.from('petty_cash').insert({ float_balance: totalFloat - amt, total_float: totalFloat });
+    }
+    setSaving(false);
+    setPcModal(false);
+    setPcForm({ payee: '', purpose: '', amount: '' });
+    load();
+  };
 
-  const [financeTab, setFinanceTab] = useState("overview");
+  // Daily balance
+  const saveDailyBalance = async () => {
+    setSaving(true);
+    const closing = (parseFloat(dbForm.opening_balance)||0) + (parseFloat(dbForm.actual_inflows)||0) - (parseFloat(dbForm.actual_payments)||0);
+    await supabase.from('daily_balances').insert({
+      ...dbForm,
+      closing_balance: closing,
+      prepared_by: user.id,
+    });
+    setSaving(false);
+    setDbModal(false);
+    setDbForm({ report_date: new Date().toISOString().slice(0,10), opening_balance: '', expected_inflows: '', expected_expenditure: '', actual_inflows: '', actual_payments: '', notes: '' });
+    load();
+  };
+
+  // Metrics
+  const pendingVouchers = vouchers.filter(v => v.status === 'pending_approval');
+  const approvedVouchers = vouchers.filter(v => v.status === 'approved');
+  const paidVouchers = vouchers.filter(v => v.status === 'paid');
+  const totalVouchersPaid = paidVouchers.reduce((s,v) => s + (v.amount||0), 0);
+  const totalPendingAmt = pendingVouchers.reduce((s,v) => s + (v.amount||0), 0);
+  const totalClientInflows = clientInvoices.reduce((s,i) => s + (i.amount||0), 0);
+  const pcBalance = pettyCash?.float_balance ?? pettyCash?.total_float ?? 200;
+  const pcTotal = pettyCash?.total_float || 200;
+  const pcPct = pcTotal > 0 ? Math.round((pcBalance / pcTotal) * 100) : 100;
+  const todayBalance = dailyBalances[0];
+
+  const inputStyle = { width: '100%', padding: '9px 12px', background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' };
+  const labelStyle = { color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 };
+
+  const statusBadge = (status) => {
+    const map = { pending_approval: [T.amber, 'Pending Approval'], approved: [T.teal, 'Approved'], paid: ['#10B981', 'Paid'], rejected: [T.red, 'Rejected'], draft: [T.textMuted, 'Draft'] };
+    const [color, label] = map[status] || [T.textMuted, status];
+    return <span style={{ background: color+'18', color, border: `1px solid ${color}30`, borderRadius: 20, padding: '2px 10px', fontSize: 10, fontWeight: 800 }}>{label}</span>;
+  };
+
+  const typeBadge = (type) => {
+    const map = { project: [T.cyan, 'Project'], cheque: [T.blue, 'Cheque'], petty_cash: [T.teal, 'Petty Cash'], staff_welfare: ['#E879F9', 'Staff Welfare'], administrative: [T.amber, 'Administrative'], statutory: [T.red, 'Statutory'] };
+    const [color, label] = map[type] || [T.textMuted, type];
+    return <span style={{ background: color+'18', color, border: `1px solid ${color}30`, borderRadius: 20, padding: '2px 8px', fontSize: 10, fontWeight: 700 }}>{label}</span>;
+  };
 
   return (
-    <div style={{ animation: "fadeUp 0.35s ease" }}>
+    <div style={{ animation: 'fadeUp 0.35s ease' }}>
       {/* Header */}
       <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 6 }}>Finance</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
           <div>
-            <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Finance Dashboard</h2>
-            <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Complete financial overview and management</div>
+            <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em' }}>Finance Operations</h2>
+            <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Vouchers · Estimates · Petty Cash · Daily Balances</div>
           </div>
-          {totalPendingApprovals > 0 && (
-            <div onClick={() => setFinanceTab("approvals")} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 14px", background: T.amber + "15", border: `1px solid ${T.amber}40`, borderRadius: 20, cursor: "pointer" }}>
-              <div style={{ width: 7, height: 7, borderRadius: "50%", background: T.amber, boxShadow: `0 0 8px ${T.amber}` }} />
-              <span style={{ color: T.amber, fontSize: 11, fontWeight: 700 }}>{totalPendingApprovals} pending approval{totalPendingApprovals > 1 ? "s" : ""}</span>
-            </div>
-          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            {pendingVouchers.length > 0 && canApprove && (
+              <div onClick={() => setFinanceTab('vouchers')} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', background: T.amber+'15', border: `1px solid ${T.amber}40`, borderRadius: 20, cursor: 'pointer' }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: T.amber, boxShadow: `0 0 8px ${T.amber}` }} />
+                <span style={{ color: T.amber, fontSize: 11, fontWeight: 700 }}>{pendingVouchers.length} voucher{pendingVouchers.length>1?'s':''} pending</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Internal Tab Nav — luxury underline style */}
-      <div style={{ display: "flex", gap: 0, marginBottom: 28, borderBottom: `1px solid ${T.border}` }}>
+      {/* Tab Nav */}
+      <div style={{ display: 'flex', gap: 0, marginBottom: 28, borderBottom: `1px solid ${T.border}` }}>
         {[
-          { id: "overview", label: "Overview" },
-          { id: "approvals", label: "Approvals", badge: totalPendingApprovals },
-          { id: "budgets", label: "Budgets" },
-          { id: "expenses", label: "Expenses" },
-          { id: "reports", label: "Reports" },
+          { id: 'overview', label: 'Overview' },
+          { id: 'vouchers', label: 'Payment Vouchers', badge: pendingVouchers.length },
+          { id: 'estimates', label: 'Estimates & Invoices' },
+          { id: 'petty-cash', label: 'Petty Cash' },
+          { id: 'daily-balance', label: 'Daily Balance' },
+          { id: 'reports', label: 'Reports' },
         ].map(tab => (
-          <button key={tab.id} onClick={() => setFinanceTab(tab.id)} style={{
-            padding: "10px 20px", border: "none", cursor: "pointer", background: "none",
-            color: financeTab === tab.id ? T.textPrimary : T.textMuted,
-            fontWeight: financeTab === tab.id ? 700 : 400,
-            fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase",
-            borderBottom: financeTab === tab.id ? `2px solid ${T.cyan}` : "2px solid transparent",
-            marginBottom: -1, transition: "all 0.15s", position: "relative",
-          }}>
+          <button key={tab.id} onClick={() => setFinanceTab(tab.id)} style={{ padding: '10px 16px', border: 'none', cursor: 'pointer', background: 'none', color: financeTab === tab.id ? T.textPrimary : T.textMuted, fontWeight: financeTab === tab.id ? 700 : 400, fontSize: 12, letterSpacing: '0.04em', textTransform: 'uppercase', borderBottom: financeTab === tab.id ? `2px solid ${T.cyan}` : '2px solid transparent', marginBottom: -1, transition: 'all 0.15s', position: 'relative' }}>
             {tab.label}
-            {tab.badge > 0 && (
-              <span style={{ marginLeft: 6, background: T.amber, color: "#000", fontSize: 9, fontWeight: 900, borderRadius: 20, padding: "1px 6px", verticalAlign: "middle" }}>{tab.badge}</span>
-            )}
+            {tab.badge > 0 && <span style={{ marginLeft: 5, background: T.amber, color: '#000', fontSize: 9, fontWeight: 900, borderRadius: 20, padding: '1px 5px' }}>{tab.badge}</span>}
           </button>
         ))}
       </div>
 
-      {/* Route to internal tabs */}
-      {financeTab === "approvals" && <FinanceApprovalsView user={user} />}
-      {financeTab === "budgets" && <BudgetView user={user} />}
-      {financeTab === "expenses" && <ExpenseView user={user} />}
-      {financeTab === "reports" && <FinanceReportsView user={user} />}
-
-      {financeTab === "overview" && <div>
-
-      {/* Alert pills */}
-      {(totalPendingApprovals > 0 || pendingInvoices.length > 0 || eventBudgetSummary.some(e => e.pct >= 90)) && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 24 }}>
-          {totalPendingApprovals > 0 && (
-            <div onClick={() => setFinanceTab("approvals")} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 14px", background: T.amber + "15", border: `1px solid ${T.amber}40`, borderRadius: 20, cursor: "pointer" }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.amber, boxShadow: `0 0 6px ${T.amber}` }} />
-              <span style={{ color: T.amber, fontSize: 11, fontWeight: 700 }}>{totalPendingApprovals} approval{totalPendingApprovals > 1 ? "s" : ""} pending</span>
-              <span style={{ color: T.amber, fontSize: 11 }}>→</span>
-            </div>
-          )}
-          {pendingInvoices.length > 0 && (
-            <div onClick={() => onTab("invoices")} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 14px", background: T.magenta + "15", border: `1px solid ${T.magenta}40`, borderRadius: 20, cursor: "pointer" }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.magenta, boxShadow: `0 0 6px ${T.magenta}` }} />
-              <span style={{ color: T.magenta, fontSize: 11, fontWeight: 700 }}>{pendingInvoices.length} invoice{pendingInvoices.length > 1 ? "s" : ""} outstanding · GHS {totalPending.toLocaleString()}</span>
-              <span style={{ color: T.magenta, fontSize: 11 }}>→</span>
-            </div>
-          )}
-          {eventBudgetSummary.some(e => e.pct >= 90) && (
-            <div onClick={() => setFinanceTab("budgets")} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 14px", background: T.red + "15", border: `1px solid ${T.red}40`, borderRadius: 20, cursor: "pointer" }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.red, boxShadow: `0 0 6px ${T.red}` }} />
-              <span style={{ color: T.red, fontSize: 11, fontWeight: 700 }}>{eventBudgetSummary.filter(e => e.pct >= 90).length} event{eventBudgetSummary.filter(e => e.pct >= 90).length > 1 ? "s" : ""} near budget limit</span>
-              <span style={{ color: T.red, fontSize: 11 }}>→</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* KPI Command Centre */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 12 }}>
-        {[
-          { label: "Total Revenue", value: "GHS " + totalRevenue.toLocaleString(), sub: "YTD: GHS " + ytdRevenue.toLocaleString(), color: T.teal, grad: `linear-gradient(135deg, ${T.teal}22, ${T.teal}08)` },
-          { label: "Gross Profit", value: "GHS " + grossProfit.toLocaleString(), sub: profitMargin + "% margin", color: grossProfit >= 0 ? T.cyan : T.red, grad: `linear-gradient(135deg, ${grossProfit >= 0 ? T.cyan : T.red}22, ${grossProfit >= 0 ? T.cyan : T.red}08)` },
-          { label: "Total Expenses", value: "GHS " + totalExpenses.toLocaleString(), sub: "MTD: GHS " + mtdExpenses.toLocaleString(), color: T.amber, grad: `linear-gradient(135deg, ${T.amber}22, ${T.amber}08)` },
-        ].map((k, i) => (
-          <div key={i} style={{ padding: "20px 22px", background: k.grad, border: `1px solid ${k.color}30`, borderRadius: 12 }}>
-            <div style={{ color: k.color, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 8 }}>{k.label}</div>
-            <div style={{ color: T.textPrimary, fontSize: 22, fontWeight: 900, letterSpacing: "-0.02em", marginBottom: 4 }}>{k.value}</div>
-            <div style={{ color: T.textMuted, fontSize: 11 }}>{k.sub}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 24 }}>
-        {[
-          { label: "MTD Revenue", value: "GHS " + mtdRevenue.toLocaleString(), color: T.teal },
-          { label: "Invoiced", value: "GHS " + totalInvoiced.toLocaleString(), color: T.cyan },
-          { label: "Paid", value: "GHS " + totalPaid.toLocaleString(), color: T.teal },
-          { label: "Outstanding", value: "GHS " + totalPending.toLocaleString(), color: T.magenta },
-        ].map((k, i) => (
-          <div key={i} style={{ padding: "12px 14px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 8 }}>
-            <div style={{ color: k.color, fontSize: 14, fontWeight: 900 }}>{k.value}</div>
-            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, marginTop: 3, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Main Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-        {/* Expenses by Category */}
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em" }}>Expenses by Category</div>
-            <button onClick={() => setFinanceTab("expenses")} style={{ background: "none", border: "none", color: T.cyan, fontSize: 11, cursor: "pointer", fontWeight: 600 }}>+ Log →</button>
-          </div>
-          {Object.keys(expensesByCategory).length === 0 ? (
-            <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No expenses yet.</div>
-          ) : Object.entries(expensesByCategory).sort((a,b) => b[1]-a[1]).map(([cat, amt]) => (
-            <div key={cat} style={{ marginBottom: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{cat}</div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <div style={{ color: T.textMuted, fontSize: 11 }}>{totalExpenses ? Math.round((amt / totalExpenses) * 100) : 0}%</div>
-                  <div style={{ color: T.amber, fontWeight: 700, fontSize: 12 }}>GHS {amt.toLocaleString()}</div>
-                </div>
-              </div>
-              <ProgressBar value={totalExpenses ? Math.round((amt / totalExpenses) * 100) : 0} color={T.amber} />
-            </div>
-          ))}
-        </div>
-
-        {/* Budget vs Spend */}
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em" }}>Budget vs Spend</div>
-            <button onClick={() => setFinanceTab("budgets")} style={{ background: "none", border: "none", color: T.cyan, fontSize: 11, cursor: "pointer", fontWeight: 600 }}>Manage →</button>
-          </div>
-          {eventBudgetSummary.length === 0 ? (
-            <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No budgets set yet.</div>
-          ) : eventBudgetSummary.map(ev => (
-            <div key={ev.id} style={{ marginBottom: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{ev.name}</div>
-                <div style={{ color: ev.pct >= 90 ? "#F43F5E" : ev.pct >= 70 ? T.amber : T.teal, fontWeight: 700, fontSize: 12 }}>{ev.pct}%</div>
-              </div>
-              <ProgressBar value={ev.pct} color={ev.pct >= 90 ? "#F43F5E" : ev.pct >= 70 ? T.amber : T.teal} />
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                <div style={{ color: T.textMuted, fontSize: 11 }}>Spent: GHS {ev.spent.toLocaleString()}</div>
-                <div style={{ color: T.textMuted, fontSize: 11 }}>Budget: GHS {ev.budget.toLocaleString()}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-        {/* Recent Invoices */}
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em" }}>Recent Invoices</div>
-            <button onClick={() => onTab("invoices")} style={{ background: "none", border: "none", color: T.cyan, fontSize: 11, cursor: "pointer", fontWeight: 600 }}>View All →</button>
-          </div>
-          {invoices.length === 0 ? (
-            <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No invoices yet.</div>
-          ) : invoices.slice(0, 5).map((inv, i) => (
-            <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < 4 ? "1px solid " + T.border : "none" }}>
-              <div>
-                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{inv.vendor || "Vendor"}</div>
-                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{inv.event_name} · {inv.date}</div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 700 }}>GHS {(inv.amount || 0).toLocaleString()}</div>
-                <Badge status={inv.status} />
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Recent Expenses */}
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em" }}>Recent Expenses</div>
-            <button onClick={() => setFinanceTab("expenses")} style={{ background: "none", border: "none", color: T.cyan, fontSize: 11, cursor: "pointer", fontWeight: 600 }}>View All →</button>
-          </div>
-          {expenses.length === 0 ? (
-            <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No expenses yet.</div>
-          ) : expenses.slice(0, 5).map((e, i) => (
-            <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < 4 ? "1px solid " + T.border : "none" }}>
-              <div>
-                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{e.description}</div>
-                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>
-                  {e.category} · {e.event_name || "General"} · {e.date}
-                </div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>GHS {(e.amount || 0).toLocaleString()}</div>
-                <div style={{ fontSize: 11, color: e.approval_status === "approved" || e.approval_status === "auto-approved" ? T.teal : e.approval_status === "rejected" ? "#F43F5E" : T.amber }}>
-                  {e.approval_status === "auto-approved" ? "✓ Auto-approved" : e.approval_status === "approved" ? "✓ Approved" : e.approval_status === "rejected" ? "✗ Rejected" : "⏳ Pending"}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px", marginBottom: 0 }}>
-        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 14 }}>Quick Actions</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-          {[
-            { label: "Log Expense", tab: "expenses", color: T.amber },
-            { label: "Set Budget", tab: "budgets", color: T.cyan },
-            { label: "View Reports", tab: "reports", color: T.teal },
-            { label: "Approvals" + (totalPendingApprovals > 0 ? " · " + totalPendingApprovals : ""), tab: "approvals", color: totalPendingApprovals > 0 ? T.amber : T.textMuted },
-          ].map(a => (
-            <button key={a.tab} onClick={() => setFinanceTab(a.tab)} style={{
-              padding: "14px 12px", background: a.color + "12", border: `1px solid ${a.color}30`,
-              borderRadius: 10, cursor: "pointer", textAlign: "center", transition: "all 0.15s",
-            }}
-              onMouseEnter={e => { e.currentTarget.style.background = a.color + "22"; e.currentTarget.style.borderColor = a.color + "60"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = a.color + "12"; e.currentTarget.style.borderColor = a.color + "30"; }}
-            >
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: a.color, boxShadow: `0 0 8px ${a.color}80`, margin: "0 auto 10px" }} />
-              <div style={{ color: a.color, fontWeight: 700, fontSize: 11, letterSpacing: "0.04em", textTransform: "uppercase" }}>{a.label}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>}
-    </div>
-  );
-};
-
-// ─── BUDGET MANAGER ───────────────────────────────────────────────────────────
-const BudgetView = ({ user }) => {
-  const [budgets, setBudgets] = useState([]);
-  const [events, setEvents] = useState([]);
-  const [expenses, setExpenses] = useState([]);
-  const [invoices, setInvoices] = useState([]);
-  const [modal, setModal] = useState(false);
-  const [requestModal, setRequestModal] = useState(null);
-  const [form, setForm] = useState({ project_id: "", event_name: "", total_budget: "", notes: "" });
-  const [requestForm, setRequestForm] = useState({ requested_amount: "", reason: "" });
-  const [saving, setSaving] = useState(false);
-  const canEdit = ["CEO", "Head of Operations", "Finance Manager"].includes(user?.role);
-
-  const load = async () => {
-    const [b, ev, ex, inv] = await Promise.all([
-      supabase.from("budgets").select("*"),
-      supabase.from("projects").select("*").order("created_at", { ascending: false }),
-      supabase.from("expenses").select("*"),
-      supabase.from("invoices").select("*"),
-    ]);
-    setBudgets(b.data || []);
-    setEvents(ev.data || []);
-    setExpenses(ex.data || []);
-    setInvoices(inv.data || []);
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const handleCreate = async () => {
-    if (!form.project_id || !form.total_budget) return;
-    setSaving(true);
-    await supabase.from("budgets").insert({
-      project_id: form.project_id, event_name: form.event_name,
-      total_budget: parseFloat(form.total_budget), notes: form.notes,
-      created_by: user.id,
-    });
-    setModal(false);
-    setForm({ project_id: "", event_name: "", total_budget: "", notes: "" });
-    setSaving(false);
-    load();
-  };
-
-  const handleBudgetRequest = async () => {
-    if (!requestForm.requested_amount || !requestModal) return;
-    setSaving(true);
-    const budget = budgets.find(b => b.project_id === requestModal.id);
-    await supabase.from("budget_requests").insert({
-      project_id: requestModal.id,
-      event_name: requestModal.name,
-      current_budget: budget?.total_budget || 0,
-      requested_amount: parseFloat(requestForm.requested_amount),
-      reason: requestForm.reason,
-      created_by: user.id,
-    });
-    setRequestModal(null);
-    setRequestForm({ requested_amount: "", reason: "" });
-    setSaving(false);
-    load();
-  };
-
-  const eventsWithBudget = events.map(ev => {
-    const budget = budgets.find(b => b.project_id === ev.id);
-    const spent = expenses.filter(e => e.project_id === ev.id).reduce((a, e) => a + (e.amount || 0), 0);
-    const invoiced = invoices.filter(i => i.project_id === ev.id).reduce((a, i) => a + (i.amount || 0), 0);
-    const remaining = (budget?.total_budget || 0) - spent - invoiced;
-    const pct = budget ? Math.min(100, Math.round(((spent + invoiced) / budget.total_budget) * 100)) : 0;
-    return { ...ev, budget, spent, invoiced, remaining, pct };
-  });
-
-  const totalBudget = budgets.reduce((a, b) => a + (b.total_budget || 0), 0);
-  const totalSpent = expenses.reduce((a, e) => a + (e.amount || 0), 0);
-  const totalInvoiced = invoices.reduce((a, i) => a + (i.amount || 0), 0);
-
-  return (
-    <div style={{ animation: "fadeUp 0.35s ease" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+      {/* ── OVERVIEW TAB ── */}
+      {financeTab === 'overview' && (
         <div>
-          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
-          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Budget Management</h2>
-          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Event budgets vs actual spend</div>
-        </div>
-        {canEdit && <Btn onClick={() => setModal(true)}>+ Set Budget</Btn>}
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
-        {[
-          { label: "Total Budgeted", value: "GHS " + totalBudget.toLocaleString(), color: T.cyan },
-          { label: "Total Expenses", value: "GHS " + totalSpent.toLocaleString(), color: T.amber },
-          { label: "Total Invoiced", value: "GHS " + totalInvoiced.toLocaleString(), color: T.magenta },
-          { label: "Remaining", value: "GHS " + (totalBudget - totalSpent - totalInvoiced).toLocaleString(), color: (totalBudget - totalSpent - totalInvoiced) >= 0 ? T.teal : T.red },
-        ].map((k, i) => (
-          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
-            <div style={{ color: k.color, fontSize: 16, fontWeight: 900 }}>{k.value}</div>
-            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
-          </div>
-        ))}
-      </div>
-      {eventsWithBudget.filter(e => e.budget).map((ev, idx) => {
-        const barColor = ev.pct >= 90 ? T.red : ev.pct >= 70 ? T.amber : T.teal;
-        return (
-        <div key={ev.id} style={{ background: T.surface, border: `1px solid ${ev.pct >= 90 ? T.red + "50" : T.border}`, borderRadius: 12, padding: "20px 22px", marginBottom: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-            <div>
-              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{ev.name}</div>
-              <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>{ev.phase} · Due {ev.deadline}</div>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ color: barColor, fontWeight: 900, fontSize: 22 }}>{ev.pct}%</div>
-              <div style={{ color: T.textMuted, fontSize: 10 }}>of budget used</div>
-            </div>
-          </div>
-          <div style={{ height: 6, background: T.border + "44", borderRadius: 3, marginBottom: 14 }}>
-            <div style={{ height: "100%", width: ev.pct + "%", background: `linear-gradient(90deg, ${barColor}, ${barColor}cc)`, borderRadius: 3, transition: "width 0.4s ease" }} />
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-            {[["Budget", ev.budget.total_budget, T.cyan], ["Expenses", ev.spent, T.amber], ["Invoiced", ev.invoiced, T.magenta], ["Remaining", ev.remaining, ev.remaining < 0 ? T.red : T.teal]].map(([label, val, color]) => (
-              <div key={label} style={{ padding: "10px 12px", background: T.bg, borderRadius: 8, border: `1px solid ${T.border}44` }}>
-                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{label}</div>
-                <div style={{ color, fontWeight: 800, fontSize: 13 }}>GHS {(val || 0).toLocaleString()}</div>
+          {/* KPI strip */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 24 }}>
+            {[
+              { label: 'Total Inflows', value: `GHS ${totalClientInflows.toLocaleString()}`, sub: `${clientInvoices.length} client invoices`, color: '#10B981', icon: '📥' },
+              { label: 'Total Paid Out', value: `GHS ${totalVouchersPaid.toLocaleString()}`, sub: `${paidVouchers.length} vouchers paid`, color: T.red, icon: '📤' },
+              { label: 'Pending Approval', value: `GHS ${totalPendingAmt.toLocaleString()}`, sub: `${pendingVouchers.length} vouchers`, color: T.amber, icon: '⏳' },
+              { label: 'Petty Cash Float', value: `GHS ${pcBalance.toLocaleString()}`, sub: `${pcPct}% remaining`, color: pcPct < 10 ? T.red : T.cyan, icon: '💵' },
+            ].map((k,i) => (
+              <div key={i} style={{ padding: '16px 18px', background: T.surface, border: `1px solid ${T.border}`, borderTop: `3px solid ${k.color}`, borderRadius: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{k.label}</div>
+                    <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
+                    <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>{k.sub}</div>
+                  </div>
+                  <span style={{ fontSize: 24, opacity: 0.4 }}>{k.icon}</span>
+                </div>
               </div>
             ))}
           </div>
-          {ev.budget.notes && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 12, fontStyle: "italic", borderTop: `1px solid ${T.border}44`, paddingTop: 10 }}>{ev.budget.notes}</div>}
-          {ev.pct >= 70 && canEdit && !["CEO","Head of Operations"].includes(user?.role) && (
-            <button onClick={() => setRequestModal(ev)} style={{ marginTop: 12, width: "100%", background: T.magenta + "15", border: `1px solid ${T.magenta}50`, color: T.magenta, padding: "9px", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>Request Budget Increase</button>
-          )}
-          {["CEO","Head of Operations"].includes(user?.role) && ev.pct >= 90 && (
-            <div style={{ marginTop: 12, padding: "8px 14px", background: T.red + "12", borderRadius: 8, border: `1px solid ${T.red}30`, display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.red, boxShadow: `0 0 6px ${T.red}` }} />
-              <span style={{ color: T.red, fontSize: 11, fontWeight: 700 }}>Budget {ev.pct >= 100 ? "exceeded" : "nearly exhausted"}</span>
-            </div>
-          )}
-        </div>
-        );
-      })}
-      {eventsWithBudget.filter(e => !e.budget).length > 0 && (
-        <Card style={{ marginTop: 8 }}>
-          <div style={{ color: T.textMuted, fontSize: 12, fontWeight: 600, marginBottom: 12 }}>Events without budgets</div>
-          {eventsWithBudget.filter(e => !e.budget).map(ev => (
-            <div key={ev.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid " + T.border }}>
-              <div style={{ color: T.textSecondary, fontSize: 13 }}>{ev.name}</div>
-              {canEdit && <button onClick={() => { setForm({ project_id: ev.id, event_name: ev.name, total_budget: "", notes: "" }); setModal(true); }} style={{ background: "none", border: "1px solid " + T.cyan, color: T.cyan, padding: "4px 12px", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>+ Set Budget</button>}
-            </div>
-          ))}
-        </Card>
-      )}
-      {requestModal && (
-        <Modal title={"Budget Increase — " + requestModal.name} onClose={() => setRequestModal(null)}>
-          <div style={{ padding: "12px 16px", background: T.magenta + "15", borderRadius: 8, border: "1px solid " + T.magenta + "33", marginBottom: 16 }}>
-            <div style={{ color: T.magenta, fontWeight: 700, fontSize: 13 }}>Current Budget: GHS {(budgets.find(b => b.project_id === requestModal.id)?.total_budget || 0).toLocaleString()}</div>
-          </div>
-          <Input label="Requested Increase (GHS)" type="number" placeholder="0" value={requestForm.requested_amount} onChange={v => setRequestForm({ ...requestForm, requested_amount: v })} />
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Reason</div>
-            <textarea value={requestForm.reason} onChange={e => setRequestForm({ ...requestForm, reason: e.target.value })}
-              placeholder="Why is additional budget needed?"
-              style={{ width: "100%", minHeight: 80, background: T.bg, border: "1px solid " + T.border, borderRadius: 6, padding: 10, color: T.textPrimary, fontSize: 13, resize: "vertical", fontFamily: "inherit" }} />
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <Btn onClick={handleBudgetRequest} disabled={saving}>{saving ? "Submitting..." : "Submit Request"}</Btn>
-            <Btn variant="ghost" onClick={() => setRequestModal(null)}>Cancel</Btn>
-          </div>
-        </Modal>
-      )}
-      {modal && (
-        <Modal title="Set Event Budget" onClose={() => setModal(false)}>
-          <Select label="Event" options={[{ value: "", label: "Select event..." }, ...events.map(e => ({ value: e.id, label: e.name }))]}
-            value={form.project_id} onChange={v => { const e = events.find(x => x.id === v); setForm({ ...form, project_id: v, event_name: e ? e.name : "" }); }} />
-          <Input label="Total Budget (GHS)" type="number" placeholder="0" value={form.total_budget} onChange={v => setForm({ ...form, total_budget: v })} />
-          <Input label="Notes" placeholder="Budget notes..." value={form.notes} onChange={v => setForm({ ...form, notes: v })} />
-          <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-            <Btn onClick={handleCreate} disabled={saving}>{saving ? "Saving..." : "Set Budget"}</Btn>
-            <Btn variant="ghost" onClick={() => setModal(false)}>Cancel</Btn>
-          </div>
-        </Modal>
-      )}
-    </div>
-  );
-};
 
-// ─── EXPENSE TRACKER ──────────────────────────────────────────────────────────
-const ExpenseView = ({ user }) => {
-  const [expenses, setExpenses] = useState([]);
-  const [events, setEvents] = useState([]);
-  const [modal, setModal] = useState(false);
-  const [receiptFile, setReceiptFile] = useState(null);
-  const [form, setForm] = useState({ project_id: "", event_name: "", category: "", description: "", amount: "", date: "", vendor: "" });
-  const [saving, setSaving] = useState(false);
-  const [filter, setFilter] = useState("all");
-  const canEdit = ["CEO", "Head of Operations", "Finance Manager"].includes(user?.role);
-  const canApprove = ["CEO", "Head of Operations"].includes(user?.role);
-
-  const categories = ["Venue", "Catering", "Equipment", "Staffing", "Marketing", "Transport", "Accommodation", "Decor", "Technology", "Miscellaneous"];
-
-  const load = async () => {
-    const [ex, ev] = await Promise.all([
-      supabase.from("expenses").select("*").order("created_at", { ascending: false }),
-      supabase.from("projects").select("*"),
-    ]);
-    setExpenses(ex.data || []);
-    setEvents(ev.data || []);
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const handleCreate = async () => {
-    if (!form.description || !form.amount) return;
-    setSaving(true);
-    let receipt_url = "", receipt_name = "";
-    if (receiptFile) {
-      const ext = receiptFile.name.split(".").pop();
-      const filename = "receipt_" + Date.now() + "." + ext;
-      const { error: uploadErr } = await supabase.storage.from("rffs").upload(filename, receiptFile);
-      if (!uploadErr) {
-        const { data: urlData } = supabase.storage.from("rffs").getPublicUrl(filename);
-        receipt_url = urlData.publicUrl;
-        receipt_name = receiptFile.name;
-      }
-    }
-    const amt = parseFloat(form.amount);
-    const needsApproval = amt >= 500;
-    await supabase.from("expenses").insert({
-      project_id: form.project_id || null, event_name: form.event_name,
-      category: form.category, description: form.description,
-      amount: amt, date: form.date || new Date().toISOString().split("T")[0],
-      vendor: form.vendor, receipt_url, receipt_name,
-      created_by: user.id, approved: !needsApproval,
-      approval_required: needsApproval,
-      approval_status: needsApproval ? "pending" : "auto-approved",
-    });
-    setModal(false);
-    setForm({ project_id: "", event_name: "", category: "", description: "", amount: "", date: "", vendor: "" });
-    setReceiptFile(null);
-    setSaving(false);
-    load();
-  };
-
-  const filtered = filter === "all" ? expenses : expenses.filter(e => e.category === filter);
-  const total = filtered.reduce((a, e) => a + (e.amount || 0), 0);
-
-  return (
-    <div style={{ animation: "fadeUp 0.35s ease" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
-        <div>
-          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
-          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Expense Tracker</h2>
-          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Log and manage company expenses</div>
-        </div>
-        {canEdit && <Btn onClick={() => setModal(true)}>+ Log Expense</Btn>}
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
-        {[
-          { label: "Total Expenses", value: "GHS " + total.toLocaleString(), color: T.amber },
-          { label: "Approved", value: filtered.filter(e => e.approved).length, color: T.teal },
-          { label: "Pending Approval", value: filtered.filter(e => !e.approved).length, color: T.magenta },
-        ].map((k, i) => (
-          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
-            <div style={{ color: k.color, fontSize: 18, fontWeight: 900 }}>{k.value}</div>
-            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
-        {["all", ...categories.filter(c => expenses.some(e => e.category === c))].map(c => (
-          <button key={c} onClick={() => setFilter(c)} style={{
-            padding: "5px 14px", borderRadius: 20, cursor: "pointer", fontSize: 11, fontWeight: 700,
-            border: `1px solid ${filter === c ? T.cyan : T.border}`,
-            background: filter === c ? T.cyan + "20" : "none",
-            color: filter === c ? T.cyan : T.textMuted,
-            letterSpacing: "0.04em", textTransform: "uppercase", transition: "all 0.15s",
-          }}>{c === "all" ? "All" : c}</button>
-        ))}
-      </div>
-      {filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
-          <div style={{ fontSize: 40, marginBottom: 16 }}>📤</div>
-          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No expenses yet</div>
-          <div style={{ color: T.textMuted, fontSize: 13 }}>Click "+ Log Expense" to get started.</div>
-        </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {filtered.map(e => (
-            <div key={e.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px", transition: "box-shadow 0.2s" }}
-              onMouseEnter={el => el.currentTarget.style.boxShadow = `0 4px 20px ${T.cyan}10`}
-              onMouseLeave={el => el.currentTarget.style.boxShadow = "none"}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13, marginBottom: 6 }}>{e.description}</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-                    {e.category && <span style={{ background: T.cyan + "18", color: T.cyan, padding: "2px 9px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>{e.category}</span>}
-                    {e.event_name && <span style={{ color: T.textMuted, fontSize: 11 }}>📁 {e.event_name}</span>}
-                    {e.vendor && <span style={{ color: T.textMuted, fontSize: 11 }}>· {e.vendor}</span>}
-                    {e.date && <span style={{ color: T.textMuted, fontSize: 11 }}>· {e.date}</span>}
-                  </div>
-                </div>
-                <div style={{ textAlign: "right", marginLeft: 16, flexShrink: 0 }}>
-                  <div style={{ color: T.amber, fontWeight: 900, fontSize: 16, marginBottom: 6 }}>GHS {(e.amount || 0).toLocaleString()}</div>
-                  {e.approved
-                    ? <span style={{ color: T.teal, fontSize: 10, fontWeight: 700, background: T.teal + "18", padding: "2px 8px", borderRadius: 20 }}>✓ Approved</span>
-                    : canApprove
-                      ? <button onClick={async () => { await supabase.from("expenses").update({ approved: true, approved_by: user.id }).eq("id", e.id); load(); }} style={{ background: T.teal + "18", border: `1px solid ${T.teal}50`, color: T.teal, padding: "3px 10px", borderRadius: 20, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>✓ Approve</button>
-                      : <span style={{ color: T.amber, fontSize: 10, fontWeight: 700, background: T.amber + "18", padding: "2px 8px", borderRadius: 20 }}>⏳ Pending</span>
-                  }
-                </div>
+          {/* Today's balance */}
+          {todayBalance && (
+            <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 12, padding: '18px 22px', marginBottom: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <div style={{ color: T.cyan, fontWeight: 800, fontSize: 14 }}>📊 Daily Balance — {new Date(todayBalance.report_date+'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+                <div style={{ color: T.textMuted, fontSize: 11 }}>Prepared by Finance</div>
               </div>
-              {e.receipt_url && (
-                <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}44` }}>
-                  <a href={e.receipt_url} target="_blank" rel="noopener noreferrer" style={{ color: T.cyan, fontSize: 11, fontWeight: 600, textDecoration: "none" }}>📎 {e.receipt_name || "View Receipt"}</a>
-                </div>
-              )}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12 }}>
+                {[
+                  ['Opening Balance', todayBalance.opening_balance, T.textMuted],
+                  ['Expected Inflows', todayBalance.expected_inflows, '#10B981'],
+                  ['Expected Expenditure', todayBalance.expected_expenditure, T.amber],
+                  ['Actual Inflows', todayBalance.actual_inflows, '#10B981'],
+                  ['Closing Balance', todayBalance.closing_balance, todayBalance.closing_balance >= 0 ? T.teal : T.red],
+                ].map(([label, val, color]) => (
+                  <div key={label} style={{ textAlign: 'center' }}>
+                    <div style={{ color, fontWeight: 900, fontSize: 18 }}>GHS {(val||0).toLocaleString()}</div>
+                    <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, marginTop: 3 }}>{label}</div>
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
+          )}
+
+          {/* Petty cash alert */}
+          {pcPct < 10 && (
+            <div style={{ background: T.red+'12', border: `1px solid ${T.red}30`, borderRadius: 10, padding: '12px 16px', marginBottom: 16, color: T.red, fontWeight: 700, fontSize: 13 }}>
+              ⚠ Petty cash float is below 10% (GHS {pcBalance.toLocaleString()} remaining). Replenishment required.
+            </div>
+          )}
+
+          {/* Recent vouchers */}
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ padding: '14px 18px', borderBottom: `1px solid ${T.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>Recent Payment Vouchers</div>
+              <button onClick={() => setFinanceTab('vouchers')} style={{ background: 'none', border: `1px solid ${T.border}`, color: T.textMuted, padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>View All</button>
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
+                  {['Voucher #','Type','Payee','Amount','Status','Date'].map(h => (
+                    <th key={h} style={{ padding: '8px 14px', textAlign: 'left', color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {vouchers.slice(0,6).map((v,i) => (
+                  <tr key={v.id} style={{ borderBottom: i < 5 ? `1px solid ${T.border}44` : 'none' }}
+                    onMouseEnter={e => e.currentTarget.style.background = T.bg}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <td style={{ padding: '10px 14px', color: T.cyan, fontWeight: 700, fontSize: 12 }}>{v.voucher_number}</td>
+                    <td style={{ padding: '10px 14px' }}>{typeBadge(v.payment_type)}</td>
+                    <td style={{ padding: '10px 14px', color: T.textPrimary, fontSize: 12 }}>{v.payee}</td>
+                    <td style={{ padding: '10px 14px', color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>GHS {(v.amount||0).toLocaleString()}</td>
+                    <td style={{ padding: '10px 14px' }}>{statusBadge(v.status)}</td>
+                    <td style={{ padding: '10px 14px', color: T.textMuted, fontSize: 11 }}>{new Date(v.created_at).toLocaleDateString('en-GB')}</td>
+                  </tr>
+                ))}
+                {vouchers.length === 0 && <tr><td colSpan={6} style={{ padding: '30px 0', textAlign: 'center', color: T.textMuted, fontSize: 13 }}>No vouchers yet</td></tr>}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
-      {modal && (
-        <Modal title="Log Expense" onClose={() => setModal(false)}>
-          <Input label="Description" placeholder="What was this expense for?" value={form.description} onChange={v => setForm({ ...form, description: v })} />
-          <Input label="Amount (GHS)" type="number" placeholder="0" value={form.amount} onChange={v => setForm({ ...form, amount: v })} />
-          <Select label="Category" options={[{ value: "", label: "Select category..." }, ...categories.map(c => ({ value: c, label: c }))]}
-            value={form.category} onChange={v => setForm({ ...form, category: v })} />
-          <Select label="Event (optional)" options={[{ value: "", label: "Not event specific" }, ...events.map(e => ({ value: e.id, label: e.name }))]}
-            value={form.project_id} onChange={v => { const e = events.find(x => x.id === v); setForm({ ...form, project_id: v, event_name: e ? e.name : "" }); }} />
-          <Input label="Vendor / Supplier" placeholder="Who was paid?" value={form.vendor} onChange={v => setForm({ ...form, vendor: v })} />
-          <Input label="Date" type="date" value={form.date} onChange={v => setForm({ ...form, date: v })} />
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Receipt (optional)</div>
-            <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setReceiptFile(e.target.files[0])} style={{ width: "100%", padding: "10px", background: T.bg, border: "1px solid " + T.border, borderRadius: 6, color: T.textSecondary, fontSize: 13, cursor: "pointer" }} />
-            {receiptFile && <div style={{ color: T.cyan, fontSize: 12, marginTop: 6 }}>✓ {receiptFile.name}</div>}
+
+      {/* ── PAYMENT VOUCHERS TAB ── */}
+      {financeTab === 'vouchers' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 16 }}>Payment Vouchers</div>
+            {isFinance && <button onClick={() => setVoucherModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: 'none', color: '#fff', padding: '9px 20px', borderRadius: 8, cursor: 'pointer', fontWeight: 800, fontSize: 13 }}>+ Raise Voucher</button>}
           </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <Btn onClick={handleCreate} disabled={saving}>{saving ? "Saving..." : "Log Expense"}</Btn>
-            <Btn variant="ghost" onClick={() => setModal(false)}>Cancel</Btn>
+
+          {/* Filter tabs */}
+          {['all','pending_approval','approved','paid','rejected'].map(s => {
+            const count = s === 'all' ? vouchers.length : vouchers.filter(v => v.status === s).length;
+            return <button key={s} onClick={() => {}} style={{ marginRight: 8, marginBottom: 16, padding: '5px 14px', borderRadius: 20, border: `1px solid ${T.border}`, background: 'none', color: T.textMuted, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{s === 'all' ? 'All' : s.replace('_',' ').replace(/\w/g, l => l.toUpperCase())} ({count})</button>;
+          })}
+
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
+                  {['Voucher #','Type','Payee','Description','Amount','Status','Due','Actions'].map(h => (
+                    <th key={h} style={{ padding: '10px 12px', textAlign: 'left', color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {vouchers.map((v,i) => (
+                  <tr key={v.id} style={{ borderBottom: i < vouchers.length-1 ? `1px solid ${T.border}44` : 'none' }}
+                    onMouseEnter={e => e.currentTarget.style.background = T.bg}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <td style={{ padding: '10px 12px', color: T.cyan, fontWeight: 700, fontSize: 12 }}>{v.voucher_number}</td>
+                    <td style={{ padding: '10px 12px' }}>{typeBadge(v.payment_type)}</td>
+                    <td style={{ padding: '10px 12px', color: T.textPrimary, fontSize: 12, fontWeight: 600 }}>{v.payee}</td>
+                    <td style={{ padding: '10px 12px', color: T.textMuted, fontSize: 11, maxWidth: 200 }}>{v.description}</td>
+                    <td style={{ padding: '10px 12px', color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>GHS {(v.amount||0).toLocaleString()}</td>
+                    <td style={{ padding: '10px 12px' }}>{statusBadge(v.status)}</td>
+                    <td style={{ padding: '10px 12px', color: v.due_date && new Date(v.due_date) < new Date() && v.status !== 'paid' ? T.red : T.textMuted, fontSize: 11 }}>{v.due_date || '—'}</td>
+                    <td style={{ padding: '10px 12px' }}>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {canApprove && v.status === 'pending_approval' && (
+                          <>
+                            <button onClick={() => approveVoucher(v)} style={{ background: '#10B98118', border: '1px solid #10B98130', color: '#10B981', padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>✓ Approve</button>
+                            <button onClick={() => rejectVoucher(v)} style={{ background: T.red+'18', border: `1px solid ${T.red}30`, color: T.red, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>✗</button>
+                          </>
+                        )}
+                        {isFinance && v.status === 'approved' && (
+                          <button onClick={() => markPaid(v)} style={{ background: T.cyan+'18', border: `1px solid ${T.cyan}30`, color: T.cyan, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>Mark Paid</button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {vouchers.length === 0 && <tr><td colSpan={8} style={{ padding: '40px 0', textAlign: 'center', color: T.textMuted }}>No payment vouchers yet</td></tr>}
+              </tbody>
+            </table>
           </div>
-        </Modal>
+        </div>
+      )}
+
+      {/* ── ESTIMATES & INVOICES TAB ── */}
+      {financeTab === 'estimates' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 16 }}>Estimates & Invoices</div>
+            {isFinance && <button onClick={() => setEstimateModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: 'none', color: '#fff', padding: '9px 20px', borderRadius: 8, cursor: 'pointer', fontWeight: 800, fontSize: 13 }}>+ New Estimate</button>}
+          </div>
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
+            <div style={{ padding: '12px 16px', borderBottom: `1px solid ${T.border}`, color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Estimates</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
+                  {['Estimate #','Client','Event','Total','Status','Action'].map(h => (
+                    <th key={h} style={{ padding: '8px 14px', textAlign: 'left', color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {estimates.map((est,i) => (
+                  <tr key={est.id} style={{ borderBottom: i < estimates.length-1 ? `1px solid ${T.border}44` : 'none' }}
+                    onMouseEnter={e => e.currentTarget.style.background = T.bg}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <td style={{ padding: '10px 14px', color: T.cyan, fontWeight: 700, fontSize: 12 }}>{est.estimate_number}</td>
+                    <td style={{ padding: '10px 14px', color: T.textPrimary, fontSize: 12 }}>{est.client_name}</td>
+                    <td style={{ padding: '10px 14px', color: T.textMuted, fontSize: 11 }}>{est.event_name || '—'}</td>
+                    <td style={{ padding: '10px 14px', color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>GHS {(est.total||0).toLocaleString()}</td>
+                    <td style={{ padding: '10px 14px' }}>
+                      <span style={{ background: est.status==='converted' ? '#10B98118' : est.status==='approved' ? T.teal+'18' : T.amber+'18', color: est.status==='converted' ? '#10B981' : est.status==='approved' ? T.teal : T.amber, borderRadius: 20, padding: '2px 8px', fontSize: 10, fontWeight: 700 }}>{est.status}</span>
+                    </td>
+                    <td style={{ padding: '10px 14px' }}>
+                      {est.status !== 'converted' && isFinance && (
+                        <button onClick={() => convertEstimate(est)} style={{ background: T.teal+'18', border: `1px solid ${T.teal}30`, color: T.teal, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>→ Convert to Invoice</button>
+                      )}
+                      {est.status === 'converted' && <span style={{ color: T.textMuted, fontSize: 11 }}>✓ Converted</span>}
+                    </td>
+                  </tr>
+                ))}
+                {estimates.length === 0 && <tr><td colSpan={6} style={{ padding: '30px 0', textAlign: 'center', color: T.textMuted }}>No estimates yet</td></tr>}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Client Invoices */}
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ padding: '12px 16px', borderBottom: `1px solid ${T.border}`, color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Client Invoices (Statement of Claim)</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
+                  {['Invoice','Client','Event','Amount','Status'].map(h => (
+                    <th key={h} style={{ padding: '8px 14px', textAlign: 'left', color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {clientInvoices.map((inv,i) => (
+                  <tr key={inv.id} style={{ borderBottom: i < clientInvoices.length-1 ? `1px solid ${T.border}44` : 'none' }}
+                    onMouseEnter={e => e.currentTarget.style.background = T.bg}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <td style={{ padding: '10px 14px', color: T.cyan, fontWeight: 700, fontSize: 12 }}>{inv.title}</td>
+                    <td style={{ padding: '10px 14px', color: T.textPrimary, fontSize: 12 }}>{inv.client_name || '—'}</td>
+                    <td style={{ padding: '10px 14px', color: T.textMuted, fontSize: 11 }}>{inv.event_name || '—'}</td>
+                    <td style={{ padding: '10px 14px', color: T.textPrimary, fontWeight: 700 }}>GHS {(inv.amount||0).toLocaleString()}</td>
+                    <td style={{ padding: '10px 14px' }}><span style={{ color: inv.status==='paid' ? '#10B981' : T.amber, fontWeight: 700, fontSize: 11 }}>{inv.status || 'pending'}</span></td>
+                  </tr>
+                ))}
+                {clientInvoices.length === 0 && <tr><td colSpan={5} style={{ padding: '30px 0', textAlign: 'center', color: T.textMuted }}>No client invoices yet</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── PETTY CASH TAB ── */}
+      {financeTab === 'petty-cash' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 16 }}>Petty Cash</div>
+            {isFinance && <button onClick={() => setPcModal(true)} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: 'none', color: '#fff', padding: '9px 20px', borderRadius: 8, cursor: 'pointer', fontWeight: 800, fontSize: 13 }}>+ Petty Cash Voucher</button>}
+          </div>
+
+          {/* Float status */}
+          <div style={{ background: T.surface, border: `1px solid ${pcPct < 10 ? T.red : T.border}`, borderRadius: 12, padding: '20px 24px', marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div>
+                <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Current Float Balance</div>
+                <div style={{ color: pcPct < 10 ? T.red : '#10B981', fontWeight: 900, fontSize: 36 }}>GHS {pcBalance.toLocaleString()}</div>
+                <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>of GHS {pcTotal.toLocaleString()} total float · {pcPct}% remaining</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 6 }}>Max single payment: <strong style={{ color: T.textPrimary }}>GHS 200</strong></div>
+                <div style={{ color: T.textMuted, fontSize: 11 }}>Replenish trigger: <strong style={{ color: T.amber }}>at 90% exhaustion</strong></div>
+                {pcPct < 10 && <div style={{ color: T.red, fontWeight: 700, fontSize: 12, marginTop: 8 }}>⚠ Replenishment required!</div>}
+              </div>
+            </div>
+            <div style={{ height: 8, background: T.border+'44', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${pcPct}%`, background: pcPct < 10 ? T.red : pcPct < 30 ? T.amber : '#10B981', borderRadius: 4, transition: 'width 0.4s ease' }} />
+            </div>
+          </div>
+
+          {/* Petty cash vouchers */}
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
+                  {['Voucher #','Payee','Purpose','Amount','Status','Date'].map(h => (
+                    <th key={h} style={{ padding: '10px 14px', textAlign: 'left', color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {pettyCashVouchers.map((v,i) => (
+                  <tr key={v.id} style={{ borderBottom: i < pettyCashVouchers.length-1 ? `1px solid ${T.border}44` : 'none' }}
+                    onMouseEnter={e => e.currentTarget.style.background = T.bg}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <td style={{ padding: '10px 14px', color: T.teal, fontWeight: 700, fontSize: 12 }}>{v.voucher_number}</td>
+                    <td style={{ padding: '10px 14px', color: T.textPrimary, fontSize: 12 }}>{v.payee}</td>
+                    <td style={{ padding: '10px 14px', color: T.textMuted, fontSize: 11 }}>{v.purpose}</td>
+                    <td style={{ padding: '10px 14px', color: T.textPrimary, fontWeight: 700 }}>GHS {(v.amount||0).toLocaleString()}</td>
+                    <td style={{ padding: '10px 14px' }}><span style={{ color: v.status==='approved' ? '#10B981' : T.amber, fontWeight: 700, fontSize: 11 }}>{v.status}</span></td>
+                    <td style={{ padding: '10px 14px', color: T.textMuted, fontSize: 11 }}>{new Date(v.created_at).toLocaleDateString('en-GB')}</td>
+                  </tr>
+                ))}
+                {pettyCashVouchers.length === 0 && <tr><td colSpan={6} style={{ padding: '30px 0', textAlign: 'center', color: T.textMuted }}>No petty cash vouchers yet</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── DAILY BALANCE TAB ── */}
+      {financeTab === 'daily-balance' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div>
+              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 16 }}>Daily Balance Reports</div>
+              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>Prepared each morning and sent to Director — previous payments, inflows, expected inflows and expenditure</div>
+            </div>
+            {isFinance && <button onClick={() => setDbModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: 'none', color: '#fff', padding: '9px 20px', borderRadius: 8, cursor: 'pointer', fontWeight: 800, fontSize: 13 }}>+ Today's Balance</button>}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {dailyBalances.map((db,i) => (
+              <div key={db.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: '16px 20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{new Date(db.report_date+'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                  <div style={{ color: db.closing_balance >= 0 ? '#10B981' : T.red, fontWeight: 900, fontSize: 18 }}>Closing: GHS {(db.closing_balance||0).toLocaleString()}</div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10 }}>
+                  {[
+                    ['Opening', db.opening_balance, T.textMuted],
+                    ['Expected Inflows', db.expected_inflows, '#10B981'],
+                    ['Expected Spend', db.expected_expenditure, T.amber],
+                    ['Actual Inflows', db.actual_inflows, '#10B981'],
+                    ['Actual Payments', db.actual_payments, T.red],
+                  ].map(([label, val, color]) => (
+                    <div key={label} style={{ textAlign: 'center', background: T.bg, borderRadius: 8, padding: '10px 8px' }}>
+                      <div style={{ color, fontWeight: 800, fontSize: 16 }}>GHS {(val||0).toLocaleString()}</div>
+                      <div style={{ color: T.textMuted, fontSize: 10, marginTop: 3 }}>{label}</div>
+                    </div>
+                  ))}
+                </div>
+                {db.notes && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 10, fontStyle: 'italic' }}>{db.notes}</div>}
+              </div>
+            ))}
+            {dailyBalances.length === 0 && <div style={{ textAlign: 'center', padding: 40, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}`, color: T.textMuted }}>No daily balance reports yet. Finance Manager prepares one each morning.</div>}
+          </div>
+        </div>
+      )}
+
+      {/* ── REPORTS TAB ── */}
+      {financeTab === 'reports' && <FinanceReportsView user={user} />}
+
+      {/* ════ MODALS ════ */}
+
+      {/* Payment Voucher Modal */}
+      {voucherModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setVoucherModal(null)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: '100%', maxWidth: 640, maxHeight: '90vh', overflow: 'auto', padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Raise Payment Voucher</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>All payments require a voucher. Amounts over GHS 200 require CEO authorization.</div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>Payment Type *</label>
+              <select value={vForm.payment_type} onChange={e => setVForm({...vForm, payment_type: e.target.value})} style={inputStyle}>
+                <option value="project">Project Payment</option>
+                <option value="cheque">Cheque Payment (&gt;GHS 200)</option>
+                <option value="petty_cash">Petty Cash (≤GHS 200)</option>
+                <option value="staff_welfare">Staff Welfare</option>
+                <option value="administrative">Administrative</option>
+                <option value="statutory">Statutory Payment</option>
+              </select>
+            </div>
+
+            {vForm.payment_type === 'staff_welfare' && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>Welfare Type</label>
+                <select value={vForm.welfare_type} onChange={e => setVForm({...vForm, welfare_type: e.target.value})} style={inputStyle}>
+                  <option value="">Select...</option>
+                  <option value="loan">Staff Loan</option>
+                  <option value="birthday">Birthday</option>
+                  <option value="travel">Travel</option>
+                  <option value="donation">Donation</option>
+                </select>
+              </div>
+            )}
+
+            {vForm.payment_type === 'administrative' && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>Administrative Type</label>
+                <select value={vForm.admin_type} onChange={e => setVForm({...vForm, admin_type: e.target.value})} style={inputStyle}>
+                  <option value="">Select...</option>
+                  <option value="internet">Internet Subscription</option>
+                  <option value="telephone">Telephone</option>
+                  <option value="stationery">Stationery & Toiletries</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            )}
+
+            {vForm.payment_type === 'statutory' && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>Statutory Type</label>
+                <select value={vForm.statutory_type} onChange={e => setVForm({...vForm, statutory_type: e.target.value})} style={inputStyle}>
+                  <option value="">Select...</option>
+                  <option value="PAYE">PAYE</option>
+                  <option value="SSNIT">SSNIT</option>
+                  <option value="VAT">VAT</option>
+                  <option value="self_assessment">Self Assessment</option>
+                  <option value="withholding_tax">Withholding Tax</option>
+                </select>
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div><label style={labelStyle}>Payee / Supplier *</label><input value={vForm.payee} onChange={e => setVForm({...vForm, payee: e.target.value})} style={inputStyle} placeholder="Who is being paid?" /></div>
+              <div><label style={labelStyle}>Amount (GHS) *</label><input type="number" value={vForm.amount} onChange={e => setVForm({...vForm, amount: e.target.value})} style={inputStyle} placeholder="0.00" /></div>
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>Description / Purpose</label>
+              <input value={vForm.description} onChange={e => setVForm({...vForm, description: e.target.value})} style={inputStyle} placeholder="What is this payment for?" />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div>
+                <label style={labelStyle}>Linked Event</label>
+                <select value={vForm.project_id} onChange={e => { const ev = events.find(x => x.id === e.target.value); setVForm({...vForm, project_id: e.target.value, event_name: ev?.name||''}); }} style={inputStyle}>
+                  <option value="">Select event (optional)...</option>
+                  {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
+                </select>
+              </div>
+              <div><label style={labelStyle}>Invoice / PO Reference</label><input value={vForm.invoice_ref} onChange={e => setVForm({...vForm, invoice_ref: e.target.value})} style={inputStyle} placeholder="e.g. INV/ST/CS/26/001" /></div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div>
+                <label style={labelStyle}>Currency</label>
+                <select value={vForm.currency} onChange={e => setVForm({...vForm, currency: e.target.value})} style={inputStyle}>
+                  {['GHS','USD','EUR','GBP','NGN','KES'].map(c => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div><label style={labelStyle}>Due Date (pay by)</label><input type="date" value={vForm.due_date} onChange={e => setVForm({...vForm, due_date: e.target.value})} style={inputStyle} /></div>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={labelStyle}>Notes</label>
+              <textarea value={vForm.notes} onChange={e => setVForm({...vForm, notes: e.target.value})} rows={2} style={{...inputStyle, resize: 'vertical'}} placeholder="Additional notes or supporting document reference..." />
+            </div>
+
+            {parseFloat(vForm.amount) > 200 && vForm.payment_type !== 'petty_cash' && (
+              <div style={{ background: T.amber+'12', border: `1px solid ${T.amber}30`, borderRadius: 8, padding: '10px 14px', marginBottom: 16, color: T.amber, fontSize: 12 }}>
+                ⚠ Amount exceeds GHS 200 — this voucher will require CEO authorization before payment.
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={saveVoucher} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: 'none', color: '#fff', padding: '10px 24px', borderRadius: 8, cursor: 'pointer', fontWeight: 800, fontSize: 13 }}>{saving ? 'Saving...' : 'Raise Voucher'}</button>
+              <button onClick={() => setVoucherModal(null)} style={{ background: 'none', border: `1px solid ${T.border}`, color: T.textMuted, padding: '10px 20px', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Estimate Modal */}
+      {estimateModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setEstimateModal(null)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: '100%', maxWidth: 680, maxHeight: '90vh', overflow: 'auto', padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>New Estimate</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>Create an estimate. Once client approves, convert it to an invoice.</div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div><label style={labelStyle}>Client Name *</label><input value={eForm.client_name} onChange={e => setEForm({...eForm, client_name: e.target.value})} style={inputStyle} placeholder="Client or company name" /></div>
+              <div>
+                <label style={labelStyle}>Linked Event</label>
+                <select value={eForm.project_id} onChange={e => { const ev = events.find(x => x.id === e.target.value); setEForm({...eForm, project_id: e.target.value, event_name: ev?.name||''}); }} style={inputStyle}>
+                  <option value="">Select event (optional)...</option>
+                  {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ color: T.cyan, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, paddingBottom: 6, borderBottom: `1px solid ${T.cyan}30` }}>Line Items</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr 1fr 28px', gap: 8, marginBottom: 6 }}>
+                {['Description','Qty','Unit Price',''].map(h => <div key={h} style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>{h}</div>)}
+              </div>
+              {eForm.line_items.map((item, idx) => (
+                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '3fr 1fr 1fr 28px', gap: 8, marginBottom: 8 }}>
+                  <input value={item.description} onChange={e => { const l = [...eForm.line_items]; l[idx].description = e.target.value; setEForm({...eForm, line_items: l}); }} style={inputStyle} placeholder="Service description" />
+                  <input type="number" value={item.qty} onChange={e => { const l = [...eForm.line_items]; l[idx].qty = e.target.value; setEForm({...eForm, line_items: l}); }} style={inputStyle} placeholder="1" />
+                  <input type="number" value={item.unit_price} onChange={e => { const l = [...eForm.line_items]; l[idx].unit_price = e.target.value; setEForm({...eForm, line_items: l}); }} style={inputStyle} placeholder="0.00" />
+                  <button onClick={() => setEForm({...eForm, line_items: eForm.line_items.filter((_,i) => i!==idx)})} style={{ background: T.red+'18', border: `1px solid ${T.red}30`, color: T.red, borderRadius: 6, cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>×</button>
+                </div>
+              ))}
+              <button onClick={() => setEForm({...eForm, line_items: [...eForm.line_items, { description: '', qty: 1, unit_price: '' }]})} style={{ background: 'none', border: `1px dashed ${T.border}`, color: T.textMuted, padding: '6px 16px', borderRadius: 6, cursor: 'pointer', fontSize: 12, width: '100%' }}>+ Add Line Item</button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div><label style={labelStyle}>Tax / VAT %</label><input type="number" value={eForm.tax_pct} onChange={e => setEForm({...eForm, tax_pct: e.target.value})} style={inputStyle} placeholder="0" /></div>
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                {(() => { const sub = eForm.line_items.reduce((s,l) => s+(parseFloat(l.unit_price)||0)*(parseInt(l.qty)||1),0); const tax = sub*((parseFloat(eForm.tax_pct)||0)/100); return <div style={{ background: T.bg, border: `1px solid ${T.cyan}30`, borderRadius: 8, padding: '10px 14px' }}><div style={{ color: T.textMuted, fontSize: 11 }}>Subtotal: GHS {sub.toLocaleString()}</div><div style={{ color: T.textMuted, fontSize: 11 }}>Tax: GHS {tax.toLocaleString()}</div><div style={{ color: T.cyan, fontWeight: 900, fontSize: 16 }}>Total: GHS {(sub+tax).toLocaleString()}</div></div>; })()}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={labelStyle}>Notes</label>
+              <textarea value={eForm.notes} onChange={e => setEForm({...eForm, notes: e.target.value})} rows={2} style={{...inputStyle, resize: 'vertical'}} placeholder="Terms, conditions or notes..." />
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={saveEstimate} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: 'none', color: '#fff', padding: '10px 24px', borderRadius: 8, cursor: 'pointer', fontWeight: 800, fontSize: 13 }}>{saving ? 'Saving...' : 'Save Estimate'}</button>
+              <button onClick={() => setEstimateModal(null)} style={{ background: 'none', border: `1px solid ${T.border}`, color: T.textMuted, padding: '10px 20px', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Petty Cash Voucher Modal */}
+      {pcModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setPcModal(false)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.teal}30`, borderRadius: 16, width: '100%', maxWidth: 480, padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Petty Cash Voucher</div>
+            <div style={{ color: T.amber, fontSize: 12, marginBottom: 20 }}>⚠ Maximum single payment: GHS 200. Use cheque for larger amounts.</div>
+            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Payee *</label><input value={pcForm.payee} onChange={e => setPcForm({...pcForm, payee: e.target.value})} style={inputStyle} placeholder="Who is being paid?" /></div>
+            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Purpose</label><input value={pcForm.purpose} onChange={e => setPcForm({...pcForm, purpose: e.target.value})} style={inputStyle} placeholder="What is this for?" /></div>
+            <div style={{ marginBottom: 20 }}><label style={labelStyle}>Amount (GHS) *</label><input type="number" max="200" value={pcForm.amount} onChange={e => setPcForm({...pcForm, amount: e.target.value})} style={inputStyle} placeholder="Max GHS 200" /></div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={savePCVoucher} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: 'none', color: '#fff', padding: '10px 24px', borderRadius: 8, cursor: 'pointer', fontWeight: 800, fontSize: 13 }}>{saving ? 'Saving...' : 'Submit Voucher'}</button>
+              <button onClick={() => setPcModal(false)} style={{ background: 'none', border: `1px solid ${T.border}`, color: T.textMuted, padding: '10px 20px', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Daily Balance Modal */}
+      {dbModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setDbModal(false)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: '100%', maxWidth: 560, padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Daily Balance Report</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>Prepared each morning and sent to the Director. Shows previous payments, inflows and expected transactions.</div>
+            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Report Date</label><input type="date" value={dbForm.report_date} onChange={e => setDbForm({...dbForm, report_date: e.target.value})} style={inputStyle} /></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div><label style={labelStyle}>Opening Balance (GHS)</label><input type="number" value={dbForm.opening_balance} onChange={e => setDbForm({...dbForm, opening_balance: e.target.value})} style={inputStyle} placeholder="0.00" /></div>
+              <div><label style={labelStyle}>Expected Inflows (GHS)</label><input type="number" value={dbForm.expected_inflows} onChange={e => setDbForm({...dbForm, expected_inflows: e.target.value})} style={inputStyle} placeholder="0.00" /></div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div><label style={labelStyle}>Expected Expenditure (GHS)</label><input type="number" value={dbForm.expected_expenditure} onChange={e => setDbForm({...dbForm, expected_expenditure: e.target.value})} style={inputStyle} placeholder="0.00" /></div>
+              <div><label style={labelStyle}>Actual Inflows (GHS)</label><input type="number" value={dbForm.actual_inflows} onChange={e => setDbForm({...dbForm, actual_inflows: e.target.value})} style={inputStyle} placeholder="0.00" /></div>
+            </div>
+            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Actual Payments Made (GHS)</label><input type="number" value={dbForm.actual_payments} onChange={e => setDbForm({...dbForm, actual_payments: e.target.value})} style={inputStyle} placeholder="0.00" /></div>
+            {(dbForm.opening_balance || dbForm.actual_inflows || dbForm.actual_payments) && (
+              <div style={{ background: T.bg, border: `1px solid ${T.cyan}30`, borderRadius: 8, padding: '10px 14px', marginBottom: 14 }}>
+                <div style={{ color: T.cyan, fontWeight: 900, fontSize: 16 }}>Closing Balance: GHS {((parseFloat(dbForm.opening_balance)||0) + (parseFloat(dbForm.actual_inflows)||0) - (parseFloat(dbForm.actual_payments)||0)).toLocaleString()}</div>
+              </div>
+            )}
+            <div style={{ marginBottom: 20 }}><label style={labelStyle}>Notes</label><textarea value={dbForm.notes} onChange={e => setDbForm({...dbForm, notes: e.target.value})} rows={2} style={{...inputStyle, resize: 'vertical'}} placeholder="Any notable transactions or observations..." /></div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={saveDailyBalance} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: 'none', color: '#fff', padding: '10px 24px', borderRadius: 8, cursor: 'pointer', fontWeight: 800, fontSize: 13 }}>{saving ? 'Saving...' : 'Save Report'}</button>
+              <button onClick={() => setDbModal(false)} style={{ background: 'none', border: `1px solid ${T.border}`, color: T.textMuted, padding: '10px 20px', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
 };
 
-// ─── FINANCIAL REPORTS ────────────────────────────────────────────────────────
 const FinanceReportsView = ({ user }) => {
   const [invoices, setInvoices] = useState([]);
   const [expenses, setExpenses] = useState([]);

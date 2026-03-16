@@ -4679,11 +4679,11 @@ const ClientsView = ({ user }) => {
             >
               <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
                 <div style={{ width: 44, height: 44, borderRadius: 10, background: `linear-gradient(135deg, ${T.cyan}30, ${T.teal}20)`, border: `1px solid ${T.cyan}30`, display: "flex", alignItems: "center", justifyContent: "center", color: T.cyan, fontWeight: 800, fontSize: 15, flexShrink: 0 }}>
-                  {c.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)}
+                  {(c.name || c.company || "?").split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.company || c.name}</div>
-                  {c.company && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{c.name}</div>}
+                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.company || c.company_name || c.name || "—"}</div>
+                  {(c.company || c.company_name) && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{c.name}</div>}
                 </div>
                 {isCEOorAdmin && profileEmails.includes(c.email) && (
                   <div style={{ color: T.teal, fontSize: 10, fontWeight: 700, background: T.teal + "18", border: `1px solid ${T.teal}40`, padding: "2px 8px", borderRadius: 20, flexShrink: 0 }}>✓ Portal</div>

@@ -4700,23 +4700,35 @@ const ClientsView = ({ user }) => {
     if (!loginModal.email) { setError('Client must have an email to create a login.'); return; }
     if (!loginForm.password) { setError('Password is required.'); return; }
     setSaving(true); setError(''); setSuccess('');
-    const { data: authData, error: authErr } = await supabase.auth.signUp({
-      email: loginModal.email,
-      password: loginForm.password,
-    });
-    if (authErr) { setError(authErr.message); setSaving(false); return; }
-    const uid = authData.user?.id;
-    const initials = loginModal.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-    await supabase.from('profiles').insert({
-      id: uid,
-      name: loginModal.name,
-      email: loginModal.email,
-      role: 'Client',
-      avatar: initials,
-    });
-    setSuccess(`Login created for ${loginModal.name}. They can now sign in.`);
-    setSaving(false);
-    setLoginForm({ password: '' });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('https://okbduzenceoknkjqnrha.supabase.co/functions/v1/create-vendor-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({
+          email: loginModal.email,
+          password: loginForm.password,
+          name: loginModal.name || loginModal.company || '',
+          role: 'Client',
+          company_name: loginModal.company || '',
+        }),
+      });
+      const result = await res.json();
+      if (result.error) { setError(result.error); setSaving(false); return; }
+      // Send welcome email
+      await sendEmail(
+        loginModal.email,
+        'Welcome to Stretchfield WorkRoom — Your Client Portal Access',
+        welcomeEmailHtml({ name: loginModal.name || loginModal.company, email: loginModal.email, password: loginForm.password, role: 'Client' })
+      );
+      setSuccess(`Portal login created for ${loginModal.name || loginModal.company}. Login details sent to ${loginModal.email}.`);
+      setSaving(false);
+      setLoginForm({ password: '' });
+      load();
+    } catch (e) {
+      setError('Failed to create login: ' + e.message);
+      setSaving(false);
+    }
   };
 
   const handleDelete = async (id) => {

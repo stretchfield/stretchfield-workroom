@@ -4662,6 +4662,9 @@ const ClientsView = ({ user }) => {
         <Btn onClick={() => setModal(true)}>+ Add Client</Btn>
       </div>
 
+      {/* Debug */}
+      <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 8 }}>Debug: {clients.length} clients loaded, loading={loading.toString()}</div>
+
       {loading ? (
         <div style={{ color: T.textMuted, textAlign: "center", padding: 60 }}>Loading...</div>
       ) : clients.length === 0 ? (

@@ -654,6 +654,9 @@ const getNavItems = (role) => {
   if (role === "Client") {
     base.push({ id: "client-events", label: "My Events", icon: "▪" }, { id: "client-finance", label: "Budget & Invoices", icon: "▪" }, { id: "client-docs", label: "Documents", icon: "▪" });
   }
+  if (role === "Board of Directors") {
+    return [{ id: "dashboard", label: "Dashboard", icon: "▪" }, { id: "notifications", label: "Notifications", icon: "▪" }];
+  }
   if (!["Vendor","Client","Strategy & Events Lead"].includes(role)) {
     base.push({ id: "feedback", label: "Feedback", icon: "▪" });
   }
@@ -4494,7 +4497,7 @@ const UsersView = ({ user }) => {
       {/* KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px,1fr))", gap: 12, marginBottom: 24 }}>
         {[...new Set(users.map(u => u.role))].map((role, i) => {
-          const roleColors = { "CEO": T.cyan, "Head of Operations": T.teal, "Vendor Manager": T.amber, "Strategy & Events Lead": T.magenta, "Finance Manager": T.gold, "Sales & Marketing": T.blue, "Vendor": T.textSecondary, "Client": "#10B981" };
+          const roleColors = { "CEO": T.cyan, "Head of Operations": T.teal, "Vendor Manager": T.amber, "Strategy & Events Lead": T.magenta, "Finance Manager": T.gold, "Sales & Marketing": T.blue, "Vendor": T.textSecondary, "Client": "#10B981", "Board of Directors": "#8B5CF6" };
           const color = roleColors[role] || T.textMuted;
           return (
             <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${color}`, borderRadius: 10 }}>
@@ -6790,6 +6793,328 @@ const ImpactIntelligenceSummary = ({ user }) => {
   );
 };
 
+
+const BoardDashboard = ({ user }) => {
+  const [events, setEvents] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [leads, setLeads] = useState([]);
+  const [opportunities, setOpportunities] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [profiles, setProfiles] = useState([]);
+  const [scorecards, setScorecards] = useState([]);
+  const [briefs, setBriefs] = useState([]);
+  const [pos, setPOs] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [awards, setAwards] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    setLoading(true);
+    const [ev, tk, ld, op, vn, pf, sc, br, po, inv, aw] = await Promise.all([
+      supabase.from("projects").select("*").order("created_at", { ascending: false }),
+      supabase.from("tasks").select("*"),
+      supabase.from("leads").select("*"),
+      supabase.from("opportunities").select("*"),
+      supabase.from("profiles").select("*").eq("role", "Vendor"),
+      supabase.from("profiles").select("*").not("role", "in", '("Client","Vendor")'),
+      supabase.from("vendor_scorecards").select("*"),
+      supabase.from("event_impact_briefs").select("*"),
+      supabase.from("purchase_orders").select("*"),
+      supabase.from("vendor_invoices").select("*"),
+      supabase.from("rff_awards").select("*"),
+    ]);
+    setEvents(ev.data || []);
+    setTasks(tk.data || []);
+    setLeads(ld.data || []);
+    setOpportunities(op.data || []);
+    setVendors(vn.data || []);
+    setProfiles(pf.data || []);
+    setScorecards(sc.data || []);
+    setBriefs(br.data || []);
+    setPOs(po.data || []);
+    setInvoices(inv.data || []);
+    setAwards(aw.data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const now = new Date();
+  const thisYear = now.getFullYear();
+  const thisMonth = now.getMonth();
+
+  // Event metrics
+  const eventsThisYear = events.filter(e => new Date(e.created_at).getFullYear() === thisYear);
+  const upcomingEvents = events.filter(e => e.event_date && new Date(e.event_date) >= now).sort((a,b) => new Date(a.event_date) - new Date(b.event_date));
+  const eventsByCategory = Object.keys(EVENT_ARCHETYPES).map(cat => ({
+    category: cat, count: events.filter(e => e.event_category === cat).length,
+    color: EVENT_ARCHETYPES[cat].color,
+  }));
+
+  // Impact metrics
+  const eventScorecardsData = events.map(e => {
+    const sc = scorecards.find(s => s.project_id === e.id);
+    return sc ? sc.overall_score : null;
+  }).filter(s => s !== null);
+  const avgImpactScore = eventScorecardsData.length > 0 ? (eventScorecardsData.reduce((a,b) => a+b, 0) / eventScorecardsData.length).toFixed(1) : null;
+  const brifsCompleted = briefs.length;
+  const briefsPending = events.filter(e => !briefs.find(b => b.project_id === e.id)).length;
+
+  // CRM metrics
+  const wonLeads = leads.filter(l => l.status === "won");
+  const pipelineValue = leads.filter(l => !["won","lost"].includes(l.status)).reduce((s,l) => s + (l.value||0), 0);
+  const wonValue = wonLeads.reduce((s,l) => s + (l.value||0), 0);
+  const conversionRate = leads.length > 0 ? Math.round((wonLeads.length / leads.length) * 100) : 0;
+  const opsByPresence = {
+    "GH+NG+KE": opportunities.filter(o => o.presence === "GH+NG+KE").length,
+    "GH+NG": opportunities.filter(o => o.presence === "GH+NG").length,
+    "GH+KE": opportunities.filter(o => o.presence === "GH+KE").length,
+    "GH": opportunities.filter(o => o.presence === "GH").length,
+  };
+
+  // Finance metrics
+  const totalPOValue = pos.reduce((s,p) => s + (p.amount||0), 0);
+  const totalInvoiced = invoices.reduce((s,i) => s + (i.amount||0), 0);
+  const paidInvoices = invoices.filter(i => i.status === "paid").reduce((s,i) => s + (i.amount||0), 0);
+  const pendingInvoices = invoices.filter(i => i.status !== "paid").reduce((s,i) => s + (i.amount||0), 0);
+
+  // Vendor metrics
+  const impressive = vendors.filter(v => (v.vendor_score||0) >= 85).length;
+  const veryGood = vendors.filter(v => (v.vendor_score||0) >= 70 && (v.vendor_score||0) < 85).length;
+  const good = vendors.filter(v => (v.vendor_score||0) >= 50 && (v.vendor_score||0) < 70).length;
+  const poor = vendors.filter(v => v.vendor_scorecard_count > 0 && (v.vendor_score||0) < 50).length;
+  const unrated = vendors.filter(v => !v.vendor_scorecard_count).length;
+
+  // Team metrics
+  const openTasks = tasks.filter(t => t.status !== "completed").length;
+  const completedTasks = tasks.filter(t => t.status === "completed").length;
+  const taskCompletionRate = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
+
+  const KPICard = ({ label, value, sub, color, icon }) => (
+    <div style={{ padding: "18px 20px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `3px solid ${color}`, borderRadius: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>{label}</div>
+          <div style={{ color, fontSize: 28, fontWeight: 900, lineHeight: 1 }}>{value}</div>
+          {sub && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 6 }}>{sub}</div>}
+        </div>
+        {icon && <div style={{ fontSize: 28, opacity: 0.4 }}>{icon}</div>}
+      </div>
+    </div>
+  );
+
+  const SectionHeader = ({ title, subtitle }) => (
+    <div style={{ marginBottom: 16, paddingBottom: 10, borderBottom: `1px solid ${T.border}` }}>
+      <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 16 }}>{title}</div>
+      {subtitle && <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{subtitle}</div>}
+    </div>
+  );
+
+  if (loading) return <div style={{ textAlign: "center", padding: 80, color: T.textMuted }}>Loading board intelligence...</div>;
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 32, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Stretchfield</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 26, fontWeight: 900, letterSpacing: "-0.02em" }}>Board Intelligence Dashboard</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4, fontStyle: "italic" }}>We don't plan events. We engineer impact. — {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
+      </div>
+
+      {/* ── Section 1: Business Performance ── */}
+      <SectionHeader title="📊 Business Performance" subtitle={`${thisYear} year to date`} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 32 }}>
+        <KPICard label="Events Delivered YTD" value={eventsThisYear.length} sub={`${events.length} total portfolio`} color={T.cyan} icon="🎪" />
+        <KPICard label="Upcoming Events" value={upcomingEvents.length} sub={upcomingEvents[0] ? `Next: ${upcomingEvents[0].name}` : "None scheduled"} color={T.teal} icon="📅" />
+        <KPICard label="Task Completion Rate" value={`${taskCompletionRate}%`} sub={`${completedTasks} of ${tasks.length} tasks done`} color={taskCompletionRate >= 70 ? "#10B981" : T.amber} icon="✅" />
+        <KPICard label="Active Staff" value={profiles.length} sub="Across all departments" color={T.blue} icon="👥" />
+      </div>
+
+      {/* Event Category Distribution */}
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 32 }}>
+        <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Events by Category — {thisYear}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
+          {eventsByCategory.map(cat => (
+            <div key={cat.category} style={{ background: T.bg, borderTop: `3px solid ${cat.color}`, borderRadius: 10, padding: "14px 16px" }}>
+              <div style={{ color: cat.color, fontWeight: 900, fontSize: 32 }}>{cat.count}</div>
+              <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12, marginTop: 4 }}>{cat.category}</div>
+              <div style={{ height: 4, background: T.border+"44", borderRadius: 2, marginTop: 8, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: events.length > 0 ? `${Math.round((cat.count/events.length)*100)}%` : "0%", background: cat.color, borderRadius: 2 }} />
+              </div>
+              <div style={{ color: T.textMuted, fontSize: 10, marginTop: 4 }}>{events.length > 0 ? Math.round((cat.count/events.length)*100) : 0}% of portfolio</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Section 2: Impact Intelligence ── */}
+      <SectionHeader title="🎯 Impact Intelligence" subtitle="Strategic measurement across all events" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 20 }}>
+        <KPICard label="Avg Impact Score" value={avgImpactScore ? `${avgImpactScore}/10` : "—"} sub={avgImpactScore ? getScoreLabel(parseFloat(avgImpactScore)).label : "No scorecards yet"} color={avgImpactScore >= 7 ? "#10B981" : avgImpactScore >= 5 ? T.amber : T.red} icon="⚡" />
+        <KPICard label="Impact Briefs Done" value={brifsCompleted} sub={`${briefsPending} events pending brief`} color={T.teal} icon="📝" />
+        <KPICard label="Events Scored" value={eventScorecardsData.length} sub={`of ${events.length} total events`} color={T.cyan} icon="📊" />
+        <KPICard label="Top Score" value={eventScorecardsData.length > 0 ? `${Math.max(...eventScorecardsData)}/10` : "—"} sub="Highest event score" color="#10B981" icon="🏆" />
+      </div>
+
+      {/* Impact score distribution */}
+      {eventScorecardsData.length > 0 && (
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 32 }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Impact Score Distribution</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 10 }}>
+            {[
+              { label: "Exceptional", range: [9,10], color: "#10B981" },
+              { label: "Strong", range: [7,8.9], color: T.teal },
+              { label: "Partial", range: [5,6.9], color: T.amber },
+              { label: "Needs Work", range: [3,4.9], color: "#E67E22" },
+              { label: "Critical", range: [0,2.9], color: T.red },
+            ].map(tier => {
+              const count = eventScorecardsData.filter(s => s >= tier.range[0] && s <= tier.range[1]).length;
+              return (
+                <div key={tier.label} style={{ background: T.bg, borderTop: `2px solid ${tier.color}`, borderRadius: 8, padding: "12px 14px", textAlign: "center" }}>
+                  <div style={{ color: tier.color, fontWeight: 900, fontSize: 24 }}>{count}</div>
+                  <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginTop: 4 }}>{tier.label}</div>
+                  <div style={{ color: T.textMuted, fontSize: 9, marginTop: 2 }}>{tier.range[0]}–{tier.range[1]}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Section 3: CRM & Growth ── */}
+      <SectionHeader title="📈 CRM & Growth Pipeline" subtitle="Lead generation and conversion performance" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 20 }}>
+        <KPICard label="Total Leads" value={leads.length} sub={`${wonLeads.length} won`} color={T.cyan} icon="🎯" />
+        <KPICard label="Pipeline Value" value={`GHS ${pipelineValue.toLocaleString()}`} sub="Active pipeline" color={T.amber} icon="💰" />
+        <KPICard label="Won Value" value={`GHS ${wonValue.toLocaleString()}`} sub="Closed revenue" color="#10B981" icon="✓" />
+        <KPICard label="Conversion Rate" value={`${conversionRate}%`} sub="Leads to won" color={conversionRate >= 20 ? "#10B981" : T.amber} icon="📊" />
+      </div>
+
+      {/* CRM pipeline stages */}
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 20 }}>
+        <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Lead Pipeline by Stage</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {["new","contacted","qualified","proposal","won","lost"].map(stage => {
+            const count = leads.filter(l => l.status === stage).length;
+            const stageColors = { new: T.cyan, contacted: T.blue, qualified: T.amber, proposal: T.magenta, won: "#10B981", lost: T.red };
+            return (
+              <div key={stage} style={{ flex: 1, background: T.bg, borderTop: `3px solid ${stageColors[stage]}`, borderRadius: 8, padding: "12px 10px", textAlign: "center" }}>
+                <div style={{ color: stageColors[stage], fontWeight: 900, fontSize: 22 }}>{count}</div>
+                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginTop: 4 }}>{stage}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Opportunities presence */}
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 32 }}>
+        <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Opportunities by Regional Presence — {opportunities.length} companies</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
+          {Object.entries(opsByPresence).map(([presence, count]) => (
+            <div key={presence} style={{ background: T.bg, borderRadius: 8, padding: "12px 14px", textAlign: "center", border: `1px solid ${T.border}` }}>
+              <div style={{ color: T.cyan, fontWeight: 900, fontSize: 22 }}>{count}</div>
+              <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, marginTop: 4 }}>{presence}</div>
+              <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{opportunities.length > 0 ? Math.round((count/opportunities.length)*100) : 0}%</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Section 4: Finance Overview ── */}
+      <SectionHeader title="💼 Finance Overview" subtitle="Procurement and invoice summary" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 32 }}>
+        <KPICard label="Total PO Value" value={`GHS ${totalPOValue.toLocaleString()}`} sub={`${pos.length} purchase orders`} color={T.cyan} icon="📋" />
+        <KPICard label="Total Invoiced" value={`GHS ${totalInvoiced.toLocaleString()}`} sub={`${invoices.length} invoices`} color={T.amber} icon="🧾" />
+        <KPICard label="Paid" value={`GHS ${paidInvoices.toLocaleString()}`} sub="Invoice payments received" color="#10B981" icon="✓" />
+        <KPICard label="Outstanding" value={`GHS ${pendingInvoices.toLocaleString()}`} sub="Pending payment" color={pendingInvoices > 0 ? T.red : T.textMuted} icon="⏳" />
+      </div>
+
+      {/* ── Section 5: Vendor Health ── */}
+      <SectionHeader title="🏭 Vendor Network Health" subtitle={`${vendors.length} registered vendors`} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginBottom: 20 }}>
+        {[
+          { label: "Total Vendors", value: vendors.length, color: T.cyan },
+          { label: "Impressive", value: impressive, color: "#10B981" },
+          { label: "Very Good", value: veryGood, color: T.teal },
+          { label: "Good", value: good, color: T.amber },
+          { label: "Poor / Blocked", value: poor, color: T.red },
+        ].map((k,i) => (
+          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginTop: 4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Vendor tier bar */}
+      {vendors.length > 0 && (
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px", marginBottom: 32 }}>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Vendor Quality Distribution</div>
+          <div style={{ height: 20, borderRadius: 10, overflow: "hidden", display: "flex" }}>
+            {[
+              { count: impressive, color: "#10B981" },
+              { count: veryGood, color: T.teal },
+              { count: good, color: T.amber },
+              { count: poor, color: T.red },
+              { count: unrated, color: T.border },
+            ].map((seg, i) => seg.count > 0 && (
+              <div key={i} style={{ width: `${(seg.count/vendors.length)*100}%`, background: seg.color, transition: "width 0.5s ease" }} />
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
+            {[["#10B981","Impressive"], [T.teal,"Very Good"], [T.amber,"Good"], [T.red,"Poor"], [T.border,"Unrated"]].map(([color, label]) => (
+              <div key={label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
+                <span style={{ color: T.textMuted, fontSize: 10 }}>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Section 6: Upcoming Events ── */}
+      {upcomingEvents.length > 0 && (
+        <>
+          <SectionHeader title="📅 Upcoming Events" subtitle="Next scheduled events" />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 12, marginBottom: 32 }}>
+            {upcomingEvents.slice(0,6).map(ev => {
+              const days = Math.ceil((new Date(ev.event_date) - now) / (1000*60*60*24));
+              const countdownColor = days <= 7 ? T.red : days <= 30 ? T.amber : T.teal;
+              const archetype = EVENT_ARCHETYPES[ev.event_category];
+              return (
+                <div key={ev.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderTop: `3px solid ${archetype?.color||T.cyan}`, borderRadius: 12, padding: "16px 18px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{ev.name}</div>
+                      <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{ev.client}</div>
+                      {ev.event_category && <div style={{ color: archetype?.color||T.cyan, fontSize: 10, fontWeight: 700, marginTop: 4 }}>{ev.event_category}</div>}
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 10 }}>
+                      <div style={{ color: countdownColor, fontWeight: 900, fontSize: 22 }}>{days}d</div>
+                      <div style={{ color: T.textMuted, fontSize: 9 }}>to go</div>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 10, height: 4, background: T.border+"44", borderRadius: 2 }}>
+                    <div style={{ height: "100%", width: `${ev.completion||0}%`, background: `linear-gradient(90deg, ${archetype?.color||T.cyan}, ${T.teal})`, borderRadius: 2 }} />
+                  </div>
+                  <div style={{ color: T.textMuted, fontSize: 10, marginTop: 4 }}>{ev.completion||0}% complete · {ev.phase}</div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* Footer */}
+      <div style={{ textAlign: "center", padding: "24px 0", borderTop: `1px solid ${T.border}`, marginTop: 16 }}>
+        <div style={{ color: T.textMuted, fontSize: 11, fontStyle: "italic" }}>Stretchfield Board Intelligence · Read-only view · Last refreshed {new Date().toLocaleTimeString("en-GB")}</div>
+        <button onClick={load} style={{ marginTop: 10, background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "6px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>↻ Refresh Data</button>
+      </div>
+    </div>
+  );
+};
+
 const CalendarView = ({ user, onNavigate }) => {
   const [today] = useState(new Date());
   const [current, setCurrent] = useState(new Date());
@@ -7406,6 +7731,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
     switch (activeTab) {
       case "dashboard":
         if (role === "CEO") return <CEODashboard onTab={setActiveTab} user={currentUser} />;
+        if (role === "Board of Directors") return <BoardDashboard user={currentUser} />;
         if (role === "Head of Operations") return <StaffDashboard user={currentUser} />;
         if (role === "Vendor") return <VendorDashboard user={currentUser} />;
         if (role === "Client") return <ClientDashboard user={currentUser} />;

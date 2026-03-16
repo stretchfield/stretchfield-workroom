@@ -12202,8 +12202,12 @@ const VendorApprovalsPanel = ({ user, onLoginCreated }) => {
   const [createdCreds, setCreatedCreds] = useState(null);
 
   const load = async () => {
-    const { data } = await supabase.from("vendor_applications").select("*").order("created_at", { ascending: false });
-    setApps(data || []);
+    const [{ data: appData }, { data: vpData }] = await Promise.all([
+      supabase.from("vendor_applications").select("*").order("created_at", { ascending: false }),
+      supabase.from("profiles").select("*").eq("role", "Vendor").order("name"),
+    ]);
+    setApps(appData || []);
+    setVendorProfiles(vpData || []);
   };
 
   useEffect(() => { load(); }, []);
@@ -12568,8 +12572,13 @@ const VendorOnboardingView = ({ user }) => {
   useEffect(() => { load(); }, []);
 
   const tabs = user?.role === "CEO"
-    ? [{ id: "applications", label: "Applications" }]
+    ? [{ id: "applications", label: "Applications" }, { id: "active-vendors", label: "Active Vendors" }]
     : [{ id: "form", label: "New Vendor Form" }, { id: "submitted", label: "Submitted Applications" }];
+  const [vendorProfiles, setVendorProfiles] = useState([]);
+  const [editVendorModal, setEditVendorModal] = useState(null);
+  const [editVendorForm, setEditVendorForm] = useState({});
+  const [savingVendor, setSavingVendor] = useState(false);
+  const VTYPES = ["Audio Visual","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Photography & Videography","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
@@ -12596,6 +12605,137 @@ const VendorOnboardingView = ({ user }) => {
               textTransform: "uppercase", letterSpacing: "0.06em",
             }}>{t.label}</button>
           ))}
+        </div>
+      )}
+
+      {/* Active Vendors Tab — CEO only */}
+      {tab === "active-vendors" && user?.role === "CEO" && (
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 16 }}>{vendorProfiles.length} active vendors with portal access</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {vendorProfiles.map(v => {
+              const linked = apps.find(a => a.contact_email === v.email);
+              const tierColor = v.vendor_scorecard_count > 0 ? (v.vendor_score >= 85 ? "#10B981" : v.vendor_score >= 70 ? T.teal : v.vendor_score >= 50 ? T.amber : T.red) : T.textMuted;
+              return (
+                <div key={v.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: "50%", background: tierColor+"20", border: `1px solid ${tierColor}40`, display: "flex", alignItems: "center", justifyContent: "center", color: tierColor, fontWeight: 800, fontSize: 13 }}>{(v.name||"?").slice(0,2).toUpperCase()}</div>
+                    <div>
+                      <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{v.name}</div>
+                      <div style={{ color: T.textMuted, fontSize: 11 }}>{v.company_name || ""} {v.company_name && v.service_category ? "·" : ""} {v.service_category || "No category"}</div>
+                      <div style={{ color: T.textMuted, fontSize: 11 }}>{v.email} {v.phone ? "· " + v.phone : ""}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    {v.vendor_scorecard_count > 0 && <span style={{ color: tierColor, fontWeight: 700, fontSize: 13 }}>{v.vendor_score}%</span>}
+                    <button onClick={() => {
+                      setEditVendorModal(v);
+                      setEditVendorForm({
+                        name: v.name || "",
+                        company_name: v.company_name || "",
+                        phone: v.phone || "",
+                        service_category: v.service_category || "",
+                        // Bank & payment from linked application
+                        bank_name: linked?.bank_name || "",
+                        bank_account_name: linked?.bank_account_name || "",
+                        account_number: linked?.account_number || "",
+                        swift_code: linked?.swift_code || "",
+                        bank_address: linked?.bank_address || "",
+                        payment_terms: linked?.payment_terms || "",
+                        country: linked?.country || "",
+                        address: linked?.address || "",
+                        contact_person: linked?.contact_person || v.name || "",
+                      });
+                    }} style={{ background: T.cyan+"15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "6px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>✎ Edit</button>
+                  </div>
+                </div>
+              );
+            })}
+            {vendorProfiles.length === 0 && <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>No active vendors yet. Approve vendor applications first.</div>}
+          </div>
+
+          {/* Vendor Edit Modal */}
+          {editVendorModal && (
+            <div style={{ position: "fixed", inset: 0, zIndex: 700, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setEditVendorModal(null)}>
+              <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 640, maxHeight: "90vh", overflow: "auto", padding: 28 }} onClick={e => e.stopPropagation()}>
+                <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Edit Vendor — {editVendorModal.name}</div>
+                <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>{editVendorModal.email}</div>
+
+                {[
+                  { section: "Contact Details", fields: [
+                    ["name", "Vendor / Contact Name", "text"],
+                    ["company_name", "Company Name", "text"],
+                    ["phone", "Phone Number", "text"],
+                    ["country", "Country", "text"],
+                    ["address", "Address", "text"],
+                  ]},
+                  { section: "Service", fields: [
+                    ["contact_person", "Contact Person", "text"],
+                  ]},
+                  { section: "Bank Details", fields: [
+                    ["bank_name", "Bank Name", "text"],
+                    ["bank_account_name", "Account Name", "text"],
+                    ["account_number", "Account Number", "text"],
+                    ["swift_code", "Swift Code", "text"],
+                    ["bank_address", "Bank Address", "text"],
+                    ["payment_terms", "Payment Terms", "text"],
+                  ]},
+                ].map(({ section, fields }) => (
+                  <div key={section}>
+                    <div style={{ color: T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10, marginTop: 18, paddingBottom: 6, borderBottom: `1px solid ${T.cyan}30` }}>{section}</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                      {fields.map(([key, label]) => (
+                        <div key={key}>
+                          <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 4 }}>{label}</label>
+                          <input value={editVendorForm[key] || ""} onChange={e => setEditVendorForm({...editVendorForm, [key]: e.target.value})} style={{ width: "100%", padding: "8px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+
+                <div style={{ marginTop: 16 }}>
+                  <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Service Category</label>
+                  <select value={editVendorForm.service_category} onChange={e => setEditVendorForm({...editVendorForm, service_category: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                    <option value="">Select category...</option>
+                    {VTYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+
+                <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
+                  <button onClick={async () => {
+                    setSavingVendor(true);
+                    // Update profile
+                    await supabase.from("profiles").update({
+                      name: editVendorForm.name,
+                      company_name: editVendorForm.company_name,
+                      phone: editVendorForm.phone,
+                      service_category: editVendorForm.service_category,
+                    }).eq("id", editVendorModal.id);
+                    // Update linked application if exists
+                    const linked = apps.find(a => a.contact_email === editVendorModal.email);
+                    if (linked) {
+                      await supabase.from("vendor_applications").update({
+                        contact_person: editVendorForm.contact_person,
+                        country: editVendorForm.country,
+                        address: editVendorForm.address,
+                        bank_name: editVendorForm.bank_name,
+                        bank_account_name: editVendorForm.bank_account_name,
+                        account_number: editVendorForm.account_number,
+                        swift_code: editVendorForm.swift_code,
+                        bank_address: editVendorForm.bank_address,
+                        payment_terms: editVendorForm.payment_terms,
+                      }).eq("id", linked.id);
+                    }
+                    setSavingVendor(false);
+                    setEditVendorModal(null);
+                    load();
+                  }} disabled={savingVendor} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{savingVendor ? "Saving..." : "Save All Changes"}</button>
+                  <button onClick={() => setEditVendorModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

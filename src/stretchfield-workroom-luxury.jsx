@@ -4945,6 +4945,19 @@ const ClientsView = ({ user }) => {
     setSaving(true); setError(''); setSuccess('');
     try {
       const { data: { session } } = await supabase.auth.getSession();
+
+      if (loginModal.has_portal) {
+        // Client already has portal — just resend welcome email with new password reminder
+        await sendEmail(
+          loginModal.email,
+          'Your Stretchfield WorkRoom Login Details',
+          welcomeEmailHtml({ name: loginModal.name || loginModal.company, email: loginModal.email, password: loginForm.password, role: 'Client' })
+        );
+        setSuccess(`Login details resent to ${loginModal.email}.`);
+        setSaving(false);
+        return;
+      }
+
       const res = await fetch('https://okbduzenceoknkjqnrha.supabase.co/functions/v1/create-vendor-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
@@ -5040,8 +5053,10 @@ const ClientsView = ({ user }) => {
                 {c.notes && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 8, fontStyle: "italic", lineHeight: 1.5 }}>{c.notes}</div>}
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                {isCEOorAdmin && !c.has_portal && c.email && (
-                  <Btn small onClick={() => { setLoginModal(c); setLoginForm({ password: generatePassword(c.email) }); setError(""); setSuccess(""); }}>🔑 Create Login</Btn>
+                {isCEOorAdmin && c.email && (
+                  <Btn small onClick={() => { setLoginModal(c); setLoginForm({ password: generatePassword(c.email) }); setError(""); setSuccess(""); }}>
+                    {c.has_portal ? "🔑 Resend Login" : "🔑 Create Login"}
+                  </Btn>
                 )}
                 <Btn small variant="ghost" onClick={() => handleDelete(c.id)}>Remove</Btn>
               </div>

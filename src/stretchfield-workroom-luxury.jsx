@@ -1090,6 +1090,209 @@ const CEODashboard = ({ onTab, user }) => {
   );
 };
 
+
+const VendorManagerDashboard = ({ user }) => {
+  const [vendors, setVendors] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [notifs, setNotifs] = useState([]);
+  const [rffs, setRffs] = useState([]);
+  const [awards, setAwards] = useState([]);
+
+  const VENDOR_TYPES = ["Audio Visual","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Photography & Videography","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from("profiles").select("*").eq("role", "Vendor").order("name"),
+      supabase.from("tasks").select("*").eq("assignee_id", user.id),
+      supabase.from("projects").select("*").eq("status", "active"),
+      supabase.from("notifications").select("*").eq("user_id", user.id).eq("read", false).limit(5),
+      supabase.from("rffs").select("*").order("created_at", { ascending: false }),
+      supabase.from("rff_awards").select("*").in("status", ["confirmed","po_created"]),
+    ]).then(([v, t, ev, n, r, aw]) => {
+      setVendors(v.data || []);
+      setTasks(t.data || []);
+      setEvents(ev.data || []);
+      setNotifs(n.data || []);
+      setRffs(r.data || []);
+      setAwards(aw.data || []);
+    });
+  }, [user.id]);
+
+  const now = new Date();
+  const greeting = now.getHours() < 12 ? "Good Morning" : now.getHours() < 17 ? "Good Afternoon" : "Good Evening";
+  const dateStr = now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+  const pending = tasks.filter(t => t.status !== "completed");
+  const pendingRffs = rffs.filter(r => !r.approved);
+  const upcomingEvents = events.filter(e => e.event_date && new Date(e.event_date) >= now).sort((a,b) => new Date(a.event_date) - new Date(b.event_date));
+
+  // Group vendors by service_category
+  const vendorsByCategory = VENDOR_TYPES.reduce((acc, type) => {
+    const list = vendors.filter(v => v.service_category === type);
+    if (list.length > 0) acc[type] = list;
+    return acc;
+  }, {});
+  // Uncategorised vendors
+  const uncategorised = vendors.filter(v => !v.service_category || !VENDOR_TYPES.includes(v.service_category));
+
+  const getTierColor = (score, count) => {
+    if (!count) return T.textMuted;
+    if (score >= 85) return "#10B981";
+    if (score >= 70) return T.teal;
+    if (score >= 50) return T.amber;
+    return T.red;
+  };
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>{dateStr}</div>
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: T.textPrimary, letterSpacing: "-0.02em" }}>{greeting}, {user.name.split(" ")[0]}</h1>
+        <div style={{ color: T.textMuted, fontSize: 13, marginTop: 4 }}>Vendor network overview and procurement status</div>
+      </div>
+
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Total Vendors", value: vendors.length, color: T.cyan },
+          { label: "Active Events", value: events.length, color: T.teal },
+          { label: "Pending RFFs", value: pendingRffs.length, color: T.amber },
+          { label: "Confirmed Gigs", value: awards.length, color: "#10B981" },
+        ].map((k,i) => (
+          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Alerts */}
+      {notifs.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          {notifs.slice(0,3).map(n => (
+            <div key={n.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: T.amber+"12", border: `1px solid ${T.amber}30`, borderRadius: 8, marginBottom: 6 }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.amber, flexShrink: 0 }} />
+              <div style={{ color: T.amber, fontSize: 12, fontWeight: 600, flex: 1 }}>{n.title}</div>
+              <div style={{ color: T.textMuted, fontSize: 11 }}>{n.message?.slice(0,60)}...</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Two column layout */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+
+        {/* Upcoming Events */}
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px" }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 14 }}>Upcoming Events</div>
+          {upcomingEvents.length > 0 ? upcomingEvents.slice(0,4).map((ev,i) => {
+            const days = Math.ceil((new Date(ev.event_date) - now)/(1000*60*60*24));
+            const color = days <= 7 ? T.red : days <= 30 ? T.amber : T.teal;
+            const archetype = EVENT_ARCHETYPES[ev.event_category];
+            return (
+              <div key={ev.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < 3 ? `1px solid ${T.border}33` : "none" }}>
+                <div>
+                  <div style={{ color: T.textPrimary, fontWeight: 600, fontSize: 12 }}>{ev.name}</div>
+                  {ev.event_category && <div style={{ color: archetype?.color||T.cyan, fontSize: 10, fontWeight: 700 }}>{ev.event_category}</div>}
+                </div>
+                <div style={{ color, fontWeight: 800, fontSize: 13 }}>{days}d</div>
+              </div>
+            );
+          }) : <div style={{ color: T.textMuted, fontSize: 12, textAlign: "center", padding: "16px 0" }}>No upcoming events</div>}
+        </div>
+
+        {/* My Tasks */}
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px" }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 14 }}>My Tasks</div>
+          {pending.length > 0 ? pending.slice(0,4).map((t,i) => (
+            <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < Math.min(pending.length,4)-1 ? `1px solid ${T.border}33` : "none" }}>
+              <div style={{ color: T.textPrimary, fontSize: 12, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</div>
+              <div style={{ color: t.deadline && new Date(t.deadline) < now ? T.red : T.textMuted, fontSize: 10, flexShrink: 0, marginLeft: 8 }}>{t.deadline || "No date"}</div>
+            </div>
+          )) : <div style={{ color: T.textMuted, fontSize: 12, textAlign: "center", padding: "16px 0" }}>No pending tasks</div>}
+        </div>
+      </div>
+
+      {/* Vendor Directory by Category */}
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ padding: "16px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Vendor Directory</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{vendors.length} vendors across {Object.keys(vendorsByCategory).length} categories</div>
+          </div>
+        </div>
+
+        <div style={{ padding: "16px 20px" }}>
+          {Object.entries(vendorsByCategory).map(([category, catVendors]) => (
+            <div key={category} style={{ marginBottom: 20 }}>
+              {/* Category Header */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, paddingBottom: 6, borderBottom: `1px solid ${T.border}` }}>
+                <div style={{ background: T.cyan+"18", border: `1px solid ${T.cyan}30`, borderRadius: 20, padding: "3px 12px", display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ color: T.cyan, fontWeight: 900, fontSize: 16 }}>{catVendors.length}</span>
+                  <span style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>vendor{catVendors.length !== 1 ? "s" : ""}</span>
+                </div>
+                <span style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{category}</span>
+              </div>
+
+              {/* Vendor List */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px,1fr))", gap: 8 }}>
+                {catVendors.map(v => {
+                  const tierColor = getTierColor(v.vendor_score, v.vendor_scorecard_count);
+                  const isPoor = v.vendor_scorecard_count > 0 && (v.vendor_score||0) < 50;
+                  return (
+                    <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: isPoor ? T.red+"08" : T.bg, border: `1px solid ${isPoor ? T.red+"30" : T.border}`, borderRadius: 8 }}>
+                      <div style={{ width: 30, height: 30, borderRadius: "50%", background: tierColor+"20", border: `1px solid ${tierColor}40`, display: "flex", alignItems: "center", justifyContent: "center", color: tierColor, fontWeight: 800, fontSize: 11, flexShrink: 0 }}>
+                        {(v.name||"?").slice(0,2).toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.name}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 1 }}>
+                          {v.vendor_scorecard_count > 0 ? (
+                            <span style={{ color: tierColor, fontSize: 10, fontWeight: 700 }}>{v.vendor_score}%</span>
+                          ) : (
+                            <span style={{ color: T.textMuted, fontSize: 10 }}>Unrated</span>
+                          )}
+                          {isPoor && <span style={{ color: T.red, fontSize: 9, fontWeight: 700 }}>⛔ Blocked</span>}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {/* Uncategorised */}
+          {uncategorised.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, paddingBottom: 6, borderBottom: `1px solid ${T.border}` }}>
+                <div style={{ background: T.textMuted+"18", border: `1px solid ${T.border}`, borderRadius: 20, padding: "3px 12px", display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ color: T.textMuted, fontWeight: 900, fontSize: 16 }}>{uncategorised.length}</span>
+                  <span style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>vendor{uncategorised.length !== 1 ? "s" : ""}</span>
+                </div>
+                <span style={{ color: T.textMuted, fontWeight: 700, fontSize: 13 }}>Uncategorised</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px,1fr))", gap: 8 }}>
+                {uncategorised.map(v => (
+                  <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8 }}>
+                    <div style={{ width: 30, height: 30, borderRadius: "50%", background: T.border, display: "flex", alignItems: "center", justifyContent: "center", color: T.textMuted, fontWeight: 800, fontSize: 11, flexShrink: 0 }}>{(v.name||"?").slice(0,2).toUpperCase()}</div>
+                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>{v.name}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {vendors.length === 0 && (
+            <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted, fontSize: 13 }}>No vendors onboarded yet. Use the Add New Vendor tab to get started.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const StaffDashboard = ({ user }) => {
   const [tasks, setTasks] = useState([]);
   const [events, setEvents] = useState([]);
@@ -7962,7 +8165,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
         if (role === "Finance Manager") return <FinanceManagerDashboard user={currentUser} onTab={setActiveTab} />;
         if (role === "Sales & Marketing") return <CRMDashboardSM user={currentUser} />;
         if (role === "Strategy & Events Lead") return <StaffDashboard user={currentUser} />;
-        if (role === "Vendor Manager") return <StaffDashboard user={currentUser} />;
+        if (role === "Vendor Manager") return <VendorManagerDashboard user={currentUser} />;
         return <StaffDashboard user={currentUser} />;
       case "events": return <EventsView user={currentUser} userRole={currentUser.role} />;
       case "tasks": return <TasksView userRole={currentUser.role} openTaskId={pendingResourceId} onOpenHandled={() => setPendingResourceId(null)} />;

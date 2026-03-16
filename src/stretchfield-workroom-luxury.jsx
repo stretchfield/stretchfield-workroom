@@ -4897,16 +4897,22 @@ const ClientsView = ({ user }) => {
         supabase.from('profiles').select('*').eq('role', 'Client').order('created_at', { ascending: false }),
         supabase.from('clients').select('*').order('created_at', { ascending: false }),
       ]);
+      const profileEmails = (profileData || []).map(p => p.email);
+      // Clients from profiles — have portal login
       const profiles = (profileData || []).map(p => ({
         ...p,
         company: p.company_name || p.company || "",
+        has_portal: true,
         source: 'profile',
       }));
-      const profileEmails = profiles.map(p => p.email);
-      // Add clients from clients table not in profiles
+      // Clients from clients table — no portal login yet
       const extraClients = (clientData || [])
         .filter(c => c.email && !profileEmails.includes(c.email))
-        .map(c => ({ ...c, source: 'clients' }));
+        .map(c => ({ ...c, has_portal: false, source: 'clients' }));
+      // Also mark clients table entries that DO have profiles
+      const linkedClients = (clientData || [])
+        .filter(c => c.email && profileEmails.includes(c.email))
+        .map(c => ({ ...c, has_portal: true, source: 'clients_linked' }));
       setClients([...profiles, ...extraClients]);
       setProfileEmails(profileEmails);
     } catch (e) {
@@ -5022,7 +5028,7 @@ const ClientsView = ({ user }) => {
                   <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.company || c.company_name || c.name || "—"}</div>
                   {(c.company || c.company_name) && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{c.name}</div>}
                 </div>
-                {isCEOorAdmin && c.source === 'profile' && (
+                {isCEOorAdmin && c.has_portal && (
                   <div style={{ color: T.teal, fontSize: 10, fontWeight: 700, background: T.teal + "18", border: `1px solid ${T.teal}40`, padding: "2px 8px", borderRadius: 20, flexShrink: 0 }}>✓ Portal</div>
                 )}
               </div>
@@ -5032,7 +5038,7 @@ const ClientsView = ({ user }) => {
                 {c.notes && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 8, fontStyle: "italic", lineHeight: 1.5 }}>{c.notes}</div>}
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                {isCEOorAdmin && c.source !== 'profile' && c.email && (
+                {isCEOorAdmin && !c.has_portal && c.email && (
                   <Btn small onClick={() => { setLoginModal(c); setLoginForm({ password: generatePassword(c.email) }); setError(""); setSuccess(""); }}>🔑 Create Login</Btn>
                 )}
                 <Btn small variant="ghost" onClick={() => handleDelete(c.id)}>Remove</Btn>

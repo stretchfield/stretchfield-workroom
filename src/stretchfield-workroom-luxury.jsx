@@ -6807,11 +6807,14 @@ const BoardDashboard = ({ user }) => {
   const [pos, setPOs] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [awards, setAwards] = useState([]);
+  const [clientBudgets, setClientBudgets] = useState([]);
+  const [clientExpenses, setClientExpenses] = useState([]);
+  const [clientInvoices, setClientInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
     setLoading(true);
-    const [ev, tk, ld, op, vn, pf, sc, br, po, inv, aw] = await Promise.all([
+    const [ev, tk, ld, op, vn, pf, sc, br, po, inv, aw, cb, ce, ci] = await Promise.all([
       supabase.from("projects").select("*").order("created_at", { ascending: false }),
       supabase.from("tasks").select("*"),
       supabase.from("leads").select("*"),
@@ -6823,6 +6826,9 @@ const BoardDashboard = ({ user }) => {
       supabase.from("purchase_orders").select("*"),
       supabase.from("vendor_invoices").select("*"),
       supabase.from("rff_awards").select("*"),
+      supabase.from("client_budgets").select("*"),
+      supabase.from("client_expenses").select("*"),
+      supabase.from("client_invoices").select("*"),
     ]);
     setEvents(ev.data || []);
     setTasks(tk.data || []);
@@ -6835,6 +6841,9 @@ const BoardDashboard = ({ user }) => {
     setPOs(po.data || []);
     setInvoices(inv.data || []);
     setAwards(aw.data || []);
+    setClientBudgets(cb.data || []);
+    setClientExpenses(ce.data || []);
+    setClientInvoices(ci.data || []);
     setLoading(false);
   };
 
@@ -6878,6 +6887,14 @@ const BoardDashboard = ({ user }) => {
   const totalInvoiced = invoices.reduce((s,i) => s + (i.amount||0), 0);
   const paidInvoices = invoices.filter(i => i.status === "paid").reduce((s,i) => s + (i.amount||0), 0);
   const pendingInvoices = invoices.filter(i => i.status !== "paid").reduce((s,i) => s + (i.amount||0), 0);
+  // Inflows = client invoices (money coming in from clients)
+  const totalInflows = clientInvoices.reduce((s,i) => s + (i.amount||0), 0);
+  // Expenses = vendor POs + client expenses
+  const clientExpTotal = clientExpenses.reduce((s,e) => s + (e.amount||0), 0);
+  const totalExpenses = totalPOValue + clientExpTotal;
+  const grossProfit = totalInflows - totalExpenses;
+  const profitMargin = totalInflows > 0 ? Math.round((grossProfit / totalInflows) * 100) : 0;
+  const totalBudgets = clientBudgets.reduce((s,b) => s + (b.agreed_budget||0), 0);
 
   // Vendor metrics
   const impressive = vendors.filter(v => (v.vendor_score||0) >= 85).length;
@@ -7023,12 +7040,66 @@ const BoardDashboard = ({ user }) => {
       </div>
 
       {/* ── Section 4: Finance Overview ── */}
-      <SectionHeader title="💼 Finance Overview" subtitle="Procurement and invoice summary" />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 32 }}>
-        <KPICard label="Total PO Value" value={`GHS ${totalPOValue.toLocaleString()}`} sub={`${pos.length} purchase orders`} color={T.cyan} icon="📋" />
-        <KPICard label="Total Invoiced" value={`GHS ${totalInvoiced.toLocaleString()}`} sub={`${invoices.length} invoices`} color={T.amber} icon="🧾" />
-        <KPICard label="Paid" value={`GHS ${paidInvoices.toLocaleString()}`} sub="Invoice payments received" color="#10B981" icon="✓" />
-        <KPICard label="Outstanding" value={`GHS ${pendingInvoices.toLocaleString()}`} sub="Pending payment" color={pendingInvoices > 0 ? T.red : T.textMuted} icon="⏳" />
+      <SectionHeader title="💼 Finance Overview" subtitle={`Year to date ${thisYear} — Inflows, Expenses & Profit`} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 20 }}>
+        <KPICard label="Total Inflows (YTD)" value={`GHS ${totalInflows.toLocaleString()}`} sub={`${clientInvoices.length} client invoices`} color="#10B981" icon="📥" />
+        <KPICard label="Total Expenses (YTD)" value={`GHS ${totalExpenses.toLocaleString()}`} sub={`Vendor costs + operations`} color={T.red} icon="📤" />
+        <KPICard label="Gross Profit (YTD)" value={`GHS ${grossProfit.toLocaleString()}`} sub={profitMargin >= 0 ? `${profitMargin}% margin` : `Loss`} color={grossProfit >= 0 ? "#10B981" : T.red} icon="💰" />
+        <KPICard label="Agreed Budgets" value={`GHS ${totalBudgets.toLocaleString()}`} sub={`${clientBudgets.length} client events`} color={T.cyan} icon="📊" />
+      </div>
+
+      {/* Finance breakdown bar */}
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 20 }}>
+        <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Inflows vs Expenses Comparison</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {[
+            { label: "Total Inflows", value: totalInflows, color: "#10B981", max: Math.max(totalInflows, totalExpenses, 1) },
+            { label: "Total Expenses", value: totalExpenses, color: T.red, max: Math.max(totalInflows, totalExpenses, 1) },
+            { label: "Gross Profit", value: Math.abs(grossProfit), color: grossProfit >= 0 ? T.teal : T.amber, max: Math.max(totalInflows, totalExpenses, 1) },
+          ].map(item => (
+            <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <div style={{ width: 130, color: T.textMuted, fontSize: 12, fontWeight: 600, textAlign: "right", flexShrink: 0 }}>{item.label}</div>
+              <div style={{ flex: 1, height: 28, background: T.border+"44", borderRadius: 6, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${Math.min((item.value/item.max)*100, 100)}%`, background: `linear-gradient(90deg, ${item.color}, ${item.color}99)`, borderRadius: 6, transition: "width 0.5s ease" }} />
+              </div>
+              <div style={{ width: 140, color: item.color, fontSize: 13, fontWeight: 800, flexShrink: 0 }}>GHS {item.value.toLocaleString()}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Vendor spend */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 32 }}>
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px" }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 12 }}>Vendor Procurement</div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+            <span style={{ color: T.textMuted, fontSize: 12 }}>Total PO Value</span>
+            <span style={{ color: T.amber, fontWeight: 700 }}>GHS {totalPOValue.toLocaleString()}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+            <span style={{ color: T.textMuted, fontSize: 12 }}>Vendor Invoices Paid</span>
+            <span style={{ color: "#10B981", fontWeight: 700 }}>GHS {paidInvoices.toLocaleString()}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ color: T.textMuted, fontSize: 12 }}>Outstanding to Vendors</span>
+            <span style={{ color: pendingInvoices > 0 ? T.red : T.textMuted, fontWeight: 700 }}>GHS {pendingInvoices.toLocaleString()}</span>
+          </div>
+        </div>
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px" }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 12 }}>Client Financials</div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+            <span style={{ color: T.textMuted, fontSize: 12 }}>Agreed Client Budgets</span>
+            <span style={{ color: T.cyan, fontWeight: 700 }}>GHS {totalBudgets.toLocaleString()}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+            <span style={{ color: T.textMuted, fontSize: 12 }}>Client Expenses Logged</span>
+            <span style={{ color: T.amber, fontWeight: 700 }}>GHS {clientExpTotal.toLocaleString()}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ color: T.textMuted, fontSize: 12 }}>Budget Utilisation</span>
+            <span style={{ color: totalBudgets > 0 ? (clientExpTotal/totalBudgets > 0.9 ? T.red : T.teal) : T.textMuted, fontWeight: 700 }}>{totalBudgets > 0 ? `${Math.round((clientExpTotal/totalBudgets)*100)}%` : "—"}</span>
+          </div>
+        </div>
       </div>
 
       {/* ── Section 5: Vendor Health ── */}

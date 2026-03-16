@@ -2795,6 +2795,8 @@ const EventsView = ({ user, userRole }) => {
   const [saving, setSaving] = useState(false);
   const [taskModalEvent, setTaskModalEvent] = useState(null);
   const [impactEvent, setImpactEvent] = useState(null);
+  const [assignModal, setAssignModal] = useState(null);
+  const [strategyLeads, setStrategyLeads] = useState([]);
   const [editEvent, setEditEvent] = useState(null);
   const [editForm, setEditForm] = useState({});
 
@@ -2802,14 +2804,16 @@ const EventsView = ({ user, userRole }) => {
   const canSeeTasks = ['CEO','Head of Operations','Strategy & Events Lead','Vendor Manager'].includes(user?.role);
 
   const load = async () => {
-    const [p, c, t] = await Promise.all([
+    const [p, c, t, sl] = await Promise.all([
       supabase.from('projects').select('*').order('created_at', { ascending: false }),
       supabase.from('clients').select('*').order('name'),
       supabase.from('tasks').select('*').order('created_at', { ascending: false }),
+      supabase.from('profiles').select('id, name, email, avatar').eq('role', 'Strategy & Events Lead'),
     ]);
     setEvents(p.data || []);
     setClients(c.data || []);
     setTasks(t.data || []);
+    setStrategyLeads(sl.data || []);
   };
 
   useEffect(() => { load(); }, []);
@@ -2896,7 +2900,7 @@ const EventsView = ({ user, userRole }) => {
         </Card>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
-          {events.map((p, idx) => (
+          {(userRole === "Strategy & Events Lead" ? events.filter(e => e.assigned_to === user?.id) : events).map((p, idx) => (
             <div key={p.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", transition: "box-shadow 0.2s, border-color 0.2s", animationDelay: idx * 0.04 + "s" }}>
               {/* Card header — always visible */}
               <div style={{ padding: "20px 22px" }}
@@ -2906,7 +2910,8 @@ const EventsView = ({ user, userRole }) => {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, letterSpacing: "-0.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
-                    <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>{p.client}</div>
+                    <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{p.client}</div>
+                    {p.assigned_to_name && <div style={{ color: T.amber, fontSize: 10, fontWeight: 700, marginTop: 2 }}>👤 {p.assigned_to_name}</div>}
                   </div>
                   <Badge status={p.status} />
                 </div>
@@ -7945,17 +7950,20 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
           </div>
 
           {/* Centre — tagline */}
-          <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", pointerEvents: "none", textAlign: "center" }}>
+          <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", pointerEvents: "none", textAlign: "center", maxWidth: "calc(100% - 480px)" }}>
             <span style={{
               fontFamily: "'Cormorant Garamond', Georgia, serif",
               fontStyle: "italic",
               fontWeight: 500,
-              fontSize: 13,
+              fontSize: 12,
               letterSpacing: "0.06em",
               background: `linear-gradient(90deg, ${T.textMuted}, ${T.textPrimary}, ${T.textMuted})`,
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              display: "block",
             }}>We don't plan events. We engineer impact.</span>
           </div>
 

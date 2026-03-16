@@ -16,6 +16,22 @@ const sendEmail = async (to, subject, html) => {
 
 const BASE_URL = "https://stretchfield-workroom.vercel.app";
 
+// ── Auto-generate password from email ──
+const generatePassword = (email) => {
+  if (!email || !email.includes("@")) return "Stretch@2026";
+  const local = email.split("@")[0]; // part before @
+  const domain = email.split("@")[1].split(".")[0]; // domain without extension
+  // Take first 4 chars of local, capitalize first
+  const part1 = (local.slice(0, 4).charAt(0).toUpperCase() + local.slice(1, 4)).replace(/[^a-zA-Z0-9]/g, "");
+  // Take first 3 chars of domain
+  const part2 = domain.slice(0, 3);
+  // Add special char and number derived from email length
+  const num = (email.length % 9) + 1;
+  const specials = ["@", "#", "!", "$", "%"];
+  const special = specials[email.length % specials.length];
+  return `${part1}${special}${part2}${num}Sf`;
+};
+
 const emailHeader = (title) => `<div style="background:#060B14;padding:28px 32px;border-radius:8px 8px 0 0;"><div style="color:#00C8FF;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;margin-bottom:4px;">STRETCHFIELD</div><div style="color:#E8F0FF;font-size:20px;font-weight:800;">${title}</div></div>`;
 const emailFooter = () => `<div style="background:#060B14;padding:20px 32px;border-radius:0 0 8px 8px;text-align:center;"><div style="color:#3D5478;font-size:11px;font-style:italic;margin-bottom:6px;">We don't plan events. We engineer impact.</div><div style="color:#1A2E4A;font-size:10px;">© ${new Date().getFullYear()} Stretchfield · www.stretchfield.com</div></div>`;
 const emailBtn = (text, url) => `<a href="${url}" style="display:inline-block;background:linear-gradient(135deg,#00C8FF,#00E5C8);color:#060B14;padding:12px 28px;border-radius:8px;font-weight:800;font-size:13px;text-decoration:none;margin:16px 0;">${text}</a>`;
@@ -4595,8 +4611,16 @@ const UsersView = ({ user }) => {
       {modal && (
         <Modal title="Add New User" onClose={() => { setModal(false); setError(''); }}>
           <Input label="Full Name" placeholder="e.g. Ama Mensah" value={form.name} onChange={v => setForm({ ...form, name: v })} />
-          <Input label="Email" type="email" placeholder="user@stretchfield.com" value={form.email} onChange={v => setForm({ ...form, email: v })} />
-          <Input label="Password" type="password" placeholder="Temporary password" value={form.password} onChange={v => setForm({ ...form, password: v })} />
+          <Input label="Email" type="email" placeholder="user@stretchfield.com" value={form.email} onChange={v => setForm({ ...form, email: v, password: generatePassword(v) })} />
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Password</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input type="text" value={form.password} onChange={e => setForm({...form, password: e.target.value})} placeholder="Auto-generated from email" style={{ flex: 1, padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+              <button type="button" onClick={() => setForm({...form, password: generatePassword(form.email)})} style={{ background: T.cyan+"15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "9px 14px", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>⚡ Generate</button>
+            </div>
+            {form.email && !form.password && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 5 }}>Click Generate to auto-create from email</div>}
+            {form.password && <div style={{ color: T.teal, fontSize: 11, marginTop: 5 }}>✓ Password set — will be emailed to user on creation</div>}
+          </div>
           <Select label="Role" options={[
             { value: 'Head of Operations', label: 'Head of Operations' },
             { value: 'Vendor Manager', label: 'Vendor Manager' },
@@ -5468,7 +5492,14 @@ const CRMView = ({ user }) => {
                       <label htmlFor="createLogin2" style={{ color: T.textSecondary, fontSize: 13, cursor: "pointer" }}>Create client portal login</label>
                     </div>
                     {createLogin && (
-                      <Input label="Portal Password" type="password" placeholder="Set a password for the client portal" value={loginPassword} onChange={v => setLoginPassword(v)} />
+                      <div style={{ marginBottom: 14 }}>
+                        <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Portal Password</label>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <input type="text" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="Auto-generated from email" style={{ flex: 1, padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                          <button type="button" onClick={() => setLoginPassword(generatePassword(loginModal?.email || loginModal?.contact_email || ""))} style={{ background: T.cyan+"15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "9px 14px", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>⚡ Generate</button>
+                        </div>
+                        {loginPassword && <div style={{ color: T.teal, fontSize: 11, marginTop: 5 }}>✓ Password will be emailed on login creation</div>}
+                      </div>
                     )}
                   </div>
                 )}

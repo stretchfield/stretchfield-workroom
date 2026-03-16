@@ -1098,9 +1098,7 @@ const VendorManagerDashboard = ({ user }) => {
   const [notifs, setNotifs] = useState([]);
   const [rffs, setRffs] = useState([]);
   const [awards, setAwards] = useState([]);
-  const [editVendor, setEditVendor] = useState(null);
-  const [editForm, setEditForm] = useState({});
-  const [saving, setSaving] = useState(false);
+
 
   const VENDOR_TYPES = ["Audio Visual","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Photography & Videography","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
 
@@ -1124,29 +1122,7 @@ const VendorManagerDashboard = ({ user }) => {
 
   useEffect(() => { loadVM(); }, [user.id]);
 
-  const openEditVendor = (v) => {
-    setEditVendor(v);
-    setEditForm({
-      name: v.name || "",
-      email: v.email || "",
-      phone: v.phone || "",
-      company_name: v.company_name || "",
-      service_category: v.service_category || "",
-    });
-  };
 
-  const saveEditVendor = async () => {
-    setSaving(true);
-    await supabase.from("profiles").update({
-      name: editForm.name,
-      phone: editForm.phone,
-      company_name: editForm.company_name,
-      service_category: editForm.service_category,
-    }).eq("id", editVendor.id);
-    setSaving(false);
-    setEditVendor(null);
-    loadVM();
-  };
 
   const now = new Date();
   const greeting = now.getHours() < 12 ? "Good Morning" : now.getHours() < 17 ? "Good Afternoon" : "Good Evening";
@@ -1270,24 +1246,22 @@ const VendorManagerDashboard = ({ user }) => {
                   const tierColor = getTierColor(v.vendor_score, v.vendor_scorecard_count);
                   const isPoor = v.vendor_scorecard_count > 0 && (v.vendor_score||0) < 50;
                   return (
-                    <div key={v.id} onClick={() => openEditVendor(v)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: isPoor ? T.red+"08" : T.bg, border: `1px solid ${isPoor ? T.red+"30" : T.border}`, borderRadius: 8, cursor: "pointer", transition: "border-color 0.15s" }}
-                      onMouseEnter={e => e.currentTarget.style.borderColor = T.cyan+"60"}
-                      onMouseLeave={e => e.currentTarget.style.borderColor = isPoor ? T.red+"30" : T.border}>
+                    <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: isPoor ? T.red+"08" : T.bg, border: `1px solid ${isPoor ? T.red+"30" : T.border}`, borderRadius: 8 }}>
                       <div style={{ width: 30, height: 30, borderRadius: "50%", background: tierColor+"20", border: `1px solid ${tierColor}40`, display: "flex", alignItems: "center", justifyContent: "center", color: tierColor, fontWeight: 800, fontSize: 11, flexShrink: 0 }}>
                         {(v.name||"?").slice(0,2).toUpperCase()}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.name}</div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 1 }}>
+                        <div style={{ color: T.textMuted, fontSize: 10, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.company_name || v.email || ""}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
                           {v.vendor_scorecard_count > 0 ? (
-                            <span style={{ color: tierColor, fontSize: 10, fontWeight: 700 }}>{v.vendor_score}%</span>
+                            <span style={{ color: tierColor, fontSize: 10, fontWeight: 700 }}>{v.vendor_score}% · {getTier(v.vendor_score).label}</span>
                           ) : (
                             <span style={{ color: T.textMuted, fontSize: 10 }}>Unrated</span>
                           )}
                           {isPoor && <span style={{ color: T.red, fontSize: 9, fontWeight: 700 }}>⛔ Blocked</span>}
                         </div>
                       </div>
-                      <div style={{ color: T.textMuted, fontSize: 10 }}>✎</div>
                     </div>
                   );
                 })}
@@ -1321,44 +1295,7 @@ const VendorManagerDashboard = ({ user }) => {
           )}
         </div>
       </div>
-      {/* Vendor Edit Modal */}
-      {editVendor && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setEditVendor(null)}>
-          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 520, padding: 28 }} onClick={e => e.stopPropagation()}>
-            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Edit Vendor</div>
-            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>{editVendor.email}</div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-              <div>
-                <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Vendor Name</label>
-                <input value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
-              </div>
-              <div>
-                <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Company Name</label>
-                <input value={editForm.company_name} onChange={e => setEditForm({...editForm, company_name: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
-              </div>
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Phone</label>
-              <input value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} placeholder="+233 XX XXX XXXX" />
-            </div>
-
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Service Category</label>
-              <select value={editForm.service_category} onChange={e => setEditForm({...editForm, service_category: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
-                <option value="">Select category...</option>
-                {VENDOR_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={saveEditVendor} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Save Changes"}</button>
-              <button onClick={() => setEditVendor(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

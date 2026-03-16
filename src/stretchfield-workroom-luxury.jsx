@@ -3377,6 +3377,7 @@ const EventsView = ({ user, userRole }) => {
               <option value="Product Launch">Product Launch</option>
               <option value="Awards Ceremony">Awards Ceremony</option>
               <option value="Corporate Party">Corporate Party</option>
+              <option value="Other">Other</option>
             </select>
           </div>
           {clients.length > 0 ? (
@@ -3426,6 +3427,7 @@ const EventsView = ({ user, userRole }) => {
               <option value="Product Launch">Product Launch</option>
               <option value="Awards Ceremony">Awards Ceremony</option>
               <option value="Corporate Party">Corporate Party</option>
+              <option value="Other">Other</option>
             </select>
           </div>
           {clients.length > 0 ? (

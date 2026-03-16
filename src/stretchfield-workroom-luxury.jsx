@@ -4662,9 +4662,6 @@ const ClientsView = ({ user }) => {
         <Btn onClick={() => setModal(true)}>+ Add Client</Btn>
       </div>
 
-      {/* Debug */}
-      <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 8 }}>Debug: {clients.length} clients loaded, loading={loading.toString()}</div>
-
       {loading ? (
         <div style={{ color: T.textMuted, textAlign: "center", padding: 60 }}>Loading...</div>
       ) : clients.length === 0 ? (
@@ -4724,116 +4721,10 @@ const ClientsView = ({ user }) => {
         </Modal>
       )}
 
-      {/* Preview Modal */}
-      {previewApp && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 700, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setPreviewApp(null)}>
-          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 680, maxHeight: "90vh", overflow: "auto", padding: 28 }} onClick={e => e.stopPropagation()}>
-            
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
-              <div>
-                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>Vendor Application</div>
-                <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 20 }}>{previewApp.vendor_name}</div>
-                <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{previewApp.vendor_type} · Submitted {new Date(previewApp.created_at).toLocaleDateString("en-GB")}</div>
-              </div>
-              <button onClick={() => setPreviewApp(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 18 }}>×</button>
-            </div>
-
-            {/* Vendor Details */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
-              {[
-                ["Contact Person", previewApp.contact_person],
-                ["Email", previewApp.contact_email],
-                ["Phone", previewApp.phone],
-                ["Country", previewApp.country],
-                ["Address", previewApp.address],
-                ["Vendor Type", previewApp.vendor_type],
-              ].map(([label, val]) => val ? (
-                <div key={label}>
-                  <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>{label}</div>
-                  <div style={{ color: T.textPrimary, fontSize: 13 }}>{val}</div>
-                </div>
-              ) : null)}
-            </div>
-
-            {/* Bank Details */}
-            {previewApp.bank_name && (
-              <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
-                <div style={{ color: T.cyan, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Bank Details</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                  {[
-                    ["Bank Name", previewApp.bank_name],
-                    ["Account Name", previewApp.bank_account_name],
-                    ["Account No", previewApp.account_no],
-                    ["Swift Code", previewApp.swift_code],
-                    ["Bank Address", previewApp.bank_address],
-                    ["Payment Terms", previewApp.payment_terms],
-                  ].map(([label, val]) => val ? (
-                    <div key={label}>
-                      <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 2 }}>{label}</div>
-                      <div style={{ color: T.textPrimary, fontSize: 12 }}>{val}</div>
-                    </div>
-                  ) : null)}
-                </div>
-              </div>
-            )}
-
-            {/* Documents */}
-            {(previewApp.business_reg_url || previewApp.vat_cert_url) && (
-              <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-                {previewApp.business_reg_url && <a href={previewApp.business_reg_url} target="_blank" rel="noopener noreferrer" style={{ background: T.cyan + "15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>📄 Business Reg Certificate</a>}
-                {previewApp.vat_cert_url && <a href={previewApp.vat_cert_url} target="_blank" rel="noopener noreferrer" style={{ background: T.cyan + "15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>📄 VAT Certificate</a>}
-              </div>
-            )}
-
-            {/* CEO Notes */}
-            {user?.role === "CEO" && (
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 6 }}>CEO Notes / Reason for Decline</label>
-                <textarea value={ceoNotes} onChange={e => setCeoNotes(e.target.value)} rows={3} placeholder="Add notes for the Vendor Manager..." style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", resize: "vertical" }} />
-              </div>
-            )}
-
-            {/* Show CEO notes to Vendor Manager */}
-            {user?.role !== "CEO" && previewApp.ceo_notes && (
-              <div style={{ background: T.red + "10", border: `1px solid ${T.red}30`, borderRadius: 8, padding: "12px 14px", marginBottom: 16 }}>
-                <div style={{ color: T.red, fontSize: 11, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>CEO Feedback</div>
-                <div style={{ color: T.textSecondary, fontSize: 13 }}>{previewApp.ceo_notes}</div>
-              </div>
-            )}
-
-            {/* Actions */}
-            {user?.role === "CEO" && previewApp.status === "pending" && (
-              <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={() => handleApprove(previewApp)} style={{ background: `linear-gradient(135deg, ${T.teal}, #10B981)`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>✓ Approve</button>
-                <button onClick={() => handleDecline(previewApp, ceoNotes)} style={{ background: T.red + "18", border: `1px solid ${T.red}40`, color: T.red, padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>✗ Decline</button>
-                <button onClick={() => setPreviewApp(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
-              </div>
-            )}
-            {(user?.role !== "CEO" || previewApp.status !== "pending") && (
-              <button onClick={() => setPreviewApp(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Close</button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Create Login Modal */}
-      {loginModal && (
-        <Modal title={`Create Login for ${loginModal.name}`} onClose={() => { setLoginModal(null); setError(''); setSuccess(''); }}>
-          <div style={{ color: T.textSecondary, fontSize: 13, marginBottom: 16 }}>
-            This will create a portal login for <strong style={{ color: T.textPrimary }}>{loginModal.name}</strong> using <strong style={{ color: T.cyan }}>{loginModal.email}</strong>.
-          </div>
-          <Input label="Temporary Password" type="password" placeholder="Set a temporary password" value={loginForm.password} onChange={v => setLoginForm({ password: v })} />
-          {error && <div style={{ color: '#F43F5E', fontSize: 12, marginTop: 4 }}>{error}</div>}
-          {success && <div style={{ color: T.teal, fontSize: 12, marginTop: 4 }}>{success}</div>}
-          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <Btn onClick={handleCreateLogin} disabled={saving || !!success}>{saving ? 'Creating...' : '🔑 Create Login'}</Btn>
-            <Btn variant="ghost" onClick={() => { setLoginModal(null); setError(''); setSuccess(''); }}>Close</Btn>
-          </div>
-        </Modal>
-      )}
     </div>
   );
 };
+
 
 
 const VendorQuotesView = ({ user }) => {

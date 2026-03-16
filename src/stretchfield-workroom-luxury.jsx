@@ -5299,6 +5299,8 @@ const CRMView = ({ user }) => {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, marginLeft: 8 }}>
                   <span style={{ background: (statusColors[lead.status] || T.cyan) + "20", color: statusColors[lead.status] || T.cyan, padding: "3px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>{lead.status}</span>
+                  {lead.status === "won" && !lead.approved && <span style={{ background: T.amber+"20", color: T.amber, fontSize: 9, fontWeight: 800, borderRadius: 20, padding: "1px 7px", marginLeft: 2 }}>Pending CEO</span>}
+                  {lead.status === "won" && lead.approved && <span style={{ background: "#10B98120", color: "#10B981", fontSize: 9, fontWeight: 800, borderRadius: 20, padding: "1px 7px", marginLeft: 2 }}>✓ Approved</span>}
                   {user?.role === "CEO" && (
                     <button onClick={async (e) => { e.stopPropagation(); if (!window.confirm(`Delete lead "${lead.company}"? This cannot be undone.`)) return; await supabase.from("opportunities").update({ converted_lead_id: null }).eq("converted_lead_id", lead.id); const { error } = await supabase.from("leads").delete().eq("id", lead.id); if (error) { alert("Delete failed: " + error.message); return; } if (selectedLead?.id === lead.id) setSelectedLead(null); load(); }}
                       style={{ background: T.red + "18", border: `1px solid ${T.red}40`, color: T.red, width: 24, height: 24, borderRadius: 6, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, flexShrink: 0 }}
@@ -5308,6 +5310,9 @@ const CRMView = ({ user }) => {
                 </div>
               </div>
               <div style={{ color: T.gold, fontWeight: 900, fontSize: 16, marginBottom: 10 }}>GHS {(lead.value || 0).toLocaleString()}</div>
+              {user?.role === "CEO" && lead.status === "won" && !lead.approved && (
+                <button onClick={e => { e.stopPropagation(); setApprovalModal(lead); }} style={{ width: "100%", padding: "8px", background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: "none", borderRadius: 8, cursor: "pointer", color: "#fff", fontSize: 12, fontWeight: 800, marginBottom: 10 }}>✓ Approve Lead — Create Client & Portal</button>
+              )}
               <div style={{ display: "flex", gap: 12, paddingTop: 8, borderTop: `1px solid ${T.border}44` }}>
                 <span style={{ color: T.textMuted, fontSize: 10 }}>{activities.filter(a => a.lead_id === lead.id).length} activities</span>
                 <span style={{ color: T.textMuted, fontSize: 10 }}>{proposals.filter(p => p.lead_id === lead.id).length} proposals</span>
@@ -5323,13 +5328,28 @@ const CRMView = ({ user }) => {
                       <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Update Status</div>
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                         {statusOrder.map(s => (
-                          <button key={s} onClick={async () => { const updates = { status: s };
+                          <button key={s} onClick={async () => {
                             if (s === "won") {
-                              updates.closed_date = new Date().toISOString().split("T")[0];
-                              const created = new Date(lead.created_at);
-                              updates.sales_cycle_days = Math.round((new Date() - created) / (1000 * 60 * 60 * 24));
+                              // Mark as pending CEO approval — not yet won
+                              const updates = {
+                                status: "won",
+                                pending_approval: true,
+                                closed_date: new Date().toISOString().split("T")[0],
+                                sales_cycle_days: Math.round((new Date() - new Date(lead.created_at)) / (1000*60*60*24)),
+                              };
+                              await supabase.from("leads").update(updates).eq("id", lead.id);
+                              // Notify CEO
+                              const { data: ceos } = await supabase.from("profiles").select("id, email, name").eq("role", "CEO");
+                              for (const ceo of ceos || []) {
+                                await supabase.from("notifications").insert({ user_id: ceo.id, title: "Lead Won — Action Required", message: `${lead.company} has been marked as Won. Please review and approve to create client and event.`, type: "crm" });
+                                if (ceo.email) await sendEmail(ceo.email, `Lead Won — ${lead.company}`, notifEmailHtml({ name: ceo.name, title: "Lead Won — Your Approval Required", message: `<strong>${lead.company}</strong> has been marked as Won by the Sales team.<br><br>Please log in to review, approve, create the client profile and set up their portal login.`, actionUrl: BASE_URL, actionLabel: "Review & Approve Lead" }));
+                              }
+                              load();
+                            } else {
+                              await supabase.from("leads").update({ status: s }).eq("id", lead.id);
+                              load();
                             }
-                            await supabase.from("leads").update(updates).eq("id", lead.id); load(); }} style={{
+                          }} style={{
                             padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600,
                             border: "1px solid " + (lead.status === s ? statusColors[s] : T.border),
                             background: lead.status === s ? statusColors[s] + "20" : "none",
@@ -5488,17 +5508,20 @@ const CRMView = ({ user }) => {
                 {(!matchedClient || !matchedClient.profile_id) && (
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: T.bg, borderRadius: 8, border: "1px solid " + T.border, marginBottom: 12 }}>
-                      <input type="checkbox" id="createLogin2" checked={createLogin} onChange={e => setCreateLogin(e.target.checked)} style={{ accentColor: T.cyan, width: 16, height: 16 }} />
-                      <label htmlFor="createLogin2" style={{ color: T.textSecondary, fontSize: 13, cursor: "pointer" }}>Create client portal login</label>
+                      <input type="checkbox" id="createLogin2" checked={createLogin} onChange={e => {
+                        setCreateLogin(e.target.checked);
+                        if (e.target.checked) setLoginPassword(generatePassword(matchedClient?.email || clientForm.email || ""));
+                      }} style={{ accentColor: T.cyan, width: 16, height: 16 }} />
+                      <label htmlFor="createLogin2" style={{ color: T.textSecondary, fontSize: 13, cursor: "pointer" }}>Create client portal login <span style={{ color: T.cyan, fontWeight: 700 }}>(recommended)</span></label>
                     </div>
                     {createLogin && (
                       <div style={{ marginBottom: 14 }}>
                         <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Portal Password</label>
                         <div style={{ display: "flex", gap: 8 }}>
-                          <input type="text" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="Auto-generated from email" style={{ flex: 1, padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
-                          <button type="button" onClick={() => setLoginPassword(generatePassword(loginModal?.email || loginModal?.contact_email || ""))} style={{ background: T.cyan+"15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "9px 14px", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>⚡ Generate</button>
+                          <input type="text" value={loginPassword || generatePassword(matchedClient?.email || clientForm.email || "")} onChange={e => setLoginPassword(e.target.value)} placeholder="Auto-generated from email" style={{ flex: 1, padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                          <button type="button" onClick={() => setLoginPassword(generatePassword(matchedClient?.email || clientForm.email || ""))} style={{ background: T.cyan+"15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "9px 14px", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>⚡ Generate</button>
                         </div>
-                        {loginPassword && <div style={{ color: T.teal, fontSize: 11, marginTop: 5 }}>✓ Password will be emailed on login creation</div>}
+                        <div style={{ color: T.teal, fontSize: 11, marginTop: 5 }}>✓ Password auto-generated from email — will be sent to client on approval</div>
                       </div>
                     )}
                   </div>

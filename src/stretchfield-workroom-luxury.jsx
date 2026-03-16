@@ -1534,7 +1534,7 @@ const VendorDashboard = ({ user }) => {
             <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < Math.min(rffs.length, 4) - 1 ? `1px solid ${T.border}44` : "none" }}>
               <div>
                 <div style={{ color: T.textPrimary, fontSize: 12, fontWeight: 600 }}>{r.title}</div>
-                <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{r.client_name} · {r.deadline}</div>
+                <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{r.event_name} · {r.deadline}</div>
               </div>
               <Badge status={r.status} />
             </div>
@@ -4372,7 +4372,7 @@ const VendorsView = ({ user }) => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                       <div>
                         <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{r.title}</div>
-                        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>🏢 {r.client_name} · Due {r.deadline}</div>
+                        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>📅 Due {r.deadline}</div>
                         {/* Status indicators for Vendor Manager */}
                         {isVendorManager && r.status === 'pending' && r.submitted_for_approval && (
                           <div style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", background: T.amber + "15", border: "1px solid " + T.amber + "33", borderRadius: 20 }}>
@@ -11380,7 +11380,7 @@ const QuotesReceivedView = ({ user }) => {
                   onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                   <div>
                     <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{rff.title}</div>
-                    <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{event?.name || rff.event_name} · {rff.client_name}</div>
+                    <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{event?.name || rff.event_name}</div>
                     <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Deadline: {rff.deadline ? new Date(rff.deadline).toLocaleDateString("en-GB") : "—"}</div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -11890,7 +11890,7 @@ const RFFApprovalsView = ({ user }) => {
                 {declined.map(r => (
                   <Card key={r.id} style={{ borderLeft: "3px solid #F43F5E", marginBottom: 0 }}>
                     <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15, marginBottom: 4 }}>{r.title}</div>
-                    <div style={{ color: T.cyan, fontSize: 12, fontWeight: 600 }}>📁 {r.event_name} · 🏢 {r.client_name}</div>
+                    <div style={{ color: T.cyan, fontSize: 12, fontWeight: 600 }}>📁 {r.event_name}</div>
                     {r.declined_notes && <div style={{ marginTop: 8, padding: "8px 12px", background: "#F43F5E10", border: "1px solid #F43F5E33", borderRadius: 6 }}><div style={{ color: "#F43F5E", fontSize: 11, fontWeight: 700, marginBottom: 2 }}>Decline Notes:</div><div style={{ color: T.textSecondary, fontSize: 12 }}>{r.declined_notes}</div></div>}
                     <button onClick={() => { setActionModal({ rff: r, action: "approve" }); setNotes(""); }} style={{ marginTop: 10, width: "100%", padding: "8px", background: T.teal + "20", border: "1px solid " + T.teal + "44", borderRadius: 8, cursor: "pointer", color: T.teal, fontSize: 12, fontWeight: 700 }}>✓ Approve Now</button>
                   </Card>

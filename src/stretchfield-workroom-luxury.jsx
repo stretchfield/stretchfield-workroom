@@ -4567,20 +4567,26 @@ const ClientsView = ({ user }) => {
 
   const load = async () => {
     setLoading(true);
-    const [c, p] = await Promise.all([
-      supabase.from('profiles').select('*').eq('role', 'Client').order('created_at', { ascending: false }),
-      supabase.from('clients').select('*').order('created_at', { ascending: false }),
-    ]);
-    // Merge both sources — profiles are the source of truth for portal users
-    // clients table has additional CRM data
-    const profileClients = (c.data || []).map(p => ({
-      ...p,
-      company: p.company_name || p.company || "",
-    }));
-    // Add any clients from clients table not already in profiles
-    const clientsData = (p.data || []).filter(cl => !profileClients.find(pc => pc.email === cl.email));
-    setClients([...profileClients, ...clientsData]);
-    setProfileEmails((c.data || []).map(x => x.email));
+    try {
+      const [{ data: profileData }, { data: clientData }] = await Promise.all([
+        supabase.from('profiles').select('*').eq('role', 'Client').order('created_at', { ascending: false }),
+        supabase.from('clients').select('*').order('created_at', { ascending: false }),
+      ]);
+      const profiles = (profileData || []).map(p => ({
+        ...p,
+        company: p.company_name || p.company || "",
+        source: 'profile',
+      }));
+      const profileEmails = profiles.map(p => p.email);
+      // Add clients from clients table not in profiles
+      const extraClients = (clientData || [])
+        .filter(c => c.email && !profileEmails.includes(c.email))
+        .map(c => ({ ...c, source: 'clients' }));
+      setClients([...profiles, ...extraClients]);
+      setProfileEmails(profileEmails);
+    } catch (e) {
+      console.error('ClientsView load error:', e);
+    }
     setLoading(false);
   };
 
@@ -4625,9 +4631,21 @@ const ClientsView = ({ user }) => {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Remove this client?')) return;
-    // Try deleting from both tables
-    await supabase.from('clients').delete().eq('id', id);
-    await supabase.from('profiles').delete().eq('id', id);
+    // Check if from profiles or clients table
+    const client = clients.find(c => c.id === id);
+    if (client?.source === 'profile') {
+      // Use edge function to delete auth user
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        await fetch('https://okbduzenceoknkjqnrha.supabase.co/functions/v1/delete-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ userId: id }),
+        });
+      } catch (e) { console.error(e); }
+    } else {
+      await supabase.from('clients').delete().eq('id', id);
+    }
     load();
   };
 

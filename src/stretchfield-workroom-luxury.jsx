@@ -2953,6 +2953,18 @@ const EventsView = ({ user, userRole }) => {
                   )}
                 </div>
 
+                {/* Assign Lead + Impact buttons — CEO only */}
+                {user?.role === "CEO" && (
+                  <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+                    <button onClick={e => { e.stopPropagation(); setAssignModal(p); }} style={{ flex: 1, padding: "6px 10px", background: T.amber+"15", border: `1px solid ${T.amber}30`, borderRadius: 6, cursor: "pointer", color: T.amber, fontSize: 11, fontWeight: 700 }}>
+                      👤 {p.assigned_to_name ? p.assigned_to_name.split(" ")[0] : "Assign Lead"}
+                    </button>
+                    {p.event_category && (
+                      <button onClick={e => { e.stopPropagation(); setImpactEvent(impactEvent?.id === p.id ? null : p); }} style={{ flex: 1, padding: "6px 10px", background: (EVENT_ARCHETYPES[p.event_category]?.color||T.teal)+"15", border: `1px solid ${(EVENT_ARCHETYPES[p.event_category]?.color||T.teal)}30`, borderRadius: 6, cursor: "pointer", color: EVENT_ARCHETYPES[p.event_category]?.color||T.teal, fontSize: 11, fontWeight: 700 }}>🎯 Impact</button>
+                    )}
+                  </div>
+                )}
+
                 {/* View Tasks button — privileged roles only */}
                 {canSeeTasks && (() => {
                   const eventTaskCount = tasks.filter(t => t.project_id === p.id).length;
@@ -2977,6 +2989,51 @@ const EventsView = ({ user, userRole }) => {
           ))}
         </div>
       )}
+      {/* ── Assign Strategy Lead Modal ── */}
+      {assignModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setAssignModal(null)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.amber}30`, borderRadius: 16, width: "100%", maxWidth: 480, padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Assign Strategy Lead</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>Event: <strong style={{ color: T.textPrimary }}>{assignModal.name}</strong></div>
+            {assignModal.assigned_to_name && (
+              <div style={{ background: T.amber+"12", border: `1px solid ${T.amber}30`, borderRadius: 8, padding: "10px 14px", marginBottom: 16, color: T.amber, fontSize: 12 }}>
+                Currently assigned to: <strong>{assignModal.assigned_to_name}</strong>
+              </div>
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+              {strategyLeads.map(sl => (
+                <div key={sl.id} onClick={async () => {
+                  await supabase.from("projects").update({ assigned_to: sl.id, assigned_to_name: sl.name }).eq("id", assignModal.id);
+                  await supabase.from("notifications").insert({ user_id: sl.id, title: "Event Assigned to You", message: `CEO assigned you to lead "${assignModal.name}". Check your Events tab.`, type: "task" });
+                  if (sl.email) await sendEmail(sl.email, `Event Assigned — ${assignModal.name}`, notifEmailHtml({ name: sl.name, title: "Event Assigned to You", message: `CEO has assigned you as Strategy Lead for <strong>${assignModal.name}</strong>. Please log in to view the event details.`, actionUrl: "https://stretchfield-workroom.vercel.app", actionLabel: "View Event" }));
+                  setAssignModal(null);
+                  load();
+                }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: assignModal.assigned_to === sl.id ? T.amber+"15" : T.bg, border: `1px solid ${assignModal.assigned_to === sl.id ? T.amber : T.border}`, borderRadius: 10, cursor: "pointer" }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = T.amber}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = assignModal.assigned_to === sl.id ? T.amber : T.border}>
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: T.amber+"20", border: `1px solid ${T.amber}40`, display: "flex", alignItems: "center", justifyContent: "center", color: T.amber, fontWeight: 800, fontSize: 13 }}>{(sl.name||"?").slice(0,2).toUpperCase()}</div>
+                  <div>
+                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{sl.name}</div>
+                    <div style={{ color: T.textMuted, fontSize: 11 }}>{sl.email}</div>
+                  </div>
+                  {assignModal.assigned_to === sl.id && <div style={{ marginLeft: "auto", color: T.amber, fontWeight: 800 }}>✓</div>}
+                </div>
+              ))}
+              {strategyLeads.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: 20 }}>No Strategy & Events Lead users found.</div>}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {assignModal.assigned_to && (
+                <button onClick={async () => {
+                  await supabase.from("projects").update({ assigned_to: null, assigned_to_name: null }).eq("id", assignModal.id);
+                  setAssignModal(null); load();
+                }} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>Remove Assignment</button>
+              )}
+              <button onClick={() => setAssignModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Event Tasks Modal ── */}
       {taskModalEvent && canSeeTasks && (() => {
         const eventTasks = tasks.filter(t => t.project_id === taskModalEvent.id);

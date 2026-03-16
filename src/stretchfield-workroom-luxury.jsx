@@ -4541,6 +4541,7 @@ const UsersView = ({ user }) => {
             { value: 'Strategy & Events Lead', label: 'Strategy & Events Lead' },
             { value: 'Sales & Marketing', label: 'Sales & Marketing' },
             { value: 'Finance Manager', label: 'Finance Manager' },
+            { value: 'Board of Directors', label: 'Board of Directors' },
             { value: 'Vendor', label: 'Vendor' },
             { value: 'Client', label: 'Client' },
           ]} value={form.role} onChange={v => setForm({ ...form, role: v })} />

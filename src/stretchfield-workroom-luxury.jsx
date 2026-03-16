@@ -12091,7 +12091,7 @@ const VendorApprovalsPanel = ({ user, onLoginCreated }) => {
                   </>
                 )}
                 {app.status === "approved" && (
-                  <button onClick={() => { setLoginModal(app); setPassword(""); }} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "6px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>🔑 Create Login</button>
+                  <button onClick={() => { setLoginModal(app); setPassword(generatePassword(app.contact_email || "")); }} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "6px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>🔑 Create Login</button>
                 )}
                 {app.status === "login-created" && <span style={{ color: "#10B981", fontSize: 12, fontWeight: 700 }}>✓ Portal access granted</span>}
               </div>
@@ -12159,7 +12159,7 @@ const VendorApprovalsPanel = ({ user, onLoginCreated }) => {
             )}
             {user?.role === "CEO" && previewApp.status === "approved" && (
               <div style={{ display: "flex", gap: 10, marginTop: 20, paddingTop: 16, borderTop: `1px solid ${T.border}` }}>
-                <button onClick={() => { setLoginModal(previewApp); setPassword(""); setPreviewApp(null); }} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>🔑 Create Login</button>
+                <button onClick={() => { setLoginModal(previewApp); setPassword(generatePassword(previewApp.contact_email || "")); setPreviewApp(null); }} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>🔑 Create Login</button>
                 <button onClick={() => setPreviewApp(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Close</button>
               </div>
             )}
@@ -12189,8 +12189,13 @@ const VendorApprovalsPanel = ({ user, onLoginCreated }) => {
           <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, padding: 28, width: 400 }} onClick={e => e.stopPropagation()}>
             <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Create Vendor Login</div>
             <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>{loginModal.vendor_name} · {loginModal.contact_email}</div>
-            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Set Password</label>
-            <input type="text" value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 8 characters" style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 20 }} />
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Password</label>
+            <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+              <input type="text" value={password} onChange={e => setPassword(e.target.value)} placeholder="Auto-generated from email" style={{ flex: 1, padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+              <button onClick={() => setPassword(generatePassword(loginModal.contact_email || ""))} style={{ background: T.cyan+"15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "9px 14px", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>⚡ Generate</button>
+            </div>
+            {password && <div style={{ color: T.teal, fontSize: 11, marginBottom: 16 }}>✓ Password will be emailed to vendor on login creation</div>}
+            {!password && <div style={{ color: T.amber, fontSize: 11, marginBottom: 16 }}>Click Generate to auto-create from vendor email</div>}
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={handleCreateLogin} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Creating..." : "Create Login"}</button>
               <button onClick={() => setLoginModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>

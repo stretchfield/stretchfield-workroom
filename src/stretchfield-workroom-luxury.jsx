@@ -12565,8 +12565,12 @@ const VendorOnboardingView = ({ user }) => {
   const [editApp, setEditApp] = useState(null);
 
   const load = async () => {
-    const { data } = await supabase.from("vendor_applications").select("*").order("created_at", { ascending: false });
-    setApps(data || []);
+    const [{ data: appData }, { data: vpData }] = await Promise.all([
+      supabase.from("vendor_applications").select("*").order("created_at", { ascending: false }),
+      supabase.from("profiles").select("*").eq("role", "Vendor").order("name"),
+    ]);
+    setApps(appData || []);
+    setVendorProfiles(vpData || []);
   };
 
   useEffect(() => { load(); }, []);

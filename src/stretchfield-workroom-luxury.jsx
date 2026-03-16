@@ -7807,7 +7807,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
         if (role === "Head of Operations") return <StaffDashboard user={currentUser} />;
         if (role === "Vendor") return <VendorDashboard user={currentUser} />;
         if (role === "Client") return <ClientDashboard user={currentUser} />;
-        if (role === "Finance Manager") return <FinanceDashboard user={currentUser} onTab={setActiveTab} />;
+        if (role === "Finance Manager") return <FinanceManagerDashboard user={currentUser} onTab={setActiveTab} />;
         if (role === "Sales & Marketing") return <CRMDashboardSM user={currentUser} />;
         if (role === "Strategy & Events Lead") return <StaffDashboard user={currentUser} />;
         if (role === "Vendor Manager") return <StaffDashboard user={currentUser} />;
@@ -8417,6 +8417,205 @@ const CRMDashboardSM = ({ user }) => {
 };
 
 // ─── FINANCE DASHBOARD ────────────────────────────────────────────────────────
+
+const FinanceManagerDashboard = ({ user, onTab }) => {
+  const [vouchers, setVouchers] = useState([]);
+  const [estimates, setEstimates] = useState([]);
+  const [pettyCash, setPettyCash] = useState(null);
+  const [dailyBalances, setDailyBalances] = useState([]);
+  const [clientInvoices, setClientInvoices] = useState([]);
+  const [vendorInvoices, setVendorInvoices] = useState([]);
+  const [pos, setPOs] = useState([]);
+  const [events, setEvents] = useState([]);
+
+  const load = async () => {
+    const [v, est, pc, db, ci, vi, po, ev] = await Promise.all([
+      supabase.from('payment_vouchers').select('*').order('created_at', { ascending: false }),
+      supabase.from('estimates').select('*').order('created_at', { ascending: false }),
+      supabase.from('petty_cash').select('*').limit(1).single(),
+      supabase.from('daily_balances').select('*').order('report_date', { ascending: false }).limit(1),
+      supabase.from('client_invoices').select('*').order('created_at', { ascending: false }),
+      supabase.from('vendor_invoices').select('*').order('created_at', { ascending: false }),
+      supabase.from('purchase_orders').select('*').order('created_at', { ascending: false }),
+      supabase.from('projects').select('*').order('event_date', { ascending: true }),
+    ]);
+    setVouchers(v.data || []);
+    setEstimates(est.data || []);
+    setPettyCash(pc.data || null);
+    setDailyBalances(db.data || []);
+    setClientInvoices(ci.data || []);
+    setVendorInvoices(vi.data || []);
+    setPOs(po.data || []);
+    setEvents(ev.data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const now = new Date();
+  const pendingVouchers = vouchers.filter(v => v.status === 'pending_approval');
+  const approvedVouchers = vouchers.filter(v => v.status === 'approved');
+  const paidVouchers = vouchers.filter(v => v.status === 'paid');
+  const totalInflows = clientInvoices.reduce((s,i) => s + (i.amount||0), 0);
+  const totalPaidOut = paidVouchers.reduce((s,v) => s + (v.amount||0), 0);
+  const pendingVendorInvoices = vendorInvoices.filter(i => i.status !== 'paid');
+  const pcBalance = pettyCash?.float_balance ?? pettyCash?.total_float ?? 200;
+  const pcTotal = pettyCash?.total_float || 200;
+  const pcPct = pcTotal > 0 ? Math.round((pcBalance/pcTotal)*100) : 100;
+  const todayBalance = dailyBalances[0];
+  const upcomingEvents = events.filter(e => e.event_date && new Date(e.event_date) >= now).slice(0,3);
+  const grossProfit = totalInflows - totalPaidOut;
+
+  return (
+    <div style={{ animation: 'fadeUp 0.35s ease' }}>
+      {/* Header */}
+      <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 6 }}>Finance</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800 }}>Good {now.getHours() < 12 ? 'Morning' : now.getHours() < 17 ? 'Afternoon' : 'Evening'}, {user?.name?.split(' ')[0]}</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>
+      </div>
+
+      {/* Action alerts */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+        {approvedVouchers.length > 0 && (
+          <div onClick={() => onTab('finance')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', background: T.teal+'15', border: `1px solid ${T.teal}40`, borderRadius: 20, cursor: 'pointer' }}>
+            <div style={{ width: 7, height: 7, borderRadius: '50%', background: T.teal, boxShadow: `0 0 8px ${T.teal}` }} />
+            <span style={{ color: T.teal, fontSize: 11, fontWeight: 700 }}>{approvedVouchers.length} voucher{approvedVouchers.length>1?'s':''} approved — ready to pay →</span>
+          </div>
+        )}
+        {pendingVouchers.length > 0 && (
+          <div onClick={() => onTab('finance')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', background: T.amber+'15', border: `1px solid ${T.amber}40`, borderRadius: 20, cursor: 'pointer' }}>
+            <div style={{ width: 7, height: 7, borderRadius: '50%', background: T.amber, boxShadow: `0 0 8px ${T.amber}` }} />
+            <span style={{ color: T.amber, fontSize: 11, fontWeight: 700 }}>{pendingVouchers.length} voucher{pendingVouchers.length>1?'s':''} awaiting CEO approval →</span>
+          </div>
+        )}
+        {pendingVendorInvoices.length > 0 && (
+          <div onClick={() => onTab('vendor-invoices')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', background: T.cyan+'15', border: `1px solid ${T.cyan}40`, borderRadius: 20, cursor: 'pointer' }}>
+            <div style={{ width: 7, height: 7, borderRadius: '50%', background: T.cyan, boxShadow: `0 0 8px ${T.cyan}` }} />
+            <span style={{ color: T.cyan, fontSize: 11, fontWeight: 700 }}>{pendingVendorInvoices.length} vendor invoice{pendingVendorInvoices.length>1?'s':''} pending review →</span>
+          </div>
+        )}
+        {pcPct < 10 && (
+          <div onClick={() => onTab('finance')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', background: T.red+'15', border: `1px solid ${T.red}40`, borderRadius: 20, cursor: 'pointer' }}>
+            <div style={{ width: 7, height: 7, borderRadius: '50%', background: T.red }} />
+            <span style={{ color: T.red, fontSize: 11, fontWeight: 700 }}>Petty cash float below 10% — replenishment required →</span>
+          </div>
+        )}
+        {!todayBalance && (
+          <div onClick={() => onTab('finance')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', background: T.border+'80', border: `1px solid ${T.border}`, borderRadius: 20, cursor: 'pointer' }}>
+            <span style={{ color: T.textMuted, fontSize: 11, fontWeight: 700 }}>📊 Daily balance report not prepared yet →</span>
+          </div>
+        )}
+      </div>
+
+      {/* KPI strip */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 24 }}>
+        {[
+          { label: 'Total Inflows', value: `GHS ${totalInflows.toLocaleString()}`, sub: `${clientInvoices.length} client invoices`, color: '#10B981' },
+          { label: 'Total Paid Out', value: `GHS ${totalPaidOut.toLocaleString()}`, sub: `${paidVouchers.length} vouchers paid`, color: T.red },
+          { label: 'Gross Position', value: `GHS ${Math.abs(grossProfit).toLocaleString()}`, sub: grossProfit >= 0 ? 'Net positive' : 'Net negative', color: grossProfit >= 0 ? T.teal : T.red },
+          { label: 'Petty Cash Float', value: `GHS ${pcBalance.toLocaleString()}`, sub: `${pcPct}% remaining`, color: pcPct < 10 ? T.red : T.cyan },
+        ].map((k,i) => (
+          <div key={i} style={{ padding: '16px 18px', background: T.surface, border: `1px solid ${T.border}`, borderTop: `3px solid ${k.color}`, borderRadius: 12 }}>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{k.label}</div>
+            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>{k.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Two column layout */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+
+        {/* Voucher status */}
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: '16px 20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>Payment Vouchers</div>
+            <button onClick={() => onTab('finance')} style={{ background: 'none', border: `1px solid ${T.border}`, color: T.textMuted, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>Manage →</button>
+          </div>
+          {[
+            ['Pending Approval', pendingVouchers.length, T.amber],
+            ['Approved — To Pay', approvedVouchers.length, T.teal],
+            ['Paid', paidVouchers.length, '#10B981'],
+            ['Total Vouchers', vouchers.length, T.cyan],
+          ].map(([label, count, color]) => (
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${T.border}33` }}>
+              <span style={{ color: T.textSecondary, fontSize: 12 }}>{label}</span>
+              <span style={{ color, fontWeight: 800, fontSize: 14 }}>{count}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Purchase Orders */}
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: '16px 20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>Purchase Orders</div>
+            <button onClick={() => onTab('purchase-orders')} style={{ background: 'none', border: `1px solid ${T.border}`, color: T.textMuted, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>View →</button>
+          </div>
+          {pos.slice(0,4).map((po,i) => (
+            <div key={po.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: i < 3 ? `1px solid ${T.border}33` : 'none' }}>
+              <div>
+                <div style={{ color: T.textPrimary, fontWeight: 600, fontSize: 12 }}>{po.internal_po_number || po.vendor_name}</div>
+                <div style={{ color: T.textMuted, fontSize: 10 }}>{po.event_name}</div>
+              </div>
+              <span style={{ color: T.cyan, fontWeight: 700, fontSize: 12 }}>GHS {(po.amount||0).toLocaleString()}</span>
+            </div>
+          ))}
+          {pos.length === 0 && <div style={{ color: T.textMuted, fontSize: 12, textAlign: 'center', padding: '16px 0' }}>No purchase orders yet</div>}
+        </div>
+      </div>
+
+      {/* Today's balance + upcoming events */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+
+        {/* Daily balance */}
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: '16px 20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>Today's Balance</div>
+            <button onClick={() => onTab('finance')} style={{ background: 'none', border: `1px solid ${T.border}`, color: T.textMuted, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>Report →</button>
+          </div>
+          {todayBalance ? (
+            [
+              ['Opening Balance', todayBalance.opening_balance, T.textMuted],
+              ['Actual Inflows', todayBalance.actual_inflows, '#10B981'],
+              ['Actual Payments', todayBalance.actual_payments, T.red],
+              ['Closing Balance', todayBalance.closing_balance, todayBalance.closing_balance >= 0 ? T.teal : T.red],
+            ].map(([label, val, color]) => (
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: label !== 'Closing Balance' ? `1px solid ${T.border}33` : 'none' }}>
+                <span style={{ color: T.textSecondary, fontSize: 12 }}>{label}</span>
+                <span style={{ color, fontWeight: label === 'Closing Balance' ? 900 : 600, fontSize: 13 }}>GHS {(val||0).toLocaleString()}</span>
+              </div>
+            ))
+          ) : (
+            <div style={{ textAlign: 'center', padding: '20px 0' }}>
+              <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 10 }}>No daily balance prepared today</div>
+              <button onClick={() => onTab('finance')} style={{ background: T.cyan+'15', border: `1px solid ${T.cyan}30`, color: T.cyan, padding: '6px 16px', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>Prepare Now →</button>
+            </div>
+          )}
+        </div>
+
+        {/* Upcoming events */}
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: '16px 20px' }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 14 }}>Upcoming Events</div>
+          {upcomingEvents.length > 0 ? upcomingEvents.map((ev,i) => {
+            const days = Math.ceil((new Date(ev.event_date) - now) / (1000*60*60*24));
+            const color = days <= 7 ? T.red : days <= 30 ? T.amber : T.teal;
+            return (
+              <div key={ev.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: i < upcomingEvents.length-1 ? `1px solid ${T.border}33` : 'none' }}>
+                <div>
+                  <div style={{ color: T.textPrimary, fontWeight: 600, fontSize: 12 }}>{ev.name}</div>
+                  <div style={{ color: T.textMuted, fontSize: 10 }}>{ev.client}</div>
+                </div>
+                <div style={{ color, fontWeight: 800, fontSize: 12 }}>{days}d</div>
+              </div>
+            );
+          }) : <div style={{ color: T.textMuted, fontSize: 12, textAlign: 'center', padding: '16px 0' }}>No upcoming events</div>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 const FinanceDashboard = ({ user, onTab }) => {
   const [financeTab, setFinanceTab] = useState("overview");
   const [vouchers, setVouchers] = useState([]);

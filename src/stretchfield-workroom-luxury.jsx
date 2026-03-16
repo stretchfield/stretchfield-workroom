@@ -2387,6 +2387,25 @@ const EVENT_ARCHETYPES = {
     tools: { pre_survey: "No", digital_tracking: "No", live_monitoring: "Yes", post_survey: "Yes", day30_survey: "No", day90_tracking: "No", social_listening: "Yes", commercial_data: "No" },
     storyTemplate: { before: "needed to strengthen team cohesion and brand pride beyond the office", design: "curated corporate experience with intentional connection moments", outcome: "pride index and brand advocacy exceeded targets" }
   },
+  "Other": {
+    color: "#8B5CF6",
+    code: "OTH",
+    dimensions: [
+      { key: "behavioural_change", label: "🎯 Behavioural Change", weight: 0.25, description: "Measurable change in attendee behaviour post-event", benchmark: ">60% demonstrate target behaviour change" },
+      { key: "emotional_impact", label: "❤️ Emotional Impact", weight: 0.20, description: "Attendee sentiment and satisfaction score", benchmark: ">80% positive sentiment" },
+      { key: "data_engagement", label: "📊 Data & Engagement", weight: 0.20, description: "Engagement metrics and dwell time", benchmark: ">70% active participation" },
+      { key: "connection", label: "🔗 Connection & Community", weight: 0.15, description: "Connections and community building", benchmark: ">3 connections per attendee" },
+      { key: "brand_visibility", label: "📣 Brand Visibility", weight: 0.10, description: "Brand reach and amplification", benchmark: ">50% of attendees share content" },
+      { key: "commercial", label: "💼 Commercial Outcome", weight: 0.10, description: "Revenue or business outcome generated", benchmark: "Measurable commercial impact" },
+    ],
+    kpiSuggestions: [
+      { name: "Attendee Satisfaction", target: ">8/10 satisfaction score", method: "Post-event survey", timing: "Event night + 48hrs" },
+      { name: "Event Reach", target: ">50% of attendees share content", method: "Social listening", timing: "Event + 7 days" },
+      { name: "Key Objective Achievement", target: "100% of stated objectives met", method: "Internal review", timing: "Post-event" },
+    ],
+    tools: { pre_survey: "No", digital_tracking: "No", live_monitoring: "Yes", post_survey: "Yes", day30_survey: "No", day90_tracking: "No", social_listening: "Yes", commercial_data: "No" },
+    storyTemplate: { before: "needed a distinctive event experience beyond standard formats", design: "bespoke event concept tailored to specific objectives", outcome: "key objectives achieved and attendees exceeded expectations" }
+  },
 };
 
 const BENCHMARKS = {
@@ -3953,7 +3972,7 @@ const VendorsView = ({ user }) => {
   useEffect(() => { load(); }, []);
 
   const generateRffCode = async (eventType) => {
-    const typeMap = { "Conference/Seminar": "CS", "Product Launch": "PL", "Awards Ceremony": "AWD", "Corporate Party": "CP" };
+    const typeMap = { "Conference/Seminar": "CS", "Product Launch": "PL", "Awards Ceremony": "AWD", "Corporate Party": "CP", "Other": "OTH" };
     const prefix = typeMap[eventType] || "GEN";
     const year = new Date().getFullYear().toString().slice(-2);
     // Get or create sequence for this type+year
@@ -4251,12 +4270,13 @@ const VendorsView = ({ user }) => {
               <option value="Product Launch">Product Launch (ST/PL)</option>
               <option value="Awards Ceremony">Awards Ceremony (ST/AWD)</option>
               <option value="Corporate Party">Corporate Party (ST/CP)</option>
+              <option value="Other">Other (ST/OTH)</option>
             </select>
           </div>
           {form.event_type && (
             <div style={{ marginBottom: 14, padding: "8px 12px", background: T.cyan+"12", border: `1px solid ${T.cyan}30`, borderRadius: 8 }}>
               <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>RFF Code Preview</div>
-              <div style={{ color: T.cyan, fontWeight: 900, fontSize: 16 }}>ST/{{"Conference/Seminar":"CS","Product Launch":"PL","Awards Ceremony":"AWD","Corporate Party":"CP"}[form.event_type]}/{new Date().getFullYear().toString().slice(-2)}/###</div>
+              <div style={{ color: T.cyan, fontWeight: 900, fontSize: 16 }}>ST/{{"Conference/Seminar":"CS","Product Launch":"PL","Awards Ceremony":"AWD","Corporate Party":"CP","Other":"OTH"}[form.event_type]}/{new Date().getFullYear().toString().slice(-2)}/###</div>
             </div>
           )}
           <Input label="Description" placeholder="Brief description of what's needed" value={form.description} onChange={v => setForm({ ...form, description: v })} />
@@ -6372,6 +6392,7 @@ const EventTypeAnalysisView = ({ user }) => {
     { key: "Product Launch", code: "PL", color: "#E879F9", label: "Product Launch" },
     { key: "Awards Ceremony", code: "AWD", color: "#F59E0B", label: "Awards Ceremony" },
     { key: "Corporate Party", code: "CP", color: "#10B981", label: "Corporate Party" },
+    { key: "Other", code: "OTH", color: "#8B5CF6", label: "Other" },
   ];
 
   const load = async () => {
@@ -11716,7 +11737,7 @@ const RFFApprovalsView = ({ user }) => {
               <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 32px", gap: 8, marginBottom: 8 }}>
                 <select value={line.category} onChange={e => { const l = [...budgetLines]; l[idx].category = e.target.value; setBudgetLines(l); }} style={{ padding: "7px 10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: line.category ? T.textPrimary : T.textMuted, fontSize: 12, fontFamily: "inherit", outline: "none" }}>
                   <option value="">Select category...</option>
-                  {["Audio Visual","Catering","Decoration & Floral","Entertainment","Photography & Videography","Printing & Branding","Security","Transportation","Venue","Other"].map(c => <option key={c} value={c}>{c}</option>)}
+                  {["Audio Visual","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Photography & Videography","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"].map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
                 <input type="number" value={line.proposed_amount} onChange={e => { const l = [...budgetLines]; l[idx].proposed_amount = e.target.value; setBudgetLines(l); }} placeholder="0.00" style={{ padding: "7px 10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
                 <input value={line.notes || ""} onChange={e => { const l = [...budgetLines]; l[idx].notes = e.target.value; setBudgetLines(l); }} placeholder="Notes..." style={{ padding: "7px 10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
@@ -11771,7 +11792,7 @@ const RFFApprovalsView = ({ user }) => {
                   <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 32px", gap: 8, marginBottom: 8 }}>
                     <select value={line.category} onChange={e => { const l = [...budgetLines]; l[idx].category = e.target.value; setBudgetLines(l); }} style={{ padding: "7px 10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: line.category ? T.textPrimary : T.textMuted, fontSize: 12, fontFamily: "inherit", outline: "none" }}>
                       <option value="">Select category...</option>
-                      {["Audio Visual","Catering","Decoration & Floral","Entertainment","Photography & Videography","Printing & Branding","Security","Transportation","Venue","Other"].map(c => <option key={c} value={c}>{c}</option>)}
+                      {["Audio Visual","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Photography & Videography","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"].map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                     <input type="number" value={line.proposed_amount} onChange={e => { const l = [...budgetLines]; l[idx].proposed_amount = e.target.value; setBudgetLines(l); }} placeholder="0.00" style={{ padding: "7px 10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
                     <input value={line.notes} onChange={e => { const l = [...budgetLines]; l[idx].notes = e.target.value; setBudgetLines(l); }} placeholder="Notes..." style={{ padding: "7px 10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
@@ -11819,7 +11840,7 @@ const VendorApplicationModal = ({ user, onClose, onSubmitted }) => {
   const busRegRef = React.useRef();
   const vatRef = React.useRef();
 
-  const vendorTypes = ["Audio Visual","Catering","Decoration & Floral","Entertainment","Photography & Videography","Printing & Branding","Security","Transportation","Venue","Other"];
+  const vendorTypes = ["Audio Visual","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Photography & Videography","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
 
   const inputStyle = { width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
   const labelStyle = { color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 };
@@ -12232,7 +12253,7 @@ const EditVendorAppModal = ({ app, user, onClose, onResubmitted }) => {
   });
   const [saving, setSaving] = useState(false);
 
-  const vendorTypes = ["Audio Visual","Catering","Decoration & Floral","Entertainment","Photography & Videography","Printing & Branding","Security","Transportation","Venue","Other"];
+  const vendorTypes = ["Audio Visual","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Photography & Videography","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
   const inputStyle = { width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
   const labelStyle = { color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 };
   const sectionStyle = { color: T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12, marginTop: 20, paddingBottom: 6, borderBottom: `1px solid ${T.cyan}30` };

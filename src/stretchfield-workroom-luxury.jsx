@@ -613,8 +613,11 @@ const Btn = ({ children, onClick, variant = "primary", small }) => {
 // ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 const getNavItems = (role) => {
   const base = [{ id: "dashboard", label: "Dashboard", icon: "▪" }];
-  if (["CEO","Head of Operations","Vendor Manager","Strategy & Events Lead","Finance Manager"].includes(role)) {
+  if (["CEO","Head of Operations","Vendor Manager","Strategy & Events Lead"].includes(role)) {
     base.push({ id: "events", label: "Events", icon: "▪" }, { id: "tasks", label: "Event Tasks", icon: "▪" });
+  }
+  if (role === "Finance Manager") {
+    base.push({ id: "events", label: "Events", icon: "▪" });
   }
   if (role === "CEO") {
     base.push({ id: "impact-intelligence", label: "Impact Intelligence", icon: "▪" });

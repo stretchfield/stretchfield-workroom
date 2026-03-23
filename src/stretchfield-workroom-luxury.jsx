@@ -3126,38 +3126,52 @@ const EventsView = ({ user, userRole }) => {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this event? This cannot be undone.')) return;
-    // Delete all related records first to avoid FK conflicts
-    await Promise.all([
-      supabase.from('tasks').delete().eq('project_id', id),
-      supabase.from('task_comments').delete().eq('project_id', id),
-      supabase.from('event_impact_briefs').delete().eq('project_id', id),
-      supabase.from('event_post_data').delete().eq('project_id', id),
-      supabase.from('event_scorecards').delete().eq('project_id', id),
-      supabase.from('event_impact_reports').delete().eq('project_id', id),
-      supabase.from('expenses').delete().eq('project_id', id),
-      supabase.from('budgets').delete().eq('project_id', id),
-      supabase.from('client_budgets').delete().eq('project_id', id),
-      supabase.from('client_expenses').delete().eq('project_id', id),
-      supabase.from('client_invoices').delete().eq('project_id', id),
-      supabase.from('vendor_scorecards').delete().eq('project_id', id),
-    ]);
-    // Delete RFF related records
-    const { data: rffList } = await supabase.from('rffs').select('id').eq('project_id', id);
-    if (rffList?.length) {
-      const rffIds = rffList.map(r => r.id);
+    try {
+      // Step 1 — delete task comments via task IDs
+      const { data: taskList } = await supabase.from('tasks').select('id').eq('project_id', id);
+      if (taskList?.length) {
+        const taskIds = taskList.map(t => t.id);
+        await supabase.from('task_comments').delete().in('task_id', taskIds);
+      }
+      // Step 2 — delete tasks
+      await supabase.from('tasks').delete().eq('project_id', id);
+      // Step 3 — delete impact data
       await Promise.all([
-        supabase.from('rff_vendor_assignments').delete().in('rff_id', rffIds),
-        supabase.from('rff_budgets').delete().in('rff_id', rffIds),
-        supabase.from('rff_awards').delete().in('rff_id', rffIds),
+        supabase.from('event_impact_briefs').delete().eq('project_id', id),
+        supabase.from('event_post_data').delete().eq('project_id', id),
+        supabase.from('event_scorecards').delete().eq('project_id', id),
+        supabase.from('event_impact_reports').delete().eq('project_id', id),
+        supabase.from('vendor_scorecards').delete().eq('project_id', id),
+        supabase.from('expenses').delete().eq('project_id', id),
+        supabase.from('budgets').delete().eq('project_id', id),
+        supabase.from('client_budgets').delete().eq('project_id', id),
+        supabase.from('client_expenses').delete().eq('project_id', id),
+        supabase.from('client_invoices').delete().eq('project_id', id),
+        supabase.from('feedback').delete().eq('project_id', id),
       ]);
-      await supabase.from('rffs').delete().eq('project_id', id);
+      // Step 4 — delete RFF chain
+      const { data: rffList } = await supabase.from('rffs').select('id').eq('project_id', id);
+      if (rffList?.length) {
+        const rffIds = rffList.map(r => r.id);
+        // Delete invoices referencing RFFs first
+        await supabase.from('invoices').delete().in('rff_id', rffIds);
+        await Promise.all([
+          supabase.from('rff_vendor_assignments').delete().in('rff_id', rffIds),
+          supabase.from('rff_budgets').delete().in('rff_id', rffIds),
+          supabase.from('rff_awards').delete().in('rff_id', rffIds),
+        ]);
+        await supabase.from('rffs').delete().in('id', rffIds);
+      }
+      // Step 5 — delete POs and vendor invoices
+      await supabase.from('vendor_invoices').delete().eq('event_id', id);
+      await supabase.from('purchase_orders').delete().eq('event_id', id);
+      // Step 6 — delete event
+      const { error } = await supabase.from('projects').delete().eq('id', id);
+      if (error) { alert('Delete failed: ' + error.message); return; }
+      load();
+    } catch (e) {
+      alert('Delete failed: ' + e.message);
     }
-    // Delete purchase orders and vendor invoices
-    await supabase.from('vendor_invoices').delete().eq('event_id', id);
-    await supabase.from('purchase_orders').delete().eq('event_id', id);
-    // Finally delete the event
-    await supabase.from('projects').delete().eq('id', id);
-    load();
   };
 
   return (

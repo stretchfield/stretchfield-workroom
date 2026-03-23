@@ -3049,6 +3049,8 @@ const EventsView = ({ user, userRole }) => {
   const [editForm, setEditForm] = useState({});
 
   const canManage = ['CEO','Head of Operations'].includes(user?.role);
+  // Debug — remove after fix
+  console.log("EventsView user role:", user?.role, "canManage:", ['CEO','Head of Operations'].includes(user?.role));
   const canSeeTasks = ['CEO','Head of Operations','Strategy & Events Lead','Vendor Manager'].includes(user?.role);
 
   const load = async () => {

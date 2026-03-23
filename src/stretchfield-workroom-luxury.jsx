@@ -108,7 +108,7 @@ const LOGO_SRC = "data:image/png;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QBMRXhpZgAA
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const USERS = {
   ceo: { id: "ceo", name: "David Osei", role: "CEO", email: "david@stretchfield.com", avatar: "DO" },
-  admin: { id: "admin", name: "Ama Mensah", role: "Head of Operations", email: "ama@stretchfield.com", avatar: "AM" },
+  admin: { id: "admin", name: "Ama Mensah", role: "Country Manager", email: "ama@stretchfield.com", avatar: "AM" },
   vendorMgr: { id: "vendorMgr", name: "Kofi Asante", role: "Vendor Manager", email: "kofi@stretchfield.com", avatar: "KA" },
   events: { id: "events", name: "Abena Boateng", role: "Strategy & Events Lead", email: "abena@stretchfield.com", avatar: "AB" },
   marketing: { id: "marketing", name: "Kwame Darko", role: "Sales & Marketing", email: "kwame@stretchfield.com", avatar: "KD" },
@@ -613,7 +613,7 @@ const Btn = ({ children, onClick, variant = "primary", small }) => {
 // ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 const getNavItems = (role) => {
   const base = [{ id: "dashboard", label: "Dashboard", icon: "▪" }];
-  if (["CEO","Head of Operations","Vendor Manager","Strategy & Events Lead"].includes(role)) {
+  if (["CEO","Country Manager","Vendor Manager","Strategy & Events Lead"].includes(role)) {
     base.push({ id: "events", label: "Events", icon: "▪" }, { id: "tasks", label: "Event Tasks", icon: "▪" });
   }
   if (role === "Finance Manager") {
@@ -637,7 +637,7 @@ const getNavItems = (role) => {
   if (["Strategy & Events Lead"].includes(role)) {
     base.push({ id: "strategy-overview", label: "Client Overview", icon: "▪" }, { id: "feedback-summary", label: "Feedback", icon: "▪" });
   }
-  if (["CEO","Head of Operations"].includes(role)) {
+  if (["CEO","Country Manager"].includes(role)) {
     base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "rff-approvals", label: "RFF Approvals", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" });
   }
   if (role === "CEO") {
@@ -648,13 +648,13 @@ const getNavItems = (role) => {
   if (role === "Vendor Manager") {
     base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quotes-received", label: "Quotes Received", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" });
   }
-  if (["CEO","Head of Operations","Vendor Manager","Finance Manager"].includes(role)) {
+  if (["CEO","Country Manager","Vendor Manager","Finance Manager"].includes(role)) {
     base.push({ id: "invoices", label: "Invoices", icon: "▪" });
   }
   if (["CEO","Finance Manager"].includes(role)) {
     base.push({ id: "zoho-books", label: "Zoho Books", icon: "▪" });
   }
-  if (["CEO","Head of Operations","Finance Manager"].includes(role)) {
+  if (["CEO","Country Manager","Finance Manager"].includes(role)) {
     base.push({ id: "finance", label: "Finance", icon: "▪" });
   }
   if (["Finance Manager","CEO"].includes(role)) {
@@ -3039,7 +3039,7 @@ const EventsView = ({ user, userRole }) => {
   const [clients, setClients] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ name: '', client: '', client_id: '', event_date: '', deadline: '', phase: 'Planning', event_category: '' });
+  const [form, setForm] = useState({ name: '', client: '', client_id: '', event_date: '', deadline: '', phase: 'Planning', event_category: '', country: 'Ghana' });
   const [saving, setSaving] = useState(false);
   const [taskModalEvent, setTaskModalEvent] = useState(null);
   const [impactEvent, setImpactEvent] = useState(null);
@@ -3048,8 +3048,8 @@ const EventsView = ({ user, userRole }) => {
   const [editEvent, setEditEvent] = useState(null);
   const [editForm, setEditForm] = useState({});
 
-  const canManage = ['CEO','Head of Operations'].includes(user?.role);
-  const canSeeTasks = ['CEO','Head of Operations','Strategy & Events Lead','Vendor Manager'].includes(user?.role);
+  const canManage = ['CEO','Country Manager'].includes(user?.role);
+  const canSeeTasks = ['CEO','Country Manager','Strategy & Events Lead','Vendor Manager'].includes(user?.role);
 
   const load = async () => {
     const [p, c, t, sl] = await Promise.all([
@@ -3082,10 +3082,11 @@ const EventsView = ({ user, userRole }) => {
       tasks: 0,
       completed: 0,
       event_category: form.event_category,
+      country: form.country || 'Ghana',
     });
     if (error) { alert('Error: ' + error.message); setSaving(false); return; }
     setModal(false);
-    setForm({ name: '', client: '', client_id: '', deadline: '', phase: 'Planning', event_category: '' });
+    setForm({ name: '', client: '', client_id: '', deadline: '', phase: 'Planning', event_category: '', country: 'Ghana' });
     setSaving(false);
     load();
   };
@@ -3102,6 +3103,7 @@ const EventsView = ({ user, userRole }) => {
       completion: p.completion || 0,
       status: p.status || 'active',
       event_category: p.event_category || '',
+      country: p.country || 'Ghana',
     });
   };
 
@@ -3118,6 +3120,7 @@ const EventsView = ({ user, userRole }) => {
       completion: parseInt(editForm.completion) || 0,
       status: editForm.status,
       event_category: editForm.event_category || null,
+      country: editForm.country || 'Ghana',
     }).eq('id', editEvent.id);
     setSaving(false);
     setEditEvent(null);
@@ -3192,7 +3195,7 @@ const EventsView = ({ user, userRole }) => {
         </Card>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
-          {(userRole === "Strategy & Events Lead" ? events.filter(e => e.assigned_to === user?.id) : events).map((p, idx) => (
+          {(userRole === "Strategy & Events Lead" ? events.filter(e => e.assigned_to === user?.id) : userRole === "Country Manager" ? events.filter(e => (e.country || 'Ghana') === (user?.country || 'Ghana')) : events).map((p, idx) => (
             <div key={p.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", transition: "box-shadow 0.2s, border-color 0.2s", animationDelay: idx * 0.04 + "s" }}>
               {/* Card header — always visible */}
               <div style={{ padding: "20px 22px" }}
@@ -3480,6 +3483,13 @@ const EventsView = ({ user, userRole }) => {
               <option value="Awards Ceremony">Awards Ceremony</option>
               <option value="Corporate Party">Corporate Party</option>
               <option value="Other">Other</option>
+            </select>
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>Country</div>
+            <select value={form.country} onChange={e => setForm({...form, country: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+              <option value="Ghana">Ghana</option>
+              <option value="Nigeria">Nigeria</option>
             </select>
           </div>
           {clients.length > 0 ? (
@@ -3946,8 +3956,8 @@ const TasksView = ({ userRole, openTaskId, onOpenHandled }) => {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', project_id: '', deadline: '', status: 'pending', assignee_id: '', assignee_name: '', assigned_by: '' });
 
-  const canEdit = ['CEO', 'Head of Operations', 'Strategy & Events Lead', 'Vendor Manager', 'Vendor', 'Sales & Marketing'].includes(userRole);
-  const canToggleVisibility = ['CEO','Head of Operations'].includes(userRole);
+  const canEdit = ['CEO', 'Country Manager', 'Strategy & Events Lead', 'Vendor Manager', 'Vendor', 'Sales & Marketing'].includes(userRole);
+  const canToggleVisibility = ['CEO','Country Manager'].includes(userRole);
 
   const openDetail = (task) => {
     setDetailTask(task);
@@ -4305,7 +4315,7 @@ const VendorsView = ({ user }) => {
       status_notes: resubmitNotes,
     }).eq('id', resubmitModal.id);
     // Notify CEO
-    const { data: ceos } = await supabase.from('profiles').select('id').in('role', ['CEO', 'Head of Operations']);
+    const { data: ceos } = await supabase.from('profiles').select('id').in('role', ['CEO', 'Country Manager']);
     if (ceos) await Promise.all(ceos.map(c => supabase.from('notifications').insert({ user_id: c.id, title: 'RFF Resubmitted', message: `RFF "${resubmitModal.title}" has been revised and resubmitted for approval.`, type: 'rff' })));
     setResubmitModal(null); setResubmitFile(null); setResubmitNotes('');
     setSaving(false); load();
@@ -4463,7 +4473,7 @@ const VendorsView = ({ user }) => {
                         border: `1px solid ${T.cyan}33`,
                       }}>📄 {r.document_name || 'Download RFF'}</a>
                     )}
-                    {['CEO','Head of Operations'].includes(user?.role) && !r.approved && (
+                    {['CEO','Country Manager'].includes(user?.role) && !r.approved && (
                       <button onClick={async (e) => { e.stopPropagation(); await supabase.from('rffs').update({ approved: true, approved_by: user.id }).eq('id', r.id); load(); }} style={{
                         marginLeft: 8, background: T.teal + '20', border: `1px solid ${T.teal}`, color: T.teal,
                         padding: '5px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600,
@@ -4792,12 +4802,12 @@ const UsersView = ({ user }) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', role: 'Head of Operations', password: '' });
+  const [form, setForm] = useState({ name: '', email: '', role: 'Country Manager', password: '', country: 'Ghana' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const roleColors = {
-    'CEO': T.cyan, 'Head of Operations': T.blue, 'Vendor Manager': T.magenta,
+    'CEO': T.cyan, 'Country Manager': T.blue, 'Vendor Manager': T.magenta,
     'Strategy & Events Lead': T.amber, 'Sales & Marketing': '#EC4899',
     'Vendor': '#06B6D4', 'Client': '#84CC16',
   };
@@ -4820,7 +4830,7 @@ const UsersView = ({ user }) => {
     const initials = form.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
     await supabase.from('profiles').insert({ id: uid, name: form.name, email: form.email, role: form.role, avatar: initials });
     setModal(false);
-    setForm({ name: '', email: '', role: 'Head of Operations', password: '' });
+    setForm({ name: '', email: '', role: 'Country Manager', password: '' });
     setSaving(false);
     load();
   };
@@ -4862,7 +4872,7 @@ const UsersView = ({ user }) => {
       {/* KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px,1fr))", gap: 12, marginBottom: 24 }}>
         {[...new Set(users.map(u => u.role))].map((role, i) => {
-          const roleColors = { "CEO": T.cyan, "Head of Operations": T.teal, "Vendor Manager": T.amber, "Strategy & Events Lead": T.magenta, "Finance Manager": T.gold, "Sales & Marketing": T.blue, "Vendor": T.textSecondary, "Client": "#10B981", "Board of Directors": "#8B5CF6" };
+          const roleColors = { "CEO": T.cyan, "Country Manager": T.teal, "Vendor Manager": T.amber, "Strategy & Events Lead": T.magenta, "Finance Manager": T.gold, "Sales & Marketing": T.blue, "Vendor": T.textSecondary, "Client": "#10B981", "Board of Directors": "#8B5CF6" };
           const color = roleColors[role] || T.textMuted;
           return (
             <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${color}`, borderRadius: 10 }}>
@@ -4909,7 +4919,7 @@ const UsersView = ({ user }) => {
             {form.password && <div style={{ color: T.teal, fontSize: 11, marginTop: 5 }}>✓ Password set — will be emailed to user on creation</div>}
           </div>
           <Select label="Role" options={[
-            { value: 'Head of Operations', label: 'Head of Operations' },
+            { value: 'Country Manager', label: 'Country Manager' },
             { value: 'Vendor Manager', label: 'Vendor Manager' },
             { value: 'Strategy & Events Lead', label: 'Strategy & Events Lead' },
             { value: 'Sales & Marketing', label: 'Sales & Marketing' },
@@ -5059,7 +5069,7 @@ const ClientsView = ({ user }) => {
     load();
   };
 
-  const isCEOorAdmin = ['CEO', 'Head of Operations'].includes(user?.role);
+  const isCEOorAdmin = ['CEO', 'Country Manager'].includes(user?.role);
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
@@ -5401,14 +5411,14 @@ const CRMView = ({ user }) => {
   const [createLogin, setCreateLogin] = useState(false);
   const [loginPassword, setLoginPassword] = useState("");
 
-  const canEdit = ["CEO", "Head of Operations", "Sales & Marketing"].includes(user?.role);
-  const canApprove = ["CEO", "Head of Operations"].includes(user?.role);
+  const canEdit = ["CEO", "Country Manager", "Sales & Marketing"].includes(user?.role);
+  const canApprove = ["CEO", "Country Manager"].includes(user?.role);
   const statusColors = { new: T.cyan, contacted: T.blue, qualified: T.amber, proposal: T.magenta, won: T.teal, lost: "#F43F5E" };
   const statusOrder = ["new", "contacted", "qualified", "proposal", "won", "lost"];
 
   const load = async () => {
     const [l, a, p, m, c] = await Promise.all([
-      ["CEO", "Head of Operations", "Sales & Marketing"].includes(user?.role) ? supabase.from("leads").select("*").order("created_at", { ascending: false }) : supabase.from("leads").select("*").or("assigned_to.eq." + user.id + ",created_by.eq." + user.id).order("created_at", { ascending: false }),
+      ["CEO", "Country Manager", "Sales & Marketing"].includes(user?.role) ? supabase.from("leads").select("*").order("created_at", { ascending: false }) : supabase.from("leads").select("*").or("assigned_to.eq." + user.id + ",created_by.eq." + user.id).order("created_at", { ascending: false }),
       supabase.from("crm_activities").select("*").order("created_at", { ascending: false }),
       supabase.from("proposals").select("*").order("created_at", { ascending: false }),
       supabase.from('profiles').select('*').not('role', 'in', '("Client","Vendor")'),
@@ -5913,12 +5923,12 @@ const SMTasksView = ({ user }) => {
   const [members, setMembers] = useState([]);
   const [saving, setSaving] = useState(false);
 
-  const canCreate = ["CEO", "Head of Operations", "Sales & Marketing"].includes(user?.role);
+  const canCreate = ["CEO", "Country Manager", "Sales & Marketing"].includes(user?.role);
 
   const load = async () => {
     const [t, m] = await Promise.all([
       supabase.from("tasks").select("*").eq("task_type", "sm").order("created_at", { ascending: false }),
-      supabase.from("profiles").select("*").in("role", ["CEO", "Head of Operations", "Sales & Marketing"]),
+      supabase.from("profiles").select("*").in("role", ["CEO", "Country Manager", "Sales & Marketing"]),
     ]);
     setTasks(t.data || []);
     setMembers(m.data || []);
@@ -6061,7 +6071,7 @@ const FeedbackView = ({ userRole }) => {
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState("all");
   const [loading, setLoading] = useState(true);
-  const canSeeDetailed = ["CEO", "Head of Operations", "Strategy & Events Lead", "Vendor Manager"].includes(userRole);
+  const canSeeDetailed = ["CEO", "Country Manager", "Strategy & Events Lead", "Vendor Manager"].includes(userRole);
 
   useEffect(() => {
     Promise.all([
@@ -7671,7 +7681,7 @@ const CalendarView = ({ user, onNavigate }) => {
     const all = [];
 
     // ── TASKS ──
-    const taskQ = ["CEO","Head of Operations"].includes(role)
+    const taskQ = ["CEO","Country Manager"].includes(role)
       ? supabase.from("tasks").select("*")
       : supabase.from("tasks").select("*").eq("assignee_id", uid);
     const { data: tasks } = await taskQ;
@@ -7696,7 +7706,7 @@ const CalendarView = ({ user, onNavigate }) => {
     }
 
     // ── LEADS (CEO, Admin, Sales & Marketing) ──
-    if (["CEO","Head of Operations","Sales & Marketing"].includes(role)) {
+    if (["CEO","Country Manager","Sales & Marketing"].includes(role)) {
       const { data: leads } = await supabase.from("leads").select("*");
       (leads || []).forEach(l => {
         if (l.created_at) all.push({ id: "lead-"+l.id, date: l.created_at.slice(0,10), type: "lead", label: l.company, sub: "Lead Created · " + l.status, nav: "crm" });
@@ -7705,7 +7715,7 @@ const CalendarView = ({ user, onNavigate }) => {
     }
 
     // ── RFFs ──
-    if (["CEO","Head of Operations","Vendor Manager"].includes(role)) {
+    if (["CEO","Country Manager","Vendor Manager"].includes(role)) {
       const { data: rffs } = await supabase.from("rffs").select("*");
       (rffs || []).filter(r => r.deadline).forEach(r => {
         const dl = r.deadline.slice(0,10);
@@ -7720,13 +7730,13 @@ const CalendarView = ({ user, onNavigate }) => {
     }
 
     // ── S&M TASKS ──
-    if (["CEO","Head of Operations","Sales & Marketing"].includes(role)) {
-      const smQ = ["CEO","Head of Operations"].includes(role)
+    if (["CEO","Country Manager","Sales & Marketing"].includes(role)) {
+      const smQ = ["CEO","Country Manager"].includes(role)
         ? supabase.from("tasks").select("*").not("assignee_id","is",null)
         : supabase.from("tasks").select("*").eq("assignee_id", uid);
       const { data: smTasks } = await smQ;
       (smTasks || []).forEach(t => {
-        if (t.deadline && !["CEO","Head of Operations"].includes(role)) {
+        if (t.deadline && !["CEO","Country Manager"].includes(role)) {
           all.push({ id: "smt-"+t.id, date: t.deadline.slice(0,10), type: "smtask", label: t.name, sub: "S&M Task", nav: "sm-tasks" });
         }
       });
@@ -7744,7 +7754,7 @@ const CalendarView = ({ user, onNavigate }) => {
     }
 
     // ── FINANCE INVOICES ──
-    if (["CEO","Head of Operations","Finance Manager"].includes(role)) {
+    if (["CEO","Country Manager","Finance Manager"].includes(role)) {
       const { data: invs } = await supabase.from("invoices").select("*");
       (invs || []).forEach(inv => {
         if (inv.created_at) all.push({ id: "finv-"+inv.id, date: inv.created_at.slice(0,10), type: "invoice", label: inv.vendor_name || "Invoice", sub: "Invoice · " + (inv.status || ""), nav: "invoices" });
@@ -8243,7 +8253,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "dashboard":
         if (role === "CEO") return <CEODashboard onTab={setActiveTab} user={currentUser} />;
         if (role === "Board of Directors") return <BoardDashboard user={currentUser} />;
-        if (role === "Head of Operations") return <StaffDashboard user={currentUser} />;
+        if (role === "Country Manager") return <StaffDashboard user={currentUser} />;
         if (role === "Vendor") return <VendorDashboard user={currentUser} />;
         if (role === "Client") return <ClientDashboard user={currentUser} />;
         if (role === "Finance Manager") return <FinanceManagerDashboard user={currentUser} onTab={setActiveTab} />;
@@ -8258,7 +8268,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "clients": return <ClientsView user={currentUser} />;
       case "users": return <UsersView user={currentUser} />;
       case "crm": return <CRMView user={currentUser} />;
-      case "crm-insights": return ["CEO","Head of Operations"].includes(currentUser.role) ? <CRMDashboardCEO user={currentUser} /> : <CRMDashboardSM user={currentUser} />;
+      case "crm-insights": return ["CEO","Country Manager"].includes(currentUser.role) ? <CRMDashboardCEO user={currentUser} /> : <CRMDashboardSM user={currentUser} />;
       case "sm-tasks": return <SMTasksView user={currentUser} />;
       case "strategy-overview": return <StrategyOverviewView />;
       case "opportunities": return <OpportunitiesView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
@@ -8529,7 +8539,7 @@ const CRMDashboardCEO = ({ user }) => {
     const [l, t, m] = await Promise.all([
       supabase.from("leads").select("*"),
       supabase.from("sales_targets").select("*").order("created_at", { ascending: false }),
-      supabase.from("profiles").select("*").in("role", ["CEO", "Head of Operations", "Sales & Marketing"]),
+      supabase.from("profiles").select("*").in("role", ["CEO", "Country Manager", "Sales & Marketing"]),
     ]);
     setLeads(l.data || []);
     setTargets(t.data || []);
@@ -9088,7 +9098,7 @@ const FinanceDashboard = ({ user, onTab }) => {
   const [dbModal, setDbModal] = useState(false);
   const [dbForm, setDbForm] = useState({ report_date: new Date().toISOString().slice(0,10), opening_balance: '', expected_inflows: '', expected_expenditure: '', actual_inflows: '', actual_payments: '', notes: '' });
 
-  const canApprove = ['CEO', 'Head of Operations'].includes(user?.role);
+  const canApprove = ['CEO', 'Country Manager'].includes(user?.role);
   const isFinance = ['Finance Manager', 'CEO'].includes(user?.role);
 
   const load = async () => {
@@ -10221,7 +10231,7 @@ const VendorScorecardsView = ({ user }) => {
   const [scoreModal, setScoreModal] = useState(null);
   const [historyVendor, setHistoryVendor] = useState(null);
 
-  const canScore = ["CEO", "Head of Operations", "Vendor Manager"].includes(user?.role);
+  const canScore = ["CEO", "Country Manager", "Vendor Manager"].includes(user?.role);
 
   const [awards, setAwards] = useState([]);
 
@@ -13107,7 +13117,7 @@ const FinanceApprovalsView = ({ user }) => {
   const [budgetRequests, setBudgetRequests] = useState([]);
   const [paymentRequests, setPaymentRequests] = useState([]);
   const [saving, setSaving] = useState(null);
-  const canApprove = ["CEO", "Head of Operations"].includes(user?.role);
+  const canApprove = ["CEO", "Country Manager"].includes(user?.role);
 
   const load = async () => {
     const [ex, br, pr] = await Promise.all([

@@ -4978,7 +4978,10 @@ const UsersView = ({ user }) => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ background: (roleColors[u.role] || T.textMuted) + '22', color: roleColors[u.role] || T.textMuted, padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700 }}>{u.role}</span>
                 {u.email !== user?.email && (
-                  <button onClick={() => handleDelete(u.id)} style={{ background: 'none', border: 'none', color: T.textMuted, cursor: 'pointer', fontSize: 18, padding: '2px 6px' }}>×</button>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button onClick={() => openEdit(u)} style={{ background: T.cyan+"18", border: `1px solid ${T.cyan}40`, color: T.cyan, width: 28, height: 28, borderRadius: 6, cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>✎</button>
+                    <button onClick={() => handleDelete(u.id)} style={{ background: 'none', border: 'none', color: T.textMuted, cursor: 'pointer', fontSize: 18, padding: '2px 6px' }}>×</button>
+                  </div>
                 )}
               </div>
             </Card>

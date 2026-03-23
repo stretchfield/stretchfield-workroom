@@ -3174,6 +3174,37 @@ const EventsView = ({ user, userRole }) => {
     load();
   };
 
+  const openEdit = (u) => {
+    setEditModal(u);
+    setEditForm({ name: u.name || '', role: u.role || '', country: u.country || 'Ghana', phone: u.phone || '', newPassword: '' });
+    setError('');
+  };
+
+  const handleUserUpdate = async () => {
+    if (!editForm.name) { setError('Name is required.'); return; }
+    setSaving(true); setError('');
+    await supabase.from('profiles').update({
+      name: editForm.name,
+      role: editForm.role,
+      country: editForm.role === 'Country Manager' ? editForm.country : null,
+      phone: editForm.phone || null,
+    }).eq('id', editModal.id);
+    // Update password if provided
+    if (editForm.newPassword) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        await fetch('https://okbduzenceoknkjqnrha.supabase.co/functions/v1/delete-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ userId: editModal.id, action: 'reset-password', newPassword: editForm.newPassword }),
+        });
+      } catch (e) { console.error(e); }
+    }
+    setSaving(false);
+    setEditModal(null);
+    load();
+  };
+
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this event? This cannot be undone.')) return;
     try {
@@ -4849,6 +4880,8 @@ const UsersView = ({ user }) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
+  const [editModal, setEditModal] = useState(null);
+  const [editForm, setEditForm] = useState({ name: '', role: '', country: '', phone: '', newPassword: '' });
   const [form, setForm] = useState({ name: '', email: '', role: 'Country Manager', password: '', country: 'Ghana' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -4952,6 +4985,67 @@ const UsersView = ({ user }) => {
           ))}
         </div>
       )}
+      {/* Edit User Modal */}
+      {editModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setEditModal(null)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 480, padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Edit User</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>{editModal.email}</div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Full Name</label>
+              <input value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Role</label>
+              <select value={editForm.role} onChange={e => setEditForm({...editForm, role: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                <option value="Country Manager">Country Manager</option>
+                <option value="Vendor Manager">Vendor Manager</option>
+                <option value="Strategy & Events Lead">Strategy & Events Lead</option>
+                <option value="Sales & Marketing">Sales & Marketing</option>
+                <option value="Finance Manager">Finance Manager</option>
+                <option value="Board of Directors">Board of Directors</option>
+                <option value="Vendor">Vendor</option>
+                <option value="Client">Client</option>
+              </select>
+            </div>
+
+            {editForm.role === 'Country Manager' && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Country</label>
+                <select value={editForm.country} onChange={e => setEditForm({...editForm, country: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                  <option value="Ghana">Ghana 🇬🇭</option>
+                  <option value="Nigeria">Nigeria 🇳🇬</option>
+                </select>
+              </div>
+            )}
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Phone</label>
+              <input value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} placeholder="+233 XX XXX XXXX" />
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>New Password (leave blank to keep current)</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input type="text" value={editForm.newPassword} onChange={e => setEditForm({...editForm, newPassword: e.target.value})}
+                  style={{ flex: 1, padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}
+                  placeholder="Leave blank to keep current" />
+                <button onClick={() => setEditForm({...editForm, newPassword: generatePassword(editModal.email)})}
+                  style={{ background: T.cyan+"15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "9px 14px", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>⚡ Generate</button>
+              </div>
+            </div>
+
+            {error && <div style={{ color: T.red, fontSize: 12, marginBottom: 12 }}>{error}</div>}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={handleUserUpdate} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Save Changes"}</button>
+              <button onClick={() => setEditModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {modal && (
         <Modal title="Add New User" onClose={() => { setModal(false); setError(''); }}>
           <Input label="Full Name" placeholder="e.g. Ama Mensah" value={form.name} onChange={v => setForm({ ...form, name: v })} />

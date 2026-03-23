@@ -648,19 +648,19 @@ const getNavItems = (role) => {
   if (role === "CEO") {
     // CEO gets grouped nav — return special structure
     return [
-      { id: "dashboard", label: "Dashboard", icon: "🏠", group: true },
-      { id: "grp-events", label: "Events & Operations", icon: "📅", group: true, children: [
+      { id: "dashboard", label: "Dashboard", group: true },
+      { id: "grp-events", label: "Events & Operations", group: true, children: [
         { id: "events", label: "Events" },
         { id: "tasks", label: "Event Tasks" },
         { id: "impact-intelligence", label: "Impact Intelligence" },
       ]},
-      { id: "grp-crm", label: "CRM & Sales", icon: "📈", group: true, children: [
+      { id: "grp-crm", label: "CRM & Sales", group: true, children: [
         { id: "opportunities", label: "Opportunities" },
         { id: "crm", label: "CRM / Leads" },
         { id: "crm-insights", label: "CRM Insights" },
         { id: "sm-tasks", label: "S&M Tasks" },
       ]},
-      { id: "grp-vendors", label: "Vendors & Procurement", icon: "🏭", group: true, children: [
+      { id: "grp-vendors", label: "Vendors & Procurement", group: true, children: [
         { id: "vendor-onboarding", label: "Vendor Applications" },
         { id: "vendors", label: "Vendors & RFFs" },
         { id: "rff-approvals", label: "RFF Approvals" },
@@ -669,26 +669,26 @@ const getNavItems = (role) => {
         { id: "contract-awards", label: "Contract Awards" },
         { id: "scorecards", label: "Vendor Scorecards" },
       ]},
-      { id: "grp-finance", label: "Finance", icon: "💼", group: true, children: [
+      { id: "grp-finance", label: "Finance", group: true, children: [
         { id: "finance", label: "Finance Operations" },
         { id: "client-financials", label: "Client Financials" },
         { id: "purchase-orders", label: "Purchase Orders" },
         { id: "vendor-invoices", label: "Vendor Invoices" },
         { id: "zoho-books", label: "Zoho Books" },
       ]},
-      { id: "grp-clients", label: "Clients", icon: "🏢", group: true, children: [
+      { id: "grp-clients", label: "Clients", group: true, children: [
         { id: "clients", label: "Client Database" },
       ]},
-      { id: "grp-people", label: "People", icon: "👥", group: true, children: [
+      { id: "grp-people", label: "People", group: true, children: [
         { id: "users", label: "User Management" },
       ]},
-      { id: "grp-intelligence", label: "Intelligence", icon: "🧠", group: true, children: [
+      { id: "grp-intelligence", label: "Intelligence", group: true, children: [
         { id: "event-analysis", label: "Event Analysis" },
         { id: "strategy-map", label: "Strategy Map" },
         { id: "impact-intelligence", label: "Impact Intelligence" },
       ]},
-      { id: "notifications", label: "Notifications", icon: "🔔", group: true },
-      { id: "calendar", label: "Calendar", icon: "📆", group: true },
+      { id: "notifications", label: "Notifications", group: true },
+      { id: "calendar", label: "Calendar", group: true },
     ];
   }
   if (role === "Vendor Manager") {
@@ -8439,8 +8439,8 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
                     letterSpacing: "0.04em", textTransform: "uppercase",
                     transition: "all 0.15s",
                   }}>
-                    {!sidebarCollapsed && <><span style={{ fontSize: 12 }}>{item.icon}</span>{item.label}</>}
-                    {sidebarCollapsed && <span style={{ fontSize: 12 }}>{item.icon}</span>}
+                    {!sidebarCollapsed && item.label}
+                    {sidebarCollapsed && item.label?.slice(0,2)}
                   </button>
                 );
               }
@@ -8462,12 +8462,11 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
                   }}>
                     {!sidebarCollapsed && (
                       <>
-                        <span style={{ fontSize: 12, flexShrink: 0 }}>{item.icon}</span>
                         <span style={{ flex: 1 }}>{item.label}</span>
-                        <span style={{ fontSize: 9, transition: "transform 0.2s", transform: groupOpen ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+                        <span style={{ fontSize: 9, transition: "transform 0.2s", transform: groupOpen ? "rotate(180deg)" : "rotate(0deg)", opacity: 0.5 }}>▾</span>
                       </>
                     )}
-                    {sidebarCollapsed && <span style={{ fontSize: 12 }}>{item.icon}</span>}
+                    {sidebarCollapsed && <span style={{ fontSize: 9 }}>▾</span>}
                   </button>
                   {groupOpen && !sidebarCollapsed && (
                     <div style={{ paddingLeft: 12, marginTop: 2 }}>

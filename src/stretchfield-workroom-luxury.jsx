@@ -3201,9 +3201,17 @@ const EventsView = ({ user, userRole }) => {
                   )}
                 </div>
 
+                {/* Edit + Delete buttons — canManage roles */}
+                {canManage && (
+                  <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+                    <button onClick={e => { e.stopPropagation(); handleEdit(p); }} style={{ flex: 1, padding: "6px 10px", background: T.cyan+"15", border: `1px solid ${T.cyan}30`, borderRadius: 6, cursor: "pointer", color: T.cyan, fontSize: 11, fontWeight: 700 }}>✎ Edit</button>
+                    <button onClick={e => { e.stopPropagation(); handleDelete(p.id); }} style={{ flex: 1, padding: "6px 10px", background: T.red+"15", border: `1px solid ${T.red}30`, borderRadius: 6, cursor: "pointer", color: T.red, fontSize: 11, fontWeight: 700 }}>🗑 Delete</button>
+                  </div>
+                )}
+
                 {/* Assign Lead + Impact buttons — CEO only */}
                 {user?.role === "CEO" && (
-                  <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+                  <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
                     <button onClick={e => { e.stopPropagation(); setAssignModal(p); }} style={{ flex: 1, padding: "6px 10px", background: T.amber+"15", border: `1px solid ${T.amber}30`, borderRadius: 6, cursor: "pointer", color: T.amber, fontSize: 11, fontWeight: 700 }}>
                       👤 {p.assigned_to_name ? p.assigned_to_name.split(" ")[0] : "Assign Lead"}
                     </button>

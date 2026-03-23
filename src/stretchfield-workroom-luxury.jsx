@@ -3126,6 +3126,36 @@ const EventsView = ({ user, userRole }) => {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this event? This cannot be undone.')) return;
+    // Delete all related records first to avoid FK conflicts
+    await Promise.all([
+      supabase.from('tasks').delete().eq('project_id', id),
+      supabase.from('task_comments').delete().eq('project_id', id),
+      supabase.from('event_impact_briefs').delete().eq('project_id', id),
+      supabase.from('event_post_data').delete().eq('project_id', id),
+      supabase.from('event_scorecards').delete().eq('project_id', id),
+      supabase.from('event_impact_reports').delete().eq('project_id', id),
+      supabase.from('expenses').delete().eq('project_id', id),
+      supabase.from('budgets').delete().eq('project_id', id),
+      supabase.from('client_budgets').delete().eq('project_id', id),
+      supabase.from('client_expenses').delete().eq('project_id', id),
+      supabase.from('client_invoices').delete().eq('project_id', id),
+      supabase.from('vendor_scorecards').delete().eq('project_id', id),
+    ]);
+    // Delete RFF related records
+    const { data: rffList } = await supabase.from('rffs').select('id').eq('project_id', id);
+    if (rffList?.length) {
+      const rffIds = rffList.map(r => r.id);
+      await Promise.all([
+        supabase.from('rff_vendor_assignments').delete().in('rff_id', rffIds),
+        supabase.from('rff_budgets').delete().in('rff_id', rffIds),
+        supabase.from('rff_awards').delete().in('rff_id', rffIds),
+      ]);
+      await supabase.from('rffs').delete().eq('project_id', id);
+    }
+    // Delete purchase orders and vendor invoices
+    await supabase.from('vendor_invoices').delete().eq('event_id', id);
+    await supabase.from('purchase_orders').delete().eq('event_id', id);
+    // Finally delete the event
     await supabase.from('projects').delete().eq('id', id);
     load();
   };

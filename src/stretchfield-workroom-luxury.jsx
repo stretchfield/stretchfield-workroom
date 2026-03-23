@@ -645,6 +645,52 @@ const getNavItems = (role) => {
     base.push({ id: "contract-awards", label: "Contract Awards", icon: "▪" });
     base.push({ id: "event-analysis", label: "Event Analysis", icon: "▪" });
   }
+  if (role === "CEO") {
+    // CEO gets grouped nav — return special structure
+    return [
+      { id: "dashboard", label: "Dashboard", icon: "🏠", group: true },
+      { id: "grp-events", label: "Events & Operations", icon: "📅", group: true, children: [
+        { id: "events", label: "Events" },
+        { id: "tasks", label: "Event Tasks" },
+        { id: "impact-intelligence", label: "Impact Intelligence" },
+      ]},
+      { id: "grp-crm", label: "CRM & Sales", icon: "📈", group: true, children: [
+        { id: "opportunities", label: "Opportunities" },
+        { id: "crm", label: "CRM / Leads" },
+        { id: "crm-insights", label: "CRM Insights" },
+        { id: "sm-tasks", label: "S&M Tasks" },
+      ]},
+      { id: "grp-vendors", label: "Vendors & Procurement", icon: "🏭", group: true, children: [
+        { id: "vendor-onboarding", label: "Vendor Applications" },
+        { id: "vendors", label: "Vendors & RFFs" },
+        { id: "rff-approvals", label: "RFF Approvals" },
+        { id: "vendor-assignment", label: "Vendor Assignment" },
+        { id: "quote-comparison", label: "Quote Comparison" },
+        { id: "contract-awards", label: "Contract Awards" },
+        { id: "scorecards", label: "Vendor Scorecards" },
+      ]},
+      { id: "grp-finance", label: "Finance", icon: "💼", group: true, children: [
+        { id: "finance", label: "Finance Operations" },
+        { id: "client-financials", label: "Client Financials" },
+        { id: "purchase-orders", label: "Purchase Orders" },
+        { id: "vendor-invoices", label: "Vendor Invoices" },
+        { id: "zoho-books", label: "Zoho Books" },
+      ]},
+      { id: "grp-clients", label: "Clients", icon: "🏢", group: true, children: [
+        { id: "clients", label: "Client Database" },
+      ]},
+      { id: "grp-people", label: "People", icon: "👥", group: true, children: [
+        { id: "users", label: "User Management" },
+      ]},
+      { id: "grp-intelligence", label: "Intelligence", icon: "🧠", group: true, children: [
+        { id: "event-analysis", label: "Event Analysis" },
+        { id: "strategy-map", label: "Strategy Map" },
+        { id: "impact-intelligence", label: "Impact Intelligence" },
+      ]},
+      { id: "notifications", label: "Notifications", icon: "🔔", group: true },
+      { id: "calendar", label: "Calendar", icon: "📆", group: true },
+    ];
+  }
   if (role === "Vendor Manager") {
     base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quotes-received", label: "Quotes Received", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" });
   }
@@ -8347,28 +8393,112 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
           )}
         </div>
         <nav style={{ flex: 1, padding: "10px 8px", overflowY: "auto" }}>
-          {getNavItems(currentUser.role).map(item => {
-            const active = activeTab === item.id;
-            return (
-              <button key={item.id} onClick={() => setActiveTab(item.id)} style={{
-                width: "100%", display: "flex", alignItems: "center", gap: 10,
-                padding: "9px 10px", borderRadius: 6, border: "none", cursor: "pointer",
-                background: active ? T.cyan + "18" : "none",
-                color: active ? T.cyan : T.textMuted,
-                fontWeight: active ? 700 : 400, fontSize: 11,
-                marginBottom: 1, textAlign: "left",
-                borderLeft: active ? `2px solid ${T.cyan}` : "2px solid transparent",
-                letterSpacing: "0.04em", textTransform: "uppercase",
-                transition: "all 0.15s", whiteSpace: "nowrap", overflow: "hidden",
-              }}
-                onMouseEnter={e => { if (!active) { e.currentTarget.style.background = T.surface; e.currentTarget.style.color = T.textSecondary; } }}
-                onMouseLeave={e => { if (!active) { e.currentTarget.style.background = "none"; e.currentTarget.style.color = T.textMuted; } }}
-              >
-                <span style={{ fontSize: 5, flexShrink: 0, color: active ? T.cyan : T.textGhost }}>■</span>
-                {!sidebarCollapsed && item.label}
-              </button>
-            );
-          })}
+          {(() => {
+            const navItems = getNavItems(currentUser.role);
+            const isCEONav = currentUser.role === "CEO";
+
+            if (!isCEONav) {
+              return navItems.map(item => {
+                const active = activeTab === item.id;
+                return (
+                  <button key={item.id} onClick={() => setActiveTab(item.id)} style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: 10,
+                    padding: "9px 10px", borderRadius: 6, border: "none", cursor: "pointer",
+                    background: active ? T.cyan + "18" : "none",
+                    color: active ? T.cyan : T.textMuted,
+                    fontWeight: active ? 700 : 400, fontSize: 11,
+                    marginBottom: 1, textAlign: "left",
+                    borderLeft: active ? `2px solid ${T.cyan}` : "2px solid transparent",
+                    letterSpacing: "0.04em", textTransform: "uppercase",
+                    transition: "all 0.15s", whiteSpace: "nowrap", overflow: "hidden",
+                  }}
+                    onMouseEnter={e => { if (!active) { e.currentTarget.style.background = T.surface; e.currentTarget.style.color = T.textSecondary; } }}
+                    onMouseLeave={e => { if (!active) { e.currentTarget.style.background = "none"; e.currentTarget.style.color = T.textMuted; } }}
+                  >
+                    <span style={{ fontSize: 5, flexShrink: 0, color: active ? T.cyan : T.textGhost }}>■</span>
+                    {!sidebarCollapsed && item.label}
+                  </button>
+                );
+              });
+            }
+
+            // CEO grouped nav
+            return navItems.map(item => {
+              if (!item.children) {
+                // Top level single item (Dashboard, Notifications, Calendar)
+                const active = activeTab === item.id;
+                return (
+                  <button key={item.id} onClick={() => setActiveTab(item.id)} style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: 8,
+                    padding: "9px 10px", borderRadius: 6, border: "none", cursor: "pointer",
+                    background: active ? T.cyan+"18" : "none",
+                    color: active ? T.cyan : T.textMuted,
+                    fontWeight: active ? 700 : 400, fontSize: 11,
+                    marginBottom: 2, textAlign: "left",
+                    borderLeft: active ? `2px solid ${T.cyan}` : "2px solid transparent",
+                    letterSpacing: "0.04em", textTransform: "uppercase",
+                    transition: "all 0.15s",
+                  }}>
+                    {!sidebarCollapsed && <><span style={{ fontSize: 12 }}>{item.icon}</span>{item.label}</>}
+                    {sidebarCollapsed && <span style={{ fontSize: 12 }}>{item.icon}</span>}
+                  </button>
+                );
+              }
+
+              // Group item with children
+              const isGroupActive = item.children.some(c => c.id === activeTab);
+              const [groupOpen, setGroupOpen] = React.useState(isGroupActive);
+
+              return (
+                <div key={item.id} style={{ marginBottom: 2 }}>
+                  <button onClick={() => setGroupOpen(o => !o)} style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: 8,
+                    padding: "8px 10px", borderRadius: 6, border: "none", cursor: "pointer",
+                    background: isGroupActive ? T.cyan+"10" : "none",
+                    color: isGroupActive ? T.cyan : T.textSecondary,
+                    fontWeight: 700, fontSize: 10,
+                    textAlign: "left", letterSpacing: "0.06em", textTransform: "uppercase",
+                    transition: "all 0.15s",
+                  }}>
+                    {!sidebarCollapsed && (
+                      <>
+                        <span style={{ fontSize: 12, flexShrink: 0 }}>{item.icon}</span>
+                        <span style={{ flex: 1 }}>{item.label}</span>
+                        <span style={{ fontSize: 9, transition: "transform 0.2s", transform: groupOpen ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+                      </>
+                    )}
+                    {sidebarCollapsed && <span style={{ fontSize: 12 }}>{item.icon}</span>}
+                  </button>
+                  {groupOpen && !sidebarCollapsed && (
+                    <div style={{ paddingLeft: 12, marginTop: 2 }}>
+                      {item.children.map(child => {
+                        const active = activeTab === child.id;
+                        return (
+                          <button key={child.id} onClick={() => setActiveTab(child.id)} style={{
+                            width: "100%", display: "flex", alignItems: "center", gap: 8,
+                            padding: "7px 10px", borderRadius: 5, border: "none", cursor: "pointer",
+                            background: active ? T.cyan+"20" : "none",
+                            color: active ? T.cyan : T.textMuted,
+                            fontWeight: active ? 700 : 400, fontSize: 11,
+                            marginBottom: 1, textAlign: "left",
+                            borderLeft: active ? `2px solid ${T.cyan}` : "2px solid transparent",
+                            letterSpacing: "0.03em",
+                            transition: "all 0.15s",
+                          }}
+                            onMouseEnter={e => { if (!active) { e.currentTarget.style.background = T.surface; e.currentTarget.style.color = T.textSecondary; } }}
+                            onMouseLeave={e => { if (!active) { e.currentTarget.style.background = "none"; e.currentTarget.style.color = T.textMuted; } }}
+                          >
+                            <span style={{ fontSize: 4, color: active ? T.cyan : T.textGhost }}>●</span>
+                            {child.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            });
+          })()}
         </nav>
         <div style={{ padding: "10px 10px 12px", borderTop: `1px solid ${T.border}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px", borderRadius: 6, marginBottom: 8 }}>

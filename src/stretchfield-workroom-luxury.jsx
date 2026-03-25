@@ -3610,12 +3610,59 @@ const OpportunitiesView = ({ user, onNavigate }) => {
   const [editModal, setEditModal] = useState(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ company: "", sector: "", presence: "GH", event_fit: "", notes: "", status: "New", contact_name: "", contact_email: "", contact_phone: "" });
+  const [expandedOpp, setExpandedOpp] = useState(null);
+  const [oppActivities, setOppActivities] = useState({});
+  const [actForm, setActForm] = useState({ type: "note", content: "", scheduled_date: "", scheduled_time: "" });
+  const [addingAct, setAddingAct] = useState(false);
 
   const canManage = ["CEO", "Sales & Marketing"].includes(user?.role);
 
   const load = async () => {
     const { data } = await supabase.from("opportunities").select("*").order("company");
     setOpportunities(data || []);
+  };
+
+  const loadActivities = async (oppId) => {
+    const { data } = await supabase.from("opportunity_activities").select("*").eq("opportunity_id", oppId).order("created_at", { ascending: false });
+    setOppActivities(prev => ({ ...prev, [oppId]: data || [] }));
+  };
+
+  const addActivity = async (oppId, company) => {
+    if (!actForm.content) return;
+    setAddingAct(true);
+    await supabase.from("opportunity_activities").insert({
+      opportunity_id: oppId,
+      type: actForm.type,
+      content: actForm.content,
+      scheduled_date: actForm.scheduled_date || null,
+      scheduled_time: actForm.scheduled_time || null,
+      created_by: user.id,
+      created_by_name: user.name,
+    });
+    // If scheduled — add to itineraries for calendar
+    if (actForm.scheduled_date && ["call","meeting","demo","follow-up"].includes(actForm.type)) {
+      await supabase.from("itineraries").insert({
+        title: `${actForm.type.charAt(0).toUpperCase()+actForm.type.slice(1)} — ${company}`,
+        week_start: actForm.scheduled_date,
+        items: JSON.stringify([{
+          date: actForm.scheduled_date,
+          time: actForm.scheduled_time || "09:00",
+          company,
+          action: actForm.type,
+          notes: actForm.content,
+        }]),
+        created_by: user.id,
+      });
+      // Notify assigned sales team
+      const { data: sales } = await supabase.from("profiles").select("id, email, name").eq("role", "Sales & Marketing");
+      for (const s of sales || []) {
+        await supabase.from("notifications").insert({ user_id: s.id, title: `Follow-up Scheduled — ${company}`, message: `${actForm.type} scheduled on ${actForm.scheduled_date}${actForm.scheduled_time ? " at " + actForm.scheduled_time : ""} for ${company}`, type: "crm" });
+        if (s.email) await sendEmail(s.email, `Follow-up Scheduled — ${company}`, notifEmailHtml({ name: s.name, title: `${actForm.type} Scheduled`, message: `A <strong>${actForm.type}</strong> has been scheduled for <strong>${company}</strong> on <strong>${actForm.scheduled_date}${actForm.scheduled_time ? " at " + actForm.scheduled_time : ""}</strong>.<br><br><em>${actForm.content}</em>`, actionUrl: BASE_URL, actionLabel: "View in WorkRoom" }));
+      }
+    }
+    setActForm({ type: "note", content: "", scheduled_date: "", scheduled_time: "" });
+    setAddingAct(false);
+    loadActivities(oppId);
   };
 
   useEffect(() => { load(); }, []);
@@ -5643,6 +5690,26 @@ const CRMView = ({ user }) => {
 
   const handleAddActivity = async () => {
     if (!actForm.notes) return;
+    // If scheduled — add to calendar
+    if (actForm.scheduled_date && ["call","meeting","demo","follow-up"].includes(actForm.type)) {
+      const lead = leads.find(l => l.id === selectedLead?.id);
+      await supabase.from("itineraries").insert({
+        title: `${actForm.type.charAt(0).toUpperCase()+actForm.type.slice(1)} — ${lead?.company || ""}`,
+        week_start: actForm.scheduled_date,
+        items: JSON.stringify([{
+          date: actForm.scheduled_date,
+          time: actForm.scheduled_time || "09:00",
+          company: lead?.company || "",
+          action: actForm.type,
+          notes: actForm.notes,
+        }]),
+        created_by: user.id,
+      });
+      // Notify assigned sales
+      if (lead?.assigned_to) {
+        await supabase.from("notifications").insert({ user_id: lead.assigned_to, title: `Follow-up Scheduled — ${lead.company}`, message: `${actForm.type} scheduled on ${actForm.scheduled_date}${actForm.scheduled_time ? " at " + actForm.scheduled_time : ""}`, type: "crm" });
+      }
+    }
     setSaving(true);
     await supabase.from("crm_activities").insert({
       lead_id: activityModal.id, type: actForm.type,

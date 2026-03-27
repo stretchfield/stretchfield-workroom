@@ -656,7 +656,7 @@ const getNavItems = (role) => {
       ]},
       { id: "grp-crm", label: "CRM & Sales", group: true, children: [
         { id: "leads", label: "Leads" },
-        { id: "crm", label: "Opportunities" },
+        { id: "crm", label: "CRM / Leads" },
         { id: "crm-insights", label: "CRM Insights" },
         { id: "sm-tasks", label: "S&M Tasks" },
       ]},

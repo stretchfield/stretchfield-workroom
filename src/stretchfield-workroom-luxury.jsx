@@ -3599,7 +3599,7 @@ const EventsView = ({ user, userRole }) => {
 };
 
 
-const LeadsView = ({ user, onNavigate }) => {
+const OpportunitiesView = ({ user, onNavigate }) => {
   const [leads, setLeads] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [search, setSearch] = useState("");
@@ -9066,7 +9066,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "crm-insights": return ["CEO","Country Manager"].includes(currentUser.role) ? <CRMDashboardCEO user={currentUser} /> : <CRMDashboardSM user={currentUser} />;
       case "sm-tasks": return <SMTasksView user={currentUser} />;
       case "strategy-overview": return <StrategyOverviewView />;
-      case "opportunities": return <LeadsView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
+      case "opportunities": return <OpportunitiesView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
       case "client-financials": return <CEOClientFinanceView user={currentUser} />;
       case "client-finance": return <ClientFinanceView user={currentUser} />;
       case "feedback-summary": return <FeedbackView userRole={currentUser.role} />;

@@ -110,7 +110,7 @@ const USERS = {
   ceo: { id: "ceo", name: "David Osei", role: "CEO", email: "david@stretchfield.com", avatar: "DO" },
   admin: { id: "admin", name: "Ama Mensah", role: "Country Manager", email: "ama@stretchfield.com", avatar: "AM" },
   vendorMgr: { id: "vendorMgr", name: "Kofi Asante", role: "Vendor Manager", email: "kofi@stretchfield.com", avatar: "KA" },
-  events: { id: "events", name: "Abena Boateng", role: "Strategy & Events Lead", email: "abena@stretchfield.com", avatar: "AB" },
+  events: { id: "events", name: "Abena Boateng", role: "Strategy & Events Opportunity", email: "abena@stretchfield.com", avatar: "AB" },
   marketing: { id: "marketing", name: "Kwame Darko", role: "Sales & Marketing", email: "kwame@stretchfield.com", avatar: "KD" },
   vendor: { id: "vendor", name: "TechPro Solutions", role: "Vendor", email: "info@techpro.com", avatar: "TP" },
   client: { id: "client", name: "Acme Corp", role: "Client", email: "events@acme.com", avatar: "AC" },
@@ -613,7 +613,7 @@ const Btn = ({ children, onClick, variant = "primary", small }) => {
 // ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 const getNavItems = (role) => {
   const base = [{ id: "dashboard", label: "Dashboard", icon: "▪" }];
-  if (["CEO","Country Manager","Vendor Manager","Strategy & Events Lead"].includes(role)) {
+  if (["CEO","Country Manager","Vendor Manager","Strategy & Events Opportunity"].includes(role)) {
     base.push({ id: "events", label: "Events", icon: "▪" }, { id: "tasks", label: "Event Tasks", icon: "▪" });
   }
   if (role === "Finance Manager") {
@@ -622,19 +622,19 @@ const getNavItems = (role) => {
   if (role === "CEO") {
     base.push({ id: "impact-intelligence", label: "Impact Intelligence", icon: "▪" });
   }
-  if (["Strategy & Events Lead", "Vendor Manager"].includes(role)) {
+  if (["Strategy & Events Opportunity", "Vendor Manager"].includes(role)) {
     base.push({ id: "strategy-map", label: "Strategy Map", icon: "▪" });
   }
   if (["Sales & Marketing"].includes(role)) {
     base.push({ id: "events", label: "Events", icon: "▪" });
   }
   if (["CEO","Sales & Marketing"].includes(role)) {
-    base.push({ id: "opportunities", label: "Opportunities", icon: "▪" });
+    base.push({ id: "leads", label: "Leads", icon: "▪" });
   }
   if (["CEO","Sales & Marketing"].includes(role)) {
-    base.push({ id: "crm", label: "CRM / Leads", icon: "▪" }, { id: "crm-insights", label: "CRM Insights", icon: "▪" }, { id: "sm-tasks", label: "S&M Tasks", icon: "▪" });
+    base.push({ id: "crm", label: "Opportunities", icon: "▪" }, { id: "crm-insights", label: "CRM Insights", icon: "▪" }, { id: "sm-tasks", label: "S&M Tasks", icon: "▪" });
   }
-  if (["Strategy & Events Lead"].includes(role)) {
+  if (["Strategy & Events Opportunity"].includes(role)) {
     base.push({ id: "strategy-overview", label: "Client Overview", icon: "▪" }, { id: "feedback-summary", label: "Feedback", icon: "▪" });
   }
   if (["CEO","Country Manager"].includes(role)) {
@@ -655,8 +655,8 @@ const getNavItems = (role) => {
         { id: "impact-intelligence", label: "Impact Intelligence" },
       ]},
       { id: "grp-crm", label: "CRM & Sales", group: true, children: [
-        { id: "opportunities", label: "Opportunities" },
-        { id: "crm", label: "CRM / Leads" },
+        { id: "leads", label: "Leads" },
+        { id: "crm", label: "Opportunities" },
         { id: "crm-insights", label: "CRM Insights" },
         { id: "sm-tasks", label: "S&M Tasks" },
       ]},
@@ -723,7 +723,7 @@ const getNavItems = (role) => {
   if (role === "Board of Directors") {
     return [{ id: "dashboard", label: "Dashboard", icon: "▪" }, { id: "notifications", label: "Notifications", icon: "▪" }];
   }
-  if (!["Vendor","Client","Strategy & Events Lead"].includes(role)) {
+  if (!["Vendor","Client","Strategy & Events Opportunity"].includes(role)) {
     base.push({ id: "feedback", label: "Feedback", icon: "▪" });
   }
   if (role !== "Client") base.push({ id: "calendar", label: "Calendar", icon: "▪" });
@@ -829,7 +829,7 @@ const CEODashboard = ({ onTab, user }) => {
   const [vendors, setVendors] = useState([]);
   const [vendorProfiles, setVendorProfiles] = useState([]);
   const [scorecards, setScorecards] = useState([]);
-  const [leads, setLeads] = useState([]);
+  const [___opportunitys_table___, setOpportunitys] = useState([]);
   const [targets, setTargets] = useState([]);
   const [feedback, setFeedback] = useState([]);
   const [clients, setClients] = useState([]);
@@ -842,7 +842,7 @@ const CEODashboard = ({ onTab, user }) => {
     supabase.from('tasks').select('*').then(({ data }) => setTasks(data || []));
     supabase.from('clients').select('*').then(({ data }) => setClients(data || []));
     supabase.from('feedback').select('*').order('created_at', { ascending: false }).then(({ data }) => setFeedback(data || []));
-    supabase.from('leads').select('*').then(({ data }) => setLeads(data || []));
+    supabase.from('___opportunitys_table___').select('*').then(({ data }) => setOpportunitys(data || []));
     supabase.from('sales_targets').select('*').then(({ data }) => setTargets(data || []));
     supabase.from('rffs').select('*').then(({ data }) => {
       setRffs(data || []);
@@ -869,18 +869,18 @@ const CEODashboard = ({ onTab, user }) => {
 
   const pendingInvoices = invoices.filter(i => i.status === 'pending');
   const openTasks = tasks.filter(t => t.status !== 'completed');
-  const wonLeads = leads.filter(l => l.status === 'won');
+  const wonOpportunitys = ___opportunitys_table___.filter(l => l.status === 'won');
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const mtdRevenue = wonLeads.filter(l => l.closed_date && new Date(l.closed_date) >= startOfMonth).reduce((a, l) => a + (l.value || 0), 0);
-  const ytdRevenue = wonLeads.filter(l => l.closed_date && new Date(l.closed_date) >= startOfYear).reduce((a, l) => a + (l.value || 0), 0);
-  const totalRevenue = wonLeads.reduce((a, l) => a + (l.value || 0), 0);
-  const closingPct = leads.length ? Math.round((wonLeads.length / leads.length) * 100) : 0;
-  const avgCycle = wonLeads.filter(l => l.sales_cycle_days).length
-    ? Math.round(wonLeads.filter(l => l.sales_cycle_days).reduce((a, l) => a + l.sales_cycle_days, 0) / wonLeads.filter(l => l.sales_cycle_days).length) : 0;
+  const mtdRevenue = wonOpportunitys.filter(l => l.closed_date && new Date(l.closed_date) >= startOfMonth).reduce((a, l) => a + (l.value || 0), 0);
+  const ytdRevenue = wonOpportunitys.filter(l => l.closed_date && new Date(l.closed_date) >= startOfYear).reduce((a, l) => a + (l.value || 0), 0);
+  const totalRevenue = wonOpportunitys.reduce((a, l) => a + (l.value || 0), 0);
+  const closingPct = ___opportunitys_table___.length ? Math.round((wonOpportunitys.length / ___opportunitys_table___.length) * 100) : 0;
+  const avgCycle = wonOpportunitys.filter(l => l.sales_cycle_days).length
+    ? Math.round(wonOpportunitys.filter(l => l.sales_cycle_days).reduce((a, l) => a + l.sales_cycle_days, 0) / wonOpportunitys.filter(l => l.sales_cycle_days).length) : 0;
   const pendingRffs = rffs.filter(r => r.status === 'pending' && r.approved);
-  const wonLeadsAwaitingApproval = leads.filter(l => l.status === 'won' && !l.approved);
+  const wonOpportunitysAwaitingApproval = ___opportunitys_table___.filter(l => l.status === 'won' && !l.approved);
   const avgRating = feedback.length ? (feedback.reduce((a, f) => a + f.rating, 0) / feedback.length).toFixed(1) : null;
   const upcomingEvents = events
     .filter(e => e.event_date && new Date(e.event_date) >= new Date())
@@ -908,7 +908,7 @@ const CEODashboard = ({ onTab, user }) => {
             <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: T.textPrimary, letterSpacing: '-0.02em' }}>{greeting}</h1>
             <div style={{ color: T.textMuted, fontSize: 14, marginTop: 4 }}>Here's your company at a glance</div>
           </div>
-          {(unreadNotifs.length > 0 || wonLeadsAwaitingApproval.length > 0 || pendingInvoices.length > 0) && (
+          {(unreadNotifs.length > 0 || wonOpportunitysAwaitingApproval.length > 0 || pendingInvoices.length > 0) && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 260 }}>
               {unreadNotifs.slice(0, 2).map(n => (
                 <div key={n.id} onClick={() => onTab('notifications')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', background: 'linear-gradient(135deg, ' + T.amber + '18, ' + T.amber + '08)', border: '1px solid ' + T.amber + '33', borderRadius: 8, cursor: 'pointer', backdropFilter: 'blur(8px)' }}>
@@ -917,10 +917,10 @@ const CEODashboard = ({ onTab, user }) => {
                   <span style={{ color: T.amber, fontSize: 11, opacity: 0.7 }}>→</span>
                 </div>
               ))}
-              {wonLeadsAwaitingApproval.length > 0 && (
+              {wonOpportunitysAwaitingApproval.length > 0 && (
                 <div onClick={() => onTab('crm')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', background: 'linear-gradient(135deg, ' + T.teal + '18, ' + T.teal + '08)', border: '1px solid ' + T.teal + '33', borderRadius: 8, cursor: 'pointer' }}>
                   <div style={{ width: 6, height: 6, borderRadius: '50%', background: T.teal, flexShrink: 0, boxShadow: '0 0 6px ' + T.teal }} />
-                  <div style={{ color: T.teal, fontSize: 12, fontWeight: 600 }}>{wonLeadsAwaitingApproval.length} Won Lead{wonLeadsAwaitingApproval.length > 1 ? 's' : ''} Awaiting Approval</div>
+                  <div style={{ color: T.teal, fontSize: 12, fontWeight: 600 }}>{wonOpportunitysAwaitingApproval.length} Won Opportunity{wonOpportunitysAwaitingApproval.length > 1 ? 's' : ''} Awaiting Approval</div>
                   <span style={{ color: T.teal, fontSize: 11, opacity: 0.7 }}>→</span>
                 </div>
               )}
@@ -939,7 +939,7 @@ const CEODashboard = ({ onTab, user }) => {
       {/* Revenue Command Centre */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 24 }}>
         {[
-          { label: 'Total Revenue', value: 'GHS ' + totalRevenue.toLocaleString(), sub: wonLeads.length + ' deals closed', color: '#C9A84C', gradient: 'linear-gradient(135deg, #C9A84C22, #C9A84C08)' },
+          { label: 'Total Revenue', value: 'GHS ' + totalRevenue.toLocaleString(), sub: wonOpportunitys.length + ' deals closed', color: '#C9A84C', gradient: 'linear-gradient(135deg, #C9A84C22, #C9A84C08)' },
           { label: 'YTD Revenue', value: 'GHS ' + ytdRevenue.toLocaleString(), sub: 'Year to date', color: T.cyan, gradient: 'linear-gradient(135deg, ' + T.cyan + '22, ' + T.cyan + '08)' },
           { label: 'MTD Revenue', value: 'GHS ' + mtdRevenue.toLocaleString(), sub: 'This month', color: T.teal, gradient: 'linear-gradient(135deg, ' + T.teal + '22, ' + T.teal + '08)' },
         ].map((k, i) => (
@@ -995,18 +995,18 @@ const CEODashboard = ({ onTab, user }) => {
           ))}
         </div>
 
-        {/* CRM Pipeline — elegant funnel */}
+        {/* Opportunities Pipeline — elegant funnel */}
         <div style={{ background: T.surface, border: '1px solid ' + T.border, borderRadius: 14, padding: '20px 22px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
             <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, letterSpacing: '-0.01em' }}>Pipeline</div>
             <button onClick={() => onTab('crm')} style={{ background: 'none', border: 'none', color: T.cyan, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>View All →</button>
           </div>
           {['new','contacted','qualified','proposal','won','lost'].map(s => {
-            const count = leads.filter(l => l.status === s).length;
-            const val = leads.filter(l => l.status === s).reduce((a, l) => a + (l.value || 0), 0);
+            const count = ___opportunitys_table___.filter(l => l.status === s).length;
+            const val = ___opportunitys_table___.filter(l => l.status === s).reduce((a, l) => a + (l.value || 0), 0);
             if (!count) return null;
             const colors = { new: T.cyan, contacted: T.blue, qualified: T.amber, proposal: T.magenta, won: T.teal, lost: '#F43F5E' };
-            const maxVal = Math.max(...['new','contacted','qualified','proposal','won','lost'].map(st => leads.filter(l => l.status === st).reduce((a,l) => a + (l.value||0), 0)));
+            const maxVal = Math.max(...['new','contacted','qualified','proposal','won','lost'].map(st => ___opportunitys_table___.filter(l => l.status === st).reduce((a,l) => a + (l.value||0), 0)));
             const barW = maxVal > 0 ? Math.round((val / maxVal) * 100) : 0;
             return (
               <div key={s} style={{ marginBottom: 10 }}>
@@ -1022,7 +1022,7 @@ const CEODashboard = ({ onTab, user }) => {
           })}
           <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid ' + T.border + '44', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ color: T.textMuted, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Pipeline Value</span>
-            <span style={{ color: '#C9A84C', fontWeight: 800, fontSize: 15 }}>GHS {leads.filter(l => !['won','lost'].includes(l.status)).reduce((a, l) => a + (l.value || 0), 0).toLocaleString()}</span>
+            <span style={{ color: '#C9A84C', fontWeight: 800, fontSize: 15 }}>GHS {___opportunitys_table___.filter(l => !['won','lost'].includes(l.status)).reduce((a, l) => a + (l.value || 0), 0).toLocaleString()}</span>
           </div>
         </div>
       </div>
@@ -1077,7 +1077,7 @@ const CEODashboard = ({ onTab, user }) => {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
             {targets.map(t => {
-              const repWon = wonLeads.filter(l => l.assigned_to === t.rep_id || l.created_by === t.rep_id);
+              const repWon = wonOpportunitys.filter(l => l.assigned_to === t.rep_id || l.created_by === t.rep_id);
               const repRevenue = repWon.reduce((a, l) => a + (l.value || 0), 0);
               const pct = Math.min(100, Math.round((repRevenue / t.target_amount) * 100));
               const col = pct >= 100 ? T.teal : pct >= 60 ? T.cyan : T.amber;
@@ -2428,7 +2428,7 @@ const TaskCommentCard = ({ task: t, user, canComment, barColor, statusColor, pct
   const [saving, setSaving] = React.useState(false);
   const [showComments, setShowComments] = React.useState(false);
 
-  const canSeeComments = ["CEO", "Strategy & Events Lead"].includes(user?.role) || user?.id === t.assignee_id;
+  const canSeeComments = ["CEO", "Strategy & Events Opportunity"].includes(user?.role) || user?.id === t.assignee_id;
 
   const loadComments = async () => {
     const { data } = await supabase.from("task_comments").select("*").eq("task_id", t.id).order("created_at", { ascending: true });
@@ -2449,8 +2449,8 @@ const TaskCommentCard = ({ task: t, user, canComment, barColor, statusColor, pct
       author_role: user.role,
       message: newComment.trim(),
     });
-    // notify assignee if commenter is CEO or Strategy Lead
-    if (["CEO", "Strategy & Events Lead"].includes(user.role) && t.assignee_id && t.assignee_id !== user.id) {
+    // notify assignee if commenter is CEO or Strategy Opportunity
+    if (["CEO", "Strategy & Events Opportunity"].includes(user.role) && t.assignee_id && t.assignee_id !== user.id) {
       await supabase.from("notifications").insert({
         user_id: t.assignee_id,
         title: `${user.name} commented on your task`,
@@ -2459,9 +2459,9 @@ const TaskCommentCard = ({ task: t, user, canComment, barColor, statusColor, pct
         resource_id: t.id,
       });
     }
-    // notify CEO + Strategy Lead if assignee replies
-    if (!["CEO", "Strategy & Events Lead"].includes(user.role)) {
-      const recipients = await supabase.from("profiles").select("id").in("role", ["CEO", "Strategy & Events Lead"]);
+    // notify CEO + Strategy Opportunity if assignee replies
+    if (!["CEO", "Strategy & Events Opportunity"].includes(user.role)) {
+      const recipients = await supabase.from("profiles").select("id").in("role", ["CEO", "Strategy & Events Opportunity"]);
       for (const r of (recipients.data || [])) {
         if (r.id !== user.id) {
           await supabase.from("notifications").insert({
@@ -2499,7 +2499,7 @@ const TaskCommentCard = ({ task: t, user, canComment, barColor, statusColor, pct
       <div style={{ color: T.textMuted, fontSize: 10, marginBottom: 6 }}>{pct}% complete</div>
       {t.notes && <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 8, fontStyle: "italic" }}>{t.notes}</div>}
 
-      {/* Comments section — only for CEO, Strategy Lead, and assignee */}
+      {/* Comments section — only for CEO, Strategy Opportunity, and assignee */}
       {canSeeComments && (
         <div style={{ marginTop: 10, borderTop: `1px solid ${T.border}44`, paddingTop: 10 }}>
           <button onClick={() => setShowComments(!showComments)} style={{
@@ -2521,7 +2521,7 @@ const TaskCommentCard = ({ task: t, user, canComment, barColor, statusColor, pct
                   {comments.map(c => {
                     const isMe = c.author_id === user.id;
                     const isCEO = c.author_role === "CEO";
-                    const bubbleColor = isCEO ? T.cyan : c.author_role === "Strategy & Events Lead" ? T.teal : T.amber;
+                    const bubbleColor = isCEO ? T.cyan : c.author_role === "Strategy & Events Opportunity" ? T.teal : T.amber;
                     return (
                       <div key={c.id} style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" }}>
                         <div style={{ maxWidth: "85%", background: isMe ? bubbleColor + "20" : T.surface, border: `1px solid ${bubbleColor}30`, borderRadius: isMe ? "12px 12px 4px 12px" : "12px 12px 12px 4px", padding: "8px 12px" }}>
@@ -2572,7 +2572,7 @@ const EVENT_ARCHETYPES = {
     color: "#00C8FF",
     code: "CS",
     dimensions: [
-      { key: "behavioural_change", label: "🎯 Behavioural Change", weight: 0.25, description: "Commitment durability — % leaders executing summit commitments", benchmark: ">80% recall + active execution at 30 days" },
+      { key: "behavioural_change", label: "🎯 Behavioural Change", weight: 0.25, description: "Commitment durability — % opportunityers executing summit commitments", benchmark: ">80% recall + active execution at 30 days" },
       { key: "emotional_impact", label: "❤️ Emotional Impact", weight: 0.20, description: "Strategic alignment score — clarity on strategic priorities", benchmark: "+3 point improvement in clarity score" },
       { key: "data_engagement", label: "📊 Data & Engagement Quality", weight: 0.20, description: "Scientific engagement depth — avg dwell time on content", benchmark: ">5 min avg dwell time" },
       { key: "connection", label: "🔗 Connection & Community", weight: 0.15, description: "Cross-team collaboration — new cross-functional initiatives", benchmark: ">2 new cross-team initiatives per dept" },
@@ -2585,7 +2585,7 @@ const EVENT_ARCHETYPES = {
       { name: "Cross-team Initiatives", target: ">2 per department", method: "HR/project management data", timing: "60 days post-event" },
     ],
     tools: { pre_survey: "Yes", digital_tracking: "No", live_monitoring: "Yes", post_survey: "Yes", day30_survey: "Yes", day90_tracking: "Yes", social_listening: "No", commercial_data: "Yes" },
-    storyTemplate: { before: "struggled with strategic misalignment and siloed decision-making", design: "immersive leadership summit with structured commitment frameworks", outcome: "strategic alignment score improved and new cross-team initiatives launched" }
+    storyTemplate: { before: "struggled with strategic misalignment and siloed decision-making", design: "immersive opportunityership summit with structured commitment frameworks", outcome: "strategic alignment score improved and new cross-team initiatives launched" }
   },
   "Product Launch": {
     color: "#E879F9",
@@ -2594,7 +2594,7 @@ const EVENT_ARCHETYPES = {
       { key: "behavioural_change", label: "🎯 Behavioural Change", weight: 0.25, description: "Intent to purchase/try — self-reported intent shift pre to post", benchmark: "+2 points on intent scale" },
       { key: "emotional_impact", label: "❤️ Emotional Impact", weight: 0.20, description: "Brand recall — % audience recalling 3+ product messages unaided", benchmark: ">65% unaided recall at 24hrs" },
       { key: "data_engagement", label: "📊 Data & Engagement", weight: 0.20, description: "Social amplification — organic content generated by attendees", benchmark: "≥3 organic posts per 10 attendees" },
-      { key: "connection", label: "🔗 Connection & Community", weight: 0.15, description: "Lead conversion — commercial pipeline from event", benchmark: "≥15% of qualified attendees enter pipeline" },
+      { key: "connection", label: "🔗 Connection & Community", weight: 0.15, description: "Opportunity conversion — commercial pipeline from event", benchmark: "≥15% of qualified attendees enter pipeline" },
       { key: "brand_visibility", label: "📣 Brand Visibility", weight: 0.10, description: "Media coverage — volume and quality of press/media mentions", benchmark: "≥3 earned media placements" },
       { key: "commercial", label: "💼 Commercial Outcome", weight: 0.10, description: "Revenue/sales pipeline generated within 30 days post-event", benchmark: "+15% pipeline contribution" },
     ],
@@ -2675,7 +2675,7 @@ const BENCHMARKS = {
   knowledge_recall: { industry: "23%", sf_target: "65%+" },
   organic_posts: { industry: "0.8 per 10", sf_target: "3+ per 10" },
   earned_media: { industry: "1-2", sf_target: "5+" },
-  lead_conversion: { industry: "9%", sf_target: "18%+" },
+  opportunity_conversion: { industry: "9%", sf_target: "18%+" },
 };
 
 const getScoreLabel = (score) => {
@@ -2708,7 +2708,7 @@ const EventImpactView = ({ user, project }) => {
     avg_dwell_time: "", digital_completion_pct: "", interactive_participation_pct: "",
     satisfaction_score: "", nps_score: "", positive_sentiment_pct: "",
     behaviour_30day: "", behaviour_90day: "", knowledge_recall_pct: "",
-    retention_rate: "", revenue_shift_pct: "", leads_generated: "",
+    retention_rate: "", revenue_shift_pct: "", ___opportunitys_table____generated: "",
     organic_posts: "", organic_reach: "", earned_media: "",
   });
   const [scorecardForm, setScorecardForm] = useState({
@@ -2975,7 +2975,7 @@ const EventImpactView = ({ user, project }) => {
               { section: "Engagement & Dwell", fields: [["avg_dwell_time","Average Dwell Time (mins)","number"],["digital_completion_pct","Digital Touchpoint Completion (%)","number"],["interactive_participation_pct","Interactive Feature Participation (%)","number"]] },
               { section: "Sentiment & Satisfaction", fields: [["satisfaction_score","Post-Event Satisfaction Score (/10)","number"],["nps_score","NPS Score","number"],["positive_sentiment_pct","Positive Sentiment % (social/survey)","number"]] },
               { section: "Behaviour Change", fields: [["behaviour_30day","30-Day Behaviour Signal","text"],["behaviour_90day","90-Day Behaviour Signal","text"],["knowledge_recall_pct","Knowledge/Recall Score (%)","number"]] },
-              { section: "Commercial Outcomes", fields: [["retention_rate","Retention Rate (%)","number"],["revenue_shift_pct","Revenue Contribution Shift (%)","number"],["leads_generated","Pipeline/Leads Generated","number"]] },
+              { section: "Commercial Outcomes", fields: [["retention_rate","Retention Rate (%)","number"],["revenue_shift_pct","Revenue Contribution Shift (%)","number"],["___opportunitys_table____generated","Pipeline/Opportunitys Generated","number"]] },
               { section: "Social & Brand", fields: [["organic_posts","Organic Social Posts Generated","number"],["organic_reach","Total Organic Reach (impressions)","number"],["earned_media","Earned Media Placements","number"]] },
             ].map(({ section, fields }) => (
               <div key={section}>
@@ -3091,24 +3091,24 @@ const EventsView = ({ user, userRole }) => {
   const [taskModalEvent, setTaskModalEvent] = useState(null);
   const [impactEvent, setImpactEvent] = useState(null);
   const [assignModal, setAssignModal] = useState(null);
-  const [strategyLeads, setStrategyLeads] = useState([]);
+  const [strategyOpportunitys, setStrategyOpportunitys] = useState([]);
   const [editEvent, setEditEvent] = useState(null);
   const [editForm, setEditForm] = useState({});
 
   const canManage = ['CEO','Country Manager'].includes(user?.role);
-  const canSeeTasks = ['CEO','Country Manager','Strategy & Events Lead','Vendor Manager'].includes(user?.role);
+  const canSeeTasks = ['CEO','Country Manager','Strategy & Events Opportunity','Vendor Manager'].includes(user?.role);
 
   const load = async () => {
     const [p, c, t, sl] = await Promise.all([
       supabase.from('projects').select('*').order('created_at', { ascending: false }),
       supabase.from('clients').select('*').order('name'),
       supabase.from('tasks').select('*').order('created_at', { ascending: false }),
-      supabase.from('profiles').select('id, name, email, avatar').eq('role', 'Strategy & Events Lead'),
+      supabase.from('profiles').select('id, name, email, avatar').eq('role', 'Strategy & Events Opportunity'),
     ]);
     setEvents(p.data || []);
     setClients(c.data || []);
     setTasks(t.data || []);
-    setStrategyLeads(sl.data || []);
+    setStrategyOpportunitys(sl.data || []);
   };
 
   useEffect(() => { load(); }, []);
@@ -3273,7 +3273,7 @@ const EventsView = ({ user, userRole }) => {
         </Card>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
-          {(userRole === "Strategy & Events Lead" ? events.filter(e => e.assigned_to === user?.id) : userRole === "Country Manager" ? events.filter(e => (e.country || 'Ghana') === (user?.country || 'Ghana')) : events).map((p, idx) => (
+          {(userRole === "Strategy & Events Opportunity" ? events.filter(e => e.assigned_to === user?.id) : userRole === "Country Manager" ? events.filter(e => (e.country || 'Ghana') === (user?.country || 'Ghana')) : events).map((p, idx) => (
             <div key={p.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", transition: "box-shadow 0.2s, border-color 0.2s", animationDelay: idx * 0.04 + "s" }}>
               {/* Card header — always visible */}
               <div style={{ padding: "20px 22px" }}
@@ -3334,11 +3334,11 @@ const EventsView = ({ user, userRole }) => {
                   </div>
                 )}
 
-                {/* Assign Lead + Impact buttons — CEO only */}
+                {/* Assign Opportunity + Impact buttons — CEO only */}
                 {user?.role === "CEO" && (
                   <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
                     <button onClick={e => { e.stopPropagation(); setAssignModal(p); }} style={{ flex: 1, padding: "6px 10px", background: T.amber+"15", border: `1px solid ${T.amber}30`, borderRadius: 6, cursor: "pointer", color: T.amber, fontSize: 11, fontWeight: 700 }}>
-                      👤 {p.assigned_to_name ? p.assigned_to_name.split(" ")[0] : "Assign Lead"}
+                      👤 {p.assigned_to_name ? p.assigned_to_name.split(" ")[0] : "Assign Opportunity"}
                     </button>
                     {p.event_category && (
                       <button onClick={e => { e.stopPropagation(); setImpactEvent(impactEvent?.id === p.id ? null : p); }} style={{ flex: 1, padding: "6px 10px", background: (EVENT_ARCHETYPES[p.event_category]?.color||T.teal)+"15", border: `1px solid ${(EVENT_ARCHETYPES[p.event_category]?.color||T.teal)}30`, borderRadius: 6, cursor: "pointer", color: EVENT_ARCHETYPES[p.event_category]?.color||T.teal, fontSize: 11, fontWeight: 700 }}>🎯 Impact</button>
@@ -3370,11 +3370,11 @@ const EventsView = ({ user, userRole }) => {
           ))}
         </div>
       )}
-      {/* ── Assign Strategy Lead Modal ── */}
+      {/* ── Assign Strategy Opportunity Modal ── */}
       {assignModal && (
         <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setAssignModal(null)}>
           <div style={{ background: T.surface, border: `1px solid ${T.amber}30`, borderRadius: 16, width: "100%", maxWidth: 480, padding: 28 }} onClick={e => e.stopPropagation()}>
-            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Assign Strategy Lead</div>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Assign Strategy Opportunity</div>
             <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>Event: <strong style={{ color: T.textPrimary }}>{assignModal.name}</strong></div>
             {assignModal.assigned_to_name && (
               <div style={{ background: T.amber+"12", border: `1px solid ${T.amber}30`, borderRadius: 8, padding: "10px 14px", marginBottom: 16, color: T.amber, fontSize: 12 }}>
@@ -3382,11 +3382,11 @@ const EventsView = ({ user, userRole }) => {
               </div>
             )}
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
-              {strategyLeads.map(sl => (
+              {strategyOpportunitys.map(sl => (
                 <div key={sl.id} onClick={async () => {
                   await supabase.from("projects").update({ assigned_to: sl.id, assigned_to_name: sl.name }).eq("id", assignModal.id);
-                  await supabase.from("notifications").insert({ user_id: sl.id, title: "Event Assigned to You", message: `CEO assigned you to lead "${assignModal.name}". Check your Events tab.`, type: "task" });
-                  if (sl.email) await sendEmail(sl.email, `Event Assigned — ${assignModal.name}`, notifEmailHtml({ name: sl.name, title: "Event Assigned to You", message: `CEO has assigned you as Strategy Lead for <strong>${assignModal.name}</strong>. Please log in to view the event details.`, actionUrl: "https://stretchfield-workroom.vercel.app", actionLabel: "View Event" }));
+                  await supabase.from("notifications").insert({ user_id: sl.id, title: "Event Assigned to You", message: `CEO assigned you to opportunity "${assignModal.name}". Check your Events tab.`, type: "task" });
+                  if (sl.email) await sendEmail(sl.email, `Event Assigned — ${assignModal.name}`, notifEmailHtml({ name: sl.name, title: "Event Assigned to You", message: `CEO has assigned you as Strategy Opportunity for <strong>${assignModal.name}</strong>. Please log in to view the event details.`, actionUrl: "https://stretchfield-workroom.vercel.app", actionLabel: "View Event" }));
                   setAssignModal(null);
                   load();
                 }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: assignModal.assigned_to === sl.id ? T.amber+"15" : T.bg, border: `1px solid ${assignModal.assigned_to === sl.id ? T.amber : T.border}`, borderRadius: 10, cursor: "pointer" }}
@@ -3400,7 +3400,7 @@ const EventsView = ({ user, userRole }) => {
                   {assignModal.assigned_to === sl.id && <div style={{ marginLeft: "auto", color: T.amber, fontWeight: 800 }}>✓</div>}
                 </div>
               ))}
-              {strategyLeads.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: 20 }}>No Strategy & Events Lead users found.</div>}
+              {strategyOpportunitys.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: 20 }}>No Strategy & Events Opportunity users found.</div>}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               {assignModal.assigned_to && (
@@ -3472,7 +3472,7 @@ const EventsView = ({ user, userRole }) => {
                       const barColor = t.status === "completed" ? T.teal : pct > 66 ? T.cyan : pct > 33 ? T.amber : T.magenta;
                       const statusColors = { completed: T.teal, "in-progress": T.cyan, pending: T.amber, blocked: T.red };
                       const statusColor = statusColors[t.status] || T.textMuted;
-                      const canComment = ["CEO", "Strategy & Events Lead"].includes(user?.role);
+                      const canComment = ["CEO", "Strategy & Events Opportunity"].includes(user?.role);
                       return (
                         <TaskCommentCard
                           key={t.id}
@@ -3599,8 +3599,8 @@ const EventsView = ({ user, userRole }) => {
 };
 
 
-const OpportunitiesView = ({ user, onNavigate }) => {
-  const [opportunities, setOpportunities] = useState([]);
+const LeadsView = ({ user, onNavigate }) => {
+  const [leads, setLeads] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [search, setSearch] = useState("");
   const [sectorFilter, setSectorFilter] = useState("all");
@@ -3618,8 +3618,8 @@ const OpportunitiesView = ({ user, onNavigate }) => {
   const canManage = ["CEO", "Sales & Marketing"].includes(user?.role);
 
   const load = async () => {
-    const { data } = await supabase.from("opportunities").select("*").order("company");
-    setOpportunities(data || []);
+    const { data } = await supabase.from("leads").select("*").order("company");
+    setLeads(data || []);
   };
 
   const loadActivities = async (oppId) => {
@@ -3668,15 +3668,15 @@ const OpportunitiesView = ({ user, onNavigate }) => {
   useEffect(() => { load(); }, []);
 
   useEffect(() => {
-    let f = [...opportunities];
+    let f = [...leads];
     if (search) f = f.filter(o => o.company.toLowerCase().includes(search.toLowerCase()) || o.sector?.toLowerCase().includes(search.toLowerCase()));
     if (sectorFilter !== "all") f = f.filter(o => o.sector === sectorFilter);
     if (presenceFilter !== "all") f = f.filter(o => o.presence === presenceFilter);
     if (statusFilter !== "all") f = f.filter(o => o.status === statusFilter);
     setFiltered(f);
-  }, [opportunities, search, sectorFilter, presenceFilter, statusFilter]);
+  }, [leads, search, sectorFilter, presenceFilter, statusFilter]);
 
-  const sectors = [...new Set(opportunities.map(o => o.sector).filter(Boolean))].sort();
+  const sectors = [...new Set(leads.map(o => o.sector).filter(Boolean))].sort();
   const statuses = ["New", "Contacted", "Qualified", "Converted"];
   const statusColors = { New: T.cyan, Contacted: T.amber, Qualified: T.teal, Converted: "#10B981" };
   const presenceColors = { GH: T.cyan, NG: T.amber, KE: T.teal };
@@ -3684,7 +3684,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
   const handleAdd = async () => {
     if (!form.company) return;
     setSaving(true);
-    await supabase.from("opportunities").insert({ ...form });
+    await supabase.from("leads").insert({ ...form });
     // form already includes contact_name, contact_email, contact_phone
     setSaving(false);
     setModal(false);
@@ -3694,7 +3694,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
 
   const handleUpdate = async () => {
     setSaving(true);
-    await supabase.from("opportunities").update({
+    await supabase.from("leads").update({
       company: editModal.company, sector: editModal.sector,
       presence: editModal.presence, event_fit: editModal.event_fit,
       notes: editModal.notes, status: editModal.status,
@@ -3710,31 +3710,31 @@ const OpportunitiesView = ({ user, onNavigate }) => {
 
   const handleDelete = async (id) => {
     if (!window.confirm("Remove this opportunity?")) return;
-    await supabase.from("opportunities").delete().eq("id", id);
+    await supabase.from("leads").delete().eq("id", id);
     load();
   };
 
   const handleConvert = async (opp) => {
-    if (!window.confirm(`Convert ${opp.company} to a Lead? It will appear in the CRM Pipeline.`)) return;
+    if (!window.confirm(`Convert ${opp.company} to a Opportunity? It will appear in the Opportunities Pipeline.`)) return;
     setSaving(true);
-    const { data: lead, error } = await supabase.from("leads").insert({
+    const { data: opportunity, error } = await supabase.from("___opportunitys_table___").insert({
       company: opp.company,
       contact_name: opp.contact_name || "",
       email: opp.contact_email || "",
       phone: opp.contact_phone || "",
       status: "new",
       value: 0,
-      notes: `Converted from Opportunities Portal.\n\nEvent Fit: ${opp.event_fit || ""}\n\nOpportunity Notes: ${opp.notes || ""}`,
-      source: "Opportunities Portal",
+      notes: `Converted from Leads Portal.\n\nEvent Fit: ${opp.event_fit || ""}\n\nOpportunity Notes: ${opp.notes || ""}`,
+      source: "Leads Portal",
       created_by: user?.id,
       assigned_to: user?.id,
       assigned_name: user?.name || "",
     }).select().single();
-    console.log("Lead insert result:", lead, error);
-    if (!error && lead) {
-      await supabase.from("opportunities").update({
+    console.log("Opportunity insert result:", opportunity, error);
+    if (!error && opportunity) {
+      await supabase.from("leads").update({
         status: "Converted",
-        converted_lead_id: lead.id,
+        converted_opportunity_id: opportunity.id,
         updated_at: new Date().toISOString(),
       }).eq("id", opp.id);
       setSaving(false);
@@ -3757,10 +3757,10 @@ const OpportunitiesView = ({ user, onNavigate }) => {
     </div>
   );
 
-  const converted = opportunities.filter(o => o.status === "Converted").length;
-  const qualified = opportunities.filter(o => o.status === "Qualified").length;
-  const contacted = opportunities.filter(o => o.status === "Contacted").length;
-  const panAfrica = opportunities.filter(o => o.presence === "GH+NG+KE").length;
+  const converted = leads.filter(o => o.status === "Converted").length;
+  const qualified = leads.filter(o => o.status === "Qualified").length;
+  const contacted = leads.filter(o => o.status === "Contacted").length;
+  const panAfrica = leads.filter(o => o.presence === "GH+NG+KE").length;
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
@@ -3768,8 +3768,8 @@ const OpportunitiesView = ({ user, onNavigate }) => {
       <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
         <div>
           <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>CRM</div>
-          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Opportunities</h2>
-          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{opportunities.length} target companies · {converted} converted to leads</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Leads</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{leads.length} target companies · {converted} converted to ___opportunitys_table___</div>
         </div>
         {canManage && (
           <button onClick={() => setModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, letterSpacing: "0.06em" }}>+ Add Opportunity</button>
@@ -3779,7 +3779,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
       {/* KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginBottom: 24 }}>
         {[
-          { label: "Total", value: opportunities.length, color: T.blue },
+          { label: "Total", value: leads.length, color: T.blue },
           { label: "Contacted", value: contacted, color: T.amber },
           { label: "Qualified", value: qualified, color: T.teal },
           { label: "Converted", value: converted, color: "#10B981" },
@@ -3861,7 +3861,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
                             💬 {(oppActivities[o.id]||[]).length > 0 ? oppActivities[o.id].length : "Notes"}
                           </button>
                           {o.status !== "Converted" && (
-                            <button onClick={() => handleConvert(o)} style={{ background: "#10B98115", border: "1px solid #10B98130", color: "#10B981", padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>→ Lead</button>
+                            <button onClick={() => handleConvert(o)} style={{ background: "#10B98115", border: "1px solid #10B98130", color: "#10B981", padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>→ Opportunity</button>
                           )}
                           <button onClick={() => handleDelete(o.id)} style={{ background: T.red + "15", border: `1px solid ${T.red}30`, color: T.red, padding: "4px 8px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>×</button>
                         </div>
@@ -3923,7 +3923,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
             </tbody>
           </table>
           {filtered.length === 0 && (
-            <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted, fontSize: 13 }}>No opportunities match your filters.</div>
+            <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted, fontSize: 13 }}>No leads match your filters.</div>
           )}
         </div>
       </div>
@@ -4014,8 +4014,8 @@ const TaskCommentThread = ({ task, user }) => {
   const [newComment, setNewComment] = React.useState("");
   const [saving, setSaving] = React.useState(false);
 
-  const canSeeComments = ["CEO", "Strategy & Events Lead"].includes(user?.role) || user?.id === task.assignee_id;
-  const canComment = ["CEO", "Strategy & Events Lead"].includes(user?.role) || user?.id === task.assignee_id;
+  const canSeeComments = ["CEO", "Strategy & Events Opportunity"].includes(user?.role) || user?.id === task.assignee_id;
+  const canComment = ["CEO", "Strategy & Events Opportunity"].includes(user?.role) || user?.id === task.assignee_id;
 
   const loadComments = async () => {
     const { data } = await supabase.from("task_comments").select("*").eq("task_id", task.id).order("created_at", { ascending: true });
@@ -4034,8 +4034,8 @@ const TaskCommentThread = ({ task, user }) => {
       author_role: user.role,
       message: newComment.trim(),
     });
-    // Notify assignee if CEO or Strategy Lead comments
-    if (["CEO", "Strategy & Events Lead"].includes(user.role) && task.assignee_id && task.assignee_id !== user.id) {
+    // Notify assignee if CEO or Strategy Opportunity comments
+    if (["CEO", "Strategy & Events Opportunity"].includes(user.role) && task.assignee_id && task.assignee_id !== user.id) {
       await supabase.from("notifications").insert({
         user_id: task.assignee_id,
         title: `${user.name} commented on your task`,
@@ -4044,9 +4044,9 @@ const TaskCommentThread = ({ task, user }) => {
         resource_id: task.id,
       });
     }
-    // Notify CEO + Strategy Lead if assignee replies
-    if (!["CEO", "Strategy & Events Lead"].includes(user.role)) {
-      const { data: recipients } = await supabase.from("profiles").select("id").in("role", ["CEO", "Strategy & Events Lead"]);
+    // Notify CEO + Strategy Opportunity if assignee replies
+    if (!["CEO", "Strategy & Events Opportunity"].includes(user.role)) {
+      const { data: recipients } = await supabase.from("profiles").select("id").in("role", ["CEO", "Strategy & Events Opportunity"]);
       for (const r of (recipients || [])) {
         if (r.id !== user.id) {
           await supabase.from("notifications").insert({
@@ -4071,7 +4071,7 @@ const TaskCommentThread = ({ task, user }) => {
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
         <div style={{ width: 5, height: 5, borderRadius: "50%", background: T.cyan, boxShadow: `0 0 6px ${T.cyan}` }} />
         <span style={{ color: T.textPrimary, fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em" }}>Private Thread</span>
-        <span style={{ color: T.textMuted, fontSize: 10 }}>— CEO · Strategy Lead · You</span>
+        <span style={{ color: T.textMuted, fontSize: 10 }}>— CEO · Strategy Opportunity · You</span>
       </div>
 
       {/* Comment bubbles */}
@@ -4082,7 +4082,7 @@ const TaskCommentThread = ({ task, user }) => {
           {comments.map(c => {
             const isMe = c.author_id === user.id;
             const isCEO = c.author_role === "CEO";
-            const bubbleColor = isCEO ? T.cyan : c.author_role === "Strategy & Events Lead" ? T.teal : T.amber;
+            const bubbleColor = isCEO ? T.cyan : c.author_role === "Strategy & Events Opportunity" ? T.teal : T.amber;
             return (
               <div key={c.id} style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" }}>
                 <div style={{ maxWidth: "85%", background: isMe ? bubbleColor + "20" : T.bg, border: `1px solid ${bubbleColor}30`, borderRadius: isMe ? "12px 12px 4px 12px" : "12px 12px 12px 4px", padding: "10px 14px" }}>
@@ -4105,7 +4105,7 @@ const TaskCommentThread = ({ task, user }) => {
             value={newComment}
             onChange={e => setNewComment(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); }}}
-            placeholder={["CEO","Strategy & Events Lead"].includes(user?.role) ? "Add a comment..." : "Reply to this thread..."}
+            placeholder={["CEO","Strategy & Events Opportunity"].includes(user?.role) ? "Add a comment..." : "Reply to this thread..."}
             rows={2}
             style={{ flex: 1, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "8px 12px", color: T.textPrimary, fontSize: 13, resize: "none", fontFamily: "inherit", outline: "none", transition: "border-color 0.15s" }}
             onFocus={e => e.target.style.borderColor = T.cyan + "60"}
@@ -4135,7 +4135,7 @@ const TasksView = ({ userRole, openTaskId, onOpenHandled }) => {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', project_id: '', deadline: '', status: 'pending', assignee_id: '', assignee_name: '', assigned_by: '' });
 
-  const canEdit = ['CEO', 'Country Manager', 'Strategy & Events Lead', 'Vendor Manager', 'Vendor', 'Sales & Marketing'].includes(userRole);
+  const canEdit = ['CEO', 'Country Manager', 'Strategy & Events Opportunity', 'Vendor Manager', 'Vendor', 'Sales & Marketing'].includes(userRole);
   const canToggleVisibility = ['CEO','Country Manager'].includes(userRole);
 
   const openDetail = (task) => {
@@ -4989,7 +4989,7 @@ const UsersView = ({ user }) => {
 
   const roleColors = {
     'CEO': T.cyan, 'Country Manager': T.blue, 'Vendor Manager': T.magenta,
-    'Strategy & Events Lead': T.amber, 'Sales & Marketing': '#EC4899',
+    'Strategy & Events Opportunity': T.amber, 'Sales & Marketing': '#EC4899',
     'Vendor': '#06B6D4', 'Client': '#84CC16',
   };
 
@@ -5053,7 +5053,7 @@ const UsersView = ({ user }) => {
       {/* KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px,1fr))", gap: 12, marginBottom: 24 }}>
         {[...new Set(users.map(u => u.role))].map((role, i) => {
-          const roleColors = { "CEO": T.cyan, "Country Manager": T.teal, "Vendor Manager": T.amber, "Strategy & Events Lead": T.magenta, "Finance Manager": T.gold, "Sales & Marketing": T.blue, "Vendor": T.textSecondary, "Client": "#10B981", "Board of Directors": "#8B5CF6" };
+          const roleColors = { "CEO": T.cyan, "Country Manager": T.teal, "Vendor Manager": T.amber, "Strategy & Events Opportunity": T.magenta, "Finance Manager": T.gold, "Sales & Marketing": T.blue, "Vendor": T.textSecondary, "Client": "#10B981", "Board of Directors": "#8B5CF6" };
           const color = roleColors[role] || T.textMuted;
           return (
             <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${color}`, borderRadius: 10 }}>
@@ -5106,7 +5106,7 @@ const UsersView = ({ user }) => {
               <select value={editForm.role} onChange={e => setEditForm({...editForm, role: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
                 <option value="Country Manager">Country Manager</option>
                 <option value="Vendor Manager">Vendor Manager</option>
-                <option value="Strategy & Events Lead">Strategy & Events Lead</option>
+                <option value="Strategy & Events Opportunity">Strategy & Events Opportunity</option>
                 <option value="Sales & Marketing">Sales & Marketing</option>
                 <option value="Finance Manager">Finance Manager</option>
                 <option value="Board of Directors">Board of Directors</option>
@@ -5166,7 +5166,7 @@ const UsersView = ({ user }) => {
           <Select label="Role" options={[
             { value: 'Country Manager', label: 'Country Manager' },
             { value: 'Vendor Manager', label: 'Vendor Manager' },
-            { value: 'Strategy & Events Lead', label: 'Strategy & Events Lead' },
+            { value: 'Strategy & Events Opportunity', label: 'Strategy & Events Opportunity' },
             { value: 'Sales & Marketing', label: 'Sales & Marketing' },
             { value: 'Finance Manager', label: 'Finance Manager' },
             { value: 'Board of Directors', label: 'Board of Directors' },
@@ -5683,12 +5683,12 @@ const VendorTasksView = ({ user }) => {
 
 // ─── CRM VIEW ─────────────────────────────────────────────────────────────────
 const CRMView = ({ user }) => {
-  const [leads, setLeads] = useState([]);
+  const [___opportunitys_table___, setOpportunitys] = useState([]);
   const [activities, setActivities] = useState([]);
   const [proposals, setProposals] = useState([]);
   const [members, setMembers] = useState([]);
   const [modal, setModal] = useState(false);
-  const [selectedLead, setSelectedLead] = useState(null);
+  const [selectedOpportunity, setSelectedOpportunity] = useState(null);
   const [activityModal, setActivityModal] = useState(null);
   const [proposalModal, setProposalModal] = useState(null);
   const [proposalFile, setProposalFile] = useState(null);
@@ -5712,13 +5712,13 @@ const CRMView = ({ user }) => {
 
   const load = async () => {
     const [l, a, p, m, c] = await Promise.all([
-      ["CEO", "Country Manager", "Sales & Marketing"].includes(user?.role) ? supabase.from("leads").select("*").order("created_at", { ascending: false }) : supabase.from("leads").select("*").or("assigned_to.eq." + user.id + ",created_by.eq." + user.id).order("created_at", { ascending: false }),
+      ["CEO", "Country Manager", "Sales & Marketing"].includes(user?.role) ? supabase.from("___opportunitys_table___").select("*").order("created_at", { ascending: false }) : supabase.from("___opportunitys_table___").select("*").or("assigned_to.eq." + user.id + ",created_by.eq." + user.id).order("created_at", { ascending: false }),
       supabase.from("crm_activities").select("*").order("created_at", { ascending: false }),
       supabase.from("proposals").select("*").order("created_at", { ascending: false }),
       supabase.from('profiles').select('*').not('role', 'in', '("Client","Vendor")'),
       supabase.from("clients").select("*"),
     ]);
-    setLeads(l.data || []);
+    setOpportunitys(l.data || []);
     setActivities(a.data || []);
     setProposals(p.data || []);
     setMembers(m.data || []);
@@ -5727,10 +5727,10 @@ const CRMView = ({ user }) => {
 
   useEffect(() => { load(); }, []);
 
-  const handleCreateLead = async () => {
+  const handleCreateOpportunity = async () => {
     if (!form.company) return;
     setSaving(true);
-    await supabase.from("leads").insert({
+    await supabase.from("___opportunitys_table___").insert({
       company: form.company, contact_name: form.contact_name, email: form.email,
       phone: form.phone, source: form.source, value: parseFloat(form.value) || 0,
       notes: form.notes, status: "new", created_by: user.id,
@@ -5746,27 +5746,27 @@ const CRMView = ({ user }) => {
     if (!actForm.notes) return;
     // If scheduled — add to calendar
     if (actForm.scheduled_date && ["call","meeting","demo","follow-up"].includes(actForm.type)) {
-      const lead = leads.find(l => l.id === selectedLead?.id);
+      const opportunity = ___opportunitys_table___.find(l => l.id === selectedOpportunity?.id);
       await supabase.from("itineraries").insert({
-        title: `${actForm.type.charAt(0).toUpperCase()+actForm.type.slice(1)} — ${lead?.company || ""}`,
+        title: `${actForm.type.charAt(0).toUpperCase()+actForm.type.slice(1)} — ${opportunity?.company || ""}`,
         week_start: actForm.scheduled_date,
         items: JSON.stringify([{
           date: actForm.scheduled_date,
           time: actForm.scheduled_time || "09:00",
-          company: lead?.company || "",
+          company: opportunity?.company || "",
           action: actForm.type,
           notes: actForm.notes,
         }]),
         created_by: user.id,
       });
       // Notify assigned sales
-      if (lead?.assigned_to) {
-        await supabase.from("notifications").insert({ user_id: lead.assigned_to, title: `Follow-up Scheduled — ${lead.company}`, message: `${actForm.type} scheduled on ${actForm.scheduled_date}${actForm.scheduled_time ? " at " + actForm.scheduled_time : ""}`, type: "crm" });
+      if (opportunity?.assigned_to) {
+        await supabase.from("notifications").insert({ user_id: opportunity.assigned_to, title: `Follow-up Scheduled — ${opportunity.company}`, message: `${actForm.type} scheduled on ${actForm.scheduled_date}${actForm.scheduled_time ? " at " + actForm.scheduled_time : ""}`, type: "crm" });
       }
     }
     setSaving(true);
     await supabase.from("crm_activities").insert({
-      lead_id: activityModal.id, type: actForm.type,
+      opportunity_id: activityModal.id, type: actForm.type,
       notes: actForm.notes, created_by: user.id, created_by_name: user.name,
     });
     setActivityModal(null);
@@ -5790,7 +5790,7 @@ const CRMView = ({ user }) => {
       }
     }
     await supabase.from("proposals").insert({
-      lead_id: proposalModal.id, title: propForm.title,
+      opportunity_id: proposalModal.id, title: propForm.title,
       amount: parseFloat(propForm.amount) || 0, notes: propForm.notes,
       status: "draft", document_url, document_name,
     });
@@ -5801,20 +5801,20 @@ const CRMView = ({ user }) => {
     load();
   };
 
-  const openApprovalModal = (lead) => {
+  const openApprovalModal = (opportunity) => {
     const matched = existingClients.find(c =>
-      c.company?.toLowerCase() === lead.company?.toLowerCase() ||
-      c.email?.toLowerCase() === lead.email?.toLowerCase()
+      c.company?.toLowerCase() === opportunity.company?.toLowerCase() ||
+      c.email?.toLowerCase() === opportunity.email?.toLowerCase()
     );
     setMatchedClient(matched || null);
-    setClientForm({ name: lead.contact_name || "", company: lead.company || "", email: lead.email || "", phone: lead.phone || "" });
-    setEventForm({ name: lead.company + " Event", deadline: "", phase: "Planning" });
+    setClientForm({ name: opportunity.contact_name || "", company: opportunity.company || "", email: opportunity.email || "", phone: opportunity.phone || "" });
+    setEventForm({ name: opportunity.company + " Event", deadline: "", phase: "Planning" });
     setCreateLogin(false);
     setLoginPassword("");
-    setApprovalModal(lead);
+    setApprovalModal(opportunity);
   };
 
-  const handleApproveWonLead = async () => {
+  const handleApproveWonOpportunity = async () => {
     setSaving(true);
     let clientId = matchedClient?.id;
     let clientEmail = matchedClient?.email || clientForm.email;
@@ -5864,8 +5864,8 @@ const CRMView = ({ user }) => {
       active_for_client: true,
     });
 
-    // Mark lead approved
-    await supabase.from("leads").update({ approved: true, approved_by: user.id }).eq("id", approvalModal.id);
+    // Mark opportunity approved
+    await supabase.from("___opportunitys_table___").update({ approved: true, approved_by: user.id }).eq("id", approvalModal.id);
 
     // Notify Sales & Marketing
     const { data: smUsers } = await supabase.from("profiles").select("id").eq("role", "Sales & Marketing");
@@ -5873,7 +5873,7 @@ const CRMView = ({ user }) => {
       await Promise.all(smUsers.map(u =>
         supabase.from("notifications").insert({
           user_id: u.id,
-          title: "Lead Approved",
+          title: "Opportunity Approved",
           message: approvalModal.company + " approved. Client and event created.",
           type: "crm",
         })
@@ -5885,25 +5885,25 @@ const CRMView = ({ user }) => {
     load();
   };
 
-  const filteredLeads = filter === "all" ? leads : leads.filter(l => l.status === filter);
-  const totalValue = leads.filter(l => l.status === "won").reduce((a, l) => a + (l.value || 0), 0);
-  const pipelineValue = leads.filter(l => !["won","lost"].includes(l.status)).reduce((a, l) => a + (l.value || 0), 0);
+  const filteredOpportunitys = filter === "all" ? ___opportunitys_table___ : ___opportunitys_table___.filter(l => l.status === filter);
+  const totalValue = ___opportunitys_table___.filter(l => l.status === "won").reduce((a, l) => a + (l.value || 0), 0);
+  const pipelineValue = ___opportunitys_table___.filter(l => !["won","lost"].includes(l.status)).reduce((a, l) => a + (l.value || 0), 0);
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
         <div>
           <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Sales</div>
-          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>CRM Pipeline</h2>
-          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{leads.length} leads · GHS {pipelineValue.toLocaleString()} in pipeline</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Opportunities Pipeline</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{___opportunitys_table___.length} ___opportunitys_table___ · GHS {pipelineValue.toLocaleString()} in pipeline</div>
         </div>
-        {canEdit && <Btn onClick={() => setModal(true)}>+ New Lead</Btn>}
+        {canEdit && <Btn onClick={() => setModal(true)}>+ New Opportunity</Btn>}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
         {[
-          { label: "Total Leads", value: leads.length, color: T.cyan },
+          { label: "Total Opportunitys", value: ___opportunitys_table___.length, color: T.cyan },
           { label: "Pipeline Value", value: "GHS " + pipelineValue.toLocaleString(), color: T.amber },
-          { label: "Won", value: leads.filter(l => l.status === "won").length, sub: "GHS " + totalValue.toLocaleString(), color: T.teal },
+          { label: "Won", value: ___opportunitys_table___.filter(l => l.status === "won").length, sub: "GHS " + totalValue.toLocaleString(), color: T.teal },
           { label: "Proposals", value: proposals.length, color: T.magenta },
         ].map((k, i) => (
           <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
@@ -5921,54 +5921,54 @@ const CRMView = ({ user }) => {
             background: filter === s ? (statusColors[s] || T.cyan) + "20" : "none",
             color: filter === s ? (statusColors[s] || T.cyan) : T.textMuted,
             letterSpacing: "0.04em", textTransform: "uppercase", transition: "all 0.15s",
-          }}>{s === "all" ? "All" : s}{s !== "all" ? ` (${leads.filter(l => l.status === s).length})` : ""}</button>
+          }}>{s === "all" ? "All" : s}{s !== "all" ? ` (${___opportunitys_table___.filter(l => l.status === s).length})` : ""}</button>
         ))}
       </div>
-      {filteredLeads.length === 0 ? (
+      {filteredOpportunitys.length === 0 ? (
         <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>🎯</div>
-          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No leads yet</div>
-          <div style={{ color: T.textMuted, fontSize: 13 }}>Add your first lead to get started.</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No ___opportunitys_table___ yet</div>
+          <div style={{ color: T.textMuted, fontSize: 13 }}>Add your first opportunity to get started.</div>
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
-          {filteredLeads.map((lead, idx) => (
-            <div key={lead.id} onClick={() => setSelectedLead(selectedLead?.id === lead.id ? null : lead)}
-              style={{ background: T.surface, border: `1px solid ${selectedLead?.id === lead.id ? (statusColors[lead.status] || T.cyan) + "60" : T.border}`, borderRadius: 12, padding: "18px 20px", cursor: "pointer", transition: "box-shadow 0.2s, border-color 0.2s" }}
-              onMouseEnter={e => { if (selectedLead?.id !== lead.id) { e.currentTarget.style.boxShadow = `0 4px 24px ${T.cyan}10`; e.currentTarget.style.borderColor = T.cyan + "40"; }}}
-              onMouseLeave={e => { if (selectedLead?.id !== lead.id) { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = T.border; }}}
+          {filteredOpportunitys.map((opportunity, idx) => (
+            <div key={opportunity.id} onClick={() => setSelectedOpportunity(selectedOpportunity?.id === opportunity.id ? null : opportunity)}
+              style={{ background: T.surface, border: `1px solid ${selectedOpportunity?.id === opportunity.id ? (statusColors[opportunity.status] || T.cyan) + "60" : T.border}`, borderRadius: 12, padding: "18px 20px", cursor: "pointer", transition: "box-shadow 0.2s, border-color 0.2s" }}
+              onMouseEnter={e => { if (selectedOpportunity?.id !== opportunity.id) { e.currentTarget.style.boxShadow = `0 4px 24px ${T.cyan}10`; e.currentTarget.style.borderColor = T.cyan + "40"; }}}
+              onMouseLeave={e => { if (selectedOpportunity?.id !== opportunity.id) { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = T.border; }}}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{lead.company}</div>
-                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>{lead.contact_name}{lead.phone ? " · " + lead.phone : ""}</div>
+                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{opportunity.company}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>{opportunity.contact_name}{opportunity.phone ? " · " + opportunity.phone : ""}</div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, marginLeft: 8 }}>
-                  <span style={{ background: (statusColors[lead.status] || T.cyan) + "20", color: statusColors[lead.status] || T.cyan, padding: "3px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>{lead.status}</span>
-                  {lead.status === "won" && !lead.approved && <span style={{ background: T.amber+"20", color: T.amber, fontSize: 9, fontWeight: 800, borderRadius: 20, padding: "1px 7px", marginLeft: 2 }}>Pending CEO</span>}
-                  {lead.status === "won" && lead.approved && <span style={{ background: "#10B98120", color: "#10B981", fontSize: 9, fontWeight: 800, borderRadius: 20, padding: "1px 7px", marginLeft: 2 }}>✓ Approved</span>}
+                  <span style={{ background: (statusColors[opportunity.status] || T.cyan) + "20", color: statusColors[opportunity.status] || T.cyan, padding: "3px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>{opportunity.status}</span>
+                  {opportunity.status === "won" && !opportunity.approved && <span style={{ background: T.amber+"20", color: T.amber, fontSize: 9, fontWeight: 800, borderRadius: 20, padding: "1px 7px", marginLeft: 2 }}>Pending CEO</span>}
+                  {opportunity.status === "won" && opportunity.approved && <span style={{ background: "#10B98120", color: "#10B981", fontSize: 9, fontWeight: 800, borderRadius: 20, padding: "1px 7px", marginLeft: 2 }}>✓ Approved</span>}
                   {user?.role === "CEO" && (
-                    <button onClick={async (e) => { e.stopPropagation(); if (!window.confirm(`Delete lead "${lead.company}"? This cannot be undone.`)) return; await supabase.from("opportunities").update({ converted_lead_id: null }).eq("converted_lead_id", lead.id); const { error } = await supabase.from("leads").delete().eq("id", lead.id); if (error) { alert("Delete failed: " + error.message); return; } if (selectedLead?.id === lead.id) setSelectedLead(null); load(); }}
+                    <button onClick={async (e) => { e.stopPropagation(); if (!window.confirm(`Delete opportunity "${opportunity.company}"? This cannot be undone.`)) return; await supabase.from("leads").update({ converted_opportunity_id: null }).eq("converted_opportunity_id", opportunity.id); const { error } = await supabase.from("___opportunitys_table___").delete().eq("id", opportunity.id); if (error) { alert("Delete failed: " + error.message); return; } if (selectedOpportunity?.id === opportunity.id) setSelectedOpportunity(null); load(); }}
                       style={{ background: T.red + "18", border: `1px solid ${T.red}40`, color: T.red, width: 24, height: 24, borderRadius: 6, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, flexShrink: 0 }}
                       onMouseEnter={e => e.currentTarget.style.background = T.red + "35"}
                       onMouseLeave={e => e.currentTarget.style.background = T.red + "18"}>×</button>
                   )}
                 </div>
               </div>
-              <div style={{ color: T.gold, fontWeight: 900, fontSize: 16, marginBottom: 10 }}>GHS {(lead.value || 0).toLocaleString()}</div>
-              {user?.role === "CEO" && lead.status === "won" && !lead.approved && (
-                <button onClick={e => { e.stopPropagation(); setApprovalModal(lead); }} style={{ width: "100%", padding: "8px", background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: "none", borderRadius: 8, cursor: "pointer", color: "#fff", fontSize: 12, fontWeight: 800, marginBottom: 10 }}>✓ Approve Lead — Create Client & Portal</button>
+              <div style={{ color: T.gold, fontWeight: 900, fontSize: 16, marginBottom: 10 }}>GHS {(opportunity.value || 0).toLocaleString()}</div>
+              {user?.role === "CEO" && opportunity.status === "won" && !opportunity.approved && (
+                <button onClick={e => { e.stopPropagation(); setApprovalModal(opportunity); }} style={{ width: "100%", padding: "8px", background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: "none", borderRadius: 8, cursor: "pointer", color: "#fff", fontSize: 12, fontWeight: 800, marginBottom: 10 }}>✓ Approve Opportunity — Create Client & Portal</button>
               )}
               <div style={{ display: "flex", gap: 12, paddingTop: 8, borderTop: `1px solid ${T.border}44` }}>
-                <span style={{ color: T.textMuted, fontSize: 10 }}>{activities.filter(a => a.lead_id === lead.id).length} activities</span>
-                <span style={{ color: T.textMuted, fontSize: 10 }}>{proposals.filter(p => p.lead_id === lead.id).length} proposals</span>
-                {lead.assigned_name && <span style={{ color: T.cyan, fontSize: 10, fontWeight: 600, marginLeft: "auto" }}>→ {lead.assigned_name}</span>}
+                <span style={{ color: T.textMuted, fontSize: 10 }}>{activities.filter(a => a.opportunity_id === opportunity.id).length} activities</span>
+                <span style={{ color: T.textMuted, fontSize: 10 }}>{proposals.filter(p => p.opportunity_id === opportunity.id).length} proposals</span>
+                {opportunity.assigned_name && <span style={{ color: T.cyan, fontSize: 10, fontWeight: 600, marginLeft: "auto" }}>→ {opportunity.assigned_name}</span>}
               </div>
-              {selectedLead?.id === lead.id && (
+              {selectedOpportunity?.id === opportunity.id && (
                 <div onClick={e => e.stopPropagation()} style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid " + T.border }}>
-                  {lead.email && <div style={{ color: T.textSecondary, fontSize: 12, marginBottom: 4 }}>✉ {lead.email}</div>}
-                  {lead.source && <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 8 }}>Source: {lead.source}</div>}
-                  {lead.notes && <div style={{ color: T.textSecondary, fontSize: 12, marginBottom: 12, fontStyle: "italic" }}>{lead.notes}</div>}
+                  {opportunity.email && <div style={{ color: T.textSecondary, fontSize: 12, marginBottom: 4 }}>✉ {opportunity.email}</div>}
+                  {opportunity.source && <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 8 }}>Source: {opportunity.source}</div>}
+                  {opportunity.notes && <div style={{ color: T.textSecondary, fontSize: 12, marginBottom: 12, fontStyle: "italic" }}>{opportunity.notes}</div>}
                   {canEdit && (
                     <div style={{ marginBottom: 12 }}>
                       <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Update Status</div>
@@ -5981,25 +5981,25 @@ const CRMView = ({ user }) => {
                                 status: "won",
                                 pending_approval: true,
                                 closed_date: new Date().toISOString().split("T")[0],
-                                sales_cycle_days: Math.round((new Date() - new Date(lead.created_at)) / (1000*60*60*24)),
+                                sales_cycle_days: Math.round((new Date() - new Date(opportunity.created_at)) / (1000*60*60*24)),
                               };
-                              await supabase.from("leads").update(updates).eq("id", lead.id);
+                              await supabase.from("___opportunitys_table___").update(updates).eq("id", opportunity.id);
                               // Notify CEO
                               const { data: ceos } = await supabase.from("profiles").select("id, email, name").eq("role", "CEO");
                               for (const ceo of ceos || []) {
-                                await supabase.from("notifications").insert({ user_id: ceo.id, title: "Lead Won — Action Required", message: `${lead.company} has been marked as Won. Please review and approve to create client and event.`, type: "crm" });
-                                if (ceo.email) await sendEmail(ceo.email, `Lead Won — ${lead.company}`, notifEmailHtml({ name: ceo.name, title: "Lead Won — Your Approval Required", message: `<strong>${lead.company}</strong> has been marked as Won by the Sales team.<br><br>Please log in to review, approve, create the client profile and set up their portal login.`, actionUrl: BASE_URL, actionLabel: "Review & Approve Lead" }));
+                                await supabase.from("notifications").insert({ user_id: ceo.id, title: "Opportunity Won — Action Required", message: `${opportunity.company} has been marked as Won. Please review and approve to create client and event.`, type: "crm" });
+                                if (ceo.email) await sendEmail(ceo.email, `Opportunity Won — ${opportunity.company}`, notifEmailHtml({ name: ceo.name, title: "Opportunity Won — Your Approval Required", message: `<strong>${opportunity.company}</strong> has been marked as Won by the Sales team.<br><br>Please log in to review, approve, create the client profile and set up their portal login.`, actionUrl: BASE_URL, actionLabel: "Review & Approve Opportunity" }));
                               }
                               load();
                             } else {
-                              await supabase.from("leads").update({ status: s }).eq("id", lead.id);
+                              await supabase.from("___opportunitys_table___").update({ status: s }).eq("id", opportunity.id);
                               load();
                             }
                           }} style={{
                             padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600,
-                            border: "1px solid " + (lead.status === s ? statusColors[s] : T.border),
-                            background: lead.status === s ? statusColors[s] + "20" : "none",
-                            color: lead.status === s ? statusColors[s] : T.textMuted,
+                            border: "1px solid " + (opportunity.status === s ? statusColors[s] : T.border),
+                            background: opportunity.status === s ? statusColors[s] + "20" : "none",
+                            color: opportunity.status === s ? statusColors[s] : T.textMuted,
                           }}>{s}</button>
                         ))}
                       </div>
@@ -6008,9 +6008,9 @@ const CRMView = ({ user }) => {
                   <div style={{ marginBottom: 12 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                       <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Activities</div>
-                      {canEdit && <button onClick={() => setActivityModal(lead)} style={{ background: "none", border: "none", color: T.cyan, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>+ Add</button>}
+                      {canEdit && <button onClick={() => setActivityModal(opportunity)} style={{ background: "none", border: "none", color: T.cyan, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>+ Add</button>}
                     </div>
-                    {activities.filter(a => a.lead_id === lead.id).slice(0,3).map(a => (
+                    {activities.filter(a => a.opportunity_id === opportunity.id).slice(0,3).map(a => (
                       <div key={a.id} style={{ padding: "6px 0", borderBottom: "1px solid " + T.border, fontSize: 12 }}>
                         <span style={{ color: T.cyan, fontWeight: 600, marginRight: 6 }}>{a.type}</span>
                         <span style={{ color: T.textSecondary }}>{a.notes}</span>
@@ -6021,9 +6021,9 @@ const CRMView = ({ user }) => {
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                       <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Proposals</div>
-                      {canEdit && <button onClick={() => setProposalModal(lead)} style={{ background: "none", border: "none", color: T.cyan, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>+ Add</button>}
+                      {canEdit && <button onClick={() => setProposalModal(opportunity)} style={{ background: "none", border: "none", color: T.cyan, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>+ Add</button>}
                     </div>
-                    {proposals.filter(p => p.lead_id === lead.id).map(p => (
+                    {proposals.filter(p => p.opportunity_id === opportunity.id).map(p => (
                       <div key={p.id} style={{ padding: "8px 10px", background: T.bg, borderRadius: 6, marginBottom: 6, border: "1px solid " + T.border }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{p.title}</div>
@@ -6046,7 +6046,7 @@ const CRMView = ({ user }) => {
         </div>
       )}
       {modal && (
-        <Modal title="New Lead" onClose={() => setModal(false)}>
+        <Modal title="New Opportunity" onClose={() => setModal(false)}>
           <Input label="Company Name" placeholder="e.g. Acme Corp" value={form.company} onChange={v => setForm({ ...form, company: v })} />
           <Input label="Contact Person" placeholder="Full name" value={form.contact_name} onChange={v => setForm({ ...form, contact_name: v })} />
           <Input label="Email" type="email" placeholder="contact@company.com" value={form.email} onChange={v => setForm({ ...form, email: v })} />
@@ -6066,7 +6066,7 @@ const CRMView = ({ user }) => {
             onChange={v => { const m = members.find(x => x.id === v); setForm({ ...form, assigned_to: v, assigned_name: m ? m.name : "" }); }} />
           <Input label="Notes" placeholder="Any additional notes..." value={form.notes} onChange={v => setForm({ ...form, notes: v })} />
           <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-            <Btn onClick={handleCreateLead} disabled={saving}>{saving ? "Saving..." : "Create Lead"}</Btn>
+            <Btn onClick={handleCreateOpportunity} disabled={saving}>{saving ? "Saving..." : "Create Opportunity"}</Btn>
             <Btn variant="ghost" onClick={() => setModal(false)}>Cancel</Btn>
           </div>
         </Modal>
@@ -6114,7 +6114,7 @@ const CRMView = ({ user }) => {
         );
 
         return (
-          <Modal title={"Approve Won Lead — " + approvalModal.company} onClose={() => setApprovalModal(null)}>
+          <Modal title={"Approve Won Opportunity — " + approvalModal.company} onClose={() => setApprovalModal(null)}>
             <StepIndicator />
 
             {/* STEP 1 — New Client Details (only for new clients) */}
@@ -6200,7 +6200,7 @@ const CRMView = ({ user }) => {
                   { value: "Review", label: "Review" },
                 ]} value={eventForm.phase} onChange={v => setEventForm({ ...eventForm, phase: v })} />
                 <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-                  <Btn onClick={handleApproveWonLead} disabled={saving || !eventForm.name}>{saving ? "Creating..." : "✓ Approve & Create Event"}</Btn>
+                  <Btn onClick={handleApproveWonOpportunity} disabled={saving || !eventForm.name}>{saving ? "Creating..." : "✓ Approve & Create Event"}</Btn>
                   <Btn variant="ghost" onClick={() => setStep(totalSteps - 1)}>← Back</Btn>
                 </div>
               </div>
@@ -6385,7 +6385,7 @@ const FeedbackView = ({ userRole }) => {
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState("all");
   const [loading, setLoading] = useState(true);
-  const canSeeDetailed = ["CEO", "Country Manager", "Strategy & Events Lead", "Vendor Manager"].includes(userRole);
+  const canSeeDetailed = ["CEO", "Country Manager", "Strategy & Events Opportunity", "Vendor Manager"].includes(userRole);
 
   useEffect(() => {
     Promise.all([
@@ -7294,7 +7294,7 @@ const StrategyMapView = ({ user }) => {
           {!brief && (
             <div style={{ background: T.amber+"12", border: `1px solid ${T.amber}30`, borderRadius: 10, padding: "14px 18px", marginBottom: 20 }}>
               <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>⚠ No Impact Brief set for this event yet</div>
-              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>The CEO or Strategy Lead needs to complete the Impact Brief in the Impact Intelligence tab first.</div>
+              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>The CEO or Strategy Opportunity needs to complete the Impact Brief in the Impact Intelligence tab first.</div>
             </div>
           )}
 
@@ -7561,8 +7561,8 @@ const ImpactIntelligenceSummary = ({ user }) => {
 const BoardDashboard = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [___opportunitys_table___, setOpportunitys] = useState([]);
   const [leads, setLeads] = useState([]);
-  const [opportunities, setOpportunities] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [scorecards, setScorecards] = useState([]);
@@ -7580,8 +7580,8 @@ const BoardDashboard = ({ user }) => {
     const [ev, tk, ld, op, vn, pf, sc, br, po, inv, aw, cb, ce, ci] = await Promise.all([
       supabase.from("projects").select("*").order("created_at", { ascending: false }),
       supabase.from("tasks").select("*"),
+      supabase.from("___opportunitys_table___").select("*"),
       supabase.from("leads").select("*"),
-      supabase.from("opportunities").select("*"),
       supabase.from("profiles").select("*").eq("role", "Vendor"),
       supabase.from("profiles").select("*").not("role", "in", '("Client","Vendor")'),
       supabase.from("vendor_scorecards").select("*"),
@@ -7595,8 +7595,8 @@ const BoardDashboard = ({ user }) => {
     ]);
     setEvents(ev.data || []);
     setTasks(tk.data || []);
-    setLeads(ld.data || []);
-    setOpportunities(op.data || []);
+    setOpportunitys(ld.data || []);
+    setLeads(op.data || []);
     setVendors(vn.data || []);
     setProfiles(pf.data || []);
     setScorecards(sc.data || []);
@@ -7634,15 +7634,15 @@ const BoardDashboard = ({ user }) => {
   const briefsPending = events.filter(e => !briefs.find(b => b.project_id === e.id)).length;
 
   // CRM metrics
-  const wonLeads = leads.filter(l => l.status === "won");
-  const pipelineValue = leads.filter(l => !["won","lost"].includes(l.status)).reduce((s,l) => s + (l.value||0), 0);
-  const wonValue = wonLeads.reduce((s,l) => s + (l.value||0), 0);
-  const conversionRate = leads.length > 0 ? Math.round((wonLeads.length / leads.length) * 100) : 0;
+  const wonOpportunitys = ___opportunitys_table___.filter(l => l.status === "won");
+  const pipelineValue = ___opportunitys_table___.filter(l => !["won","lost"].includes(l.status)).reduce((s,l) => s + (l.value||0), 0);
+  const wonValue = wonOpportunitys.reduce((s,l) => s + (l.value||0), 0);
+  const conversionRate = ___opportunitys_table___.length > 0 ? Math.round((wonOpportunitys.length / ___opportunitys_table___.length) * 100) : 0;
   const opsByPresence = {
-    "GH+NG+KE": opportunities.filter(o => o.presence === "GH+NG+KE").length,
-    "GH+NG": opportunities.filter(o => o.presence === "GH+NG").length,
-    "GH+KE": opportunities.filter(o => o.presence === "GH+KE").length,
-    "GH": opportunities.filter(o => o.presence === "GH").length,
+    "GH+NG+KE": leads.filter(o => o.presence === "GH+NG+KE").length,
+    "GH+NG": leads.filter(o => o.presence === "GH+NG").length,
+    "GH+KE": leads.filter(o => o.presence === "GH+KE").length,
+    "GH": leads.filter(o => o.presence === "GH").length,
   };
 
   // Finance metrics
@@ -7763,20 +7763,20 @@ const BoardDashboard = ({ user }) => {
       )}
 
       {/* ── Section 3: CRM & Growth ── */}
-      <SectionHeader title="📈 CRM & Growth Pipeline" subtitle="Lead generation and conversion performance" />
+      <SectionHeader title="📈 CRM & Growth Pipeline" subtitle="Opportunity generation and conversion performance" />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 20 }}>
-        <KPICard label="Total Leads" value={leads.length} sub={`${wonLeads.length} won`} color={T.cyan} icon="🎯" />
+        <KPICard label="Total Opportunitys" value={___opportunitys_table___.length} sub={`${wonOpportunitys.length} won`} color={T.cyan} icon="🎯" />
         <KPICard label="Pipeline Value" value={`GHS ${pipelineValue.toLocaleString()}`} sub="Active pipeline" color={T.amber} icon="💰" />
         <KPICard label="Won Value" value={`GHS ${wonValue.toLocaleString()}`} sub="Closed revenue" color="#10B981" icon="✓" />
-        <KPICard label="Conversion Rate" value={`${conversionRate}%`} sub="Leads to won" color={conversionRate >= 20 ? "#10B981" : T.amber} icon="📊" />
+        <KPICard label="Conversion Rate" value={`${conversionRate}%`} sub="Opportunitys to won" color={conversionRate >= 20 ? "#10B981" : T.amber} icon="📊" />
       </div>
 
       {/* CRM pipeline stages */}
       <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 20 }}>
-        <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Lead Pipeline by Stage</div>
+        <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Opportunity Pipeline by Stage</div>
         <div style={{ display: "flex", gap: 8 }}>
           {["new","contacted","qualified","proposal","won","lost"].map(stage => {
-            const count = leads.filter(l => l.status === stage).length;
+            const count = ___opportunitys_table___.filter(l => l.status === stage).length;
             const stageColors = { new: T.cyan, contacted: T.blue, qualified: T.amber, proposal: T.magenta, won: "#10B981", lost: T.red };
             return (
               <div key={stage} style={{ flex: 1, background: T.bg, borderTop: `3px solid ${stageColors[stage]}`, borderRadius: 8, padding: "12px 10px", textAlign: "center" }}>
@@ -7788,15 +7788,15 @@ const BoardDashboard = ({ user }) => {
         </div>
       </div>
 
-      {/* Opportunities presence */}
+      {/* Leads presence */}
       <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 32 }}>
-        <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Opportunities by Regional Presence — {opportunities.length} companies</div>
+        <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Leads by Regional Presence — {leads.length} companies</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
           {Object.entries(opsByPresence).map(([presence, count]) => (
             <div key={presence} style={{ background: T.bg, borderRadius: 8, padding: "12px 14px", textAlign: "center", border: `1px solid ${T.border}` }}>
               <div style={{ color: T.cyan, fontWeight: 900, fontSize: 22 }}>{count}</div>
               <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, marginTop: 4 }}>{presence}</div>
-              <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{opportunities.length > 0 ? Math.round((count/opportunities.length)*100) : 0}%</div>
+              <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{leads.length > 0 ? Math.round((count/leads.length)*100) : 0}%</div>
             </div>
           ))}
         </div>
@@ -8143,7 +8143,7 @@ const HRView = ({ user }) => {
                   const staffReviews = reviews.filter(r => r.staff_id === s.id).length;
                   const staffTraining = training.filter(t => t.staff_id === s.id && t.status === "completed").length;
                   const latestReview = reviews.filter(r => r.staff_id === s.id).sort((a,b) => new Date(b.created_at) - new Date(a.created_at))[0];
-                  const roleColor = { CEO: T.cyan, "Country Manager": T.teal, "Vendor Manager": T.amber, "Strategy & Events Lead": "#E879F9", "Finance Manager": "#F59E0B", "Sales & Marketing": T.blue }[s.role] || T.textMuted;
+                  const roleColor = { CEO: T.cyan, "Country Manager": T.teal, "Vendor Manager": T.amber, "Strategy & Events Opportunity": "#E879F9", "Finance Manager": "#F59E0B", "Sales & Marketing": T.blue }[s.role] || T.textMuted;
                   return (
                     <tr key={s.id} style={{ borderBottom: i < staff.length-1 ? `1px solid ${T.border}44` : "none" }}
                       onMouseEnter={e => e.currentTarget.style.background = T.bg}
@@ -8442,7 +8442,7 @@ const CalendarView = ({ user, onNavigate }) => {
   const [itinSaving, setItinSaving] = useState(false);
   const [itineraries, setItineraries] = useState([]);
   const [viewItinModal, setViewItinModal] = useState(null);
-  const [leads, setLeads] = useState([]);
+  const [___opportunitys_table___, setOpportunitys] = useState([]);
   const [opps, setOpps] = useState([]);
 
   const role = user?.role;
@@ -8452,7 +8452,7 @@ const CalendarView = ({ user, onNavigate }) => {
   const typeColors = {
     task: "#00C8FF",
     event: "#00E5C8",
-    lead: "#F59E0B",
+    opportunity: "#F59E0B",
     rff: "#E879F9",
     invoice: "#C9A84C",
     activity: "#3B7BFF",
@@ -8460,13 +8460,13 @@ const CalendarView = ({ user, onNavigate }) => {
     itinerary: "#F472B6",
   };
 
-  const loadLeadsOpps = async () => {
+  const loadOpportunitysOpps = async () => {
     const [{ data: l }, { data: o }, { data: itins }] = await Promise.all([
-      supabase.from("leads").select("id, company, contact_name, status"),
-      supabase.from("opportunities").select("id, company, sector, status").neq("status","Converted"),
+      supabase.from("___opportunitys_table___").select("id, company, contact_name, status"),
+      supabase.from("leads").select("id, company, sector, status").neq("status","Converted"),
       uid ? supabase.from("itineraries").select("*").eq("created_by", uid).order("created_at", { ascending: false }) : Promise.resolve({ data: [] }),
     ]);
-    setLeads(l || []);
+    setOpportunitys(l || []);
     setOpps(o || []);
     setItineraries(itins || []);
   };
@@ -8502,10 +8502,10 @@ const CalendarView = ({ user, onNavigate }) => {
 
     // ── LEADS (CEO, Admin, Sales & Marketing) ──
     if (["CEO","Country Manager","Sales & Marketing"].includes(role)) {
-      const { data: leads } = await supabase.from("leads").select("*");
-      (leads || []).forEach(l => {
-        if (l.created_at) all.push({ id: "lead-"+l.id, date: l.created_at.slice(0,10), type: "lead", label: l.company, sub: "Lead Created · " + l.status, nav: "crm" });
-        if (l.closed_date) all.push({ id: "lead-"+l.id+"-c", date: l.closed_date, type: "lead", label: l.company, sub: "Lead Closed · Won", nav: "crm" });
+      const { data: ___opportunitys_table___ } = await supabase.from("___opportunitys_table___").select("*");
+      (___opportunitys_table___ || []).forEach(l => {
+        if (l.created_at) all.push({ id: "opportunity-"+l.id, date: l.created_at.slice(0,10), type: "opportunity", label: l.company, sub: "Opportunity Created · " + l.status, nav: "crm" });
+        if (l.closed_date) all.push({ id: "opportunity-"+l.id+"-c", date: l.closed_date, type: "opportunity", label: l.company, sub: "Opportunity Closed · Won", nav: "crm" });
       });
     }
 
@@ -8594,7 +8594,7 @@ const CalendarView = ({ user, onNavigate }) => {
 
   const dayItems = selectedDay ? (itemsByDate[selectedDay] || []) : [];
 
-  const typeLabel = { task: "Task", event: "Event", lead: "Lead", rff: "RFF", invoice: "Invoice", activity: "Activity", smtask: "S&M Task", itinerary: "Itinerary" };
+  const typeLabel = { task: "Task", event: "Event", opportunity: "Opportunity", rff: "RFF", invoice: "Invoice", activity: "Activity", smtask: "S&M Task", itinerary: "Itinerary" };
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
@@ -8609,7 +8609,7 @@ const CalendarView = ({ user, onNavigate }) => {
           {["CEO","Sales & Marketing"].includes(role) && (
             <button onClick={() => setItinModal(true)} style={{ background: `linear-gradient(135deg, #F472B6, #E879F9)`, border: "none", color: "#fff", padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>+ Create Itinerary</button>
           )}
-          {["CEO","Strategy & Events Lead","Vendor Manager","Sales & Marketing","Vendor"].includes(role) && (
+          {["CEO","Strategy & Events Opportunity","Vendor Manager","Sales & Marketing","Vendor"].includes(role) && (
             <button onClick={() => {
               const feedUrl = `https://stretchfield-workroom.vercel.app/api/calendar-feed?user_id=${uid}`;
               navigator.clipboard.writeText(feedUrl).then(() => alert(
@@ -8755,7 +8755,7 @@ const CalendarView = ({ user, onNavigate }) => {
         <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setItinModal(false)}>
           <div style={{ background: T.surface, border: `1px solid #F472B640`, borderRadius: 16, width: "100%", maxWidth: 800, maxHeight: "90vh", overflow: "auto", padding: 28, boxShadow: "0 24px 80px rgba(0,0,0,0.5)" }} onClick={e => e.stopPropagation()}>
             <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 20, marginBottom: 4 }}>Create Weekly Itinerary</div>
-            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>Build a weekly outreach or visit schedule from your leads and opportunities</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>Build a weekly outreach or visit schedule from your ___opportunitys_table___ and leads</div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
               <div>
@@ -8781,8 +8781,8 @@ const CalendarView = ({ user, onNavigate }) => {
                   <input value={row.time} onChange={e => { const rows = [...itinForm.rows]; rows[idx].time = e.target.value; setItinForm({ ...itinForm, rows }); }} placeholder="9:00am" style={{ padding: "7px 8px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
                   <select value={row.company} onChange={e => { const rows = [...itinForm.rows]; rows[idx].company = e.target.value; setItinForm({ ...itinForm, rows }); }} style={{ padding: "7px 8px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: row.company ? T.textPrimary : T.textMuted, fontSize: 12, fontFamily: "inherit", outline: "none" }}>
                     <option value="">Select company...</option>
-                    {leads.length > 0 && <optgroup label="── Leads ──">{leads.map(l => <option key={"l"+l.id} value={l.company}>{l.company}</option>)}</optgroup>}
-                    {opps.length > 0 && <optgroup label="── Opportunities ──">{opps.map(o => <option key={"o"+o.id} value={o.company}>{o.company}</option>)}</optgroup>}
+                    {___opportunitys_table___.length > 0 && <optgroup label="── Opportunitys ──">{___opportunitys_table___.map(l => <option key={"l"+l.id} value={l.company}>{l.company}</option>)}</optgroup>}
+                    {opps.length > 0 && <optgroup label="── Leads ──">{opps.map(o => <option key={"o"+o.id} value={o.company}>{o.company}</option>)}</optgroup>}
                   </select>
                   <input value={row.action} onChange={e => { const rows = [...itinForm.rows]; rows[idx].action = e.target.value; setItinForm({ ...itinForm, rows }); }} placeholder="e.g. Cold call, Site visit" style={{ padding: "7px 8px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
                   <input value={row.notes} onChange={e => { const rows = [...itinForm.rows]; rows[idx].notes = e.target.value; setItinForm({ ...itinForm, rows }); }} placeholder="Notes..." style={{ padding: "7px 8px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
@@ -8808,7 +8808,7 @@ const CalendarView = ({ user, onNavigate }) => {
                 setItinModal(false);
                 setItinForm({ title: "", week_start: "", rows: [{ date: "", time: "", company: "", action: "", notes: "" }] });
                 load();
-                loadLeadsOpps();
+                loadOpportunitysOpps();
               }} disabled={itinSaving || !itinForm.title || !itinForm.week_start} style={{ background: "linear-gradient(135deg, #F472B6, #E879F9)", border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, opacity: (!itinForm.title || !itinForm.week_start) ? 0.5 : 1 }}>{itinSaving ? "Saving..." : "Save & Add to Calendar"}</button>
               <button onClick={() => setItinModal(false)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
             </div>
@@ -8839,7 +8839,7 @@ const CalendarView = ({ user, onNavigate }) => {
               ))}
             </div>
             <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
-              <button onClick={async () => { if (!window.confirm("Delete this itinerary?")) return; await supabase.from("itineraries").delete().eq("id", viewItinModal.id); setViewItinModal(null); loadLeadsOpps(); load(); }} style={{ background: T.red + "18", border: `1px solid ${T.red}40`, color: T.red, padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Delete Itinerary</button>
+              <button onClick={async () => { if (!window.confirm("Delete this itinerary?")) return; await supabase.from("itineraries").delete().eq("id", viewItinModal.id); setViewItinModal(null); loadOpportunitysOpps(); load(); }} style={{ background: T.red + "18", border: `1px solid ${T.red}40`, color: T.red, padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Delete Itinerary</button>
               <button onClick={() => setViewItinModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>Close</button>
             </div>
           </div>
@@ -8900,8 +8900,8 @@ const NotificationsView = ({ user, onNavigate }) => {
       else if (t.includes("contract award confirmed") || t.includes("gig confirmed")) resolvedTarget = "purchase-orders";
       else if (t.includes("purchase order")) resolvedTarget = "vendor-invoices-submit";
       else if (t.includes("invoice received")) resolvedTarget = "vendor-invoices";
-      else if (t.includes("lead") || t.includes("crm")) resolvedTarget = "crm";
-      else if (t.includes("opportunity") || t.includes("converted")) resolvedTarget = "opportunities";
+      else if (t.includes("opportunity") || t.includes("crm")) resolvedTarget = "crm";
+      else if (t.includes("opportunity") || t.includes("converted")) resolvedTarget = "leads";
       else if (t.includes("vendor assigned") || t.includes("new rff assignment")) resolvedTarget = "rffs";
       else if (note.type === "rff") resolvedTarget = "vendors";
       else if (note.type === "task") resolvedTarget = "tasks";
@@ -9053,7 +9053,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
         if (role === "Client") return <ClientDashboard user={currentUser} />;
         if (role === "Finance Manager") return <FinanceManagerDashboard user={currentUser} onTab={setActiveTab} />;
         if (role === "Sales & Marketing") return <CRMDashboardSM user={currentUser} />;
-        if (role === "Strategy & Events Lead") return <StaffDashboard user={currentUser} />;
+        if (role === "Strategy & Events Opportunity") return <StaffDashboard user={currentUser} />;
         if (role === "Vendor Manager") return <VendorManagerDashboard user={currentUser} />;
         return <StaffDashboard user={currentUser} />;
       case "events": return <EventsView user={currentUser} userRole={currentUser.role} />;
@@ -9066,7 +9066,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "crm-insights": return ["CEO","Country Manager"].includes(currentUser.role) ? <CRMDashboardCEO user={currentUser} /> : <CRMDashboardSM user={currentUser} />;
       case "sm-tasks": return <SMTasksView user={currentUser} />;
       case "strategy-overview": return <StrategyOverviewView />;
-      case "opportunities": return <OpportunitiesView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
+      case "leads": return <LeadsView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
       case "client-financials": return <CEOClientFinanceView user={currentUser} />;
       case "client-finance": return <ClientFinanceView user={currentUser} />;
       case "feedback-summary": return <FeedbackView userRole={currentUser.role} />;
@@ -9407,7 +9407,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
 }
 
 const CRMDashboardCEO = ({ user }) => {
-  const [leads, setLeads] = useState([]);
+  const [___opportunitys_table___, setOpportunitys] = useState([]);
   const [targets, setTargets] = useState([]);
   const [members, setMembers] = useState([]);
   const [modal, setModal] = useState(false);
@@ -9416,37 +9416,37 @@ const CRMDashboardCEO = ({ user }) => {
 
   const load = async () => {
     const [l, t, m] = await Promise.all([
-      supabase.from("leads").select("*"),
+      supabase.from("___opportunitys_table___").select("*"),
       supabase.from("sales_targets").select("*").order("created_at", { ascending: false }),
       supabase.from("profiles").select("*").in("role", ["CEO", "Country Manager", "Sales & Marketing"]),
     ]);
-    setLeads(l.data || []);
+    setOpportunitys(l.data || []);
     setTargets(t.data || []);
     setMembers(m.data || []);
   };
 
   useEffect(() => { load(); }, []);
 
-  const wonLeads = leads.filter(l => l.status === "won");
-  const totalRevenue = wonLeads.reduce((a, l) => a + (l.value || 0), 0);
+  const wonOpportunitys = ___opportunitys_table___.filter(l => l.status === "won");
+  const totalRevenue = wonOpportunitys.reduce((a, l) => a + (l.value || 0), 0);
   const now = new Date();
   const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const ytdRevenue = wonLeads.filter(l => l.closed_date && new Date(l.closed_date) >= startOfYear).reduce((a, l) => a + (l.value || 0), 0);
-  const avgCycle = wonLeads.filter(l => l.sales_cycle_days).length
-    ? Math.round(wonLeads.filter(l => l.sales_cycle_days).reduce((a, l) => a + l.sales_cycle_days, 0) / wonLeads.filter(l => l.sales_cycle_days).length) : 0;
-  const closingPct = leads.length ? Math.round((wonLeads.length / leads.length) * 100) : 0;
+  const ytdRevenue = wonOpportunitys.filter(l => l.closed_date && new Date(l.closed_date) >= startOfYear).reduce((a, l) => a + (l.value || 0), 0);
+  const avgCycle = wonOpportunitys.filter(l => l.sales_cycle_days).length
+    ? Math.round(wonOpportunitys.filter(l => l.sales_cycle_days).reduce((a, l) => a + l.sales_cycle_days, 0) / wonOpportunitys.filter(l => l.sales_cycle_days).length) : 0;
+  const closingPct = ___opportunitys_table___.length ? Math.round((wonOpportunitys.length / ___opportunitys_table___.length) * 100) : 0;
 
   const repStats = members.map(m => {
-    const repLeads = leads.filter(l => l.assigned_to === m.id || l.created_by === m.id);
-    const repWon = repLeads.filter(l => l.status === "won");
+    const repOpportunitys = ___opportunitys_table___.filter(l => l.assigned_to === m.id || l.created_by === m.id);
+    const repWon = repOpportunitys.filter(l => l.status === "won");
     const repRevenue = repWon.reduce((a, l) => a + (l.value || 0), 0);
     const repTarget = targets.find(t => t.rep_id === m.id);
     const repCycle = repWon.filter(l => l.sales_cycle_days).length
       ? Math.round(repWon.filter(l => l.sales_cycle_days).reduce((a, l) => a + l.sales_cycle_days, 0) / repWon.filter(l => l.sales_cycle_days).length) : 0;
-    return { ...m, repLeads, repWon, repRevenue, repTarget, repCycle, closingPct: repLeads.length ? Math.round((repWon.length / repLeads.length) * 100) : 0 };
+    return { ...m, repOpportunitys, repWon, repRevenue, repTarget, repCycle, closingPct: repOpportunitys.length ? Math.round((repWon.length / repOpportunitys.length) * 100) : 0 };
   }).sort((a, b) => b.repRevenue - a.repRevenue);
 
-  const clientEarnings = wonLeads.reduce((acc, l) => { acc[l.company] = (acc[l.company] || 0) + (l.value || 0); return acc; }, {});
+  const clientEarnings = wonOpportunitys.reduce((acc, l) => { acc[l.company] = (acc[l.company] || 0) + (l.value || 0); return acc; }, {});
 
   const handleCreateTarget = async () => {
     if (!form.rep_id || !form.target_amount) return;
@@ -9481,7 +9481,7 @@ const CRMDashboardCEO = ({ user }) => {
           { label: "YTD Revenue", value: "GHS " + ytdRevenue.toLocaleString(), color: T.cyan },
           { label: "Closing Rate", value: closingPct + "%", color: T.blue },
           { label: "Avg Cycle", value: avgCycle + "d", color: T.amber },
-          { label: "Deals Won", value: wonLeads.length + " / " + leads.length, color: T.magenta },
+          { label: "Deals Won", value: wonOpportunitys.length + " / " + ___opportunitys_table___.length, color: T.magenta },
         ].map((k, i) => (
           <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
             <div style={{ color: k.color, fontSize: 18, fontWeight: 900 }}>{k.value}</div>
@@ -9585,16 +9585,16 @@ const CRMDashboardCEO = ({ user }) => {
 };
 
 const CRMDashboardSM = ({ user }) => {
-  const [leads, setLeads] = useState([]);
+  const [___opportunitys_table___, setOpportunitys] = useState([]);
   const [target, setTarget] = useState(null);
   const [period, setPeriod] = useState("mtd");
 
   const load = async () => {
     const [l, t] = await Promise.all([
-      supabase.from("leads").select("*").or("assigned_to.eq." + user.id + ",created_by.eq." + user.id),
+      supabase.from("___opportunitys_table___").select("*").or("assigned_to.eq." + user.id + ",created_by.eq." + user.id),
       supabase.from("sales_targets").select("*").eq("rep_id", user.id).order("created_at", { ascending: false }).limit(1),
     ]);
-    setLeads(l.data || []);
+    setOpportunitys(l.data || []);
     setTarget(t.data && t.data[0] ? t.data[0] : null);
   };
 
@@ -9612,18 +9612,18 @@ const CRMDashboardSM = ({ user }) => {
     return true;
   });
 
-  const wonLeads = leads.filter(l => l.status === "won");
-  const periodRevenue = filterByPeriod(wonLeads, period).reduce((a, l) => a + (l.value || 0), 0);
-  const ytdRevenue = filterByPeriod(wonLeads, "ytd").reduce((a, l) => a + (l.value || 0), 0);
-  const totalRevenue = wonLeads.reduce((a, l) => a + (l.value || 0), 0);
-  const pipelineValue = leads.filter(l => !["won","lost"].includes(l.status)).reduce((a, l) => a + (l.value || 0), 0);
+  const wonOpportunitys = ___opportunitys_table___.filter(l => l.status === "won");
+  const periodRevenue = filterByPeriod(wonOpportunitys, period).reduce((a, l) => a + (l.value || 0), 0);
+  const ytdRevenue = filterByPeriod(wonOpportunitys, "ytd").reduce((a, l) => a + (l.value || 0), 0);
+  const totalRevenue = wonOpportunitys.reduce((a, l) => a + (l.value || 0), 0);
+  const pipelineValue = ___opportunitys_table___.filter(l => !["won","lost"].includes(l.status)).reduce((a, l) => a + (l.value || 0), 0);
   const targetAmount = target ? target.target_amount : 0;
   const targetPct = targetAmount ? Math.min(100, Math.round((periodRevenue / targetAmount) * 100)) : 0;
   const ytdTargetPct = targetAmount ? Math.min(100, Math.round((ytdRevenue / targetAmount) * 100)) : 0;
-  const avgCycle = wonLeads.filter(l => l.sales_cycle_days).length
-    ? Math.round(wonLeads.filter(l => l.sales_cycle_days).reduce((a, l) => a + l.sales_cycle_days, 0) / wonLeads.filter(l => l.sales_cycle_days).length) : 0;
-  const closingPct = leads.length ? Math.round((wonLeads.length / leads.length) * 100) : 0;
-  const clientSpread = wonLeads.reduce((acc, l) => { acc[l.company] = (acc[l.company] || 0) + (l.value || 0); return acc; }, {});
+  const avgCycle = wonOpportunitys.filter(l => l.sales_cycle_days).length
+    ? Math.round(wonOpportunitys.filter(l => l.sales_cycle_days).reduce((a, l) => a + l.sales_cycle_days, 0) / wonOpportunitys.filter(l => l.sales_cycle_days).length) : 0;
+  const closingPct = ___opportunitys_table___.length ? Math.round((wonOpportunitys.length / ___opportunitys_table___.length) * 100) : 0;
+  const clientSpread = wonOpportunitys.reduce((acc, l) => { acc[l.company] = (acc[l.company] || 0) + (l.value || 0); return acc; }, {});
   const periodLabel = period === "mtd" ? "Month to Date" : period === "ytd" ? "Year to Date" : "All Time";
 
   return (
@@ -9704,8 +9704,8 @@ const CRMDashboardSM = ({ user }) => {
         <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
           <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>Pipeline by Stage</div>
           {["new","contacted","qualified","proposal","won","lost"].map(s => {
-            const count = leads.filter(l => l.status === s).length;
-            const val = leads.filter(l => l.status === s).reduce((a, l) => a + (l.value || 0), 0);
+            const count = ___opportunitys_table___.filter(l => l.status === s).length;
+            const val = ___opportunitys_table___.filter(l => l.status === s).reduce((a, l) => a + (l.value || 0), 0);
             if (!count) return null;
             const colors = { new: T.cyan, contacted: T.blue, qualified: T.amber, proposal: T.magenta, won: T.teal, lost: T.red };
             return (
@@ -10760,18 +10760,18 @@ const FinanceDashboard = ({ user, onTab }) => {
 const FinanceReportsView = ({ user }) => {
   const [invoices, setInvoices] = useState([]);
   const [expenses, setExpenses] = useState([]);
-  const [leads, setLeads] = useState([]);
+  const [___opportunitys_table___, setOpportunitys] = useState([]);
   const [period, setPeriod] = useState("mtd");
 
   useEffect(() => {
     Promise.all([
       supabase.from("invoices").select("*"),
       supabase.from("expenses").select("*"),
-      supabase.from("leads").select("*").eq("status", "won"),
+      supabase.from("___opportunitys_table___").select("*").eq("status", "won"),
     ]).then(([inv, exp, l]) => {
       setInvoices(inv.data || []);
       setExpenses(exp.data || []);
-      setLeads(l.data || []);
+      setOpportunitys(l.data || []);
     });
   }, []);
 
@@ -10783,7 +10783,7 @@ const FinanceReportsView = ({ user }) => {
   };
   const start = ranges[period];
 
-  const periodRevenue = leads.filter(l => l.closed_date && new Date(l.closed_date) >= start).reduce((a, l) => a + (l.value || 0), 0);
+  const periodRevenue = ___opportunitys_table___.filter(l => l.closed_date && new Date(l.closed_date) >= start).reduce((a, l) => a + (l.value || 0), 0);
   const periodExpenses = expenses.filter(e => e.date && new Date(e.date) >= start).reduce((a, e) => a + (e.amount || 0), 0);
   const periodInvoiced = invoices.filter(i => i.created_at && new Date(i.created_at) >= start).reduce((a, i) => a + (i.amount || 0), 0);
   const periodPaid = invoices.filter(i => i.status === "paid" && i.created_at && new Date(i.created_at) >= start).reduce((a, i) => a + (i.amount || 0), 0);
@@ -10794,7 +10794,7 @@ const FinanceReportsView = ({ user }) => {
     const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
     const next = new Date(now.getFullYear(), now.getMonth() - (5 - i) + 1, 1);
     const label = d.toLocaleString("default", { month: "short" });
-    const rev = leads.filter(l => l.closed_date && new Date(l.closed_date) >= d && new Date(l.closed_date) < next).reduce((a, l) => a + (l.value || 0), 0);
+    const rev = ___opportunitys_table___.filter(l => l.closed_date && new Date(l.closed_date) >= d && new Date(l.closed_date) < next).reduce((a, l) => a + (l.value || 0), 0);
     const exp = expenses.filter(e => e.date && new Date(e.date) >= d && new Date(e.date) < next).reduce((a, e) => a + (e.amount || 0), 0);
     return { label, rev, exp, profit: rev - exp };
   });

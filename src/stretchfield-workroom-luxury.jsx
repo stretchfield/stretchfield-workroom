@@ -629,7 +629,7 @@ const getNavItems = (role) => {
     base.push({ id: "events", label: "Events", icon: "▪" });
   }
   if (["CEO","Sales & Marketing"].includes(role)) {
-    base.push({ id: "leads", label: "Leads", icon: "▪" });
+    base.push({ id: "opportunities", label: "Opportunities", icon: "▪" });
   }
   if (["CEO","Sales & Marketing"].includes(role)) {
     base.push({ id: "crm", label: "CRM / Leads", icon: "▪" }, { id: "crm-insights", label: "CRM Insights", icon: "▪" }, { id: "sm-tasks", label: "S&M Tasks", icon: "▪" });
@@ -655,7 +655,7 @@ const getNavItems = (role) => {
         { id: "impact-intelligence", label: "Impact Intelligence" },
       ]},
       { id: "grp-crm", label: "CRM & Sales", group: true, children: [
-        { id: "leads", label: "Leads" },
+        { id: "opportunities", label: "Opportunities" },
         { id: "crm", label: "CRM / Leads" },
         { id: "crm-insights", label: "CRM Insights" },
         { id: "sm-tasks", label: "S&M Tasks" },
@@ -9066,7 +9066,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "crm-insights": return ["CEO","Country Manager"].includes(currentUser.role) ? <CRMDashboardCEO user={currentUser} /> : <CRMDashboardSM user={currentUser} />;
       case "sm-tasks": return <SMTasksView user={currentUser} />;
       case "strategy-overview": return <StrategyOverviewView />;
-      case "leads": return <LeadsView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
+      case "opportunities": return <LeadsView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
       case "client-financials": return <CEOClientFinanceView user={currentUser} />;
       case "client-finance": return <ClientFinanceView user={currentUser} />;
       case "feedback-summary": return <FeedbackView userRole={currentUser.role} />;

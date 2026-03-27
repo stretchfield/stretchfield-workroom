@@ -632,7 +632,7 @@ const getNavItems = (role) => {
     base.push({ id: "leads", label: "Leads", icon: "▪" });
   }
   if (["CEO","Sales & Marketing"].includes(role)) {
-    base.push({ id: "crm", label: "Opportunities", icon: "▪" }, { id: "crm-insights", label: "CRM Insights", icon: "▪" }, { id: "sm-tasks", label: "S&M Tasks", icon: "▪" });
+    base.push({ id: "crm", label: "CRM / Leads", icon: "▪" }, { id: "crm-insights", label: "CRM Insights", icon: "▪" }, { id: "sm-tasks", label: "S&M Tasks", icon: "▪" });
   }
   if (["Strategy & Events Opportunity"].includes(role)) {
     base.push({ id: "strategy-overview", label: "Client Overview", icon: "▪" }, { id: "feedback-summary", label: "Feedback", icon: "▪" });

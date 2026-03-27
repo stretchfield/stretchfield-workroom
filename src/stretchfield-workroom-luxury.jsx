@@ -829,7 +829,7 @@ const CEODashboard = ({ onTab, user }) => {
   const [vendors, setVendors] = useState([]);
   const [vendorProfiles, setVendorProfiles] = useState([]);
   const [scorecards, setScorecards] = useState([]);
-  const [___opportunitys_table___, setOpportunitys] = useState([]);
+  const [opportunities, setOpportunitys] = useState([]);
   const [targets, setTargets] = useState([]);
   const [feedback, setFeedback] = useState([]);
   const [clients, setClients] = useState([]);
@@ -842,7 +842,7 @@ const CEODashboard = ({ onTab, user }) => {
     supabase.from('tasks').select('*').then(({ data }) => setTasks(data || []));
     supabase.from('clients').select('*').then(({ data }) => setClients(data || []));
     supabase.from('feedback').select('*').order('created_at', { ascending: false }).then(({ data }) => setFeedback(data || []));
-    supabase.from('___opportunitys_table___').select('*').then(({ data }) => setOpportunitys(data || []));
+    supabase.from('opportunities').select('*').then(({ data }) => setOpportunitys(data || []));
     supabase.from('sales_targets').select('*').then(({ data }) => setTargets(data || []));
     supabase.from('rffs').select('*').then(({ data }) => {
       setRffs(data || []);
@@ -869,18 +869,18 @@ const CEODashboard = ({ onTab, user }) => {
 
   const pendingInvoices = invoices.filter(i => i.status === 'pending');
   const openTasks = tasks.filter(t => t.status !== 'completed');
-  const wonOpportunitys = ___opportunitys_table___.filter(l => l.status === 'won');
+  const wonOpportunitys = opportunities.filter(l => l.status === 'won');
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const startOfYear = new Date(now.getFullYear(), 0, 1);
   const mtdRevenue = wonOpportunitys.filter(l => l.closed_date && new Date(l.closed_date) >= startOfMonth).reduce((a, l) => a + (l.value || 0), 0);
   const ytdRevenue = wonOpportunitys.filter(l => l.closed_date && new Date(l.closed_date) >= startOfYear).reduce((a, l) => a + (l.value || 0), 0);
   const totalRevenue = wonOpportunitys.reduce((a, l) => a + (l.value || 0), 0);
-  const closingPct = ___opportunitys_table___.length ? Math.round((wonOpportunitys.length / ___opportunitys_table___.length) * 100) : 0;
+  const closingPct = opportunities.length ? Math.round((wonOpportunitys.length / opportunities.length) * 100) : 0;
   const avgCycle = wonOpportunitys.filter(l => l.sales_cycle_days).length
     ? Math.round(wonOpportunitys.filter(l => l.sales_cycle_days).reduce((a, l) => a + l.sales_cycle_days, 0) / wonOpportunitys.filter(l => l.sales_cycle_days).length) : 0;
   const pendingRffs = rffs.filter(r => r.status === 'pending' && r.approved);
-  const wonOpportunitysAwaitingApproval = ___opportunitys_table___.filter(l => l.status === 'won' && !l.approved);
+  const wonOpportunitysAwaitingApproval = opportunities.filter(l => l.status === 'won' && !l.approved);
   const avgRating = feedback.length ? (feedback.reduce((a, f) => a + f.rating, 0) / feedback.length).toFixed(1) : null;
   const upcomingEvents = events
     .filter(e => e.event_date && new Date(e.event_date) >= new Date())
@@ -1002,11 +1002,11 @@ const CEODashboard = ({ onTab, user }) => {
             <button onClick={() => onTab('crm')} style={{ background: 'none', border: 'none', color: T.cyan, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>View All →</button>
           </div>
           {['new','contacted','qualified','proposal','won','lost'].map(s => {
-            const count = ___opportunitys_table___.filter(l => l.status === s).length;
-            const val = ___opportunitys_table___.filter(l => l.status === s).reduce((a, l) => a + (l.value || 0), 0);
+            const count = opportunities.filter(l => l.status === s).length;
+            const val = opportunities.filter(l => l.status === s).reduce((a, l) => a + (l.value || 0), 0);
             if (!count) return null;
             const colors = { new: T.cyan, contacted: T.blue, qualified: T.amber, proposal: T.magenta, won: T.teal, lost: '#F43F5E' };
-            const maxVal = Math.max(...['new','contacted','qualified','proposal','won','lost'].map(st => ___opportunitys_table___.filter(l => l.status === st).reduce((a,l) => a + (l.value||0), 0)));
+            const maxVal = Math.max(...['new','contacted','qualified','proposal','won','lost'].map(st => opportunities.filter(l => l.status === st).reduce((a,l) => a + (l.value||0), 0)));
             const barW = maxVal > 0 ? Math.round((val / maxVal) * 100) : 0;
             return (
               <div key={s} style={{ marginBottom: 10 }}>
@@ -1022,7 +1022,7 @@ const CEODashboard = ({ onTab, user }) => {
           })}
           <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid ' + T.border + '44', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ color: T.textMuted, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Pipeline Value</span>
-            <span style={{ color: '#C9A84C', fontWeight: 800, fontSize: 15 }}>GHS {___opportunitys_table___.filter(l => !['won','lost'].includes(l.status)).reduce((a, l) => a + (l.value || 0), 0).toLocaleString()}</span>
+            <span style={{ color: '#C9A84C', fontWeight: 800, fontSize: 15 }}>GHS {opportunities.filter(l => !['won','lost'].includes(l.status)).reduce((a, l) => a + (l.value || 0), 0).toLocaleString()}</span>
           </div>
         </div>
       </div>
@@ -2708,7 +2708,7 @@ const EventImpactView = ({ user, project }) => {
     avg_dwell_time: "", digital_completion_pct: "", interactive_participation_pct: "",
     satisfaction_score: "", nps_score: "", positive_sentiment_pct: "",
     behaviour_30day: "", behaviour_90day: "", knowledge_recall_pct: "",
-    retention_rate: "", revenue_shift_pct: "", ___opportunitys_table____generated: "",
+    retention_rate: "", revenue_shift_pct: "", opportunities_generated: "",
     organic_posts: "", organic_reach: "", earned_media: "",
   });
   const [scorecardForm, setScorecardForm] = useState({
@@ -2975,7 +2975,7 @@ const EventImpactView = ({ user, project }) => {
               { section: "Engagement & Dwell", fields: [["avg_dwell_time","Average Dwell Time (mins)","number"],["digital_completion_pct","Digital Touchpoint Completion (%)","number"],["interactive_participation_pct","Interactive Feature Participation (%)","number"]] },
               { section: "Sentiment & Satisfaction", fields: [["satisfaction_score","Post-Event Satisfaction Score (/10)","number"],["nps_score","NPS Score","number"],["positive_sentiment_pct","Positive Sentiment % (social/survey)","number"]] },
               { section: "Behaviour Change", fields: [["behaviour_30day","30-Day Behaviour Signal","text"],["behaviour_90day","90-Day Behaviour Signal","text"],["knowledge_recall_pct","Knowledge/Recall Score (%)","number"]] },
-              { section: "Commercial Outcomes", fields: [["retention_rate","Retention Rate (%)","number"],["revenue_shift_pct","Revenue Contribution Shift (%)","number"],["___opportunitys_table____generated","Pipeline/Opportunitys Generated","number"]] },
+              { section: "Commercial Outcomes", fields: [["retention_rate","Retention Rate (%)","number"],["revenue_shift_pct","Revenue Contribution Shift (%)","number"],["opportunities_generated","Pipeline/Opportunitys Generated","number"]] },
               { section: "Social & Brand", fields: [["organic_posts","Organic Social Posts Generated","number"],["organic_reach","Total Organic Reach (impressions)","number"],["earned_media","Earned Media Placements","number"]] },
             ].map(({ section, fields }) => (
               <div key={section}>
@@ -3717,7 +3717,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
   const handleConvert = async (opp) => {
     if (!window.confirm(`Convert ${opp.company} to a Opportunity? It will appear in the Opportunities Pipeline.`)) return;
     setSaving(true);
-    const { data: opportunity, error } = await supabase.from("___opportunitys_table___").insert({
+    const { data: opportunity, error } = await supabase.from("opportunities").insert({
       company: opp.company,
       contact_name: opp.contact_name || "",
       email: opp.contact_email || "",
@@ -3769,7 +3769,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
         <div>
           <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>CRM</div>
           <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Leads</h2>
-          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{leads.length} target companies · {converted} converted to ___opportunitys_table___</div>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{leads.length} target companies · {converted} converted to opportunities</div>
         </div>
         {canManage && (
           <button onClick={() => setModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, letterSpacing: "0.06em" }}>+ Add Opportunity</button>
@@ -5683,7 +5683,7 @@ const VendorTasksView = ({ user }) => {
 
 // ─── CRM VIEW ─────────────────────────────────────────────────────────────────
 const CRMView = ({ user }) => {
-  const [___opportunitys_table___, setOpportunitys] = useState([]);
+  const [opportunities, setOpportunitys] = useState([]);
   const [activities, setActivities] = useState([]);
   const [proposals, setProposals] = useState([]);
   const [members, setMembers] = useState([]);
@@ -5712,7 +5712,7 @@ const CRMView = ({ user }) => {
 
   const load = async () => {
     const [l, a, p, m, c] = await Promise.all([
-      ["CEO", "Country Manager", "Sales & Marketing"].includes(user?.role) ? supabase.from("___opportunitys_table___").select("*").order("created_at", { ascending: false }) : supabase.from("___opportunitys_table___").select("*").or("assigned_to.eq." + user.id + ",created_by.eq." + user.id).order("created_at", { ascending: false }),
+      ["CEO", "Country Manager", "Sales & Marketing"].includes(user?.role) ? supabase.from("opportunities").select("*").order("created_at", { ascending: false }) : supabase.from("opportunities").select("*").or("assigned_to.eq." + user.id + ",created_by.eq." + user.id).order("created_at", { ascending: false }),
       supabase.from("crm_activities").select("*").order("created_at", { ascending: false }),
       supabase.from("proposals").select("*").order("created_at", { ascending: false }),
       supabase.from('profiles').select('*').not('role', 'in', '("Client","Vendor")'),
@@ -5730,7 +5730,7 @@ const CRMView = ({ user }) => {
   const handleCreateOpportunity = async () => {
     if (!form.company) return;
     setSaving(true);
-    await supabase.from("___opportunitys_table___").insert({
+    await supabase.from("opportunities").insert({
       company: form.company, contact_name: form.contact_name, email: form.email,
       phone: form.phone, source: form.source, value: parseFloat(form.value) || 0,
       notes: form.notes, status: "new", created_by: user.id,
@@ -5746,7 +5746,7 @@ const CRMView = ({ user }) => {
     if (!actForm.notes) return;
     // If scheduled — add to calendar
     if (actForm.scheduled_date && ["call","meeting","demo","follow-up"].includes(actForm.type)) {
-      const opportunity = ___opportunitys_table___.find(l => l.id === selectedOpportunity?.id);
+      const opportunity = opportunities.find(l => l.id === selectedOpportunity?.id);
       await supabase.from("itineraries").insert({
         title: `${actForm.type.charAt(0).toUpperCase()+actForm.type.slice(1)} — ${opportunity?.company || ""}`,
         week_start: actForm.scheduled_date,
@@ -5865,7 +5865,7 @@ const CRMView = ({ user }) => {
     });
 
     // Mark opportunity approved
-    await supabase.from("___opportunitys_table___").update({ approved: true, approved_by: user.id }).eq("id", approvalModal.id);
+    await supabase.from("opportunities").update({ approved: true, approved_by: user.id }).eq("id", approvalModal.id);
 
     // Notify Sales & Marketing
     const { data: smUsers } = await supabase.from("profiles").select("id").eq("role", "Sales & Marketing");
@@ -5885,9 +5885,9 @@ const CRMView = ({ user }) => {
     load();
   };
 
-  const filteredOpportunitys = filter === "all" ? ___opportunitys_table___ : ___opportunitys_table___.filter(l => l.status === filter);
-  const totalValue = ___opportunitys_table___.filter(l => l.status === "won").reduce((a, l) => a + (l.value || 0), 0);
-  const pipelineValue = ___opportunitys_table___.filter(l => !["won","lost"].includes(l.status)).reduce((a, l) => a + (l.value || 0), 0);
+  const filteredOpportunitys = filter === "all" ? opportunities : opportunities.filter(l => l.status === filter);
+  const totalValue = opportunities.filter(l => l.status === "won").reduce((a, l) => a + (l.value || 0), 0);
+  const pipelineValue = opportunities.filter(l => !["won","lost"].includes(l.status)).reduce((a, l) => a + (l.value || 0), 0);
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
@@ -5895,15 +5895,15 @@ const CRMView = ({ user }) => {
         <div>
           <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Sales</div>
           <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Opportunities Pipeline</h2>
-          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{___opportunitys_table___.length} ___opportunitys_table___ · GHS {pipelineValue.toLocaleString()} in pipeline</div>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{opportunities.length} opportunities · GHS {pipelineValue.toLocaleString()} in pipeline</div>
         </div>
         {canEdit && <Btn onClick={() => setModal(true)}>+ New Opportunity</Btn>}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
         {[
-          { label: "Total Opportunitys", value: ___opportunitys_table___.length, color: T.cyan },
+          { label: "Total Opportunitys", value: opportunities.length, color: T.cyan },
           { label: "Pipeline Value", value: "GHS " + pipelineValue.toLocaleString(), color: T.amber },
-          { label: "Won", value: ___opportunitys_table___.filter(l => l.status === "won").length, sub: "GHS " + totalValue.toLocaleString(), color: T.teal },
+          { label: "Won", value: opportunities.filter(l => l.status === "won").length, sub: "GHS " + totalValue.toLocaleString(), color: T.teal },
           { label: "Proposals", value: proposals.length, color: T.magenta },
         ].map((k, i) => (
           <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
@@ -5921,13 +5921,13 @@ const CRMView = ({ user }) => {
             background: filter === s ? (statusColors[s] || T.cyan) + "20" : "none",
             color: filter === s ? (statusColors[s] || T.cyan) : T.textMuted,
             letterSpacing: "0.04em", textTransform: "uppercase", transition: "all 0.15s",
-          }}>{s === "all" ? "All" : s}{s !== "all" ? ` (${___opportunitys_table___.filter(l => l.status === s).length})` : ""}</button>
+          }}>{s === "all" ? "All" : s}{s !== "all" ? ` (${opportunities.filter(l => l.status === s).length})` : ""}</button>
         ))}
       </div>
       {filteredOpportunitys.length === 0 ? (
         <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>🎯</div>
-          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No ___opportunitys_table___ yet</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No opportunities yet</div>
           <div style={{ color: T.textMuted, fontSize: 13 }}>Add your first opportunity to get started.</div>
         </div>
       ) : (
@@ -5948,7 +5948,7 @@ const CRMView = ({ user }) => {
                   {opportunity.status === "won" && !opportunity.approved && <span style={{ background: T.amber+"20", color: T.amber, fontSize: 9, fontWeight: 800, borderRadius: 20, padding: "1px 7px", marginLeft: 2 }}>Pending CEO</span>}
                   {opportunity.status === "won" && opportunity.approved && <span style={{ background: "#10B98120", color: "#10B981", fontSize: 9, fontWeight: 800, borderRadius: 20, padding: "1px 7px", marginLeft: 2 }}>✓ Approved</span>}
                   {user?.role === "CEO" && (
-                    <button onClick={async (e) => { e.stopPropagation(); if (!window.confirm(`Delete opportunity "${opportunity.company}"? This cannot be undone.`)) return; await supabase.from("leads").update({ converted_opportunity_id: null }).eq("converted_opportunity_id", opportunity.id); const { error } = await supabase.from("___opportunitys_table___").delete().eq("id", opportunity.id); if (error) { alert("Delete failed: " + error.message); return; } if (selectedOpportunity?.id === opportunity.id) setSelectedOpportunity(null); load(); }}
+                    <button onClick={async (e) => { e.stopPropagation(); if (!window.confirm(`Delete opportunity "${opportunity.company}"? This cannot be undone.`)) return; await supabase.from("leads").update({ converted_opportunity_id: null }).eq("converted_opportunity_id", opportunity.id); const { error } = await supabase.from("opportunities").delete().eq("id", opportunity.id); if (error) { alert("Delete failed: " + error.message); return; } if (selectedOpportunity?.id === opportunity.id) setSelectedOpportunity(null); load(); }}
                       style={{ background: T.red + "18", border: `1px solid ${T.red}40`, color: T.red, width: 24, height: 24, borderRadius: 6, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, flexShrink: 0 }}
                       onMouseEnter={e => e.currentTarget.style.background = T.red + "35"}
                       onMouseLeave={e => e.currentTarget.style.background = T.red + "18"}>×</button>
@@ -5983,7 +5983,7 @@ const CRMView = ({ user }) => {
                                 closed_date: new Date().toISOString().split("T")[0],
                                 sales_cycle_days: Math.round((new Date() - new Date(opportunity.created_at)) / (1000*60*60*24)),
                               };
-                              await supabase.from("___opportunitys_table___").update(updates).eq("id", opportunity.id);
+                              await supabase.from("opportunities").update(updates).eq("id", opportunity.id);
                               // Notify CEO
                               const { data: ceos } = await supabase.from("profiles").select("id, email, name").eq("role", "CEO");
                               for (const ceo of ceos || []) {
@@ -5992,7 +5992,7 @@ const CRMView = ({ user }) => {
                               }
                               load();
                             } else {
-                              await supabase.from("___opportunitys_table___").update({ status: s }).eq("id", opportunity.id);
+                              await supabase.from("opportunities").update({ status: s }).eq("id", opportunity.id);
                               load();
                             }
                           }} style={{
@@ -7561,7 +7561,7 @@ const ImpactIntelligenceSummary = ({ user }) => {
 const BoardDashboard = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [tasks, setTasks] = useState([]);
-  const [___opportunitys_table___, setOpportunitys] = useState([]);
+  const [opportunities, setOpportunitys] = useState([]);
   const [leads, setLeads] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [profiles, setProfiles] = useState([]);
@@ -7580,7 +7580,7 @@ const BoardDashboard = ({ user }) => {
     const [ev, tk, ld, op, vn, pf, sc, br, po, inv, aw, cb, ce, ci] = await Promise.all([
       supabase.from("projects").select("*").order("created_at", { ascending: false }),
       supabase.from("tasks").select("*"),
-      supabase.from("___opportunitys_table___").select("*"),
+      supabase.from("opportunities").select("*"),
       supabase.from("leads").select("*"),
       supabase.from("profiles").select("*").eq("role", "Vendor"),
       supabase.from("profiles").select("*").not("role", "in", '("Client","Vendor")'),
@@ -7634,10 +7634,10 @@ const BoardDashboard = ({ user }) => {
   const briefsPending = events.filter(e => !briefs.find(b => b.project_id === e.id)).length;
 
   // CRM metrics
-  const wonOpportunitys = ___opportunitys_table___.filter(l => l.status === "won");
-  const pipelineValue = ___opportunitys_table___.filter(l => !["won","lost"].includes(l.status)).reduce((s,l) => s + (l.value||0), 0);
+  const wonOpportunitys = opportunities.filter(l => l.status === "won");
+  const pipelineValue = opportunities.filter(l => !["won","lost"].includes(l.status)).reduce((s,l) => s + (l.value||0), 0);
   const wonValue = wonOpportunitys.reduce((s,l) => s + (l.value||0), 0);
-  const conversionRate = ___opportunitys_table___.length > 0 ? Math.round((wonOpportunitys.length / ___opportunitys_table___.length) * 100) : 0;
+  const conversionRate = opportunities.length > 0 ? Math.round((wonOpportunitys.length / opportunities.length) * 100) : 0;
   const opsByPresence = {
     "GH+NG+KE": leads.filter(o => o.presence === "GH+NG+KE").length,
     "GH+NG": leads.filter(o => o.presence === "GH+NG").length,
@@ -7765,7 +7765,7 @@ const BoardDashboard = ({ user }) => {
       {/* ── Section 3: CRM & Growth ── */}
       <SectionHeader title="📈 CRM & Growth Pipeline" subtitle="Opportunity generation and conversion performance" />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 20 }}>
-        <KPICard label="Total Opportunitys" value={___opportunitys_table___.length} sub={`${wonOpportunitys.length} won`} color={T.cyan} icon="🎯" />
+        <KPICard label="Total Opportunitys" value={opportunities.length} sub={`${wonOpportunitys.length} won`} color={T.cyan} icon="🎯" />
         <KPICard label="Pipeline Value" value={`GHS ${pipelineValue.toLocaleString()}`} sub="Active pipeline" color={T.amber} icon="💰" />
         <KPICard label="Won Value" value={`GHS ${wonValue.toLocaleString()}`} sub="Closed revenue" color="#10B981" icon="✓" />
         <KPICard label="Conversion Rate" value={`${conversionRate}%`} sub="Opportunitys to won" color={conversionRate >= 20 ? "#10B981" : T.amber} icon="📊" />
@@ -7776,7 +7776,7 @@ const BoardDashboard = ({ user }) => {
         <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Opportunity Pipeline by Stage</div>
         <div style={{ display: "flex", gap: 8 }}>
           {["new","contacted","qualified","proposal","won","lost"].map(stage => {
-            const count = ___opportunitys_table___.filter(l => l.status === stage).length;
+            const count = opportunities.filter(l => l.status === stage).length;
             const stageColors = { new: T.cyan, contacted: T.blue, qualified: T.amber, proposal: T.magenta, won: "#10B981", lost: T.red };
             return (
               <div key={stage} style={{ flex: 1, background: T.bg, borderTop: `3px solid ${stageColors[stage]}`, borderRadius: 8, padding: "12px 10px", textAlign: "center" }}>
@@ -8442,7 +8442,7 @@ const CalendarView = ({ user, onNavigate }) => {
   const [itinSaving, setItinSaving] = useState(false);
   const [itineraries, setItineraries] = useState([]);
   const [viewItinModal, setViewItinModal] = useState(null);
-  const [___opportunitys_table___, setOpportunitys] = useState([]);
+  const [opportunities, setOpportunitys] = useState([]);
   const [opps, setOpps] = useState([]);
 
   const role = user?.role;
@@ -8462,7 +8462,7 @@ const CalendarView = ({ user, onNavigate }) => {
 
   const loadOpportunitysOpps = async () => {
     const [{ data: l }, { data: o }, { data: itins }] = await Promise.all([
-      supabase.from("___opportunitys_table___").select("id, company, contact_name, status"),
+      supabase.from("opportunities").select("id, company, contact_name, status"),
       supabase.from("leads").select("id, company, sector, status").neq("status","Converted"),
       uid ? supabase.from("itineraries").select("*").eq("created_by", uid).order("created_at", { ascending: false }) : Promise.resolve({ data: [] }),
     ]);
@@ -8502,8 +8502,8 @@ const CalendarView = ({ user, onNavigate }) => {
 
     // ── LEADS (CEO, Admin, Sales & Marketing) ──
     if (["CEO","Country Manager","Sales & Marketing"].includes(role)) {
-      const { data: ___opportunitys_table___ } = await supabase.from("___opportunitys_table___").select("*");
-      (___opportunitys_table___ || []).forEach(l => {
+      const { data: opportunities } = await supabase.from("opportunities").select("*");
+      (opportunities || []).forEach(l => {
         if (l.created_at) all.push({ id: "opportunity-"+l.id, date: l.created_at.slice(0,10), type: "opportunity", label: l.company, sub: "Opportunity Created · " + l.status, nav: "crm" });
         if (l.closed_date) all.push({ id: "opportunity-"+l.id+"-c", date: l.closed_date, type: "opportunity", label: l.company, sub: "Opportunity Closed · Won", nav: "crm" });
       });
@@ -8755,7 +8755,7 @@ const CalendarView = ({ user, onNavigate }) => {
         <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setItinModal(false)}>
           <div style={{ background: T.surface, border: `1px solid #F472B640`, borderRadius: 16, width: "100%", maxWidth: 800, maxHeight: "90vh", overflow: "auto", padding: 28, boxShadow: "0 24px 80px rgba(0,0,0,0.5)" }} onClick={e => e.stopPropagation()}>
             <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 20, marginBottom: 4 }}>Create Weekly Itinerary</div>
-            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>Build a weekly outreach or visit schedule from your ___opportunitys_table___ and leads</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>Build a weekly outreach or visit schedule from your opportunities and leads</div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
               <div>
@@ -8781,7 +8781,7 @@ const CalendarView = ({ user, onNavigate }) => {
                   <input value={row.time} onChange={e => { const rows = [...itinForm.rows]; rows[idx].time = e.target.value; setItinForm({ ...itinForm, rows }); }} placeholder="9:00am" style={{ padding: "7px 8px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
                   <select value={row.company} onChange={e => { const rows = [...itinForm.rows]; rows[idx].company = e.target.value; setItinForm({ ...itinForm, rows }); }} style={{ padding: "7px 8px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: row.company ? T.textPrimary : T.textMuted, fontSize: 12, fontFamily: "inherit", outline: "none" }}>
                     <option value="">Select company...</option>
-                    {___opportunitys_table___.length > 0 && <optgroup label="── Opportunitys ──">{___opportunitys_table___.map(l => <option key={"l"+l.id} value={l.company}>{l.company}</option>)}</optgroup>}
+                    {opportunities.length > 0 && <optgroup label="── Opportunitys ──">{opportunities.map(l => <option key={"l"+l.id} value={l.company}>{l.company}</option>)}</optgroup>}
                     {opps.length > 0 && <optgroup label="── Leads ──">{opps.map(o => <option key={"o"+o.id} value={o.company}>{o.company}</option>)}</optgroup>}
                   </select>
                   <input value={row.action} onChange={e => { const rows = [...itinForm.rows]; rows[idx].action = e.target.value; setItinForm({ ...itinForm, rows }); }} placeholder="e.g. Cold call, Site visit" style={{ padding: "7px 8px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
@@ -9407,7 +9407,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
 }
 
 const CRMDashboardCEO = ({ user }) => {
-  const [___opportunitys_table___, setOpportunitys] = useState([]);
+  const [opportunities, setOpportunitys] = useState([]);
   const [targets, setTargets] = useState([]);
   const [members, setMembers] = useState([]);
   const [modal, setModal] = useState(false);
@@ -9416,7 +9416,7 @@ const CRMDashboardCEO = ({ user }) => {
 
   const load = async () => {
     const [l, t, m] = await Promise.all([
-      supabase.from("___opportunitys_table___").select("*"),
+      supabase.from("opportunities").select("*"),
       supabase.from("sales_targets").select("*").order("created_at", { ascending: false }),
       supabase.from("profiles").select("*").in("role", ["CEO", "Country Manager", "Sales & Marketing"]),
     ]);
@@ -9427,17 +9427,17 @@ const CRMDashboardCEO = ({ user }) => {
 
   useEffect(() => { load(); }, []);
 
-  const wonOpportunitys = ___opportunitys_table___.filter(l => l.status === "won");
+  const wonOpportunitys = opportunities.filter(l => l.status === "won");
   const totalRevenue = wonOpportunitys.reduce((a, l) => a + (l.value || 0), 0);
   const now = new Date();
   const startOfYear = new Date(now.getFullYear(), 0, 1);
   const ytdRevenue = wonOpportunitys.filter(l => l.closed_date && new Date(l.closed_date) >= startOfYear).reduce((a, l) => a + (l.value || 0), 0);
   const avgCycle = wonOpportunitys.filter(l => l.sales_cycle_days).length
     ? Math.round(wonOpportunitys.filter(l => l.sales_cycle_days).reduce((a, l) => a + l.sales_cycle_days, 0) / wonOpportunitys.filter(l => l.sales_cycle_days).length) : 0;
-  const closingPct = ___opportunitys_table___.length ? Math.round((wonOpportunitys.length / ___opportunitys_table___.length) * 100) : 0;
+  const closingPct = opportunities.length ? Math.round((wonOpportunitys.length / opportunities.length) * 100) : 0;
 
   const repStats = members.map(m => {
-    const repOpportunitys = ___opportunitys_table___.filter(l => l.assigned_to === m.id || l.created_by === m.id);
+    const repOpportunitys = opportunities.filter(l => l.assigned_to === m.id || l.created_by === m.id);
     const repWon = repOpportunitys.filter(l => l.status === "won");
     const repRevenue = repWon.reduce((a, l) => a + (l.value || 0), 0);
     const repTarget = targets.find(t => t.rep_id === m.id);
@@ -9481,7 +9481,7 @@ const CRMDashboardCEO = ({ user }) => {
           { label: "YTD Revenue", value: "GHS " + ytdRevenue.toLocaleString(), color: T.cyan },
           { label: "Closing Rate", value: closingPct + "%", color: T.blue },
           { label: "Avg Cycle", value: avgCycle + "d", color: T.amber },
-          { label: "Deals Won", value: wonOpportunitys.length + " / " + ___opportunitys_table___.length, color: T.magenta },
+          { label: "Deals Won", value: wonOpportunitys.length + " / " + opportunities.length, color: T.magenta },
         ].map((k, i) => (
           <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
             <div style={{ color: k.color, fontSize: 18, fontWeight: 900 }}>{k.value}</div>
@@ -9585,13 +9585,13 @@ const CRMDashboardCEO = ({ user }) => {
 };
 
 const CRMDashboardSM = ({ user }) => {
-  const [___opportunitys_table___, setOpportunitys] = useState([]);
+  const [opportunities, setOpportunitys] = useState([]);
   const [target, setTarget] = useState(null);
   const [period, setPeriod] = useState("mtd");
 
   const load = async () => {
     const [l, t] = await Promise.all([
-      supabase.from("___opportunitys_table___").select("*").or("assigned_to.eq." + user.id + ",created_by.eq." + user.id),
+      supabase.from("opportunities").select("*").or("assigned_to.eq." + user.id + ",created_by.eq." + user.id),
       supabase.from("sales_targets").select("*").eq("rep_id", user.id).order("created_at", { ascending: false }).limit(1),
     ]);
     setOpportunitys(l.data || []);
@@ -9612,17 +9612,17 @@ const CRMDashboardSM = ({ user }) => {
     return true;
   });
 
-  const wonOpportunitys = ___opportunitys_table___.filter(l => l.status === "won");
+  const wonOpportunitys = opportunities.filter(l => l.status === "won");
   const periodRevenue = filterByPeriod(wonOpportunitys, period).reduce((a, l) => a + (l.value || 0), 0);
   const ytdRevenue = filterByPeriod(wonOpportunitys, "ytd").reduce((a, l) => a + (l.value || 0), 0);
   const totalRevenue = wonOpportunitys.reduce((a, l) => a + (l.value || 0), 0);
-  const pipelineValue = ___opportunitys_table___.filter(l => !["won","lost"].includes(l.status)).reduce((a, l) => a + (l.value || 0), 0);
+  const pipelineValue = opportunities.filter(l => !["won","lost"].includes(l.status)).reduce((a, l) => a + (l.value || 0), 0);
   const targetAmount = target ? target.target_amount : 0;
   const targetPct = targetAmount ? Math.min(100, Math.round((periodRevenue / targetAmount) * 100)) : 0;
   const ytdTargetPct = targetAmount ? Math.min(100, Math.round((ytdRevenue / targetAmount) * 100)) : 0;
   const avgCycle = wonOpportunitys.filter(l => l.sales_cycle_days).length
     ? Math.round(wonOpportunitys.filter(l => l.sales_cycle_days).reduce((a, l) => a + l.sales_cycle_days, 0) / wonOpportunitys.filter(l => l.sales_cycle_days).length) : 0;
-  const closingPct = ___opportunitys_table___.length ? Math.round((wonOpportunitys.length / ___opportunitys_table___.length) * 100) : 0;
+  const closingPct = opportunities.length ? Math.round((wonOpportunitys.length / opportunities.length) * 100) : 0;
   const clientSpread = wonOpportunitys.reduce((acc, l) => { acc[l.company] = (acc[l.company] || 0) + (l.value || 0); return acc; }, {});
   const periodLabel = period === "mtd" ? "Month to Date" : period === "ytd" ? "Year to Date" : "All Time";
 
@@ -9704,8 +9704,8 @@ const CRMDashboardSM = ({ user }) => {
         <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
           <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>Pipeline by Stage</div>
           {["new","contacted","qualified","proposal","won","lost"].map(s => {
-            const count = ___opportunitys_table___.filter(l => l.status === s).length;
-            const val = ___opportunitys_table___.filter(l => l.status === s).reduce((a, l) => a + (l.value || 0), 0);
+            const count = opportunities.filter(l => l.status === s).length;
+            const val = opportunities.filter(l => l.status === s).reduce((a, l) => a + (l.value || 0), 0);
             if (!count) return null;
             const colors = { new: T.cyan, contacted: T.blue, qualified: T.amber, proposal: T.magenta, won: T.teal, lost: T.red };
             return (
@@ -10760,14 +10760,14 @@ const FinanceDashboard = ({ user, onTab }) => {
 const FinanceReportsView = ({ user }) => {
   const [invoices, setInvoices] = useState([]);
   const [expenses, setExpenses] = useState([]);
-  const [___opportunitys_table___, setOpportunitys] = useState([]);
+  const [opportunities, setOpportunitys] = useState([]);
   const [period, setPeriod] = useState("mtd");
 
   useEffect(() => {
     Promise.all([
       supabase.from("invoices").select("*"),
       supabase.from("expenses").select("*"),
-      supabase.from("___opportunitys_table___").select("*").eq("status", "won"),
+      supabase.from("opportunities").select("*").eq("status", "won"),
     ]).then(([inv, exp, l]) => {
       setInvoices(inv.data || []);
       setExpenses(exp.data || []);
@@ -10783,7 +10783,7 @@ const FinanceReportsView = ({ user }) => {
   };
   const start = ranges[period];
 
-  const periodRevenue = ___opportunitys_table___.filter(l => l.closed_date && new Date(l.closed_date) >= start).reduce((a, l) => a + (l.value || 0), 0);
+  const periodRevenue = opportunities.filter(l => l.closed_date && new Date(l.closed_date) >= start).reduce((a, l) => a + (l.value || 0), 0);
   const periodExpenses = expenses.filter(e => e.date && new Date(e.date) >= start).reduce((a, e) => a + (e.amount || 0), 0);
   const periodInvoiced = invoices.filter(i => i.created_at && new Date(i.created_at) >= start).reduce((a, i) => a + (i.amount || 0), 0);
   const periodPaid = invoices.filter(i => i.status === "paid" && i.created_at && new Date(i.created_at) >= start).reduce((a, i) => a + (i.amount || 0), 0);
@@ -10794,7 +10794,7 @@ const FinanceReportsView = ({ user }) => {
     const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
     const next = new Date(now.getFullYear(), now.getMonth() - (5 - i) + 1, 1);
     const label = d.toLocaleString("default", { month: "short" });
-    const rev = ___opportunitys_table___.filter(l => l.closed_date && new Date(l.closed_date) >= d && new Date(l.closed_date) < next).reduce((a, l) => a + (l.value || 0), 0);
+    const rev = opportunities.filter(l => l.closed_date && new Date(l.closed_date) >= d && new Date(l.closed_date) < next).reduce((a, l) => a + (l.value || 0), 0);
     const exp = expenses.filter(e => e.date && new Date(e.date) >= d && new Date(e.date) < next).reduce((a, e) => a + (e.amount || 0), 0);
     return { label, rev, exp, profit: rev - exp };
   });

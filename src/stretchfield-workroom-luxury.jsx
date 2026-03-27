@@ -3828,7 +3828,8 @@ const OpportunitiesView = ({ user, onNavigate }) => {
               {filtered.map((o, i) => {
                 const statusColor = statusColors[o.status] || T.textMuted;
                 return (
-                  <tr key={o.id} style={{ borderBottom: i < filtered.length - 1 ? `1px solid ${T.border}44` : "none", transition: "background 0.15s" }}
+                  <React.Fragment key={o.id}>
+                  <tr style={{ borderBottom: expandedOpp !== o.id && i < filtered.length - 1 ? `1px solid ${T.border}44` : "none", transition: "background 0.15s" }}
                     onMouseEnter={e => e.currentTarget.style.background = T.bg}
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                     <td style={{ padding: "12px 16px" }}>
@@ -3856,6 +3857,9 @@ const OpportunitiesView = ({ user, onNavigate }) => {
                       {canManage && (
                         <div style={{ display: "flex", gap: 6 }}>
                           <button onClick={() => setEditModal({ ...o })} style={{ background: T.cyan + "15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>Edit</button>
+                          <button onClick={() => { const isOpen = expandedOpp === o.id; setExpandedOpp(isOpen ? null : o.id); if (!isOpen) loadActivities(o.id); }} style={{ background: expandedOpp === o.id ? "#8B5CF620" : T.surface, border: `1px solid ${expandedOpp === o.id ? "#8B5CF6" : T.border}`, color: expandedOpp === o.id ? "#8B5CF6" : T.textMuted, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>
+                            💬 {(oppActivities[o.id]||[]).length > 0 ? oppActivities[o.id].length : "Notes"}
+                          </button>
                           {o.status !== "Converted" && (
                             <button onClick={() => handleConvert(o)} style={{ background: "#10B98115", border: "1px solid #10B98130", color: "#10B981", padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>→ Lead</button>
                           )}
@@ -3864,6 +3868,56 @@ const OpportunitiesView = ({ user, onNavigate }) => {
                       )}
                     </td>
                   </tr>
+                  {/* Notes Thread Row */}
+                  {expandedOpp === o.id && (
+                    <tr key={o.id + "_notes"}>
+                      <td colSpan={8} style={{ padding: "0 12px 12px", background: T.bg }}>
+                        <div style={{ border: `1px solid #8B5CF630`, borderRadius: 10, padding: "14px 16px", background: T.surface }}>
+                          <div style={{ color: "#8B5CF6", fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Notes & Follow-ups — {o.company}</div>
+
+                          {/* Add Activity */}
+                          {canManage && (
+                            <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "12px 14px", marginBottom: 12 }}>
+                              <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+                                {["note","call","meeting","email","demo","follow-up"].map(t => (
+                                  <button key={t} onClick={() => setActForm(f => ({...f, type: t}))} style={{ padding: "3px 10px", borderRadius: 20, border: `1px solid ${actForm.type === t ? "#8B5CF6" : T.border}`, background: actForm.type === t ? "#8B5CF620" : "none", color: actForm.type === t ? "#8B5CF6" : T.textMuted, fontSize: 10, fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>{t}</button>
+                                ))}
+                              </div>
+                              <textarea value={actForm.content} onChange={e => setActForm(f => ({...f, content: e.target.value}))} placeholder={`Add ${actForm.type}...`} rows={2} style={{ width: "100%", padding: "8px 10px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none", resize: "none", boxSizing: "border-box", marginBottom: 6 }} />
+                              {["call","meeting","demo","follow-up"].includes(actForm.type) && (
+                                <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                                  <input type="date" value={actForm.scheduled_date} onChange={e => setActForm(f => ({...f, scheduled_date: e.target.value}))} style={{ flex: 1, padding: "6px 10px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+                                  <input type="time" value={actForm.scheduled_time} onChange={e => setActForm(f => ({...f, scheduled_time: e.target.value}))} style={{ flex: 1, padding: "6px 10px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+                                </div>
+                              )}
+                              {actForm.scheduled_date && <div style={{ color: "#8B5CF6", fontSize: 11, fontWeight: 700, marginBottom: 6 }}>📅 Will be added to calendar on {actForm.scheduled_date}{actForm.scheduled_time ? " at " + actForm.scheduled_time : ""}</div>}
+                              <button onClick={() => addActivity(o.id, o.company)} disabled={addingAct || !actForm.content} style={{ background: "#8B5CF6", border: "none", color: "#fff", padding: "6px 16px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700, opacity: !actForm.content ? 0.5 : 1 }}>{addingAct ? "Adding..." : "Add"}</button>
+                            </div>
+                          )}
+
+                          {/* Thread */}
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            {(oppActivities[o.id]||[]).length === 0 && <div style={{ color: T.textMuted, fontSize: 12, textAlign: "center", padding: "8px 0" }}>No notes yet.</div>}
+                            {(oppActivities[o.id]||[]).map(act => {
+                              const typeColors = { note: T.textMuted, call: T.teal, meeting: T.cyan, email: T.blue, demo: T.amber, "follow-up": "#8B5CF6" };
+                              const color = typeColors[act.type] || T.textMuted;
+                              return (
+                                <div key={act.id} style={{ background: T.bg, border: `1px solid ${T.border}`, borderLeft: `3px solid ${color}`, borderRadius: 6, padding: "10px 12px" }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                                    <span style={{ background: color+"18", color, borderRadius: 20, padding: "1px 8px", fontSize: 9, fontWeight: 800, textTransform: "uppercase" }}>{act.type}</span>
+                                    <span style={{ color: T.textMuted, fontSize: 10 }}>{new Date(act.created_at).toLocaleDateString("en-GB")} · {act.created_by_name}</span>
+                                  </div>
+                                  <div style={{ color: T.textPrimary, fontSize: 12, lineHeight: 1.5 }}>{act.content}</div>
+                                  {act.scheduled_date && <div style={{ color: "#8B5CF6", fontSize: 11, fontWeight: 700, marginTop: 4 }}>📅 {act.scheduled_date}{act.scheduled_time ? " at " + act.scheduled_time : ""} — on calendar</div>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 );
               })}
             </tbody>

@@ -4172,7 +4172,7 @@ const TasksView = ({ userRole, openTaskId, onOpenHandled }) => {
       supabase.from('tasks').select('*').order('created_at', { ascending: false }),
       supabase.from('projects').select('*'),
       supabase.from('profiles').select('*').not('role', 'in', '("Client","Vendor")'),
-      supabase.from('rff_awards').select('*, rffs(project_id, event_name)').in('status', ['confirmed','po_created']),
+      supabase.from('rff_awards').select('*, rffs(project_id, event_name), profiles!vendor_id(id, name, email, role)').in('status', ['confirmed','po_created']),
     ]);
     setTasks(t.data || []);
     setProjects(p.data || []);
@@ -4371,7 +4371,38 @@ const TasksView = ({ userRole, openTaskId, onOpenHandled }) => {
         <Modal title="New Task" onClose={() => setModal(false)}>
           <Input label="Task Name" placeholder="Describe the task" value={form.name} onChange={v => setForm({ ...form, name: v })} />
           <Select label="Event" options={[{ value: '', label: 'Select event...' }, ...projects.map(p => ({ value: p.id, label: p.name }))]} value={form.project_id} onChange={v => { const proj = projects.find(p => p.id === v); setForm({ ...form, project_id: v, client_id: proj?.client_id || '' }); }} />
-          <Select label="Assign To (Person Responsible)" options={[{ value: '', label: 'Select team member...' }, ...members.map(m => ({ value: m.id, label: m.name + ' — ' + m.role }))]} value={form.assignee_id} onChange={v => { const m = members.find(x => x.id === v); setForm({ ...form, assignee_id: v, assignee_name: m ? m.name : '' }); }} />
+          {(() => {
+            // Get vendors awarded to this event
+            const eventVendors = form.project_id
+              ? awardedVendors.filter(a => a.rffs?.project_id === form.project_id).map(a => ({
+                  value: a.vendor_id,
+                  label: a.vendor_name + ' — Vendor',
+                  isVendor: true,
+                }))
+              : [];
+            const staffOptions = members.map(m => ({ value: m.id, label: m.name + ' — ' + m.role }));
+            const allOptions = [
+              { value: '', label: 'Select assignee...' },
+              ...staffOptions,
+              ...(eventVendors.length > 0 ? [{ value: '__divider__', label: '── Awarded Vendors ──', disabled: true }, ...eventVendors] : []),
+            ];
+            return (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Assign To (Person Responsible)</div>
+                <select value={form.assignee_id} onChange={e => {
+                  const v = e.target.value;
+                  if (v === '__divider__') return;
+                  const m = members.find(x => x.id === v);
+                  const vendor = awardedVendors.find(a => a.vendor_id === v);
+                  setForm({ ...form, assignee_id: v, assignee_name: m ? m.name : vendor ? vendor.vendor_name : '' });
+                }} style={{ width: '100%', padding: '9px 12px', background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: 'inherit', outline: 'none' }}>
+                  {allOptions.map((o, i) => <option key={i} value={o.value} disabled={o.disabled}>{o.label}</option>)}
+                </select>
+                {form.project_id && eventVendors.length > 0 && <div style={{ color: T.teal, fontSize: 11, marginTop: 4 }}>✓ {eventVendors.length} awarded vendor{eventVendors.length !== 1 ? "s" : ""} available for this event</div>}
+                {form.project_id && eventVendors.length === 0 && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>No confirmed vendors for this event yet</div>}
+              </div>
+            );
+          })()}
           <Select label="Assigned By" options={[{ value: '', label: 'Select assignor...' }, ...members.map(m => ({ value: m.id, label: m.name + ' — ' + m.role }))]} value={form.assigned_by} onChange={v => setForm({ ...form, assigned_by: v })} />
           <Input label="Deadline" type="date" value={form.deadline} onChange={v => setForm({ ...form, deadline: v })} />
           <Select label="Status" options={[
@@ -12398,6 +12429,7 @@ const QuoteComparisonView = ({ user }) => {
   const [compareVendors, setCompareVendors] = useState([]);
   const [awardModal, setAwardModal] = useState(null);
   const [awardNotes, setAwardNotes] = useState("");
+  const [agreedAmount, setAgreedAmount] = useState("");
   const [saving, setSaving] = useState(false);
   const [awards, setAwards] = useState([]);
   const [vendorProfiles, setVendorProfiles] = useState([]);
@@ -12469,11 +12501,13 @@ const QuoteComparisonView = ({ user }) => {
     setSaving(true);
     const assignment = assignments.find(a => a.id === awardModal.id);
     const rff = rffs.find(r => r.id === selectedRff);
+    const finalAmount = parseFloat(agreedAmount) || awardModal.quote_amount;
     await supabase.from("rff_awards").insert({
       rff_id: selectedRff,
       vendor_id: awardModal.vendor_id,
       vendor_name: awardModal.vendor_name,
       quoted_amount: awardModal.quote_amount,
+      agreed_amount: finalAmount,
       proposed_budget: totalBudget,
       vendor_manager_notes: awardNotes,
       status: "pending_ceo",
@@ -12485,13 +12519,14 @@ const QuoteComparisonView = ({ user }) => {
       await supabase.from("notifications").insert({
         user_id: ceo.id,
         title: "Contract Award Pending Approval",
-        message: `${user.name} has nominated ${awardModal.vendor_name} for "${rff?.title}". Quote: GHS ${awardModal.quote_amount?.toLocaleString()}. Please review.`,
+        message: `${user.name} has nominated ${awardModal.vendor_name} for "${rff?.title}". Agreed Amount: GHS ${finalAmount?.toLocaleString()}${finalAmount !== awardModal.quote_amount ? ` (Original: GHS ${awardModal.quote_amount?.toLocaleString()})` : ""}. Please review.`,
         type: "rff",
       });
     }
     setSaving(false);
     setAwardModal(null);
     setAwardNotes("");
+    setAgreedAmount("");
     load();
     loadQuotes(selectedRff);
   };
@@ -12625,7 +12660,7 @@ const QuoteComparisonView = ({ user }) => {
                           <button onClick={() => toggleCompare(a.id)} style={{ background: isSelected ? T.amber+"20" : T.surface, border: `1px solid ${isSelected ? T.amber : T.border}`, color: isSelected ? T.amber : T.textMuted, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>{isSelected ? "✓ Selected" : "Compare"}</button>
                           {a.quote_document_url && <a href={a.quote_document_url} target="_blank" rel="noopener noreferrer" style={{ background: T.cyan+"15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 700, textDecoration: "none" }}>View</a>}
                           {!isAwarded && user?.role === "Vendor Manager" && (
-                            <button onClick={() => setAwardModal(a)} style={{ background: "#10B98115", border: "1px solid #10B98130", color: "#10B981", padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>🏆 Award</button>
+                            <button onClick={() => { setAwardModal(a); setAgreedAmount(a.quote_amount || ""); }} style={{ background: "#10B98115", border: "1px solid #10B98130", color: "#10B981", padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>🏆 Award</button>
                           )}
                           {isAwarded && <span style={{ color: "#10B981", fontSize: 10, fontWeight: 700 }}>✓ Awarded</span>}
                         </div>
@@ -12693,10 +12728,26 @@ const QuoteComparisonView = ({ user }) => {
             <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>Nominate {awardModal.vendor_name} for this RFF</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16, background: T.bg, borderRadius: 8, padding: "12px 14px" }}>
               <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Vendor</div><div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13, marginTop: 3 }}>{awardModal.vendor_name}</div></div>
-              <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Quote</div><div style={{ color: "#10B981", fontWeight: 900, fontSize: 16, marginTop: 3 }}>GHS {(awardModal.quote_amount || 0).toLocaleString()}</div></div>
+              <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Original Quote</div><div style={{ color: "#10B981", fontWeight: 900, fontSize: 16, marginTop: 3 }}>GHS {(awardModal.quote_amount || 0).toLocaleString()}</div></div>
               <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Proposed Budget</div><div style={{ color: T.cyan, fontWeight: 700, fontSize: 13, marginTop: 3 }}>GHS {totalBudget.toLocaleString()}</div></div>
-              <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Variance</div><div style={{ color: awardModal.quote_amount <= totalBudget ? T.teal : T.red, fontWeight: 700, fontSize: 13, marginTop: 3 }}>{awardModal.quote_amount <= totalBudget ? "✓ Within budget" : `⚠ Over by GHS ${(awardModal.quote_amount - totalBudget).toLocaleString()}`}</div></div>
+              <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Variance</div><div style={{ color: (parseFloat(agreedAmount)||awardModal.quote_amount) <= totalBudget ? T.teal : T.red, fontWeight: 700, fontSize: 13, marginTop: 3 }}>{(parseFloat(agreedAmount)||awardModal.quote_amount) <= totalBudget ? "✓ Within budget" : `⚠ Over by GHS ${((parseFloat(agreedAmount)||awardModal.quote_amount) - totalBudget).toLocaleString()}`}</div></div>
             </div>
+
+            {/* Agreed Amount — editable */}
+            <div style={{ marginBottom: 16, background: T.amber+"10", border: `1px solid ${T.amber}30`, borderRadius: 8, padding: "12px 14px" }}>
+              <label style={{ color: T.amber, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Agreed Amount (GHS) — edit if negotiated</label>
+              <input type="number" value={agreedAmount} onChange={e => setAgreedAmount(e.target.value)}
+                style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.amber}40`, borderRadius: 8, color: T.textPrimary, fontSize: 15, fontWeight: 700, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+                placeholder={awardModal.quote_amount || "Enter agreed amount"} />
+              {agreedAmount && parseFloat(agreedAmount) !== awardModal.quote_amount && (
+                <div style={{ color: T.amber, fontSize: 11, marginTop: 5, fontWeight: 600 }}>
+                  {parseFloat(agreedAmount) < awardModal.quote_amount
+                    ? `✓ Negotiated down by GHS ${(awardModal.quote_amount - parseFloat(agreedAmount)).toLocaleString()}`
+                    : `↑ Increased by GHS ${(parseFloat(agreedAmount) - awardModal.quote_amount).toLocaleString()}`}
+                </div>
+              )}
+            </div>
+
             <div style={{ marginBottom: 20 }}>
               <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Award Notes (sent to CEO)</label>
               <textarea value={awardNotes} onChange={e => setAwardNotes(e.target.value)} rows={3} placeholder="Reason for selection, notes for CEO..." style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", resize: "vertical" }} />

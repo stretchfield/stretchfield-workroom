@@ -3715,7 +3715,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
   };
 
   const handleConvert = async (opp) => {
-    if (!window.confirm(`Convert ${opp.company} to a Opportunity? It will appear in the Opportunities Pipeline.`)) return;
+    if (!window.confirm(`Convert ${opp.company} to a Lead? It will appear in the Leads Pipeline.`)) return;
     setSaving(true);
     const { data: opportunity, error } = await supabase.from("opportunities").insert({
       company: opp.company,
@@ -3768,8 +3768,8 @@ const OpportunitiesView = ({ user, onNavigate }) => {
       <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
         <div>
           <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>CRM</div>
-          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Leads</h2>
-          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{leads.length} target companies · {converted} converted to opportunities</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Opportunities</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{leads.length} target companies · {converted} converted to leads</div>
         </div>
         {canManage && (
           <button onClick={() => setModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, letterSpacing: "0.06em" }}>+ Add Opportunity</button>
@@ -5894,7 +5894,7 @@ const CRMView = ({ user }) => {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
         <div>
           <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Sales</div>
-          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Opportunities Pipeline</h2>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Leads Pipeline</h2>
           <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{opportunities.length} opportunities · GHS {pipelineValue.toLocaleString()} in pipeline</div>
         </div>
         {canEdit && <Btn onClick={() => setModal(true)}>+ New Opportunity</Btn>}

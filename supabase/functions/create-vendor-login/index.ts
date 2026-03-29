@@ -10,7 +10,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const { email, password, name, phone, company_name, service_category, application_id } = await req.json();
+    const { email, password, name, phone, company_name, service_category, application_id, role } = await req.json();
 
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -27,25 +27,28 @@ serve(async (req) => {
     if (authErr) throw new Error(authErr.message);
 
     const userId = authData.user.id;
+    const assignedRole = role || "Vendor";
 
-    // Create profile
+    // Create profile with correct role
     await supabaseAdmin.from("profiles").insert({
       id: userId,
       name,
       email,
-      role: "Vendor",
-      phone,
-      company_name,
-      service_category,
+      role: assignedRole,
+      phone: phone || null,
+      company_name: company_name || null,
+      service_category: assignedRole === "Vendor" ? service_category : null,
       approval_status: "approved",
       login_created: true,
     });
 
-    // Update application
-    await supabaseAdmin.from("vendor_applications").update({
-      status: "login-created",
-      profile_id: userId,
-    }).eq("id", application_id);
+    // Update vendor application if applicable
+    if (application_id && assignedRole === "Vendor") {
+      await supabaseAdmin.from("vendor_applications").update({
+        status: "login-created",
+        profile_id: userId,
+      }).eq("id", application_id);
+    }
 
     return new Response(JSON.stringify({ success: true, user_id: userId }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

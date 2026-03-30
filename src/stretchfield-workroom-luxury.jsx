@@ -5344,8 +5344,14 @@ const ClientsView = ({ user }) => {
         const { error } = await supabase.from('clients').delete().eq('id', id);
         if (error) { alert('Delete failed: ' + error.message); return; }
       }
-      // Also remove from clients table if exists
-      await supabase.from('clients').delete().eq('email', client?.email);
+      // Clear FK references before deleting from clients table
+      const { data: clientRecord } = await supabase.from('clients').select('id').eq('email', client?.email).single();
+      if (clientRecord) {
+        // Null out client_id on rffs referencing this client
+        await supabase.from('rffs').update({ client_id: null }).eq('client_id', clientRecord.id);
+        await supabase.from('projects').update({ client_id: null }).eq('client_id', clientRecord.id);
+        await supabase.from('clients').delete().eq('id', clientRecord.id);
+      }
       setClients(prev => prev.filter(c => c.id !== id));
     } catch (e) {
       alert('Delete failed: ' + e.message);

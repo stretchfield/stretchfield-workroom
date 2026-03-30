@@ -5327,22 +5327,29 @@ const ClientsView = ({ user }) => {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Remove this client?')) return;
-    // Check if from profiles or clients table
     const client = clients.find(c => c.id === id);
-    if (client?.source === 'profile') {
-      // Use edge function to delete auth user
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        await fetch('https://okbduzenceoknkjqnrha.supabase.co/functions/v1/delete-user', {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (client?.source === 'profile') {
+        // Has auth account — delete via edge function
+        const res = await fetch('https://okbduzenceoknkjqnrha.supabase.co/functions/v1/delete-user', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
           body: JSON.stringify({ userId: id }),
         });
-      } catch (e) { console.error(e); }
-    } else {
-      await supabase.from('clients').delete().eq('id', id);
+        const result = await res.json();
+        if (result.error) { alert('Delete failed: ' + result.error); return; }
+      } else {
+        // No auth account — just delete from clients table
+        const { error } = await supabase.from('clients').delete().eq('id', id);
+        if (error) { alert('Delete failed: ' + error.message); return; }
+      }
+      // Also remove from clients table if exists
+      await supabase.from('clients').delete().eq('email', client?.email);
+      setClients(prev => prev.filter(c => c.id !== id));
+    } catch (e) {
+      alert('Delete failed: ' + e.message);
     }
-    load();
   };
 
   const isCEOorAdmin = ['CEO', 'Country Manager'].includes(user?.role);

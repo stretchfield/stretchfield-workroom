@@ -43,9 +43,11 @@ function App() {
     setProfile(null);
   };
 
-  if (loading) return (
-    <div style={{ minHeight: "100vh", background: "#060B14", display: "flex", alignItems: "center", justifyContent: "center", color: "#00C8FF", fontFamily: "DM Sans, sans-serif", letterSpacing: "0.1em", fontSize: 12 }}>
-      LOADING...
+  if (loading || (session && !profile)) return (
+    <div style={{ minHeight: "100vh", background: "#060B14", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16, fontFamily: "DM Sans, sans-serif" }}>
+      <div style={{ width: 44, height: 44, border: "3px solid #0a1628", borderTop: "3px solid #00C8FF", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+      <div style={{ color: "#00C8FF", fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase" }}>Loading WorkRoom...</div>
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 

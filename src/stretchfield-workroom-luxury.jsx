@@ -5751,42 +5751,50 @@ const VendorTasksView = ({ user }) => {
 
 // ─── CRM VIEW ─────────────────────────────────────────────────────────────────
 const CRMView = ({ user }) => {
-  const [opportunities, setOpportunitys] = useState([]);
+  const [leads, setLeads] = useState([]);
   const [activities, setActivities] = useState([]);
   const [proposals, setProposals] = useState([]);
   const [members, setMembers] = useState([]);
+  const [existingClients, setExistingClients] = useState([]);
+  const [view, setView] = useState("kanban"); // kanban | list
+  const [search, setSearch] = useState("");
   const [modal, setModal] = useState(false);
-  const [selectedOpportunity, setSelectedOpportunity] = useState(null);
-  const [activityModal, setActivityModal] = useState(null);
-  const [proposalModal, setProposalModal] = useState(null);
-  const [proposalFile, setProposalFile] = useState(null);
-  const [form, setForm] = useState({ company: "", contact_name: "", email: "", phone: "", source: "", value: "", notes: "", assigned_to: "", assigned_name: "" });
-  const [actForm, setActForm] = useState({ type: "call", notes: "" });
-  const [propForm, setPropForm] = useState({ title: "", amount: "", notes: "" });
+  const [selectedLead, setSelectedLead] = useState(null);
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState("all");
   const [approvalModal, setApprovalModal] = useState(null);
-  const [existingClients, setExistingClients] = useState([]);
   const [matchedClient, setMatchedClient] = useState(null);
   const [clientForm, setClientForm] = useState({ name: "", company: "", email: "", phone: "" });
   const [eventForm, setEventForm] = useState({ name: "", deadline: "", phase: "Planning" });
   const [createLogin, setCreateLogin] = useState(false);
   const [loginPassword, setLoginPassword] = useState("");
+  const [actForm, setActForm] = useState({ type: "call", notes: "", scheduled_date: "", scheduled_time: "" });
+  const [addingAct, setAddingAct] = useState(false);
+  const [form, setForm] = useState({ company: "", contact_name: "", email: "", phone: "", source: "", value: "", notes: "", status: "new", assigned_to: "", assigned_name: "" });
 
   const canEdit = ["CEO", "Country Manager", "Sales & Marketing"].includes(user?.role);
   const canApprove = ["CEO", "Country Manager"].includes(user?.role);
-  const statusColors = { new: T.cyan, contacted: T.blue, qualified: T.amber, proposal: T.magenta, won: T.teal, lost: "#F43F5E" };
-  const statusOrder = ["new", "contacted", "qualified", "proposal", "won", "lost"];
+
+  const STAGES = [
+    { id: "new", label: "New", color: T.cyan },
+    { id: "contacted", label: "Contacted", color: T.blue },
+    { id: "qualified", label: "Qualified", color: T.amber },
+    { id: "proposal", label: "Proposal", color: "#E879F9" },
+    { id: "won", label: "Won", color: T.teal },
+    { id: "lost", label: "Lost", color: "#F43F5E" },
+  ];
 
   const load = async () => {
     const [l, a, p, m, c] = await Promise.all([
-      ["CEO", "Country Manager", "Sales & Marketing"].includes(user?.role) ? supabase.from("opportunities").select("*").order("created_at", { ascending: false }) : supabase.from("opportunities").select("*").or("assigned_to.eq." + user.id + ",created_by.eq." + user.id).order("created_at", { ascending: false }),
+      ["CEO", "Country Manager", "Sales & Marketing"].includes(user?.role)
+        ? supabase.from("opportunities").select("*").order("created_at", { ascending: false })
+        : supabase.from("opportunities").select("*").or("assigned_to.eq." + user.id + ",created_by.eq." + user.id).order("created_at", { ascending: false }),
       supabase.from("crm_activities").select("*").order("created_at", { ascending: false }),
       supabase.from("proposals").select("*").order("created_at", { ascending: false }),
-      supabase.from('profiles').select('*').not('role', 'in', '("Client","Vendor")'),
+      supabase.from("profiles").select("*").not("role", "in", '("Client","Vendor")'),
       supabase.from("clients").select("*"),
     ]);
-    setOpportunitys(l.data || []);
+    setLeads(l.data || []);
     setActivities(a.data || []);
     setProposals(p.data || []);
     setMembers(m.data || []);
@@ -5795,3120 +5803,386 @@ const CRMView = ({ user }) => {
 
   useEffect(() => { load(); }, []);
 
-  const handleCreateOpportunity = async () => {
+  const filteredLeads = leads.filter(l => {
+    if (filter !== "all" && l.status !== filter) return false;
+    if (search && !l.company?.toLowerCase().includes(search.toLowerCase()) && !l.contact_name?.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  const totalPipeline = leads.filter(l => !["won","lost"].includes(l.status)).reduce((a,l) => a + (l.value||0), 0);
+  const totalWon = leads.filter(l => l.status === "won").reduce((a,l) => a + (l.value||0), 0);
+  const wonCount = leads.filter(l => l.status === "won").length;
+  const pendingApproval = leads.filter(l => l.status === "won" && !l.approved).length;
+
+  const handleCreate = async () => {
     if (!form.company) return;
     setSaving(true);
     await supabase.from("opportunities").insert({
       company: form.company, contact_name: form.contact_name, email: form.email,
       phone: form.phone, source: form.source, value: parseFloat(form.value) || 0,
-      notes: form.notes, status: "new", created_by: user.id,
+      notes: form.notes, status: form.status || "new", created_by: user.id,
       assigned_to: form.assigned_to || null, assigned_name: form.assigned_name || "",
     });
     setModal(false);
-    setForm({ company: "", contact_name: "", email: "", phone: "", source: "", value: "", notes: "", assigned_to: "", assigned_name: "" });
+    setForm({ company: "", contact_name: "", email: "", phone: "", source: "", value: "", notes: "", status: "new", assigned_to: "", assigned_name: "" });
     setSaving(false);
     load();
   };
 
-  const handleAddActivity = async () => {
+  const updateStatus = async (leadId, newStatus) => {
+    if (newStatus === "won") {
+      await supabase.from("opportunities").update({ status: "won", pending_approval: true, closed_date: new Date().toISOString().slice(0,10), sales_cycle_days: Math.round((new Date() - new Date(leads.find(l=>l.id===leadId)?.created_at||new Date()))/(1000*60*60*24)) }).eq("id", leadId);
+      const { data: ceos } = await supabase.from("profiles").select("id, email, name").eq("role", "CEO");
+      for (const ceo of ceos || []) {
+        await supabase.from("notifications").insert({ user_id: ceo.id, title: "Lead Won — Action Required", message: `${leads.find(l=>l.id===leadId)?.company} has been marked as Won. Please review and approve.`, type: "crm" });
+        if (ceo.email) await sendEmail(ceo.email, `Lead Won — ${leads.find(l=>l.id===leadId)?.company}`, notifEmailHtml({ name: ceo.name, title: "Lead Won — Your Approval Required", message: `<strong>${leads.find(l=>l.id===leadId)?.company}</strong> has been marked as Won. Please log in to review and approve.`, actionUrl: BASE_URL, actionLabel: "Review Lead" }));
+      }
+    } else {
+      await supabase.from("opportunities").update({ status: newStatus }).eq("id", leadId);
+    }
+    load();
+  };
+
+  const addActivity = async (leadId, company) => {
     if (!actForm.notes) return;
-    // If scheduled — add to calendar
+    setAddingAct(true);
+    await supabase.from("crm_activities").insert({
+      lead_id: leadId, type: actForm.type, notes: actForm.notes,
+      date: new Date().toISOString().slice(0,10),
+      scheduled_date: actForm.scheduled_date || null,
+      scheduled_time: actForm.scheduled_time || null,
+      activity_type: actForm.type,
+      created_by: user.id, created_by_name: user.name,
+    });
     if (actForm.scheduled_date && ["call","meeting","demo","follow-up"].includes(actForm.type)) {
-      const opportunity = opportunities.find(l => l.id === selectedOpportunity?.id);
       await supabase.from("itineraries").insert({
-        title: `${actForm.type.charAt(0).toUpperCase()+actForm.type.slice(1)} — ${opportunity?.company || ""}`,
+        title: `${actForm.type.charAt(0).toUpperCase()+actForm.type.slice(1)} — ${company}`,
         week_start: actForm.scheduled_date,
-        items: JSON.stringify([{
-          date: actForm.scheduled_date,
-          time: actForm.scheduled_time || "09:00",
-          company: opportunity?.company || "",
-          action: actForm.type,
-          notes: actForm.notes,
-        }]),
+        items: JSON.stringify([{ date: actForm.scheduled_date, time: actForm.scheduled_time || "09:00", company, action: actForm.type, notes: actForm.notes }]),
         created_by: user.id,
       });
-      // Notify assigned sales
-      if (opportunity?.assigned_to) {
-        await supabase.from("notifications").insert({ user_id: opportunity.assigned_to, title: `Follow-up Scheduled — ${opportunity.company}`, message: `${actForm.type} scheduled on ${actForm.scheduled_date}${actForm.scheduled_time ? " at " + actForm.scheduled_time : ""}`, type: "crm" });
+      const lead = leads.find(l => l.id === leadId);
+      if (lead?.assigned_to) {
+        await supabase.from("notifications").insert({ user_id: lead.assigned_to, title: `Follow-up Scheduled — ${company}`, message: `${actForm.type} scheduled on ${actForm.scheduled_date}${actForm.scheduled_time ? " at " + actForm.scheduled_time : ""}`, type: "crm" });
       }
     }
-    setSaving(true);
-    await supabase.from("crm_activities").insert({
-      opportunity_id: activityModal.id, type: actForm.type,
-      notes: actForm.notes, created_by: user.id, created_by_name: user.name,
-    });
-    setActivityModal(null);
-    setActForm({ type: "call", notes: "" });
-    setSaving(false);
+    setActForm({ type: "call", notes: "", scheduled_date: "", scheduled_time: "" });
+    setAddingAct(false);
     load();
   };
 
-  const handleCreateProposal = async () => {
-    if (!propForm.title) return;
-    setSaving(true);
-    let document_url = "", document_name = "";
-    if (proposalFile) {
-      const ext = proposalFile.name.split(".").pop();
-      const filename = "proposal_" + Date.now() + "." + ext;
-      const { error: uploadErr } = await supabase.storage.from("rffs").upload(filename, proposalFile);
-      if (!uploadErr) {
-        const { data: urlData } = supabase.storage.from("rffs").getPublicUrl(filename);
-        document_url = urlData.publicUrl;
-        document_name = proposalFile.name;
-      }
-    }
-    await supabase.from("proposals").insert({
-      opportunity_id: proposalModal.id, title: propForm.title,
-      amount: parseFloat(propForm.amount) || 0, notes: propForm.notes,
-      status: "draft", document_url, document_name,
-    });
-    setProposalModal(null);
-    setPropForm({ title: "", amount: "", notes: "" });
-    setProposalFile(null);
-    setSaving(false);
-    load();
-  };
+  const typeColors = { note: T.textMuted, call: T.teal, meeting: T.cyan, email: T.blue, demo: T.amber, "follow-up": "#8B5CF6" };
+  const typeIcons = { note: "📝", call: "📞", meeting: "🤝", email: "✉️", demo: "🎯", "follow-up": "🔄" };
 
-  const openApprovalModal = (opportunity) => {
-    const matched = existingClients.find(c =>
-      c.company?.toLowerCase() === opportunity.company?.toLowerCase() ||
-      c.email?.toLowerCase() === opportunity.email?.toLowerCase()
+  // ── KANBAN CARD ──
+  const LeadCard = ({ lead }) => {
+    const stage = STAGES.find(s => s.id === lead.status) || STAGES[0];
+    const leadActivities = activities.filter(a => a.lead_id === lead.id);
+    const lastAct = leadActivities[0];
+    const daysSince = lead.created_at ? Math.floor((new Date() - new Date(lead.created_at)) / (1000*60*60*24)) : 0;
+    const isSelected = selectedLead?.id === lead.id;
+
+    return (
+      <div onClick={() => setSelectedLead(isSelected ? null : lead)}
+        style={{ background: isSelected ? T.surface : T.bg, border: `1px solid ${isSelected ? stage.color+"80" : T.border}`, borderLeft: `3px solid ${stage.color}`, borderRadius: 10, padding: "14px 16px", cursor: "pointer", transition: "all 0.2s", marginBottom: 8 }}
+        onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.borderColor = stage.color+"50"; e.currentTarget.style.background = T.surface; }}}
+        onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.background = T.bg; }}}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lead.company}</div>
+            {lead.contact_name && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{lead.contact_name}</div>}
+          </div>
+          {lead.status === "won" && !lead.approved && <span style={{ background: T.amber+"20", color: T.amber, fontSize: 9, fontWeight: 800, borderRadius: 20, padding: "2px 7px", flexShrink: 0, marginLeft: 6 }}>CEO</span>}
+          {lead.status === "won" && lead.approved && <span style={{ background: "#10B98120", color: "#10B981", fontSize: 9, fontWeight: 800, borderRadius: 20, padding: "2px 7px", flexShrink: 0, marginLeft: 6 }}>✓</span>}
+        </div>
+        <div style={{ color: T.gold, fontWeight: 900, fontSize: 15, marginBottom: 8 }}>GHS {(lead.value||0).toLocaleString()}</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ color: T.textMuted, fontSize: 10 }}>{daysSince}d</span>
+            {lastAct && <span style={{ color: typeColors[lastAct.type]||T.textMuted, fontSize: 10 }}>{typeIcons[lastAct.type]}</span>}
+            <span style={{ color: T.textMuted, fontSize: 10 }}>{leadActivities.length} act.</span>
+          </div>
+          {lead.assigned_name && <span style={{ color: T.cyan, fontSize: 10, fontWeight: 600 }}>{lead.assigned_name.split(" ")[0]}</span>}
+        </div>
+      </div>
     );
-    setMatchedClient(matched || null);
-    setClientForm({ name: opportunity.contact_name || "", company: opportunity.company || "", email: opportunity.email || "", phone: opportunity.phone || "" });
-    setEventForm({ name: opportunity.company + " Event", deadline: "", phase: "Planning" });
-    setCreateLogin(false);
-    setLoginPassword("");
-    setApprovalModal(opportunity);
   };
 
-  const handleApproveWonOpportunity = async () => {
-    setSaving(true);
-    let clientId = matchedClient?.id;
-    let clientEmail = matchedClient?.email || clientForm.email;
-
-    if (!matchedClient) {
-      const { data: newClient } = await supabase.from("clients").insert({
-        name: clientForm.name,
-        company: clientForm.company,
-        email: clientForm.email,
-        phone: clientForm.phone,
-      }).select().single();
-      clientId = newClient?.id;
-      clientEmail = clientForm.email;
-    }
-
-    // Create portal login if requested (for both new and existing clients without login)
-    if (createLogin && loginPassword && clientEmail) {
-      const { data: authData } = await supabase.auth.signUp({
-        email: clientEmail,
-        password: loginPassword,
-      });
-      if (authData?.user) {
-        const name = matchedClient ? (matchedClient.name || matchedClient.company) : (clientForm.name || clientForm.company);
-        const initials = name.split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase();
-        await supabase.from("profiles").insert({
-          id: authData.user.id,
-          name,
-          email: clientEmail,
-          role: "Client",
-          avatar: initials,
-        });
-        await supabase.from("clients").update({ profile_id: authData.user.id }).eq("id", clientId);
-      }
-    }
-
-    // Create event for client
-    await supabase.from("projects").insert({
-      name: eventForm.name,
-      client_id: clientId,
-      client: clientForm.company || matchedClient?.company,
-      deadline: eventForm.deadline || null,
-      phase: eventForm.phase,
-      completion: 0,
-      status: "active",
-      tasks: 0,
-      completed: 0,
-      active_for_client: true,
-    });
-
-    // Mark opportunity approved
-    await supabase.from("opportunities").update({ approved: true, approved_by: user.id }).eq("id", approvalModal.id);
-
-    // Notify Sales & Marketing
-    const { data: smUsers } = await supabase.from("profiles").select("id").eq("role", "Sales & Marketing");
-    if (smUsers) {
-      await Promise.all(smUsers.map(u =>
-        supabase.from("notifications").insert({
-          user_id: u.id,
-          title: "Opportunity Approved",
-          message: approvalModal.company + " approved. Client and event created.",
-          type: "crm",
-        })
-      ));
-    }
-
-    setApprovalModal(null);
-    setSaving(false);
-    load();
-  };
-
-  const filteredOpportunitys = filter === "all" ? opportunities : opportunities.filter(l => l.status === filter);
-  const totalValue = opportunities.filter(l => l.status === "won").reduce((a, l) => a + (l.value || 0), 0);
-  const pipelineValue = opportunities.filter(l => !["won","lost"].includes(l.status)).reduce((a, l) => a + (l.value || 0), 0);
-
-  return (
-    <div style={{ animation: "fadeUp 0.35s ease" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
-        <div>
-          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Sales</div>
-          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Leads Pipeline</h2>
-          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{opportunities.length} opportunities · GHS {pipelineValue.toLocaleString()} in pipeline</div>
-        </div>
-        {canEdit && <Btn onClick={() => setModal(true)}>+ New Opportunity</Btn>}
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
-        {[
-          { label: "Total Opportunitys", value: opportunities.length, color: T.cyan },
-          { label: "Pipeline Value", value: "GHS " + pipelineValue.toLocaleString(), color: T.amber },
-          { label: "Won", value: opportunities.filter(l => l.status === "won").length, sub: "GHS " + totalValue.toLocaleString(), color: T.teal },
-          { label: "Proposals", value: proposals.length, color: T.magenta },
-        ].map((k, i) => (
-          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
-            <div style={{ color: k.color, fontSize: 20, fontWeight: 900 }}>{k.value}</div>
-            <div style={{ color: T.textPrimary, fontSize: 10, fontWeight: 700, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
-            {k.sub && <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{k.sub}</div>}
-          </div>
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
-        {["all", ...statusOrder].map(s => (
-          <button key={s} onClick={() => setFilter(s)} style={{
-            padding: "5px 14px", borderRadius: 20, cursor: "pointer", fontSize: 11, fontWeight: 700,
-            border: "1px solid " + (filter === s ? (statusColors[s] || T.cyan) : T.border),
-            background: filter === s ? (statusColors[s] || T.cyan) + "20" : "none",
-            color: filter === s ? (statusColors[s] || T.cyan) : T.textMuted,
-            letterSpacing: "0.04em", textTransform: "uppercase", transition: "all 0.15s",
-          }}>{s === "all" ? "All" : s}{s !== "all" ? ` (${opportunities.filter(l => l.status === s).length})` : ""}</button>
-        ))}
-      </div>
-      {filteredOpportunitys.length === 0 ? (
-        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
-          <div style={{ fontSize: 40, marginBottom: 16 }}>🎯</div>
-          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No opportunities yet</div>
-          <div style={{ color: T.textMuted, fontSize: 13 }}>Add your first opportunity to get started.</div>
-        </div>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
-          {filteredOpportunitys.map((opportunity, idx) => (
-            <div key={opportunity.id} onClick={() => setSelectedOpportunity(selectedOpportunity?.id === opportunity.id ? null : opportunity)}
-              style={{ background: T.surface, border: `1px solid ${selectedOpportunity?.id === opportunity.id ? (statusColors[opportunity.status] || T.cyan) + "60" : T.border}`, borderRadius: 12, padding: "18px 20px", cursor: "pointer", transition: "box-shadow 0.2s, border-color 0.2s" }}
-              onMouseEnter={e => { if (selectedOpportunity?.id !== opportunity.id) { e.currentTarget.style.boxShadow = `0 4px 24px ${T.cyan}10`; e.currentTarget.style.borderColor = T.cyan + "40"; }}}
-              onMouseLeave={e => { if (selectedOpportunity?.id !== opportunity.id) { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = T.border; }}}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{opportunity.company}</div>
-                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>{opportunity.contact_name}{opportunity.phone ? " · " + opportunity.phone : ""}</div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, marginLeft: 8 }}>
-                  <span style={{ background: (statusColors[opportunity.status] || T.cyan) + "20", color: statusColors[opportunity.status] || T.cyan, padding: "3px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>{opportunity.status}</span>
-                  {opportunity.status === "won" && !opportunity.approved && <span style={{ background: T.amber+"20", color: T.amber, fontSize: 9, fontWeight: 800, borderRadius: 20, padding: "1px 7px", marginLeft: 2 }}>Pending CEO</span>}
-                  {opportunity.status === "won" && opportunity.approved && <span style={{ background: "#10B98120", color: "#10B981", fontSize: 9, fontWeight: 800, borderRadius: 20, padding: "1px 7px", marginLeft: 2 }}>✓ Approved</span>}
-                  {user?.role === "CEO" && (
-                    <button onClick={async (e) => { e.stopPropagation(); if (!window.confirm(`Delete opportunity "${opportunity.company}"? This cannot be undone.`)) return; await supabase.from("leads").update({ converted_opportunity_id: null }).eq("converted_opportunity_id", opportunity.id); const { error } = await supabase.from("opportunities").delete().eq("id", opportunity.id); if (error) { alert("Delete failed: " + error.message); return; } if (selectedOpportunity?.id === opportunity.id) setSelectedOpportunity(null); load(); }}
-                      style={{ background: T.red + "18", border: `1px solid ${T.red}40`, color: T.red, width: 24, height: 24, borderRadius: 6, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, flexShrink: 0 }}
-                      onMouseEnter={e => e.currentTarget.style.background = T.red + "35"}
-                      onMouseLeave={e => e.currentTarget.style.background = T.red + "18"}>×</button>
-                  )}
-                </div>
-              </div>
-              <div style={{ color: T.gold, fontWeight: 900, fontSize: 16, marginBottom: 10 }}>GHS {(opportunity.value || 0).toLocaleString()}</div>
-              {user?.role === "CEO" && opportunity.status === "won" && !opportunity.approved && (
-                <button onClick={e => { e.stopPropagation(); setApprovalModal(opportunity); }} style={{ width: "100%", padding: "8px", background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: "none", borderRadius: 8, cursor: "pointer", color: "#fff", fontSize: 12, fontWeight: 800, marginBottom: 10 }}>✓ Approve Opportunity — Create Client & Portal</button>
-              )}
-              <div style={{ display: "flex", gap: 12, paddingTop: 8, borderTop: `1px solid ${T.border}44` }}>
-                <span style={{ color: T.textMuted, fontSize: 10 }}>{activities.filter(a => a.opportunity_id === opportunity.id).length} activities</span>
-                <span style={{ color: T.textMuted, fontSize: 10 }}>{proposals.filter(p => p.opportunity_id === opportunity.id).length} proposals</span>
-                {opportunity.assigned_name && <span style={{ color: T.cyan, fontSize: 10, fontWeight: 600, marginLeft: "auto" }}>→ {opportunity.assigned_name}</span>}
-              </div>
-              {selectedOpportunity?.id === opportunity.id && (
-                <div onClick={e => e.stopPropagation()} style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid " + T.border }}>
-                  {opportunity.email && <div style={{ color: T.textSecondary, fontSize: 12, marginBottom: 4 }}>✉ {opportunity.email}</div>}
-                  {opportunity.source && <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 8 }}>Source: {opportunity.source}</div>}
-                  {opportunity.notes && <div style={{ color: T.textSecondary, fontSize: 12, marginBottom: 12, fontStyle: "italic" }}>{opportunity.notes}</div>}
-                  {canEdit && (
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Update Status</div>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        {statusOrder.map(s => (
-                          <button key={s} onClick={async () => {
-                            if (s === "won") {
-                              // Mark as pending CEO approval — not yet won
-                              const updates = {
-                                status: "won",
-                                pending_approval: true,
-                                closed_date: new Date().toISOString().split("T")[0],
-                                sales_cycle_days: Math.round((new Date() - new Date(opportunity.created_at)) / (1000*60*60*24)),
-                              };
-                              await supabase.from("opportunities").update(updates).eq("id", opportunity.id);
-                              // Notify CEO
-                              const { data: ceos } = await supabase.from("profiles").select("id, email, name").eq("role", "CEO");
-                              for (const ceo of ceos || []) {
-                                await supabase.from("notifications").insert({ user_id: ceo.id, title: "Opportunity Won — Action Required", message: `${opportunity.company} has been marked as Won. Please review and approve to create client and event.`, type: "crm" });
-                                if (ceo.email) await sendEmail(ceo.email, `Opportunity Won — ${opportunity.company}`, notifEmailHtml({ name: ceo.name, title: "Opportunity Won — Your Approval Required", message: `<strong>${opportunity.company}</strong> has been marked as Won by the Sales team.<br><br>Please log in to review, approve, create the client profile and set up their portal login.`, actionUrl: BASE_URL, actionLabel: "Review & Approve Opportunity" }));
-                              }
-                              load();
-                            } else {
-                              await supabase.from("opportunities").update({ status: s }).eq("id", opportunity.id);
-                              load();
-                            }
-                          }} style={{
-                            padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600,
-                            border: "1px solid " + (opportunity.status === s ? statusColors[s] : T.border),
-                            background: opportunity.status === s ? statusColors[s] + "20" : "none",
-                            color: opportunity.status === s ? statusColors[s] : T.textMuted,
-                          }}>{s}</button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                      <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Activities</div>
-                      {canEdit && <button onClick={() => setActivityModal(opportunity)} style={{ background: "none", border: "none", color: T.cyan, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>+ Add</button>}
-                    </div>
-                    {activities.filter(a => a.opportunity_id === opportunity.id).slice(0,3).map(a => (
-                      <div key={a.id} style={{ padding: "6px 0", borderBottom: "1px solid " + T.border, fontSize: 12 }}>
-                        <span style={{ color: T.cyan, fontWeight: 600, marginRight: 6 }}>{a.type}</span>
-                        <span style={{ color: T.textSecondary }}>{a.notes}</span>
-                        <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{a.created_by_name} · {new Date(a.created_at).toLocaleDateString()}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                      <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Proposals</div>
-                      {canEdit && <button onClick={() => setProposalModal(opportunity)} style={{ background: "none", border: "none", color: T.cyan, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>+ Add</button>}
-                    </div>
-                    {proposals.filter(p => p.opportunity_id === opportunity.id).map(p => (
-                      <div key={p.id} style={{ padding: "8px 10px", background: T.bg, borderRadius: 6, marginBottom: 6, border: "1px solid " + T.border }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{p.title}</div>
-                          <span style={{ background: p.status === "approved" ? T.teal + "22" : T.amber + "22", color: p.status === "approved" ? T.teal : T.amber, padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700 }}>{p.status}</span>
-                        </div>
-                        <div style={{ color: T.amber, fontWeight: 700, fontSize: 13, marginTop: 4 }}>GHS {(p.amount || 0).toLocaleString()}</div>
-                        <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
-                          {p.document_url && <a href={p.document_url} target="_blank" rel="noopener noreferrer" style={{ color: T.cyan, fontSize: 12, fontWeight: 600, textDecoration: "none" }}>📄 View</a>}
-                          {canApprove && p.status === "draft" && (
-                            <button onClick={async () => { await supabase.from("proposals").update({ status: "approved", approved_by: user.id }).eq("id", p.id); load(); }} style={{ background: T.teal + "20", border: "1px solid " + T.teal, color: T.teal, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>✓ Approve</button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-      {modal && (
-        <Modal title="New Opportunity" onClose={() => setModal(false)}>
-          <Input label="Company Name" placeholder="e.g. Acme Corp" value={form.company} onChange={v => setForm({ ...form, company: v })} />
-          <Input label="Contact Person" placeholder="Full name" value={form.contact_name} onChange={v => setForm({ ...form, contact_name: v })} />
-          <Input label="Email" type="email" placeholder="contact@company.com" value={form.email} onChange={v => setForm({ ...form, email: v })} />
-          <Input label="Phone" placeholder="+233 XX XXX XXXX" value={form.phone} onChange={v => setForm({ ...form, phone: v })} />
-          <Input label="Deal Value (GHS )" type="number" placeholder="0" value={form.value} onChange={v => setForm({ ...form, value: v })} />
-          <Select label="Source" options={[
-            { value: "", label: "Select source..." },
-            { value: "referral", label: "Referral" },
-            { value: "social media", label: "Social Media" },
-            { value: "website", label: "Website" },
-            { value: "cold outreach", label: "Cold Outreach" },
-            { value: "event", label: "Event" },
-            { value: "other", label: "Other" },
-          ]} value={form.source} onChange={v => setForm({ ...form, source: v })} />
-          <Select label="Assign To" options={[{ value: "", label: "Select team member..." }, ...members.map(m => ({ value: m.id, label: m.name + " — " + m.role }))]}
-            value={form.assigned_to}
-            onChange={v => { const m = members.find(x => x.id === v); setForm({ ...form, assigned_to: v, assigned_name: m ? m.name : "" }); }} />
-          <Input label="Notes" placeholder="Any additional notes..." value={form.notes} onChange={v => setForm({ ...form, notes: v })} />
-          <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-            <Btn onClick={handleCreateOpportunity} disabled={saving}>{saving ? "Saving..." : "Create Opportunity"}</Btn>
-            <Btn variant="ghost" onClick={() => setModal(false)}>Cancel</Btn>
-          </div>
-        </Modal>
-      )}
-      {activityModal && (
-        <Modal title={"Log Activity — " + activityModal.company} onClose={() => setActivityModal(null)}>
-          <Select label="Activity Type" options={[
-            { value: "call", label: "📞 Call" },
-            { value: "email", label: "✉ Email" },
-            { value: "meeting", label: "🤝 Meeting" },
-            { value: "follow-up", label: "🔄 Follow Up" },
-            { value: "demo", label: "💻 Demo" },
-            { value: "other", label: "📝 Other" },
-          ]} value={actForm.type} onChange={v => setActForm({ ...actForm, type: v })} />
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Notes</div>
-            <textarea value={actForm.notes} onChange={e => setActForm({ ...actForm, notes: e.target.value })}
-              placeholder="What happened in this interaction?"
-              style={{ width: "100%", minHeight: 100, background: T.bg, border: "1px solid " + T.border, borderRadius: 6, padding: 10, color: T.textPrimary, fontSize: 13, resize: "vertical", fontFamily: "inherit" }} />
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <Btn onClick={handleAddActivity} disabled={saving}>{saving ? "Saving..." : "Log Activity"}</Btn>
-            <Btn variant="ghost" onClick={() => setActivityModal(null)}>Cancel</Btn>
-          </div>
-        </Modal>
-      )}
-      {approvalModal && (() => {
-        const [step, setStep] = React.useState(matchedClient ? 2 : 1);
-        const totalSteps = matchedClient ? 2 : 3;
-
-        const StepIndicator = () => (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
-            {Array.from({ length: totalSteps }).map((_, i) => (
-              <React.Fragment key={i}>
-                <div style={{
-                  width: 28, height: 28, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
-                  background: step > i + 1 ? T.teal : step === i + 1 ? T.cyan : T.bg,
-                  border: "2px solid " + (step >= i + 1 ? (step > i + 1 ? T.teal : T.cyan) : T.border),
-                  color: step >= i + 1 ? "#000" : T.textMuted, fontSize: 12, fontWeight: 700,
-                }}>{step > i + 1 ? "✓" : i + 1}</div>
-                {i < totalSteps - 1 && <div style={{ flex: 1, height: 2, background: step > i + 1 ? T.teal : T.border }} />}
-              </React.Fragment>
-            ))}
-          </div>
-        );
-
-        return (
-          <Modal title={"Approve Won Opportunity — " + approvalModal.company} onClose={() => setApprovalModal(null)}>
-            <StepIndicator />
-
-            {/* STEP 1 — New Client Details (only for new clients) */}
-            {!matchedClient && step === 1 && (
-              <div>
-                <div style={{ padding: "10px 14px", background: T.amber + "15", border: "1px solid " + T.amber + "33", borderRadius: 8, marginBottom: 16 }}>
-                  <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>New Client</div>
-                  <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>No existing client found for <strong>{approvalModal.company}</strong>. Fill in client details below.</div>
-                </div>
-                <Input label="Contact Name" value={clientForm.name} onChange={v => setClientForm({ ...clientForm, name: v })} />
-                <Input label="Company Name" value={clientForm.company} onChange={v => setClientForm({ ...clientForm, company: v })} />
-                <Input label="Email" type="email" value={clientForm.email} onChange={v => setClientForm({ ...clientForm, email: v })} />
-                <Input label="Phone" value={clientForm.phone} onChange={v => setClientForm({ ...clientForm, phone: v })} />
-                <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-                  <Btn onClick={() => setStep(2)} disabled={!clientForm.company || !clientForm.email}>Next: Portal Login →</Btn>
-                  <Btn variant="ghost" onClick={() => setApprovalModal(null)}>Cancel</Btn>
-                </div>
-              </div>
-            )}
-
-            {/* STEP 2 — Portal Login */}
-            {step === 2 && (
-              <div>
-                {matchedClient ? (
-                  <div style={{ padding: "12px 16px", background: T.teal + "15", border: "1px solid " + T.teal + "33", borderRadius: 8, marginBottom: 16 }}>
-                    <div style={{ color: T.teal, fontWeight: 700, fontSize: 13 }}>✓ Existing Client: {matchedClient.company || matchedClient.name}</div>
-                    <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{matchedClient.email}</div>
-                    {matchedClient.profile_id && <div style={{ color: T.teal, fontSize: 12, marginTop: 6 }}>✓ Portal login already active</div>}
-                  </div>
-                ) : (
-                  <div style={{ padding: "12px 16px", background: T.cyan + "15", border: "1px solid " + T.cyan + "33", borderRadius: 8, marginBottom: 16 }}>
-                    <div style={{ color: T.cyan, fontWeight: 700, fontSize: 13 }}>Client: {clientForm.company}</div>
-                    <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{clientForm.email}</div>
-                  </div>
-                )}
-
-                {(!matchedClient || !matchedClient.profile_id) && (
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: T.bg, borderRadius: 8, border: "1px solid " + T.border, marginBottom: 12 }}>
-                      <input type="checkbox" id="createLogin2" checked={createLogin} onChange={e => {
-                        setCreateLogin(e.target.checked);
-                        if (e.target.checked) setLoginPassword(generatePassword(matchedClient?.email || clientForm.email || ""));
-                      }} style={{ accentColor: T.cyan, width: 16, height: 16 }} />
-                      <label htmlFor="createLogin2" style={{ color: T.textSecondary, fontSize: 13, cursor: "pointer" }}>Create client portal login <span style={{ color: T.cyan, fontWeight: 700 }}>(recommended)</span></label>
-                    </div>
-                    {createLogin && (
-                      <div style={{ marginBottom: 14 }}>
-                        <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Portal Password</label>
-                        <div style={{ display: "flex", gap: 8 }}>
-                          <input type="text" value={loginPassword || generatePassword(matchedClient?.email || clientForm.email || "")} onChange={e => setLoginPassword(e.target.value)} placeholder="Auto-generated from email" style={{ flex: 1, padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
-                          <button type="button" onClick={() => setLoginPassword(generatePassword(matchedClient?.email || clientForm.email || ""))} style={{ background: T.cyan+"15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "9px 14px", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>⚡ Generate</button>
-                        </div>
-                        <div style={{ color: T.teal, fontSize: 11, marginTop: 5 }}>✓ Password auto-generated from email — will be sent to client on approval</div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-                  <Btn onClick={() => setStep(totalSteps)}>Next: Create Event →</Btn>
-                  {!matchedClient && <Btn variant="ghost" onClick={() => setStep(1)}>← Back</Btn>}
-                  {matchedClient && <Btn variant="ghost" onClick={() => setApprovalModal(null)}>Cancel</Btn>}
-                </div>
-              </div>
-            )}
-
-            {/* STEP 3 — Create Event */}
-            {step === totalSteps && (
-              <div>
-                <div style={{ padding: "12px 16px", background: T.teal + "15", border: "1px solid " + T.teal + "33", borderRadius: 8, marginBottom: 16 }}>
-                  <div style={{ color: T.teal, fontWeight: 700, fontSize: 13 }}>
-                    {matchedClient ? "✓ " + (matchedClient.company || matchedClient.name) : "✓ " + clientForm.company}
-                    {createLogin && !matchedClient?.profile_id && <span style={{ marginLeft: 8, color: T.cyan, fontWeight: 600, fontSize: 12 }}>+ Portal Login</span>}
-                  </div>
-                  <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>Now create an event for this client</div>
-                </div>
-                <Input label="Event Name" placeholder="e.g. Annual Conference 2025" value={eventForm.name} onChange={v => setEventForm({ ...eventForm, name: v })} />
-                <Input label="Deadline" type="date" value={eventForm.deadline} onChange={v => setEventForm({ ...eventForm, deadline: v })} />
-                <Select label="Phase" options={[
-                  { value: "Planning", label: "Planning" },
-                  { value: "Design", label: "Design" },
-                  { value: "Execution", label: "Execution" },
-                  { value: "Review", label: "Review" },
-                ]} value={eventForm.phase} onChange={v => setEventForm({ ...eventForm, phase: v })} />
-                <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-                  <Btn onClick={handleApproveWonOpportunity} disabled={saving || !eventForm.name}>{saving ? "Creating..." : "✓ Approve & Create Event"}</Btn>
-                  <Btn variant="ghost" onClick={() => setStep(totalSteps - 1)}>← Back</Btn>
-                </div>
-              </div>
-            )}
-          </Modal>
-        );
-      })()}
-      {proposalModal && (
-        <Modal title={"New Proposal — " + proposalModal.company} onClose={() => setProposalModal(null)}>
-          <Input label="Proposal Title" placeholder="e.g. Event Management Package" value={propForm.title} onChange={v => setPropForm({ ...propForm, title: v })} />
-          <Input label="Amount (GHS )" type="number" placeholder="0" value={propForm.amount} onChange={v => setPropForm({ ...propForm, amount: v })} />
-          <Input label="Notes" placeholder="Proposal details..." value={propForm.notes} onChange={v => setPropForm({ ...propForm, notes: v })} />
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Attach Document</div>
-            <input type="file" accept=".pdf,.doc,.docx" onChange={e => setProposalFile(e.target.files[0])} style={{ width: "100%", padding: "10px", background: T.bg, border: "1px solid " + T.border, borderRadius: 6, color: T.textSecondary, fontSize: 13, cursor: "pointer" }} />
-            {proposalFile && <div style={{ color: T.cyan, fontSize: 12, marginTop: 6 }}>✓ {proposalFile.name}</div>}
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <Btn onClick={handleCreateProposal} disabled={saving}>{saving ? "Uploading..." : "Create Proposal"}</Btn>
-            <Btn variant="ghost" onClick={() => setProposalModal(null)}>Cancel</Btn>
-          </div>
-        </Modal>
-      )}
-    </div>
-  );
-};
-
-// ─── S&M TASKS VIEW ───────────────────────────────────────────────────────────
-const SMTasksView = ({ user }) => {
-  const [tasks, setTasks] = useState([]);
-  const [modal, setModal] = useState(false);
-  const [detailTask, setDetailTask] = useState(null);
-  const [form, setForm] = useState({ name: "", notes: "", deadline: "", assigned_to: "", assigned_name: "" });
-  const [members, setMembers] = useState([]);
-  const [saving, setSaving] = useState(false);
-
-  const canCreate = ["CEO", "Country Manager", "Sales & Marketing"].includes(user?.role);
-
-  const load = async () => {
-    const [t, m] = await Promise.all([
-      supabase.from("tasks").select("*").eq("task_type", "sm").order("created_at", { ascending: false }),
-      supabase.from("profiles").select("*").in("role", ["CEO", "Country Manager", "Sales & Marketing"]),
-    ]);
-    setTasks(t.data || []);
-    setMembers(m.data || []);
-  };
-
-  useEffect(() => { load(); }, [user.id]);
-
-  const handleCreate = async () => {
-    if (!form.name) return;
-    setSaving(true);
-    await supabase.from("tasks").insert({
-      name: form.name, notes: form.notes, deadline: form.deadline || null,
-      assignee_id: form.assigned_to || null, assignee_name: form.assigned_name || "",
-      assigned_by: user.id, status: "pending", progress: 0,
-      task_type: "sm", visible_to_client: false,
-    });
-    setModal(false);
-    setForm({ name: "", notes: "", deadline: "", assigned_to: "", assigned_name: "" });
-    setSaving(false);
-    load();
-  };
-
-  const handleUpdate = async () => {
-    await supabase.from("tasks").update({
-      progress: detailTask.progress, status: detailTask.status, notes: detailTask.notes,
-    }).eq("id", detailTask.id);
-    setDetailTask(null);
-    load();
-  };
-
-  return (
-    <div style={{ animation: "fadeUp 0.35s ease" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
-        <div>
-          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Sales</div>
-          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>S&M Tasks</h2>
-          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Sales & Marketing internal tasks</div>
-        </div>
-        {canCreate && <Btn onClick={() => setModal(true)}>+ New Task</Btn>}
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
-        {[
-          { label: "Total Tasks", value: tasks.length, color: T.cyan },
-          { label: "In Progress", value: tasks.filter(t => t.status === "in-progress").length, color: T.amber },
-          { label: "Completed", value: tasks.filter(t => t.status === "completed").length, color: T.teal },
-        ].map((k, i) => (
-          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
-            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
-            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
-          </div>
-        ))}
-      </div>
-      {tasks.length === 0 ? (
-        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
-          <div style={{ fontSize: 40, marginBottom: 16 }}>📋</div>
-          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No S&M tasks yet</div>
-          <div style={{ color: T.textMuted, fontSize: 13 }}>Tasks between CEO and Sales & Marketing appear here.</div>
-        </div>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
-          {tasks.map((t, idx) => {
-            const pct = t.progress || 0;
-            const barColor = t.status === "completed" ? T.teal : pct > 66 ? T.cyan : pct > 33 ? T.amber : T.magenta;
-            return (
-              <div key={t.id} onClick={() => setDetailTask({ ...t })} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px", cursor: "pointer", transition: "box-shadow 0.2s, border-color 0.2s" }}
-                onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 4px 24px ${T.cyan}12`; e.currentTarget.style.borderColor = T.cyan + "40"; }}
-                onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = T.border; }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</div>
-                    {t.assignee_name && <div style={{ color: T.cyan, fontSize: 10, fontWeight: 700 }}>→ {t.assignee_name}</div>}
-                    {t.notes && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4, fontStyle: "italic", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.notes}</div>}
-                  </div>
-                  <Badge status={t.status} />
-                </div>
-                <div style={{ height: 3, background: T.border + "44", borderRadius: 2, marginBottom: 6 }}>
-                  <div style={{ height: "100%", width: pct + "%", background: barColor, borderRadius: 2 }} />
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <div style={{ color: T.textMuted, fontSize: 10 }}>{pct}% complete</div>
-                  {t.deadline && <div style={{ color: T.textMuted, fontSize: 10 }}>Due {t.deadline}</div>}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {modal && (
-        <Modal title="New S&M Task" onClose={() => setModal(false)}>
-          <Input label="Task Name" placeholder="e.g. Prepare pitch deck" value={form.name} onChange={v => setForm({ ...form, name: v })} />
-          <Select label="Assign To" options={[{ value: "", label: "Select..." }, ...members.map(m => ({ value: m.id, label: m.name + " — " + m.role }))]}
-            value={form.assigned_to}
-            onChange={v => { const m = members.find(x => x.id === v); setForm({ ...form, assigned_to: v, assigned_name: m ? m.name : "" }); }} />
-          <Input label="Deadline" type="date" value={form.deadline} onChange={v => setForm({ ...form, deadline: v })} />
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Notes</div>
-            <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}
-              placeholder="Task details..."
-              style={{ width: "100%", minHeight: 80, background: T.bg, border: "1px solid " + T.border, borderRadius: 6, padding: 10, color: T.textPrimary, fontSize: 13, resize: "vertical", fontFamily: "inherit" }} />
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <Btn onClick={handleCreate} disabled={saving}>{saving ? "Saving..." : "Create Task"}</Btn>
-            <Btn variant="ghost" onClick={() => setModal(false)}>Cancel</Btn>
-          </div>
-        </Modal>
-      )}
-      {detailTask && (
-        <Modal title="Update Task" onClose={() => setDetailTask(null)}>
-          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 12 }}>{detailTask.name}</div>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Progress: {detailTask.progress || 0}%</div>
-            <input type="range" min="0" max="100" value={detailTask.progress || 0}
-              onChange={e => setDetailTask({ ...detailTask, progress: parseInt(e.target.value) })}
-              style={{ width: "100%", accentColor: T.cyan }} />
-          </div>
-          <Select label="Status" options={[
-            { value: "pending", label: "Pending" },
-            { value: "in-progress", label: "In Progress" },
-            { value: "completed", label: "Completed" },
-          ]} value={detailTask.status} onChange={v => setDetailTask({ ...detailTask, status: v })} />
-          <div style={{ marginBottom: 16, marginTop: 8 }}>
-            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Notes</div>
-            <textarea value={detailTask.notes || ""} onChange={e => setDetailTask({ ...detailTask, notes: e.target.value })}
-              style={{ width: "100%", minHeight: 80, background: T.bg, border: "1px solid " + T.border, borderRadius: 6, padding: 10, color: T.textPrimary, fontSize: 13, resize: "vertical", fontFamily: "inherit" }} />
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <Btn onClick={handleUpdate}>Save</Btn>
-            <Btn variant="ghost" onClick={() => setDetailTask(null)}>Cancel</Btn>
-          </div>
-        </Modal>
-      )}
-    </div>
-  );
-};
-
-// ─── FEEDBACK VIEW ────────────────────────────────────────────────────────────
-const FeedbackView = ({ userRole }) => {
-  const [feedback, setFeedback] = useState([]);
-  const [events, setEvents] = useState([]);
-  const [selectedEvent, setSelectedEvent] = useState("all");
-  const [loading, setLoading] = useState(true);
-  const canSeeDetailed = ["CEO", "Country Manager", "Strategy & Events Opportunity", "Vendor Manager"].includes(userRole);
-
-  useEffect(() => {
-    Promise.all([
-      supabase.from("feedback").select("*").order("created_at", { ascending: false }),
-      supabase.from("projects").select("*"),
-    ]).then(([f, e]) => { setFeedback(f.data || []); setEvents(e.data || []); setLoading(false); });
-  }, []);
-
-  const filtered = selectedEvent === "all" ? feedback : feedback.filter(f => f.project_id === selectedEvent);
-  const avgRating = filtered.length ? (filtered.reduce((a, f) => a + f.rating, 0) / filtered.length).toFixed(1) : 0;
-
-  return (
-    <div style={{ animation: "fadeUp 0.35s ease" }}>
-      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Clients</div>
-        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Client Feedback</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Event satisfaction and reviews</div>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 20 }}>
-        {[
-          { label: "Avg Rating", value: avgRating + " / 5", color: "#F59E0B" },
-          { label: "Total Reviews", value: filtered.length, color: T.cyan },
-          { label: "5-Star Reviews", value: filtered.filter(f => f.rating === 5).length, color: T.teal },
-        ].map((k, i) => (
-          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
-            <div style={{ color: k.color, fontSize: 20, fontWeight: 900 }}>{k.value}</div>
-            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
-        {[{ id: "all", name: "All Events" }, ...events.filter(e => feedback.some(f => f.project_id === e.id))].map(e => (
-          <button key={e.id} onClick={() => setSelectedEvent(e.id)} style={{ padding: "5px 14px", borderRadius: 20, border: `1px solid ${selectedEvent === e.id ? T.cyan : T.border}`, background: selectedEvent === e.id ? T.cyan + "20" : "none", color: selectedEvent === e.id ? T.cyan : T.textMuted, cursor: "pointer", fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", transition: "all 0.15s" }}>{e.name}</button>
-        ))}
-      </div>
-      {loading ? <div style={{ color: T.textMuted, textAlign: "center", padding: 60 }}>Loading...</div>
-      : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
-          <div style={{ fontSize: 40, marginBottom: 16 }}>💬</div>
-          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No feedback yet</div>
-        </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {filtered.map(f => (
-            <div key={f.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                <div>
-                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{f.client_name}</div>
-                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{f.event_name} · {new Date(f.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>
-                </div>
-                <div style={{ color: "#F59E0B", fontSize: 16, flexShrink: 0 }}>{"★".repeat(f.rating)}{"☆".repeat(5 - f.rating)}</div>
-              </div>
-              <div style={{ color: T.textMuted, fontSize: 12, fontStyle: "italic", marginBottom: canSeeDetailed && f.detailed_feedback ? 10 : 0 }}>"{f.summary}"</div>
-              {canSeeDetailed && f.detailed_feedback && (
-                <div style={{ padding: "10px 14px", background: T.bg, borderRadius: 8, border: `1px solid ${T.border}44`, marginTop: 10 }}>
-                  <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Detailed Feedback</div>
-                  <div style={{ color: T.textMuted, fontSize: 12 }}>{f.detailed_feedback}</div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ─── STRATEGY OVERVIEW ────────────────────────────────────────────────────────
-const StrategyOverviewView = () => {
-  const [clients, setClients] = useState([]);
-  const [events, setEvents] = useState([]);
-  const [feedback, setFeedback] = useState([]);
-
-  useEffect(() => {
-    Promise.all([
-      supabase.from("clients").select("*"),
-      supabase.from("projects").select("*").eq("status", "active"),
-      supabase.from("feedback").select("*").order("created_at", { ascending: false }),
-    ]).then(([c, e, f]) => { setClients(c.data || []); setEvents(e.data || []); setFeedback(f.data || []); });
-  }, []);
-
-  const totalEvents = events.length;
-  const avgCompletion = totalEvents ? Math.round(events.reduce((a, e) => a + (e.completion || 0), 0) / totalEvents) : 0;
-  const avgFeedbackRating = feedback.length ? (feedback.reduce((a, f) => a + f.rating, 0) / feedback.length).toFixed(1) : null;
-
-  return (
-    <div style={{ animation: "fadeUp 0.35s ease" }}>
-      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Strategy</div>
-        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Client & Event Overview</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Pictorial view of all active clients and events</div>
-      </div>
-
-      {/* KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
-        {[
-          { label: "Active Clients", value: clients.length, color: T.cyan },
-          { label: "Active Events", value: totalEvents, color: T.teal },
-          { label: "Avg Completion", value: avgCompletion + "%", color: T.amber },
-          { label: "Avg Feedback", value: avgFeedbackRating ? avgFeedbackRating + " / 5" : "—", color: "#F59E0B" },
-        ].map((k, i) => (
-          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
-            <div style={{ color: k.color, fontSize: 20, fontWeight: 900 }}>{k.value}</div>
-            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
-        {clients.map(c => {
-          const clientEvents = events.filter(e => e.client_id === c.id);
-          const clientFeedback = feedback.filter(f => f.client_id === c.id);
-          const avgRating = clientFeedback.length ? (clientFeedback.reduce((a, f) => a + f.rating, 0) / clientFeedback.length).toFixed(1) : null;
-          const initials = (c.company || c.name).slice(0,2).toUpperCase();
-          return (
-            <div key={c.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px", transition: "box-shadow 0.2s" }}
-              onMouseEnter={e => e.currentTarget.style.boxShadow = `0 4px 24px ${T.cyan}10`}
-              onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
-            >
-              {/* Client header */}
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, paddingBottom: 14, borderBottom: `1px solid ${T.border}44` }}>
-                <div style={{ width: 44, height: 44, borderRadius: 10, background: `linear-gradient(135deg, ${T.blue}40, ${T.cyan}20)`, border: `1px solid ${T.cyan}30`, display: "flex", alignItems: "center", justifyContent: "center", color: T.cyan, fontWeight: 900, fontSize: 14, flexShrink: 0 }}>{initials}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.company || c.name}</div>
-                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 1 }}>{c.name}</div>
-                  {avgRating && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 3 }}>
-                      <span style={{ color: "#F59E0B", fontSize: 11 }}>{"★".repeat(Math.round(avgRating))}</span>
-                      <span style={{ color: T.textMuted, fontSize: 10 }}>{avgRating}/5</span>
-                    </div>
-                  )}
-                </div>
-                <div style={{ background: clientEvents.length > 0 ? T.teal + "18" : T.border + "40", border: `1px solid ${clientEvents.length > 0 ? T.teal + "40" : T.border}`, color: clientEvents.length > 0 ? T.teal : T.textMuted, padding: "2px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
-                  {clientEvents.length} event{clientEvents.length !== 1 ? "s" : ""}
-                </div>
-              </div>
-
-              {clientEvents.length === 0
-                ? <div style={{ color: T.textMuted, fontSize: 12, fontStyle: "italic", padding: "8px 0" }}>No active events</div>
-                : clientEvents.map(e => {
-                    const pct = e.completion || 0;
-                    const barColor = pct >= 80 ? T.teal : pct >= 50 ? T.cyan : T.amber;
-                    const evFeedback = feedback.filter(f => f.project_id === e.id).slice(0,1);
-                    return (
-                      <div key={e.id} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: `1px solid ${T.border}33` }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                          <div style={{ color: T.textPrimary, fontSize: 12, fontWeight: 700, flex: 1, marginRight: 8 }}>{e.name}</div>
-                          <span style={{ color: barColor, fontWeight: 900, fontSize: 13, flexShrink: 0 }}>{pct}%</span>
-                        </div>
-                        <div style={{ height: 4, background: T.border + "44", borderRadius: 2, marginBottom: 5 }}>
-                          <div style={{ height: "100%", width: pct + "%", background: `linear-gradient(90deg, ${barColor}, ${barColor}cc)`, borderRadius: 2, transition: "width 0.4s ease" }} />
-                        </div>
-                        <div style={{ color: T.textMuted, fontSize: 10 }}>{e.phase} · Due {e.deadline}</div>
-                        {evFeedback.map(f => (
-                          <div key={f.id} style={{ marginTop: 8, padding: "8px 10px", background: T.cyan + "08", borderRadius: 8, border: `1px solid ${T.cyan}18` }}>
-                            <div style={{ color: "#F59E0B", fontSize: 10, marginBottom: 2 }}>{"★".repeat(f.rating)}</div>
-                            <div style={{ color: T.textMuted, fontSize: 11, fontStyle: "italic" }}>"{f.summary}"</div>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })
-              }
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-// ─── CLIENT FEEDBACK FORM ─────────────────────────────────────────────────────
-const ClientFeedbackForm = ({ event, user }) => {
-  const [rating, setRating] = useState(0);
-  const [summary, setSummary] = useState("");
-  const [detailed, setDetailed] = useState("");
-  const [recommend, setRecommend] = useState(null);
-  const [categoryRatings, setCategoryRatings] = useState({ communication: 0, quality: 0, timeliness: 0, value: 0 });
-  const [saving, setSaving] = useState(false);
-  const [done, setDone] = useState(false);
-  const [existing, setExisting] = useState(null);
-  const [clientId, setClientId] = useState(null);
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    supabase.from("clients").select("id").eq("profile_id", user.id).single().then(({ data }) => {
-      if (data) {
-        setClientId(data.id);
-        supabase.from("feedback").select("*").eq("project_id", event.id).eq("client_id", data.id).single()
-          .then(({ data: fb }) => { if (fb) { setExisting(fb); setDone(true); } });
-      }
-    });
-  }, [user.id, event.id]);
-
-  const handleSubmit = async () => {
-    if (!rating || !summary) return;
-    setSaving(true);
-    const { error } = await supabase.from("feedback").insert({
-      client_id: clientId, project_id: event.id,
-      client_name: user.name, event_name: event.name,
-      rating, summary, detailed_feedback: detailed,
-      recommend,
-      communication_rating: categoryRatings.communication || null,
-      quality_rating: categoryRatings.quality || null,
-      timeliness_rating: categoryRatings.timeliness || null,
-      value_rating: categoryRatings.value || null,
-    });
-    setSaving(false);
-    if (error) { alert("Error: " + error.message); return; }
-    setDone(true);
-    setExisting({ rating, summary });
-    setOpen(false);
-  };
-
-  const StarRow = ({ label, field }) => (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid " + T.border }}>
-      <div style={{ color: T.textSecondary, fontSize: 13 }}>{label}</div>
-      <div style={{ display: "flex", gap: 4 }}>
-        {[1,2,3,4,5].map(s => (
-          <button key={s} onClick={() => setCategoryRatings(prev => ({ ...prev, [field]: s }))}
-            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: s <= categoryRatings[field] ? "#F59E0B" : T.border, padding: "2px" }}>★</button>
-        ))}
-      </div>
-    </div>
-  );
-
-  if (done && existing) return (
-    <div style={{ marginTop: 20, padding: 16, background: T.teal + "15", borderRadius: 10, border: "1px solid " + T.teal + "33" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <div style={{ color: T.teal, fontWeight: 700, fontSize: 14, marginBottom: 4 }}>✓ Feedback Submitted</div>
-          <div style={{ color: "#F59E0B", fontSize: 18 }}>{"★".repeat(existing.rating)}{"☆".repeat(5 - existing.rating)}</div>
-          <div style={{ color: T.textSecondary, fontSize: 13, marginTop: 6, fontStyle: "italic" }}>"{existing.summary}"</div>
-        </div>
-      </div>
-    </div>
-  );
-
-  if (done) return (
-    <div style={{ marginTop: 20, padding: 16, background: T.teal + "15", borderRadius: 10, border: "1px solid " + T.teal + "33" }}>
-      <div style={{ color: T.teal, fontWeight: 700, fontSize: 14 }}>✓ Thank you for your feedback!</div>
-    </div>
-  );
-
-  return (
-    <div style={{ marginTop: 20 }}>
-      {!open ? (
-        <button onClick={() => setOpen(true)} style={{ width: "100%", padding: "12px", background: T.cyan + "15", border: "1px solid " + T.cyan + "33", borderRadius: 10, cursor: "pointer", color: T.cyan, fontWeight: 700, fontSize: 13 }}>
-          📝 Leave Feedback for this Event
-        </button>
-      ) : (
-        <div style={{ padding: 20, background: T.surface, borderRadius: 12, border: "1px solid " + T.border }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 16 }}>📝 Event Feedback</div>
-            <button onClick={() => setOpen(false)} style={{ background: "none", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 18 }}>×</button>
-          </div>
-
-          {/* Overall Rating */}
-          <div style={{ marginBottom: 20, padding: 16, background: T.bg, borderRadius: 10 }}>
-            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.06em" }}>Overall Rating *</div>
-            <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
-              {[1,2,3,4,5].map(s => (
-                <button key={s} onClick={() => setRating(s)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 40, color: s <= rating ? "#F59E0B" : T.border, transition: "color 0.15s" }}>★</button>
-              ))}
-            </div>
-            {rating > 0 && (
-              <div style={{ textAlign: "center", marginTop: 8, color: T.textMuted, fontSize: 13 }}>
-                {["", "Poor", "Fair", "Good", "Very Good", "Excellent"][rating]}
-              </div>
-            )}
-          </div>
-
-          {/* Category Ratings */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.06em" }}>Rate Specific Areas</div>
-            <div style={{ background: T.bg, borderRadius: 10, padding: "0 16px" }}>
-              <StarRow label="Communication" field="communication" />
-              <StarRow label="Quality of Work" field="quality" />
-              <StarRow label="Timeliness" field="timeliness" />
-              <StarRow label="Value for Money" field="value" />
-            </div>
-          </div>
-
-          {/* Summary */}
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Summary *</div>
-            <input value={summary} onChange={e => setSummary(e.target.value)} placeholder="Brief summary of your experience..."
-              style={{ width: "100%", padding: "10px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }} />
-          </div>
-
-          {/* Detailed */}
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Detailed Feedback <span style={{ color: T.textMuted, fontWeight: 400 }}>(optional)</span></div>
-            <textarea value={detailed} onChange={e => setDetailed(e.target.value)} placeholder="What went well? What could be improved? Any other comments..."
-              style={{ width: "100%", minHeight: 100, padding: "10px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }} />
-          </div>
-
-          {/* Recommend */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>Would you recommend us?</div>
-            <div style={{ display: "flex", gap: 10 }}>
-              {["Yes, definitely!", "Maybe", "No"].map(opt => (
-                <button key={opt} onClick={() => setRecommend(opt)} style={{
-                  flex: 1, padding: "10px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600,
-                  border: "1px solid " + (recommend === opt ? T.cyan : T.border),
-                  background: recommend === opt ? T.cyan + "20" : T.bg,
-                  color: recommend === opt ? T.cyan : T.textMuted,
-                }}>{opt}</button>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: 10 }}>
-            <Btn onClick={handleSubmit} disabled={saving || !rating || !summary}>{saving ? "Submitting..." : "Submit Feedback"}</Btn>
-            <Btn variant="ghost" onClick={() => setOpen(false)}>Cancel</Btn>
-          </div>
-          {(!rating || !summary) && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 8 }}>* Overall rating and summary are required</div>}
-        </div>
-      )}
-    </div>
-  );
-};
-
-
-
-
-const ZohoBooksView = ({ user }) => {
-  const [connected, setConnected] = useState(false);
-  const [checking, setChecking] = useState(true);
-  const [tab, setTab] = useState("invoices");
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [syncMsg, setSyncMsg] = useState("");
-  const [clients, setClients] = useState([]);
-  const [vendors, setVendors] = useState([]);
-
-  const tabs = [
-    { id: "invoices", label: "Invoices" },
-    { id: "estimates", label: "Quotes / Estimates" },
-    { id: "payments", label: "Payments Received" },
-    { id: "expenses", label: "Expenses" },
-    { id: "bills", label: "Bills" },
-    { id: "purchaseorders", label: "Purchase Orders" },
-    { id: "contacts", label: "Contacts" },
-    { id: "sync", label: "⟳ Sync" },
-  ];
-
-  const checkConnection = async () => {
-    setChecking(true);
-    try {
-      const res = await fetch("/api/zoho-sync?action=status");
-      const json = await res.json();
-      setConnected(!!json.connected);
-    } catch {
-      setConnected(false);
-    }
-    setChecking(false);
-  };
-
-  const fetchTab = async (t) => {
-    setLoading(true);
-    setData([]);
-    try {
-      const res = await fetch(`/api/zoho-sync?action=${t}`);
-      const json = await res.json();
-      const key = Object.keys(json).find(k => Array.isArray(json[k]));
-      setData(key ? json[key] : []);
-    } catch {
-      setData([]);
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    checkConnection();
-    // Check if just connected via OAuth callback
-    if (window.location.search.includes("zoho=connected")) {
-      setSyncMsg("✅ Zoho Books connected successfully!");
-      window.history.replaceState({}, "", window.location.pathname);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (connected && tab !== "sync") fetchTab(tab);
-  }, [connected, tab]);
-
-  const loadLocalData = async () => {
-    const [{ data: cl }, { data: vn }] = await Promise.all([
-      supabase.from("clients").select("*").order("name"),
-      supabase.from("profiles").select("*").eq("role", "Vendor"),
-    ]);
-    setClients(cl || []);
-    setVendors(vn || []);
-  };
-
-  useEffect(() => { loadLocalData(); }, []);
-
-  const syncClient = async (client) => {
-    setSyncing(true);
-    setSyncMsg("");
-    try {
-      const res = await fetch("/api/zoho-sync?action=sync-client", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client }),
-      });
-      const json = await res.json();
-      if (json.contact) setSyncMsg(`✅ ${client.name} synced to Zoho Books`);
-      else setSyncMsg(`⚠ ${json.message || "Sync failed"}`);
-    } catch (e) {
-      setSyncMsg("❌ Error: " + e.message);
-    }
-    setSyncing(false);
-  };
-
-  const syncVendor = async (vendor) => {
-    setSyncing(true);
-    setSyncMsg("");
-    try {
-      const res = await fetch("/api/zoho-sync?action=sync-vendor", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vendor }),
-      });
-      const json = await res.json();
-      if (json.contact) setSyncMsg(`✅ ${vendor.name} synced to Zoho Books`);
-      else setSyncMsg(`⚠ ${json.message || "Sync failed"}`);
-    } catch (e) {
-      setSyncMsg("❌ Error: " + e.message);
-    }
-    setSyncing(false);
-  };
-
-  // Column definitions per tab
-  const columns = {
-    invoices: ["Invoice #", "Customer", "Date", "Due Date", "Amount", "Status"],
-    estimates: ["Estimate #", "Customer", "Date", "Expiry", "Amount", "Status"],
-    payments: ["Payment #", "Customer", "Date", "Amount", "Mode"],
-    expenses: ["Date", "Category", "Description", "Amount", "Status"],
-    bills: ["Bill #", "Vendor", "Date", "Due Date", "Amount", "Status"],
-    purchaseorders: ["PO #", "Vendor", "Date", "Expected", "Amount", "Status"],
-    contacts: ["Name", "Type", "Email", "Phone", "Balance"],
-  };
-
-  const getRow = (item, t) => {
-    if (t === "invoices") return [item.invoice_number, item.customer_name, item.date, item.due_date, `${item.currency_code} ${(item.total || 0).toLocaleString()}`, item.status];
-    if (t === "estimates") return [item.estimate_number, item.customer_name, item.date, item.expiry_date, `${item.currency_code} ${(item.total || 0).toLocaleString()}`, item.status];
-    if (t === "payments") return [item.payment_number, item.customer_name, item.date, `${item.currency_code} ${(item.amount || 0).toLocaleString()}`, item.payment_mode];
-    if (t === "expenses") return [item.date, item.account_name, item.description || item.reference_number, `${item.currency_code} ${(item.total || 0).toLocaleString()}`, item.status];
-    if (t === "bills") return [item.bill_number, item.vendor_name, item.date, item.due_date, `${item.currency_code} ${(item.total || 0).toLocaleString()}`, item.status];
-    if (t === "purchaseorders") return [item.purchaseorder_number, item.vendor_name, item.date, item.delivery_date, `${item.currency_code} ${(item.total || 0).toLocaleString()}`, item.status];
-    if (t === "contacts") return [item.contact_name, item.contact_type, item.email, item.phone, `${item.currency_code || ""} ${(item.outstanding_receivable_amount || 0).toLocaleString()}`];
-    return [];
-  };
-
-  const statusColor = (s) => {
-    if (!s) return T.textMuted;
-    const sl = s.toLowerCase();
-    if (["paid","accepted","received","open"].includes(sl)) return T.teal;
-    if (["overdue","expired"].includes(sl)) return T.red;
-    if (["draft","pending","sent"].includes(sl)) return T.amber;
-    return T.textMuted;
-  };
-
-  return (
-    <div style={{ animation: "fadeUp 0.35s ease" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-        <div>
-          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
-          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Zoho Books</h2>
-          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Live sync with your Zoho Books Professional account</div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {checking ? (
-            <span style={{ color: T.textMuted, fontSize: 12 }}>Checking connection...</span>
-          ) : connected ? (
-            <span style={{ background: T.teal + "18", color: T.teal, border: `1px solid ${T.teal}30`, borderRadius: 20, padding: "4px 14px", fontSize: 11, fontWeight: 700 }}>● Connected</span>
-          ) : (
-            <a href="/api/zoho-auth" style={{ background: `linear-gradient(135deg, #E67E22, #F39C12)`, border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, textDecoration: "none" }}>Connect Zoho Books</a>
-          )}
-          {connected && <button onClick={() => { if (tab !== "sync") fetchTab(tab); }} style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.textMuted, padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>↻ Refresh</button>}
-          {connected && <a href="https://books.zoho.com" target="_blank" rel="noopener noreferrer" style={{ background: `linear-gradient(135deg, #E67E22, #F39C12)`, color: "#fff", padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>Open Zoho Books ↗</a>}
-        </div>
-      </div>
-
-      {!connected && !checking && (
-        <div style={{ textAlign: "center", padding: "60px 0", background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>📚</div>
-          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 18, marginBottom: 8 }}>Connect Zoho Books</div>
-          <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 24 }}>Click "Connect Zoho Books" above to authorise access to your account.</div>
-          <a href="/api/zoho-auth" style={{ background: `linear-gradient(135deg, #E67E22, #F39C12)`, color: "#fff", padding: "12px 28px", borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: "none" }}>Connect Now</a>
-        </div>
-      )}
-
-      {connected && (
-        <>
-          {/* Tabs */}
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
-            {tabs.map(t => (
-              <button key={t.id} onClick={() => setTab(t.id)} style={{
-                padding: "6px 16px", borderRadius: 20, cursor: "pointer", fontSize: 11, fontWeight: 700,
-                border: `1px solid ${tab === t.id ? "#E67E22" : T.border}`,
-                background: tab === t.id ? "#E67E2220" : "none",
-                color: tab === t.id ? "#E67E22" : T.textMuted,
-                letterSpacing: "0.04em", textTransform: "uppercase", transition: "all 0.15s",
-              }}>{t.label}</button>
-            ))}
-          </div>
-
-          {/* Sync tab */}
-          {tab === "sync" && (
+  // ── LEAD DETAIL PANEL ──
+  const LeadPanel = ({ lead }) => {
+    const leadActivities = activities.filter(a => a.lead_id === lead.id).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+    const stage = STAGES.find(s => s.id === lead.status) || STAGES[0];
+    return (
+      <div style={{ width: 380, flexShrink: 0, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 200px)", overflow: "hidden" }}>
+        {/* Panel Header */}
+        <div style={{ padding: "18px 20px", borderBottom: `1px solid ${T.border}`, background: stage.color+"08" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div>
-              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 16, marginBottom: 16 }}>Sync WorkRoom Data to Zoho Books</div>
-              {syncMsg && <div style={{ padding: "10px 14px", background: T.teal + "12", border: `1px solid ${T.teal}30`, borderRadius: 8, color: T.teal, fontSize: 13, marginBottom: 16 }}>{syncMsg}</div>}
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-                {/* Clients */}
-                <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 20 }}>
-                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Clients → Zoho Customers</div>
-                  <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 14 }}>Push WorkRoom clients to Zoho Books as customer contacts</div>
-                  {clients.map(c => (
-                    <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: `1px solid ${T.border}44` }}>
-                      <div>
-                        <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{c.name}</div>
-                        <div style={{ color: T.textMuted, fontSize: 11 }}>{c.email}</div>
-                      </div>
-                      <button onClick={() => syncClient(c)} disabled={syncing} style={{ background: "#E67E2218", border: "1px solid #E67E2230", color: "#E67E22", padding: "4px 12px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
-                        {c.zoho_contact_id ? "Re-sync" : "→ Zoho"}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Vendors */}
-                <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 20 }}>
-                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Vendors → Zoho Vendors</div>
-                  <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 14 }}>Push WorkRoom vendors to Zoho Books as vendor contacts</div>
-                  {vendors.map(v => (
-                    <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: `1px solid ${T.border}44` }}>
-                      <div>
-                        <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{v.name}</div>
-                        <div style={{ color: T.textMuted, fontSize: 11 }}>{v.email}</div>
-                      </div>
-                      <button onClick={() => syncVendor(v)} disabled={syncing} style={{ background: "#E67E2218", border: "1px solid #E67E2230", color: "#E67E22", padding: "4px 12px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>→ Zoho</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 16 }}>{lead.company}</div>
+              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{lead.contact_name} {lead.phone ? "· "+lead.phone : ""}</div>
+              {lead.email && <div style={{ color: T.cyan, fontSize: 11, marginTop: 2 }}>{lead.email}</div>}
+            </div>
+            <button onClick={() => setSelectedLead(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, width: 28, height: 28, borderRadius: 6, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
+            <span style={{ color: T.gold, fontWeight: 900, fontSize: 18 }}>GHS {(lead.value||0).toLocaleString()}</span>
+            <span style={{ background: stage.color+"20", color: stage.color, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{lead.status}</span>
+          </div>
+          {/* Stage selector */}
+          {canEdit && (
+            <div style={{ display: "flex", gap: 4, marginTop: 12, flexWrap: "wrap" }}>
+              {STAGES.map(s => (
+                <button key={s.id} onClick={() => updateStatus(lead.id, s.id)} style={{ padding: "3px 10px", borderRadius: 20, border: `1px solid ${lead.status === s.id ? s.color : T.border}`, background: lead.status === s.id ? s.color+"20" : "none", color: lead.status === s.id ? s.color : T.textMuted, fontSize: 10, fontWeight: 700, cursor: "pointer" }}>{s.label}</button>
+              ))}
             </div>
           )}
+          {/* CEO Approve button */}
+          {canApprove && lead.status === "won" && !lead.approved && (
+            <button onClick={() => { setApprovalModal(lead); const mc = existingClients.find(c => c.email === lead.email || c.company === lead.company); setMatchedClient(mc||null); }} style={{ marginTop: 10, width: "100%", padding: "8px", background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: "none", borderRadius: 8, cursor: "pointer", color: "#fff", fontSize: 12, fontWeight: 800 }}>✓ Approve — Create Client & Portal</button>
+          )}
+        </div>
 
-          {/* Data table */}
-          {tab !== "sync" && (
-            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-              {loading ? (
-                <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted }}>Loading from Zoho Books...</div>
-              ) : data.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted, fontSize: 13 }}>No {tab} found in Zoho Books. <a href="https://books.zoho.com" target="_blank" rel="noopener noreferrer" style={{ color: "#E67E22", fontWeight: 700 }}>Create one in Zoho Books ↗</a></div>
-              ) : (
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
-                    <thead>
-                      <tr style={{ borderBottom: `1px solid ${T.border}`, background: T.bg }}>
-                        {(columns[tab] || []).map((h, i) => (
-                          <th key={i} style={{ padding: "12px 16px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.map((item, idx) => {
-                        const row = getRow(item, tab);
-                        return (
-                          <tr key={idx} style={{ borderBottom: idx < data.length - 1 ? `1px solid ${T.border}44` : "none" }}
-                            onMouseEnter={e => e.currentTarget.style.background = T.bg}
-                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                            {row.map((cell, ci) => (
-                              <td key={ci} style={{ padding: "11px 16px", fontSize: 12 }}>
-                                {ci === row.length - 1 && tab !== "contacts" && tab !== "payments" ? (
-                                  <span style={{ background: statusColor(cell) + "18", color: statusColor(cell), border: `1px solid ${statusColor(cell)}30`, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{cell}</span>
-                                ) : (
-                                  <span style={{ color: ci === 0 ? T.textPrimary : T.textSecondary, fontWeight: ci === 0 ? 700 : 400 }}>{cell}</span>
-                                )}
-                              </td>
-                            ))}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+        {/* Notes */}
+        {lead.notes && (
+          <div style={{ padding: "12px 20px", borderBottom: `1px solid ${T.border}44`, background: T.bg }}>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>Notes</div>
+            <div style={{ color: T.textSecondary, fontSize: 12, lineHeight: 1.5 }}>{lead.notes}</div>
+          </div>
+        )}
+
+        {/* Activity Feed */}
+        <div style={{ flex: 1, overflow: "auto", padding: "14px 20px" }}>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Activity Timeline</div>
+
+          {/* Add Activity */}
+          {canEdit && (
+            <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "12px", marginBottom: 14 }}>
+              <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
+                {["call","meeting","email","note","demo","follow-up"].map(t => (
+                  <button key={t} onClick={() => setActForm(f => ({...f, type: t}))} style={{ padding: "2px 8px", borderRadius: 20, border: `1px solid ${actForm.type === t ? typeColors[t] : T.border}`, background: actForm.type === t ? typeColors[t]+"20" : "none", color: actForm.type === t ? typeColors[t] : T.textMuted, fontSize: 9, fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>
+                    {typeIcons[t]} {t}
+                  </button>
+                ))}
+              </div>
+              <textarea value={actForm.notes} onChange={e => setActForm(f => ({...f, notes: e.target.value}))} placeholder={`Log ${actForm.type}...`} rows={2} style={{ width: "100%", padding: "7px 10px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none", resize: "none", boxSizing: "border-box", marginBottom: 6 }} />
+              {["call","meeting","demo","follow-up"].includes(actForm.type) && (
+                <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+                  <input type="date" value={actForm.scheduled_date} onChange={e => setActForm(f => ({...f, scheduled_date: e.target.value}))} style={{ flex: 1, padding: "5px 8px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 5, color: T.textPrimary, fontSize: 11, fontFamily: "inherit", outline: "none" }} />
+                  <input type="time" value={actForm.scheduled_time} onChange={e => setActForm(f => ({...f, scheduled_time: e.target.value}))} style={{ flex: 1, padding: "5px 8px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 5, color: T.textPrimary, fontSize: 11, fontFamily: "inherit", outline: "none" }} />
                 </div>
               )}
+              {actForm.scheduled_date && <div style={{ color: "#8B5CF6", fontSize: 10, fontWeight: 700, marginBottom: 6 }}>📅 {actForm.scheduled_date}{actForm.scheduled_time ? " at "+actForm.scheduled_time : ""} → calendar</div>}
+              <button onClick={() => addActivity(lead.id, lead.company)} disabled={addingAct || !actForm.notes} style={{ background: T.cyan, border: "none", color: "#000", padding: "5px 14px", borderRadius: 5, cursor: "pointer", fontSize: 11, fontWeight: 800, opacity: !actForm.notes ? 0.5 : 1 }}>{addingAct ? "..." : "Log"}</button>
             </div>
           )}
-        </>
-      )}
-    </div>
-  );
-};
 
-
-const EventTypeAnalysisView = ({ user }) => {
-  const [rffs, setRffs] = useState([]);
-  const [pos, setPOs] = useState([]);
-  const [invoices, setInvoices] = useState([]);
-  const [periodType, setPeriodType] = useState("year");
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  const eventTypes = [
-    { key: "Conference/Seminar", code: "CS", color: "#00C8FF", label: "Conference / Seminar" },
-    { key: "Product Launch", code: "PL", color: "#E879F9", label: "Product Launch" },
-    { key: "Awards Ceremony", code: "AWD", color: "#F59E0B", label: "Awards Ceremony" },
-    { key: "Corporate Party", code: "CP", color: "#10B981", label: "Corporate Party" },
-    { key: "Other", code: "OTH", color: "#8B5CF6", label: "Other" },
-  ];
-
-  const load = async () => {
-    setLoading(true);
-    const [{ data: rf }, { data: po }, { data: inv }] = await Promise.all([
-      supabase.from("rffs").select("*").not("event_type", "is", null),
-      supabase.from("purchase_orders").select("*"),
-      supabase.from("vendor_invoices").select("*"),
-    ]);
-    setRffs(rf || []);
-    setPOs(po || []);
-    setInvoices(inv || []);
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const getDateRange = () => {
-    if (periodType === "year") {
-      return { from: `${selectedYear}-01-01`, to: `${selectedYear}-12-31` };
-    }
-    return { from: startDate, to: endDate };
-  };
-
-  const { from, to } = getDateRange();
-
-  const filteredRffs = rffs.filter(r => {
-    if (!r.created_at) return false;
-    const d = r.created_at.slice(0, 10);
-    return (!from || d >= from) && (!to || d <= to);
-  });
-
-  const totalRffs = filteredRffs.length;
-  const totalBudget = filteredRffs.reduce((s, r) => s + (r.amount || 0), 0);
-
-  const typeStats = eventTypes.map(et => {
-    const typeRffs = filteredRffs.filter(r => r.event_type === et.key);
-    const typePOs = pos.filter(p => p.internal_po_number?.includes(`/ST/${et.code}/`));
-    const typeInvoices = invoices.filter(i => i.invoice_number?.includes(`/ST/${et.code}/`));
-    const totalAmt = typeRffs.reduce((s, r) => s + (r.amount || 0), 0);
-    const pct = totalRffs > 0 ? Math.round((typeRffs.length / totalRffs) * 100) : 0;
-    return { ...et, count: typeRffs.length, pct, totalAmt, poCount: typePOs.length, invoiceCount: typeInvoices.length, rffs: typeRffs };
-  });
-
-  const years = ["2024", "2025", "2026", "2027", "2028"];
-
-  return (
-    <div style={{ animation: "fadeUp 0.35s ease" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>CEO</div>
-        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Event Type Analysis</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Distribution of RFFs, POs and invoices by event category</div>
-      </div>
-
-      {/* Period Selector */}
-      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px", marginBottom: 24 }}>
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ display: "flex", gap: 6 }}>
-            {["year", "custom"].map(pt => (
-              <button key={pt} onClick={() => setPeriodType(pt)} style={{ padding: "6px 16px", borderRadius: 20, cursor: "pointer", fontSize: 11, fontWeight: 700, border: `1px solid ${periodType === pt ? T.cyan : T.border}`, background: periodType === pt ? T.cyan+"20" : "none", color: periodType === pt ? T.cyan : T.textMuted, textTransform: "uppercase" }}>{pt === "year" ? "By Year" : "Custom Range"}</button>
-            ))}
-          </div>
-          {periodType === "year" ? (
-            <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} style={{ padding: "7px 14px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
-              {years.map(y => <option key={y}>{y}</option>)}
-            </select>
-          ) : (
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ padding: "7px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
-              <span style={{ color: T.textMuted }}>to</span>
-              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ padding: "7px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
-            </div>
-          )}
-          <div style={{ marginLeft: "auto", color: T.textMuted, fontSize: 12 }}>{filteredRffs.length} RFFs in period</div>
-        </div>
-      </div>
-
-      {/* Summary KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
-        {[
-          { label: "Total RFFs", value: totalRffs, color: T.cyan },
-          { label: "Total POs", value: pos.length, color: T.teal },
-          { label: "Total Invoices", value: invoices.length, color: T.amber },
-          { label: "Most Active Type", value: typeStats.sort((a,b)=>b.count-a.count)[0]?.label?.split("/")[0] || "—", color: "#10B981" },
-        ].map((k,i) => (
-          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
-            <div style={{ color: k.color, fontSize: i===3?16:20, fontWeight: 900 }}>{k.value}</div>
-            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginTop: 4 }}>{k.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Distribution Chart */}
-      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 24 }}>
-        <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 20 }}>RFF Distribution by Event Type</div>
-        {typeStats.sort((a,b) => b.count - a.count).map((et, i) => (
-          <div key={et.key} style={{ marginBottom: 20 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 12, height: 12, borderRadius: "50%", background: et.color, flexShrink: 0 }} />
-                <span style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{et.label}</span>
-                <span style={{ background: et.color+"18", color: et.color, borderRadius: 20, padding: "1px 8px", fontSize: 10, fontWeight: 800 }}>ST/{et.code}</span>
-              </div>
-              <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
-                <span style={{ color: T.textMuted, fontSize: 12 }}>{et.count} RFF{et.count!==1?"s":""}</span>
-                <span style={{ color: et.color, fontWeight: 800, fontSize: 14 }}>{et.pct}%</span>
-              </div>
-            </div>
-            <div style={{ height: 28, background: T.border+"44", borderRadius: 6, overflow: "hidden", position: "relative" }}>
-              <div style={{ height: "100%", width: `${et.pct}%`, background: `linear-gradient(90deg, ${et.color}, ${et.color}99)`, borderRadius: 6, transition: "width 0.6s ease", minWidth: et.count > 0 ? 4 : 0 }} />
-              {et.count > 0 && <div style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#fff", fontSize: 11, fontWeight: 700 }}>{et.count} RFF{et.count!==1?"s":""}</div>}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Detailed breakdown table */}
-      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
-        <div style={{ padding: "16px 20px", borderBottom: `1px solid ${T.border}` }}>
-          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Detailed Breakdown</div>
-        </div>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
-              {["Event Type","Code Prefix","RFFs","POs Created","Invoices","% Share"].map(h => (
-                <th key={h} style={{ padding: "10px 16px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {typeStats.map((et, i) => (
-              <tr key={et.key} style={{ borderBottom: i < typeStats.length-1 ? `1px solid ${T.border}44` : "none" }}
-                onMouseEnter={e => e.currentTarget.style.background = T.bg}
-                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                <td style={{ padding: "12px 16px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: et.color }} />
-                    <span style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{et.label}</span>
-                  </div>
-                </td>
-                <td style={{ padding: "12px 16px" }}><span style={{ background: et.color+"18", color: et.color, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 800 }}>ST/{et.code}/YY/###</span></td>
-                <td style={{ padding: "12px 16px", color: et.count > 0 ? T.textPrimary : T.textMuted, fontWeight: et.count > 0 ? 700 : 400, fontSize: 13 }}>{et.count}</td>
-                <td style={{ padding: "12px 16px", color: T.textPrimary, fontSize: 13 }}>{et.poCount}</td>
-                <td style={{ padding: "12px 16px", color: T.textPrimary, fontSize: 13 }}>{et.invoiceCount}</td>
-                <td style={{ padding: "12px 16px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ width: 60, height: 6, background: T.border+"44", borderRadius: 3, overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${et.pct}%`, background: et.color, borderRadius: 3 }} />
-                    </div>
-                    <span style={{ color: et.color, fontWeight: 800, fontSize: 12 }}>{et.pct}%</span>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {/* Totals row */}
-            <tr style={{ background: T.bg, borderTop: `2px solid ${T.border}` }}>
-              <td style={{ padding: "12px 16px", color: T.textPrimary, fontWeight: 900, fontSize: 13 }}>TOTAL</td>
-              <td style={{ padding: "12px 16px" }} />
-              <td style={{ padding: "12px 16px", color: T.cyan, fontWeight: 900, fontSize: 13 }}>{totalRffs}</td>
-              <td style={{ padding: "12px 16px", color: T.cyan, fontWeight: 900, fontSize: 13 }}>{pos.length}</td>
-              <td style={{ padding: "12px 16px", color: T.cyan, fontWeight: 900, fontSize: 13 }}>{invoices.length}</td>
-              <td style={{ padding: "12px 16px", color: T.cyan, fontWeight: 900, fontSize: 13 }}>100%</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      {/* Monthly trend for selected year */}
-      {periodType === "year" && (
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 24px" }}>
-          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 16 }}>Monthly Activity — {selectedYear}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(12,1fr)", gap: 6 }}>
-            {Array.from({length:12},(_,i)=>i+1).map(month => {
-              const monthRffs = filteredRffs.filter(r => {
-                const d = new Date(r.created_at);
-                return d.getFullYear() === parseInt(selectedYear) && d.getMonth()+1 === month;
-              });
-              const maxCount = Math.max(...Array.from({length:12},(_,i)=>filteredRffs.filter(r=>new Date(r.created_at).getMonth()===i).length), 1);
-              const heightPct = monthRffs.length > 0 ? Math.max((monthRffs.length/maxCount)*80, 10) : 0;
-              const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+          {/* Timeline */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {leadActivities.length === 0 && <div style={{ color: T.textMuted, fontSize: 12, textAlign: "center", padding: "20px 0" }}>No activity yet</div>}
+            {leadActivities.map((act, i) => {
+              const color = typeColors[act.type] || T.textMuted;
               return (
-                <div key={month} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                  <div style={{ height: 80, display: "flex", alignItems: "flex-end", width: "100%" }}>
-                    <div style={{ width: "100%", height: `${heightPct}%`, background: monthRffs.length > 0 ? `linear-gradient(180deg, ${T.cyan}, ${T.teal})` : T.border+"44", borderRadius: "4px 4px 0 0", transition: "height 0.4s ease" }} />
+                <div key={act.id} style={{ display: "flex", gap: 10 }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: color+"20", border: `1px solid ${color}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, flexShrink: 0 }}>{typeIcons[act.type]}</div>
+                    {i < leadActivities.length-1 && <div style={{ width: 1, flex: 1, background: T.border, marginTop: 4, minHeight: 12 }} />}
                   </div>
-                  {monthRffs.length > 0 && <div style={{ color: T.cyan, fontSize: 10, fontWeight: 800 }}>{monthRffs.length}</div>}
-                  <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 600 }}>{months[month-1]}</div>
+                  <div style={{ flex: 1, paddingBottom: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                      <span style={{ color, fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{act.type}</span>
+                      <span style={{ color: T.textMuted, fontSize: 10 }}>{new Date(act.created_at).toLocaleDateString("en-GB")}</span>
+                    </div>
+                    <div style={{ color: T.textSecondary, fontSize: 12, lineHeight: 1.5 }}>{act.notes}</div>
+                    {act.scheduled_date && <div style={{ color: "#8B5CF6", fontSize: 10, fontWeight: 700, marginTop: 3 }}>📅 {act.scheduled_date}{act.scheduled_time ? " at "+act.scheduled_time : ""}</div>}
+                    <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>— {act.created_by_name}</div>
+                  </div>
                 </div>
               );
             })}
           </div>
         </div>
-      )}
-    </div>
-  );
-};
 
-
-
-const StrategyMapView = ({ user }) => {
-  const [events, setEvents] = useState([]);
-  const [selectedEvent, setSelectedEvent] = useState(null);
-  const [brief, setBrief] = useState(null);
-  const [scorecard, setScorecard] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  const load = async () => {
-    const { data: ev } = await supabase.from("projects").select("*").order("event_date", { ascending: false });
-    setEvents(ev || []);
+        {/* Panel Footer */}
+        {canEdit && (
+          <div style={{ padding: "12px 20px", borderTop: `1px solid ${T.border}`, display: "flex", gap: 8 }}>
+            <button onClick={() => handleDelete(lead.id)} style={{ background: T.red+"15", border: `1px solid ${T.red}30`, color: T.red, padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>Delete</button>
+          </div>
+        )}
+      </div>
+    );
   };
 
-  useEffect(() => { load(); }, []);
-
-  const loadEventData = async (eventId) => {
-    setLoading(true);
-    const [{ data: b }, { data: sc }] = await Promise.all([
-      supabase.from("event_impact_briefs").select("*").eq("project_id", eventId).single(),
-      supabase.from("event_scorecards").select("*").eq("project_id", eventId).single(),
-    ]);
-    setBrief(b || null);
-    setScorecard(sc || null);
-    setLoading(false);
-  };
-
-  const archetype = selectedEvent ? EVENT_ARCHETYPES[selectedEvent.event_category] : null;
-
-  const toolStatus = (val) => {
-    if (val === "Yes") return { color: "#10B981", icon: "✓" };
-    if (val === "No") return { color: T.red, icon: "✗" };
-    return { color: T.textMuted, icon: "—" };
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this lead?")) return;
+    await supabase.from("opportunities").update({ converted_lead_id: null }).eq("converted_lead_id", id);
+    await supabase.from("opportunities").delete().eq("id", id);
+    setSelectedLead(null);
+    load();
   };
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Strategic</div>
-        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Strategy Map</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Event impact briefs and strategic parameters to inform your planning</div>
-      </div>
-
-      {/* Event selector */}
-      <div style={{ marginBottom: 24 }}>
-        <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 8 }}>Select Event</label>
-        <select value={selectedEvent?.id || ""} onChange={e => {
-          const ev = events.find(x => x.id === e.target.value);
-          setSelectedEvent(ev || null);
-          if (ev) loadEventData(ev.id);
-        }} style={{ width: "100%", maxWidth: 400, padding: "10px 14px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
-          <option value="">Choose an event...</option>
-          {events.map(ev => (
-            <option key={ev.id} value={ev.id}>{ev.name} {ev.event_category ? `— ${ev.event_category}` : ""}</option>
-          ))}
-        </select>
-      </div>
-
-      {!selectedEvent && (
-        <div style={{ textAlign: "center", padding: "60px 0", background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
-          <div style={{ fontSize: 40, marginBottom: 16 }}>🗺</div>
-          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>Select an event to view its strategy map</div>
-          <div style={{ color: T.textMuted, fontSize: 13 }}>The strategy map shows the impact brief, KPIs and scorecard parameters defined by the CEO.</div>
-        </div>
-      )}
-
-      {selectedEvent && loading && (
-        <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>Loading strategy data...</div>
-      )}
-
-      {selectedEvent && !loading && (
-        <div>
-          {/* Event header card */}
-          <div style={{ background: archetype ? archetype.color+"12" : T.surface, border: `1px solid ${archetype ? archetype.color+"40" : T.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 20 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <div>
-                <div style={{ color: archetype?.color || T.cyan, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>{selectedEvent.event_category || "Event"}</div>
-                <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 20 }}>{selectedEvent.name}</div>
-                <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{selectedEvent.client} · {selectedEvent.phase}</div>
-                {selectedEvent.event_date && <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>📅 {new Date(selectedEvent.event_date+"T12:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>}
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 4 }}>Completion</div>
-                <div style={{ color: archetype?.color || T.cyan, fontWeight: 900, fontSize: 24 }}>{selectedEvent.completion || 0}%</div>
-              </div>
+      {/* ── Header ── */}
+      <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 4 }}>Sales</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Leads Pipeline</h2>
+          <div style={{ display: "flex", gap: 8 }}>
+            {/* View toggle */}
+            <div style={{ display: "flex", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: 3 }}>
+              {[["kanban","⊞"], ["list","≡"]].map(([v, icon]) => (
+                <button key={v} onClick={() => setView(v)} style={{ padding: "4px 12px", borderRadius: 6, border: "none", cursor: "pointer", background: view === v ? T.surface : "none", color: view === v ? T.cyan : T.textMuted, fontSize: 14, fontWeight: 700, transition: "all 0.15s" }}>{icon}</button>
+              ))}
             </div>
+            {canEdit && <button onClick={() => setModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "9px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>+ New Lead</button>}
           </div>
+        </div>
+      </div>
 
-          {!brief && (
-            <div style={{ background: T.amber+"12", border: `1px solid ${T.amber}30`, borderRadius: 10, padding: "14px 18px", marginBottom: 20 }}>
-              <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>⚠ No Impact Brief set for this event yet</div>
-              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>The CEO or Strategy Opportunity needs to complete the Impact Brief in the Impact Intelligence tab first.</div>
-            </div>
-          )}
+      {/* ── KPI Strip ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 20 }}>
+        {[
+          { label: "Total Leads", value: leads.length, color: T.cyan },
+          { label: "Pipeline Value", value: "GHS "+totalPipeline.toLocaleString(), color: T.amber },
+          { label: "Won", value: wonCount, sub: "GHS "+totalWon.toLocaleString(), color: T.teal },
+          { label: "Pending Approval", value: pendingApproval, color: pendingApproval > 0 ? T.red : T.textMuted },
+        ].map((k,i) => (
+          <div key={i} style={{ padding: "12px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 20, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginTop: 2 }}>{k.label}</div>
+            {k.sub && <div style={{ color: T.textMuted, fontSize: 10, marginTop: 1 }}>{k.sub}</div>}
+          </div>
+        ))}
+      </div>
 
-          {brief && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+      {/* ── Search + Filter ── */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search leads..." style={{ flex: 1, minWidth: 180, padding: "8px 14px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+        <div style={{ display: "flex", gap: 4 }}>
+          {["all",...STAGES.map(s=>s.id)].map(f => (
+            <button key={f} onClick={() => setFilter(f)} style={{ padding: "6px 12px", borderRadius: 20, border: `1px solid ${filter===f ? (STAGES.find(s=>s.id===f)?.color||T.cyan) : T.border}`, background: filter===f ? (STAGES.find(s=>s.id===f)?.color||T.cyan)+"18" : "none", color: filter===f ? (STAGES.find(s=>s.id===f)?.color||T.cyan) : T.textMuted, fontSize: 10, fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>
+              {f === "all" ? "All" : f}
+            </button>
+          ))}
+        </div>
+      </div>
 
-              {/* Impact Objective */}
-              <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
-                <div style={{ color: archetype?.color || T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>🎯 Impact Objective</div>
-                {brief.impact_objective && (
-                  <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
-                    <div style={{ color: T.textPrimary, fontSize: 13, lineHeight: 1.6 }}>{brief.impact_objective}</div>
-                  </div>
-                )}
-                {brief.target_audience && <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 4 }}><strong style={{ color: T.textSecondary }}>Who:</strong> {brief.target_audience}</div>}
-                {brief.observable_signal && <div style={{ color: T.textMuted, fontSize: 12 }}><strong style={{ color: T.textSecondary }}>Signal:</strong> {brief.observable_signal}</div>}
-              </div>
-
-              {/* Measurement Tools */}
-              <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
-                <div style={{ color: archetype?.color || T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>🔧 Measurement Tools</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {[
-                    ["Pre-Event Survey", brief.tool_pre_survey],
-                    ["Digital Tracking", brief.tool_digital_tracking],
-                    ["Live Monitoring", brief.tool_live_monitoring],
-                    ["Post-Event Survey", brief.tool_post_survey],
-                    ["30-Day Follow-Up", brief.tool_30day_survey],
-                    ["90-Day Tracking", brief.tool_90day_tracking],
-                    ["Social Listening", brief.tool_social_listening],
-                    ["Commercial Data", brief.tool_commercial_data],
-                  ].map(([label, val]) => {
-                    const s = toolStatus(val);
-                    return (
-                      <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: `1px solid ${T.border}33` }}>
-                        <span style={{ color: T.textSecondary, fontSize: 12 }}>{label}</span>
-                        <span style={{ color: s.color, fontSize: 12, fontWeight: 700 }}>{s.icon} {val || "—"}</span>
+      {/* ── Main Content ── */}
+      <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+        {/* Kanban / List */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {view === "kanban" ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px,1fr))", gap: 12 }}>
+              {STAGES.filter(s => filter === "all" || s.id === filter).map(stage => {
+                const stageLeads = filteredLeads.filter(l => l.status === stage.id);
+                const stageValue = stageLeads.reduce((a,l) => a+(l.value||0), 0);
+                return (
+                  <div key={stage.id}>
+                    {/* Column Header */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, padding: "6px 10px", background: stage.color+"10", border: `1px solid ${stage.color}25`, borderRadius: 8 }}>
+                      <div>
+                        <span style={{ color: stage.color, fontWeight: 800, fontSize: 11, textTransform: "uppercase" }}>{stage.label}</span>
+                        <span style={{ color: T.textMuted, fontSize: 10, marginLeft: 6 }}>({stageLeads.length})</span>
                       </div>
+                      {stageValue > 0 && <span style={{ color: stage.color, fontSize: 10, fontWeight: 700 }}>GHS {stageValue.toLocaleString()}</span>}
+                    </div>
+                    {/* Cards */}
+                    <div style={{ minHeight: 80 }}>
+                      {stageLeads.length === 0 && <div style={{ color: T.textMuted, fontSize: 11, textAlign: "center", padding: "20px 0", fontStyle: "italic" }}>Empty</div>}
+                      {stageLeads.map(lead => <LeadCard key={lead.id} lead={lead} />)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* List View */
+            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
+                    {["Company","Contact","Value","Stage","Source","Assigned","Actions"].map(h => (
+                      <th key={h} style={{ padding: "10px 14px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredLeads.map((lead,i) => {
+                    const stage = STAGES.find(s => s.id === lead.status) || STAGES[0];
+                    return (
+                      <tr key={lead.id} style={{ borderBottom: i < filteredLeads.length-1 ? `1px solid ${T.border}44` : "none", cursor: "pointer" }}
+                        onClick={() => setSelectedLead(selectedLead?.id === lead.id ? null : lead)}
+                        onMouseEnter={e => e.currentTarget.style.background = T.bg}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                        <td style={{ padding: "10px 14px" }}>
+                          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{lead.company}</div>
+                          {lead.email && <div style={{ color: T.textMuted, fontSize: 11 }}>{lead.email}</div>}
+                        </td>
+                        <td style={{ padding: "10px 14px", color: T.textSecondary, fontSize: 12 }}>{lead.contact_name||"—"}<br/><span style={{ color: T.textMuted, fontSize: 11 }}>{lead.phone||""}</span></td>
+                        <td style={{ padding: "10px 14px", color: T.gold, fontWeight: 800, fontSize: 13 }}>GHS {(lead.value||0).toLocaleString()}</td>
+                        <td style={{ padding: "10px 14px" }}><span style={{ background: stage.color+"18", color: stage.color, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{stage.label}</span></td>
+                        <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 12 }}>{lead.source||"—"}</td>
+                        <td style={{ padding: "10px 14px", color: T.cyan, fontSize: 12 }}>{lead.assigned_name||"—"}</td>
+                        <td style={{ padding: "10px 14px" }}>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            {canApprove && lead.status === "won" && !lead.approved && (
+                              <button onClick={e => { e.stopPropagation(); setApprovalModal(lead); const mc = existingClients.find(c => c.email === lead.email || c.company === lead.company); setMatchedClient(mc||null); }} style={{ background: T.teal+"15", border: `1px solid ${T.teal}30`, color: T.teal, padding: "3px 8px", borderRadius: 5, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>✓ Approve</button>
+                            )}
+                            {canEdit && <button onClick={e => { e.stopPropagation(); handleDelete(lead.id); }} style={{ background: T.red+"15", border: `1px solid ${T.red}30`, color: T.red, padding: "3px 8px", borderRadius: 5, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>×</button>}
+                          </div>
+                        </td>
+                      </tr>
                     );
                   })}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* KPIs */}
-          {brief && (brief.kpi1_name || brief.kpi2_name || brief.kpi3_name) && (
-            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px", marginBottom: 20 }}>
-              <div style={{ color: archetype?.color || T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>📊 Success KPIs</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
-                {[1,2,3].map(n => {
-                  const name = brief[`kpi${n}_name`];
-                  const target = brief[`kpi${n}_target`];
-                  const method = brief[`kpi${n}_method`];
-                  const timing = brief[`kpi${n}_timing`];
-                  if (!name) return null;
-                  return (
-                    <div key={n} style={{ background: T.bg, border: `1px solid ${archetype?.color || T.cyan}25`, borderTop: `2px solid ${archetype?.color || T.cyan}`, borderRadius: 8, padding: "12px 14px" }}>
-                      <div style={{ color: archetype?.color || T.cyan, fontSize: 10, fontWeight: 800, textTransform: "uppercase", marginBottom: 6 }}>KPI {n}</div>
-                      <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13, marginBottom: 6 }}>{name}</div>
-                      <div style={{ color: "#10B981", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Target: {target}</div>
-                      <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 2 }}>Method: {method}</div>
-                      <div style={{ color: T.textMuted, fontSize: 11 }}>When: {timing}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Scorecard dimensions */}
-          {archetype && (
-            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px", marginBottom: 20 }}>
-              <div style={{ color: archetype.color, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>⚖️ Impact Dimensions — What We Are Measuring</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {archetype.dimensions.map((dim, i) => {
-                  const score = scorecard ? scorecard[dim.key+"_score"] : null;
-                  return (
-                    <div key={dim.key} style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 14px", background: T.bg, borderRadius: 8, border: `1px solid ${T.border}` }}>
-                      <div style={{ width: 36, height: 36, borderRadius: "50%", background: archetype.color+"20", border: `2px solid ${archetype.color}40`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <span style={{ color: archetype.color, fontWeight: 900, fontSize: 12 }}>{Math.round(dim.weight*100)}%</span>
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{dim.label}</div>
-                        <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{dim.description}</div>
-                        <div style={{ color: archetype.color, fontSize: 10, marginTop: 2 }}>Benchmark: {dim.benchmark}</div>
-                      </div>
-                      {score !== null && score !== undefined && parseFloat(score) > 0 ? (
-                        <div style={{ textAlign: "right", flexShrink: 0 }}>
-                          <div style={{ color: getScoreLabel(parseFloat(score)).color, fontWeight: 900, fontSize: 20 }}>{score}</div>
-                          <div style={{ color: T.textMuted, fontSize: 9 }}>/10</div>
-                        </div>
-                      ) : (
-                        <div style={{ color: T.textMuted, fontSize: 11, flexShrink: 0 }}>Not scored</div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Story intent */}
-          {brief && (brief.story_before || brief.story_design || brief.story_outcome) && (
-            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
-              <div style={{ color: archetype?.color || T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>✍️ Impact Story We Are Engineering</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {brief.story_before && <div style={{ background: T.bg, borderLeft: `3px solid ${T.red}`, borderRadius: 6, padding: "10px 14px" }}><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>Before Stretchfield</div><div style={{ color: T.textSecondary, fontSize: 13 }}>{brief.story_before}</div></div>}
-                {brief.story_design && <div style={{ background: T.bg, borderLeft: `3px solid ${archetype?.color||T.cyan}`, borderRadius: 6, padding: "10px 14px" }}><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>What We Are Engineering</div><div style={{ color: T.textSecondary, fontSize: 13 }}>{brief.story_design}</div></div>}
-                {brief.story_outcome && <div style={{ background: T.bg, borderLeft: `3px solid #10B981`, borderRadius: 6, padding: "10px 14px" }}><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>Intended Outcome</div><div style={{ color: T.textSecondary, fontSize: 13 }}>{brief.story_outcome}</div></div>}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const ImpactIntelligenceSummary = ({ user }) => {
-  const [events, setEvents] = useState([]);
-  const [scorecards, setScorecardsData] = useState([]);
-  const [briefs, setBriefs] = useState([]);
-  const [reports, setReports] = useState([]);
-  const [selectedEvent, setSelectedEvent] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  const load = async () => {
-    setLoading(true);
-    const [{ data: ev }, { data: sc }, { data: br }, { data: rp }] = await Promise.all([
-      supabase.from("projects").select("*").not("event_category", "is", null).order("event_date", { ascending: false }),
-      supabase.from("event_scorecards").select("*"),
-      supabase.from("event_impact_briefs").select("*"),
-      supabase.from("event_impact_reports").select("*"),
-    ]);
-    setEvents(ev || []);
-    setScorecardsData(sc || []);
-    setBriefs(br || []);
-    setReports(rp || []);
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const getEventScore = (eventId) => {
-    const sc = scorecards.find(s => s.project_id === eventId);
-    return sc ? sc.overall_score : null;
-  };
-
-  const avgScore = scorecards.length > 0 ? (scorecards.reduce((s, sc) => s + (sc.overall_score || 0), 0) / scorecards.length).toFixed(1) : null;
-
-  const categoryStats = Object.keys(EVENT_ARCHETYPES).map(cat => {
-    const catEvents = events.filter(e => e.event_category === cat);
-    const catScores = catEvents.map(e => getEventScore(e.id)).filter(s => s !== null);
-    const avgCatScore = catScores.length > 0 ? (catScores.reduce((a,b) => a+b, 0) / catScores.length).toFixed(1) : null;
-    return { category: cat, count: catEvents.length, avgScore: avgCatScore, color: EVENT_ARCHETYPES[cat].color };
-  }).filter(c => c.count > 0);
-
-  return (
-    <div style={{ animation: "fadeUp 0.35s ease" }}>
-      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Strategic</div>
-        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Impact Intelligence</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Cross-event impact scores, briefs and reports</div>
-      </div>
-
-      {/* KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
-        {[
-          { label: "Events Tracked", value: events.length, color: T.cyan },
-          { label: "Briefs Completed", value: briefs.length, color: T.teal },
-          { label: "Scorecards", value: scorecards.length, color: T.amber },
-          { label: "Avg Impact Score", value: avgScore ? `${avgScore}/10` : "—", color: avgScore >= 7 ? "#10B981" : avgScore >= 5 ? T.amber : T.red },
-        ].map((k,i) => (
-          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
-            <div style={{ color: k.color, fontSize: 20, fontWeight: 900 }}>{k.value}</div>
-            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginTop: 4 }}>{k.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Category performance */}
-      {categoryStats.length > 0 && (
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 24 }}>
-          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 16 }}>Performance by Event Category</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px,1fr))", gap: 12 }}>
-            {categoryStats.map(cat => (
-              <div key={cat.category} style={{ background: T.bg, border: `1px solid ${cat.color}30`, borderTop: `3px solid ${cat.color}`, borderRadius: 10, padding: "14px 16px" }}>
-                <div style={{ color: cat.color, fontSize: 10, fontWeight: 800, textTransform: "uppercase", marginBottom: 4 }}>{cat.category}</div>
-                <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 28 }}>{cat.avgScore || "—"}<span style={{ fontSize: 14, color: T.textMuted }}>/10</span></div>
-                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>{cat.count} event{cat.count!==1?"s":""}</div>
-                {cat.avgScore && <div style={{ color: getScoreLabel(parseFloat(cat.avgScore)).color, fontSize: 11, fontWeight: 700, marginTop: 4 }}>{getScoreLabel(parseFloat(cat.avgScore)).label}</div>}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Events table */}
-      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-        <div style={{ padding: "16px 20px", borderBottom: `1px solid ${T.border}` }}>
-          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>All Events — Impact Status</div>
-        </div>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
-              {["Event","Category","Date","Brief","Score","Report","Action"].map(h => (
-                <th key={h} style={{ padding: "10px 16px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {events.map((ev, i) => {
-              const score = getEventScore(ev.id);
-              const hasBrief = briefs.some(b => b.project_id === ev.id);
-              const hasReport = reports.some(r => r.project_id === ev.id);
-              const archetype = EVENT_ARCHETYPES[ev.event_category];
-              return (
-                <tr key={ev.id} style={{ borderBottom: i < events.length-1 ? `1px solid ${T.border}44` : "none" }}
-                  onMouseEnter={e => e.currentTarget.style.background = T.bg}
-                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                  <td style={{ padding: "12px 16px", color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{ev.name}</td>
-                  <td style={{ padding: "12px 16px" }}>
-                    <span style={{ background: (archetype?.color||T.cyan)+"18", color: archetype?.color||T.cyan, border: `1px solid ${(archetype?.color||T.cyan)}30`, borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 800 }}>{ev.event_category}</span>
-                  </td>
-                  <td style={{ padding: "12px 16px", color: T.textMuted, fontSize: 12 }}>{ev.event_date ? new Date(ev.event_date+"T12:00:00").toLocaleDateString("en-GB") : "—"}</td>
-                  <td style={{ padding: "12px 16px" }}>
-                    <span style={{ color: hasBrief ? "#10B981" : T.amber, fontSize: 12, fontWeight: 700 }}>{hasBrief ? "✓ Done" : "Pending"}</span>
-                  </td>
-                  <td style={{ padding: "12px 16px" }}>
-                    {score !== null ? (
-                      <span style={{ color: getScoreLabel(score).color, fontWeight: 900, fontSize: 14 }}>{score}/10</span>
-                    ) : <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>}
-                  </td>
-                  <td style={{ padding: "12px 16px" }}>
-                    <span style={{ color: hasReport ? "#10B981" : T.textMuted, fontSize: 12, fontWeight: 700 }}>{hasReport ? "✓ Done" : "—"}</span>
-                  </td>
-                  <td style={{ padding: "12px 16px" }}>
-                    <button onClick={() => setSelectedEvent(selectedEvent?.id === ev.id ? null : ev)} style={{ background: (archetype?.color||T.cyan)+"15", border: `1px solid ${(archetype?.color||T.cyan)}30`, color: archetype?.color||T.cyan, padding: "4px 12px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
-                      {selectedEvent?.id === ev.id ? "Close" : "Open"}
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-            {events.length === 0 && (
-              <tr><td colSpan={7} style={{ padding: "40px 0", textAlign: "center", color: T.textMuted, fontSize: 13 }}>No events with categories yet. Add event categories to start tracking impact.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Expanded event impact view */}
-      {selectedEvent && (
-        <div style={{ marginTop: 24 }}>
-          <EventImpactView user={user} project={selectedEvent} />
-        </div>
-      )}
-    </div>
-  );
-};
-
-
-const BoardDashboard = ({ user }) => {
-  const [events, setEvents] = useState([]);
-  const [tasks, setTasks] = useState([]);
-  const [opportunities, setOpportunitys] = useState([]);
-  const [leads, setLeads] = useState([]);
-  const [vendors, setVendors] = useState([]);
-  const [profiles, setProfiles] = useState([]);
-  const [scorecards, setScorecards] = useState([]);
-  const [briefs, setBriefs] = useState([]);
-  const [pos, setPOs] = useState([]);
-  const [invoices, setInvoices] = useState([]);
-  const [awards, setAwards] = useState([]);
-  const [clientBudgets, setClientBudgets] = useState([]);
-  const [clientExpenses, setClientExpenses] = useState([]);
-  const [clientInvoices, setClientInvoices] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = async () => {
-    setLoading(true);
-    const [ev, tk, ld, op, vn, pf, sc, br, po, inv, aw, cb, ce, ci] = await Promise.all([
-      supabase.from("projects").select("*").order("created_at", { ascending: false }),
-      supabase.from("tasks").select("*"),
-      supabase.from("opportunities").select("*"),
-      supabase.from("leads").select("*"),
-      supabase.from("profiles").select("*").eq("role", "Vendor"),
-      supabase.from("profiles").select("*").not("role", "in", '("Client","Vendor")'),
-      supabase.from("vendor_scorecards").select("*"),
-      supabase.from("event_impact_briefs").select("*"),
-      supabase.from("purchase_orders").select("*"),
-      supabase.from("vendor_invoices").select("*"),
-      supabase.from("rff_awards").select("*"),
-      supabase.from("client_budgets").select("*"),
-      supabase.from("client_expenses").select("*"),
-      supabase.from("client_invoices").select("*"),
-    ]);
-    setEvents(ev.data || []);
-    setTasks(tk.data || []);
-    setOpportunitys(ld.data || []);
-    setLeads(op.data || []);
-    setVendors(vn.data || []);
-    setProfiles(pf.data || []);
-    setScorecards(sc.data || []);
-    setBriefs(br.data || []);
-    setPOs(po.data || []);
-    setInvoices(inv.data || []);
-    setAwards(aw.data || []);
-    setClientBudgets(cb.data || []);
-    setClientExpenses(ce.data || []);
-    setClientInvoices(ci.data || []);
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const now = new Date();
-  const thisYear = now.getFullYear();
-  const thisMonth = now.getMonth();
-
-  // Event metrics
-  const eventsThisYear = events.filter(e => new Date(e.created_at).getFullYear() === thisYear);
-  const upcomingEvents = events.filter(e => e.event_date && new Date(e.event_date) >= now).sort((a,b) => new Date(a.event_date) - new Date(b.event_date));
-  const eventsByCategory = Object.keys(EVENT_ARCHETYPES).map(cat => ({
-    category: cat, count: events.filter(e => e.event_category === cat).length,
-    color: EVENT_ARCHETYPES[cat].color,
-  }));
-
-  // Impact metrics
-  const eventScorecardsData = events.map(e => {
-    const sc = scorecards.find(s => s.project_id === e.id);
-    return sc ? sc.overall_score : null;
-  }).filter(s => s !== null);
-  const avgImpactScore = eventScorecardsData.length > 0 ? (eventScorecardsData.reduce((a,b) => a+b, 0) / eventScorecardsData.length).toFixed(1) : null;
-  const brifsCompleted = briefs.length;
-  const briefsPending = events.filter(e => !briefs.find(b => b.project_id === e.id)).length;
-
-  // CRM metrics
-  const wonOpportunitys = opportunities.filter(l => l.status === "won");
-  const pipelineValue = opportunities.filter(l => !["won","lost"].includes(l.status)).reduce((s,l) => s + (l.value||0), 0);
-  const wonValue = wonOpportunitys.reduce((s,l) => s + (l.value||0), 0);
-  const conversionRate = opportunities.length > 0 ? Math.round((wonOpportunitys.length / opportunities.length) * 100) : 0;
-  const opsByPresence = {
-    "GH+NG+KE": leads.filter(o => o.presence === "GH+NG+KE").length,
-    "GH+NG": leads.filter(o => o.presence === "GH+NG").length,
-    "GH+KE": leads.filter(o => o.presence === "GH+KE").length,
-    "GH": leads.filter(o => o.presence === "GH").length,
-  };
-
-  // Finance metrics
-  const totalPOValue = pos.reduce((s,p) => s + (p.amount||0), 0);
-  const totalInvoiced = invoices.reduce((s,i) => s + (i.amount||0), 0);
-  const paidInvoices = invoices.filter(i => i.status === "paid").reduce((s,i) => s + (i.amount||0), 0);
-  const pendingInvoices = invoices.filter(i => i.status !== "paid").reduce((s,i) => s + (i.amount||0), 0);
-  // Inflows = client invoices (money coming in from clients)
-  const totalInflows = clientInvoices.reduce((s,i) => s + (i.amount||0), 0);
-  // Expenses = vendor POs + client expenses
-  const clientExpTotal = clientExpenses.reduce((s,e) => s + (e.amount||0), 0);
-  const totalExpenses = totalPOValue + clientExpTotal;
-  const grossProfit = totalInflows - totalExpenses;
-  const profitMargin = totalInflows > 0 ? Math.round((grossProfit / totalInflows) * 100) : 0;
-  const totalBudgets = clientBudgets.reduce((s,b) => s + (b.agreed_budget||0), 0);
-
-  // Vendor metrics
-  const impressive = vendors.filter(v => (v.vendor_score||0) >= 85).length;
-  const veryGood = vendors.filter(v => (v.vendor_score||0) >= 70 && (v.vendor_score||0) < 85).length;
-  const good = vendors.filter(v => (v.vendor_score||0) >= 50 && (v.vendor_score||0) < 70).length;
-  const poor = vendors.filter(v => v.vendor_scorecard_count > 0 && (v.vendor_score||0) < 50).length;
-  const unrated = vendors.filter(v => !v.vendor_scorecard_count).length;
-
-  // Team metrics
-  const openTasks = tasks.filter(t => t.status !== "completed").length;
-  const completedTasks = tasks.filter(t => t.status === "completed").length;
-  const taskCompletionRate = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
-
-  const KPICard = ({ label, value, sub, color, icon }) => (
-    <div style={{ padding: "18px 20px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `3px solid ${color}`, borderRadius: 12 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div>
-          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>{label}</div>
-          <div style={{ color, fontSize: 28, fontWeight: 900, lineHeight: 1 }}>{value}</div>
-          {sub && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 6 }}>{sub}</div>}
-        </div>
-        {icon && <div style={{ fontSize: 28, opacity: 0.4 }}>{icon}</div>}
-      </div>
-    </div>
-  );
-
-  const SectionHeader = ({ title, subtitle }) => (
-    <div style={{ marginBottom: 16, paddingBottom: 10, borderBottom: `1px solid ${T.border}` }}>
-      <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 16 }}>{title}</div>
-      {subtitle && <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{subtitle}</div>}
-    </div>
-  );
-
-  if (loading) return <div style={{ textAlign: "center", padding: 80, color: T.textMuted }}>Loading board intelligence...</div>;
-
-  return (
-    <div style={{ animation: "fadeUp 0.35s ease" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 32, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Stretchfield</div>
-        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 26, fontWeight: 900, letterSpacing: "-0.02em" }}>Board Intelligence Dashboard</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4, fontStyle: "italic" }}>We don't plan events. We engineer impact. — {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
-      </div>
-
-      {/* ── Section 1: Business Performance ── */}
-      <SectionHeader title="📊 Business Performance" subtitle={`${thisYear} year to date`} />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 32 }}>
-        <KPICard label="Events Delivered YTD" value={eventsThisYear.length} sub={`${events.length} total portfolio`} color={T.cyan} icon="🎪" />
-        <KPICard label="Upcoming Events" value={upcomingEvents.length} sub={upcomingEvents[0] ? `Next: ${upcomingEvents[0].name}` : "None scheduled"} color={T.teal} icon="📅" />
-        <KPICard label="Task Completion Rate" value={`${taskCompletionRate}%`} sub={`${completedTasks} of ${tasks.length} tasks done`} color={taskCompletionRate >= 70 ? "#10B981" : T.amber} icon="✅" />
-        <KPICard label="Active Staff" value={profiles.length} sub="Across all departments" color={T.blue} icon="👥" />
-      </div>
-
-      {/* Event Category Distribution */}
-      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 32 }}>
-        <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Events by Category — {thisYear}</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
-          {eventsByCategory.map(cat => (
-            <div key={cat.category} style={{ background: T.bg, borderTop: `3px solid ${cat.color}`, borderRadius: 10, padding: "14px 16px" }}>
-              <div style={{ color: cat.color, fontWeight: 900, fontSize: 32 }}>{cat.count}</div>
-              <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12, marginTop: 4 }}>{cat.category}</div>
-              <div style={{ height: 4, background: T.border+"44", borderRadius: 2, marginTop: 8, overflow: "hidden" }}>
-                <div style={{ height: "100%", width: events.length > 0 ? `${Math.round((cat.count/events.length)*100)}%` : "0%", background: cat.color, borderRadius: 2 }} />
-              </div>
-              <div style={{ color: T.textMuted, fontSize: 10, marginTop: 4 }}>{events.length > 0 ? Math.round((cat.count/events.length)*100) : 0}% of portfolio</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Section 2: Impact Intelligence ── */}
-      <SectionHeader title="🎯 Impact Intelligence" subtitle="Strategic measurement across all events" />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 20 }}>
-        <KPICard label="Avg Impact Score" value={avgImpactScore ? `${avgImpactScore}/10` : "—"} sub={avgImpactScore ? getScoreLabel(parseFloat(avgImpactScore)).label : "No scorecards yet"} color={avgImpactScore >= 7 ? "#10B981" : avgImpactScore >= 5 ? T.amber : T.red} icon="⚡" />
-        <KPICard label="Impact Briefs Done" value={brifsCompleted} sub={`${briefsPending} events pending brief`} color={T.teal} icon="📝" />
-        <KPICard label="Events Scored" value={eventScorecardsData.length} sub={`of ${events.length} total events`} color={T.cyan} icon="📊" />
-        <KPICard label="Top Score" value={eventScorecardsData.length > 0 ? `${Math.max(...eventScorecardsData)}/10` : "—"} sub="Highest event score" color="#10B981" icon="🏆" />
-      </div>
-
-      {/* Impact score distribution */}
-      {eventScorecardsData.length > 0 && (
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 32 }}>
-          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Impact Score Distribution</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 10 }}>
-            {[
-              { label: "Exceptional", range: [9,10], color: "#10B981" },
-              { label: "Strong", range: [7,8.9], color: T.teal },
-              { label: "Partial", range: [5,6.9], color: T.amber },
-              { label: "Needs Work", range: [3,4.9], color: "#E67E22" },
-              { label: "Critical", range: [0,2.9], color: T.red },
-            ].map(tier => {
-              const count = eventScorecardsData.filter(s => s >= tier.range[0] && s <= tier.range[1]).length;
-              return (
-                <div key={tier.label} style={{ background: T.bg, borderTop: `2px solid ${tier.color}`, borderRadius: 8, padding: "12px 14px", textAlign: "center" }}>
-                  <div style={{ color: tier.color, fontWeight: 900, fontSize: 24 }}>{count}</div>
-                  <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginTop: 4 }}>{tier.label}</div>
-                  <div style={{ color: T.textMuted, fontSize: 9, marginTop: 2 }}>{tier.range[0]}–{tier.range[1]}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ── Section 3: CRM & Growth ── */}
-      <SectionHeader title="📈 CRM & Growth Pipeline" subtitle="Opportunity generation and conversion performance" />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 20 }}>
-        <KPICard label="Total Opportunitys" value={opportunities.length} sub={`${wonOpportunitys.length} won`} color={T.cyan} icon="🎯" />
-        <KPICard label="Pipeline Value" value={`GHS ${pipelineValue.toLocaleString()}`} sub="Active pipeline" color={T.amber} icon="💰" />
-        <KPICard label="Won Value" value={`GHS ${wonValue.toLocaleString()}`} sub="Closed revenue" color="#10B981" icon="✓" />
-        <KPICard label="Conversion Rate" value={`${conversionRate}%`} sub="Opportunitys to won" color={conversionRate >= 20 ? "#10B981" : T.amber} icon="📊" />
-      </div>
-
-      {/* CRM pipeline stages */}
-      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 20 }}>
-        <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Opportunity Pipeline by Stage</div>
-        <div style={{ display: "flex", gap: 8 }}>
-          {["new","contacted","qualified","proposal","won","lost"].map(stage => {
-            const count = opportunities.filter(l => l.status === stage).length;
-            const stageColors = { new: T.cyan, contacted: T.blue, qualified: T.amber, proposal: T.magenta, won: "#10B981", lost: T.red };
-            return (
-              <div key={stage} style={{ flex: 1, background: T.bg, borderTop: `3px solid ${stageColors[stage]}`, borderRadius: 8, padding: "12px 10px", textAlign: "center" }}>
-                <div style={{ color: stageColors[stage], fontWeight: 900, fontSize: 22 }}>{count}</div>
-                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginTop: 4 }}>{stage}</div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Leads presence */}
-      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 32 }}>
-        <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Leads by Regional Presence — {leads.length} companies</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
-          {Object.entries(opsByPresence).map(([presence, count]) => (
-            <div key={presence} style={{ background: T.bg, borderRadius: 8, padding: "12px 14px", textAlign: "center", border: `1px solid ${T.border}` }}>
-              <div style={{ color: T.cyan, fontWeight: 900, fontSize: 22 }}>{count}</div>
-              <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, marginTop: 4 }}>{presence}</div>
-              <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{leads.length > 0 ? Math.round((count/leads.length)*100) : 0}%</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Section 4: Finance Overview ── */}
-      <SectionHeader title="💼 Finance Overview" subtitle={`Year to date ${thisYear} — Inflows, Expenses & Profit`} />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 20 }}>
-        <KPICard label="Total Inflows (YTD)" value={`GHS ${totalInflows.toLocaleString()}`} sub={`${clientInvoices.length} client invoices`} color="#10B981" icon="📥" />
-        <KPICard label="Total Expenses (YTD)" value={`GHS ${totalExpenses.toLocaleString()}`} sub={`Vendor costs + operations`} color={T.red} icon="📤" />
-        <KPICard label="Gross Profit (YTD)" value={`GHS ${grossProfit.toLocaleString()}`} sub={profitMargin >= 0 ? `${profitMargin}% margin` : `Loss`} color={grossProfit >= 0 ? "#10B981" : T.red} icon="💰" />
-        <KPICard label="Agreed Budgets" value={`GHS ${totalBudgets.toLocaleString()}`} sub={`${clientBudgets.length} client events`} color={T.cyan} icon="📊" />
-      </div>
-
-      {/* Finance breakdown bar */}
-      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 20 }}>
-        <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Inflows vs Expenses Comparison</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {[
-            { label: "Total Inflows", value: totalInflows, color: "#10B981", max: Math.max(totalInflows, totalExpenses, 1) },
-            { label: "Total Expenses", value: totalExpenses, color: T.red, max: Math.max(totalInflows, totalExpenses, 1) },
-            { label: "Gross Profit", value: Math.abs(grossProfit), color: grossProfit >= 0 ? T.teal : T.amber, max: Math.max(totalInflows, totalExpenses, 1) },
-          ].map(item => (
-            <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <div style={{ width: 130, color: T.textMuted, fontSize: 12, fontWeight: 600, textAlign: "right", flexShrink: 0 }}>{item.label}</div>
-              <div style={{ flex: 1, height: 28, background: T.border+"44", borderRadius: 6, overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${Math.min((item.value/item.max)*100, 100)}%`, background: `linear-gradient(90deg, ${item.color}, ${item.color}99)`, borderRadius: 6, transition: "width 0.5s ease" }} />
-              </div>
-              <div style={{ width: 140, color: item.color, fontSize: 13, fontWeight: 800, flexShrink: 0 }}>GHS {item.value.toLocaleString()}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Vendor spend */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 32 }}>
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px" }}>
-          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 12 }}>Vendor Procurement</div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-            <span style={{ color: T.textMuted, fontSize: 12 }}>Total PO Value</span>
-            <span style={{ color: T.amber, fontWeight: 700 }}>GHS {totalPOValue.toLocaleString()}</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-            <span style={{ color: T.textMuted, fontSize: 12 }}>Vendor Invoices Paid</span>
-            <span style={{ color: "#10B981", fontWeight: 700 }}>GHS {paidInvoices.toLocaleString()}</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span style={{ color: T.textMuted, fontSize: 12 }}>Outstanding to Vendors</span>
-            <span style={{ color: pendingInvoices > 0 ? T.red : T.textMuted, fontWeight: 700 }}>GHS {pendingInvoices.toLocaleString()}</span>
-          </div>
-        </div>
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px" }}>
-          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 12 }}>Client Financials</div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-            <span style={{ color: T.textMuted, fontSize: 12 }}>Agreed Client Budgets</span>
-            <span style={{ color: T.cyan, fontWeight: 700 }}>GHS {totalBudgets.toLocaleString()}</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-            <span style={{ color: T.textMuted, fontSize: 12 }}>Client Expenses Logged</span>
-            <span style={{ color: T.amber, fontWeight: 700 }}>GHS {clientExpTotal.toLocaleString()}</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span style={{ color: T.textMuted, fontSize: 12 }}>Budget Utilisation</span>
-            <span style={{ color: totalBudgets > 0 ? (clientExpTotal/totalBudgets > 0.9 ? T.red : T.teal) : T.textMuted, fontWeight: 700 }}>{totalBudgets > 0 ? `${Math.round((clientExpTotal/totalBudgets)*100)}%` : "—"}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Section 5: Vendor Health ── */}
-      <SectionHeader title="🏭 Vendor Network Health" subtitle={`${vendors.length} registered vendors`} />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginBottom: 20 }}>
-        {[
-          { label: "Total Vendors", value: vendors.length, color: T.cyan },
-          { label: "Impressive", value: impressive, color: "#10B981" },
-          { label: "Very Good", value: veryGood, color: T.teal },
-          { label: "Good", value: good, color: T.amber },
-          { label: "Poor / Blocked", value: poor, color: T.red },
-        ].map((k,i) => (
-          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
-            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
-            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginTop: 4 }}>{k.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Vendor tier bar */}
-      {vendors.length > 0 && (
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px", marginBottom: 32 }}>
-          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Vendor Quality Distribution</div>
-          <div style={{ height: 20, borderRadius: 10, overflow: "hidden", display: "flex" }}>
-            {[
-              { count: impressive, color: "#10B981" },
-              { count: veryGood, color: T.teal },
-              { count: good, color: T.amber },
-              { count: poor, color: T.red },
-              { count: unrated, color: T.border },
-            ].map((seg, i) => seg.count > 0 && (
-              <div key={i} style={{ width: `${(seg.count/vendors.length)*100}%`, background: seg.color, transition: "width 0.5s ease" }} />
-            ))}
-          </div>
-          <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
-            {[["#10B981","Impressive"], [T.teal,"Very Good"], [T.amber,"Good"], [T.red,"Poor"], [T.border,"Unrated"]].map(([color, label]) => (
-              <div key={label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
-                <span style={{ color: T.textMuted, fontSize: 10 }}>{label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Section 6: Upcoming Events ── */}
-      {upcomingEvents.length > 0 && (
-        <>
-          <SectionHeader title="📅 Upcoming Events" subtitle="Next scheduled events" />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 12, marginBottom: 32 }}>
-            {upcomingEvents.slice(0,6).map(ev => {
-              const days = Math.ceil((new Date(ev.event_date) - now) / (1000*60*60*24));
-              const countdownColor = days <= 7 ? T.red : days <= 30 ? T.amber : T.teal;
-              const archetype = EVENT_ARCHETYPES[ev.event_category];
-              return (
-                <div key={ev.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderTop: `3px solid ${archetype?.color||T.cyan}`, borderRadius: 12, padding: "16px 18px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{ev.name}</div>
-                      <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{ev.client}</div>
-                      {ev.event_category && <div style={{ color: archetype?.color||T.cyan, fontSize: 10, fontWeight: 700, marginTop: 4 }}>{ev.event_category}</div>}
-                    </div>
-                    <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 10 }}>
-                      <div style={{ color: countdownColor, fontWeight: 900, fontSize: 22 }}>{days}d</div>
-                      <div style={{ color: T.textMuted, fontSize: 9 }}>to go</div>
-                    </div>
-                  </div>
-                  <div style={{ marginTop: 10, height: 4, background: T.border+"44", borderRadius: 2 }}>
-                    <div style={{ height: "100%", width: `${ev.completion||0}%`, background: `linear-gradient(90deg, ${archetype?.color||T.cyan}, ${T.teal})`, borderRadius: 2 }} />
-                  </div>
-                  <div style={{ color: T.textMuted, fontSize: 10, marginTop: 4 }}>{ev.completion||0}% complete · {ev.phase}</div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-
-      {/* Footer */}
-      <div style={{ textAlign: "center", padding: "24px 0", borderTop: `1px solid ${T.border}`, marginTop: 16 }}>
-        <div style={{ color: T.textMuted, fontSize: 11, fontStyle: "italic" }}>Stretchfield Board Intelligence · Read-only view · Last refreshed {new Date().toLocaleTimeString("en-GB")}</div>
-        <button onClick={load} style={{ marginTop: 10, background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "6px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>↻ Refresh Data</button>
-      </div>
-    </div>
-  );
-};
-
-
-const HRView = ({ user }) => {
-  const [hrTab, setHrTab] = useState("staff");
-  const [staff, setStaff] = useState([]);
-  const [leaveRequests, setLeaveRequests] = useState([]);
-  const [reviews, setReviews] = useState([]);
-  const [training, setTraining] = useState([]);
-  const [trainingNeeds, setTrainingNeeds] = useState([]);
-  const [saving, setSaving] = useState(false);
-
-  // Modals
-  const [leaveModal, setLeaveModal] = useState(false);
-  const [reviewModal, setReviewModal] = useState(null);
-  const [trainingModal, setTrainingModal] = useState(null);
-  const [needModal, setNeedModal] = useState(false);
-
-  // Forms
-  const [leaveForm, setLeaveForm] = useState({ staff_id: "", staff_name: "", leave_type: "Annual", start_date: "", end_date: "", reason: "" });
-  const [reviewForm, setReviewForm] = useState({ staff_id: "", staff_name: "", review_period: "", score: 7, strengths: "", improvements: "", goals: "", events_delivered: 0 });
-  const [trainingForm, setTrainingForm] = useState({ staff_id: "", staff_name: "", training_name: "", training_type: "Internal", provider: "", date_completed: "", expiry_date: "", notes: "" });
-  const [needForm, setNeedForm] = useState({ staff_id: "", staff_name: "", training_required: "", priority: "medium", reason: "" });
-
-  const load = async () => {
-    const [s, l, r, t, n] = await Promise.all([
-      supabase.from("profiles").select("*").not("role", "in", '("Client","Vendor","Board of Directors")').order("name"),
-      supabase.from("leave_requests").select("*").order("created_at", { ascending: false }),
-      supabase.from("performance_reviews").select("*").order("created_at", { ascending: false }),
-      supabase.from("training_records").select("*").order("created_at", { ascending: false }),
-      supabase.from("training_needs").select("*").order("created_at", { ascending: false }),
-    ]);
-    setStaff(s.data || []);
-    setLeaveRequests(l.data || []);
-    setReviews(r.data || []);
-    setTraining(t.data || []);
-    setTrainingNeeds(n.data || []);
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const calcDays = (start, end) => {
-    if (!start || !end) return 0;
-    return Math.ceil((new Date(end) - new Date(start)) / (1000*60*60*24)) + 1;
-  };
-
-  const saveLeave = async () => {
-    if (!leaveForm.staff_id || !leaveForm.start_date || !leaveForm.end_date) { alert("Please fill all required fields."); return; }
-    setSaving(true);
-    const days = calcDays(leaveForm.start_date, leaveForm.end_date);
-    await supabase.from("leave_requests").insert({ ...leaveForm, days_requested: days, status: "pending" });
-    // Notify staff member
-    await supabase.from("notifications").insert({ user_id: leaveForm.staff_id, title: "Leave Request Submitted", message: `Your ${leaveForm.leave_type} leave request for ${days} day(s) has been submitted for approval.`, type: "task" });
-    setSaving(false);
-    setLeaveModal(false);
-    setLeaveForm({ staff_id: "", staff_name: "", leave_type: "Annual", start_date: "", end_date: "", reason: "" });
-    load();
-  };
-
-  const approveLeave = async (id, staffId, approved) => {
-    await supabase.from("leave_requests").update({ status: approved ? "approved" : "declined", approved_by: user.id, approved_at: new Date().toISOString() }).eq("id", id);
-    await supabase.from("notifications").insert({ user_id: staffId, title: approved ? "Leave Approved" : "Leave Declined", message: `Your leave request has been ${approved ? "approved" : "declined"} by CEO.`, type: "task" });
-    load();
-  };
-
-  const saveReview = async () => {
-    if (!reviewForm.staff_id || !reviewForm.review_period) { alert("Please fill all required fields."); return; }
-    setSaving(true);
-    await supabase.from("performance_reviews").insert({ ...reviewForm, reviewed_by: user.id, review_date: new Date().toISOString().slice(0,10) });
-    await supabase.from("notifications").insert({ user_id: reviewForm.staff_id, title: "Performance Review Added", message: `Your performance review for ${reviewForm.review_period} has been completed.`, type: "task" });
-    setSaving(false);
-    setReviewModal(null);
-    setReviewForm({ staff_id: "", staff_name: "", review_period: "", score: 7, strengths: "", improvements: "", goals: "", events_delivered: 0 });
-    load();
-  };
-
-  const saveTraining = async () => {
-    if (!trainingForm.staff_id || !trainingForm.training_name) { alert("Please fill all required fields."); return; }
-    setSaving(true);
-    await supabase.from("training_records").insert({ ...trainingForm, status: trainingForm.date_completed ? "completed" : "pending", created_by: user.id });
-    setSaving(false);
-    setTrainingModal(null);
-    setTrainingForm({ staff_id: "", staff_name: "", training_name: "", training_type: "Internal", provider: "", date_completed: "", expiry_date: "", notes: "" });
-    load();
-  };
-
-  const saveNeed = async () => {
-    if (!needForm.staff_id || !needForm.training_required) { alert("Please fill all required fields."); return; }
-    setSaving(true);
-    await supabase.from("training_needs").insert({ ...needForm, status: "open", created_by: user.id });
-    setSaving(false);
-    setNeedModal(false);
-    setNeedForm({ staff_id: "", staff_name: "", training_required: "", priority: "medium", reason: "" });
-    load();
-  };
-
-  const inputStyle = { width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
-  const labelStyle = { color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 };
-  const sectionHead = { color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 16 };
-
-  const pendingLeave = leaveRequests.filter(l => l.status === "pending");
-  const expiringCerts = training.filter(t => t.expiry_date && new Date(t.expiry_date) <= new Date(Date.now() + 30*24*60*60*1000) && t.status === "completed");
-  const openNeeds = trainingNeeds.filter(n => n.status === "open");
-
-  const staffSelect = [{ value: "", label: "Select staff member..." }, ...staff.map(s => ({ value: s.id, label: `${s.name} — ${s.role}` }))];
-
-  const StatusPill = ({ status }) => {
-    const map = { pending: [T.amber, "Pending"], approved: ["#10B981", "Approved"], declined: [T.red, "Declined"], completed: ["#10B981", "Completed"], open: [T.amber, "Open"], in_progress: [T.cyan, "In Progress"] };
-    const [color, label] = map[status] || [T.textMuted, status];
-    return <span style={{ background: color+"18", color, border: `1px solid ${color}30`, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 800 }}>{label}</span>;
-  };
-
-  const PriorityPill = ({ priority }) => {
-    const map = { high: [T.red, "High"], medium: [T.amber, "Medium"], low: [T.teal, "Low"] };
-    const [color, label] = map[priority] || [T.textMuted, priority];
-    return <span style={{ background: color+"18", color, border: `1px solid ${color}30`, borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>{label}</span>;
-  };
-
-  const Modal = ({ title, onClose, children, maxWidth = 580 }) => (
-    <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
-      <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth, maxHeight: "90vh", overflow: "auto", padding: 28 }} onClick={e => e.stopPropagation()}>
-        <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 20 }}>{title}</div>
-        {children}
-      </div>
-    </div>
-  );
-
-  const Field = ({ label, children }) => (
-    <div style={{ marginBottom: 14 }}><label style={labelStyle}>{label}</label>{children}</div>
-  );
-
-  const StaffSelect = ({ value, onChange }) => (
-    <select value={value} onChange={e => { const s = staff.find(x => x.id === e.target.value); onChange(e.target.value, s?.name || ""); }} style={inputStyle}>
-      {staffSelect.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
-  );
-
-  const hrTabs = [
-    { id: "staff", label: "Staff Records", badge: 0 },
-    { id: "leave", label: "Leave", badge: pendingLeave.length },
-    { id: "performance", label: "Performance", badge: 0 },
-    { id: "training", label: "Training", badge: expiringCerts.length + openNeeds.length },
-  ];
-
-  return (
-    <div style={{ animation: "fadeUp 0.35s ease" }}>
-      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>People</div>
-        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800 }}>Human Resources</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{staff.length} staff members · {pendingLeave.length} leave pending · {openNeeds.length} training needs open</div>
-      </div>
-
-      {/* KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
-        {[
-          { label: "Total Staff", value: staff.length, color: T.cyan },
-          { label: "Leave Pending", value: pendingLeave.length, color: T.amber },
-          { label: "Training Needs", value: openNeeds.length, color: T.red },
-          { label: "Expiring Certs", value: expiringCerts.length, color: expiringCerts.length > 0 ? T.red : T.teal },
-        ].map((k,i) => (
-          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
-            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
-            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginTop: 4 }}>{k.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* HR Tabs */}
-      <div style={{ display: "flex", gap: 0, marginBottom: 24, borderBottom: `1px solid ${T.border}` }}>
-        {hrTabs.map(t => (
-          <button key={t.id} onClick={() => setHrTab(t.id)} style={{ padding: "10px 18px", border: "none", cursor: "pointer", background: "none", color: hrTab === t.id ? T.textPrimary : T.textMuted, fontWeight: hrTab === t.id ? 700 : 400, fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: hrTab === t.id ? `2px solid ${T.cyan}` : "2px solid transparent", marginBottom: -1, position: "relative" }}>
-            {t.label}
-            {t.badge > 0 && <span style={{ marginLeft: 5, background: T.amber, color: "#000", fontSize: 9, fontWeight: 900, borderRadius: 20, padding: "1px 5px" }}>{t.badge}</span>}
-          </button>
-        ))}
-      </div>
-
-      {/* ── STAFF RECORDS ── */}
-      {hrTab === "staff" && (
-        <div>
-          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
-                  {["Name","Role","Email","Country","Leave Taken","Reviews","Training"].map(h => (
-                    <th key={h} style={{ padding: "10px 14px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {staff.map((s, i) => {
-                  const staffLeave = leaveRequests.filter(l => l.staff_id === s.id && l.status === "approved").reduce((sum, l) => sum + (l.days_requested || 0), 0);
-                  const staffReviews = reviews.filter(r => r.staff_id === s.id).length;
-                  const staffTraining = training.filter(t => t.staff_id === s.id && t.status === "completed").length;
-                  const latestReview = reviews.filter(r => r.staff_id === s.id).sort((a,b) => new Date(b.created_at) - new Date(a.created_at))[0];
-                  const roleColor = { CEO: T.cyan, "Country Manager": T.teal, "Vendor Manager": T.amber, "Strategy & Events Opportunity": "#E879F9", "Finance Manager": "#F59E0B", "Sales & Marketing": T.blue }[s.role] || T.textMuted;
-                  return (
-                    <tr key={s.id} style={{ borderBottom: i < staff.length-1 ? `1px solid ${T.border}44` : "none" }}
-                      onMouseEnter={e => e.currentTarget.style.background = T.bg}
-                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                      <td style={{ padding: "10px 14px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ width: 28, height: 28, borderRadius: "50%", background: roleColor+"20", border: `1px solid ${roleColor}40`, display: "flex", alignItems: "center", justifyContent: "center", color: roleColor, fontWeight: 800, fontSize: 10 }}>{(s.name||"?").slice(0,2).toUpperCase()}</div>
-                          <span style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{s.name}</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: "10px 14px" }}><span style={{ background: roleColor+"15", color: roleColor, borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>{s.role}</span></td>
-                      <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 11 }}>{s.email}</td>
-                      <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 12 }}>{s.country || "Ghana"}</td>
-                      <td style={{ padding: "10px 14px", color: T.textPrimary, fontSize: 12, fontWeight: 600 }}>{staffLeave} days</td>
-                      <td style={{ padding: "10px 14px" }}>
-                        <div style={{ color: staffReviews > 0 ? T.teal : T.textMuted, fontSize: 12 }}>
-                          {staffReviews > 0 ? `${staffReviews} reviews` : "—"}
-                          {latestReview && <div style={{ color: T.textMuted, fontSize: 10 }}>Last: {latestReview.score}/10</div>}
-                        </div>
-                      </td>
-                      <td style={{ padding: "10px 14px", color: staffTraining > 0 ? T.cyan : T.textMuted, fontSize: 12 }}>{staffTraining > 0 ? `${staffTraining} completed` : "—"}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ── LEAVE MANAGEMENT ── */}
-      {hrTab === "leave" && (
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <div style={sectionHead}>Leave Requests</div>
-            <button onClick={() => setLeaveModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "9px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>+ Add Leave Request</button>
-          </div>
-          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
-                  {["Staff","Type","From","To","Days","Reason","Status","Actions"].map(h => (
-                    <th key={h} style={{ padding: "10px 14px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {leaveRequests.map((l, i) => (
-                  <tr key={l.id} style={{ borderBottom: i < leaveRequests.length-1 ? `1px solid ${T.border}44` : "none" }}
-                    onMouseEnter={e => e.currentTarget.style.background = T.bg}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                    <td style={{ padding: "10px 14px", color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{l.staff_name}</td>
-                    <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 12 }}>{l.leave_type}</td>
-                    <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 12 }}>{l.start_date}</td>
-                    <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 12 }}>{l.end_date}</td>
-                    <td style={{ padding: "10px 14px", color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{l.days_requested}</td>
-                    <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 11, maxWidth: 160 }}>{l.reason}</td>
-                    <td style={{ padding: "10px 14px" }}><StatusPill status={l.status} /></td>
-                    <td style={{ padding: "10px 14px" }}>
-                      {l.status === "pending" && (
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button onClick={() => approveLeave(l.id, l.staff_id, true)} style={{ background: "#10B98118", border: "1px solid #10B98130", color: "#10B981", padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>✓ Approve</button>
-                          <button onClick={() => approveLeave(l.id, l.staff_id, false)} style={{ background: T.red+"18", border: `1px solid ${T.red}30`, color: T.red, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>✗ Decline</button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {leaveRequests.length === 0 && <tr><td colSpan={8} style={{ padding: "30px 0", textAlign: "center", color: T.textMuted }}>No leave requests yet</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ── PERFORMANCE REVIEWS ── */}
-      {hrTab === "performance" && (
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <div style={sectionHead}>Performance Reviews</div>
-            <button onClick={() => setReviewModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "9px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>+ Add Review</button>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14 }}>
-            {staff.map(s => {
-              const staffReviews = reviews.filter(r => r.staff_id === s.id).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
-              const latest = staffReviews[0];
-              const avgScore = staffReviews.length > 0 ? (staffReviews.reduce((sum,r) => sum + (r.score||0), 0) / staffReviews.length).toFixed(1) : null;
-              const scoreColor = avgScore >= 8 ? "#10B981" : avgScore >= 6 ? T.teal : avgScore >= 4 ? T.amber : T.red;
-              return (
-                <div key={s.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 18px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-                    <div>
-                      <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{s.name}</div>
-                      <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{s.role}</div>
-                    </div>
-                    {avgScore && <div style={{ textAlign: "right" }}><div style={{ color: scoreColor, fontWeight: 900, fontSize: 22 }}>{avgScore}</div><div style={{ color: T.textMuted, fontSize: 9 }}>avg /10</div></div>}
-                  </div>
-                  {latest ? (
-                    <div>
-                      <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 4 }}>Latest: {latest.review_period} · Score: {latest.score}/10</div>
-                      {latest.strengths && <div style={{ color: T.textSecondary, fontSize: 11, marginBottom: 2 }}>✓ {latest.strengths?.slice(0,60)}...</div>}
-                      {latest.improvements && <div style={{ color: T.amber, fontSize: 11 }}>↑ {latest.improvements?.slice(0,60)}...</div>}
-                      <div style={{ color: T.textMuted, fontSize: 10, marginTop: 6 }}>{staffReviews.length} review{staffReviews.length !== 1 ? "s" : ""} total</div>
-                    </div>
-                  ) : (
-                    <div style={{ color: T.textMuted, fontSize: 12, fontStyle: "italic" }}>No reviews yet</div>
-                  )}
-                  <button onClick={() => setReviewModal({ staff_id: s.id, staff_name: s.name })} style={{ marginTop: 12, width: "100%", background: T.cyan+"12", border: `1px solid ${T.cyan}25`, color: T.cyan, padding: "6px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>+ Add Review</button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ── TRAINING ── */}
-      {hrTab === "training" && (
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <div style={sectionHead}>Training & Development</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => setNeedModal(true)} style={{ background: T.amber+"15", border: `1px solid ${T.amber}30`, color: T.amber, padding: "9px 16px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 12 }}>+ Training Need</button>
-              <button onClick={() => setTrainingModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "9px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>+ Log Training</button>
-            </div>
-          </div>
-
-          {/* Training Needs */}
-          {trainingNeeds.length > 0 && (
-            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 20 }}>
-              <div style={{ padding: "12px 16px", borderBottom: `1px solid ${T.border}`, color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>Training Needs — {openNeeds.length} open</div>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead><tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
-                  {["Staff","Training Required","Priority","Reason","Status"].map(h => <th key={h} style={{ padding: "8px 14px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>)}
-                </tr></thead>
-                <tbody>
-                  {trainingNeeds.map((n, i) => (
-                    <tr key={n.id} style={{ borderBottom: i < trainingNeeds.length-1 ? `1px solid ${T.border}44` : "none" }}
-                      onMouseEnter={e => e.currentTarget.style.background = T.bg}
-                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                      <td style={{ padding: "10px 14px", color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{n.staff_name}</td>
-                      <td style={{ padding: "10px 14px", color: T.textSecondary, fontSize: 12 }}>{n.training_required}</td>
-                      <td style={{ padding: "10px 14px" }}><PriorityPill priority={n.priority} /></td>
-                      <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 11 }}>{n.reason}</td>
-                      <td style={{ padding: "10px 14px" }}>
-                        <select value={n.status} onChange={async e => { await supabase.from("training_needs").update({ status: e.target.value }).eq("id", n.id); load(); }} style={{ padding: "4px 8px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 11, fontFamily: "inherit", outline: "none" }}>
-                          <option value="open">Open</option>
-                          <option value="in_progress">In Progress</option>
-                          <option value="completed">Completed</option>
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredLeads.length === 0 && <tr><td colSpan={7} style={{ padding: "40px 0", textAlign: "center", color: T.textMuted }}>No leads found</td></tr>}
                 </tbody>
               </table>
             </div>
           )}
-
-          {/* Training Records */}
-          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-            <div style={{ padding: "12px 16px", borderBottom: `1px solid ${T.border}`, color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>Training Records</div>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
-                {["Staff","Training","Type","Provider","Date","Expiry","Status"].map(h => <th key={h} style={{ padding: "8px 14px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>)}
-              </tr></thead>
-              <tbody>
-                {training.map((t, i) => {
-                  const isExpiring = t.expiry_date && new Date(t.expiry_date) <= new Date(Date.now() + 30*24*60*60*1000);
-                  return (
-                    <tr key={t.id} style={{ borderBottom: i < training.length-1 ? `1px solid ${T.border}44` : "none", background: isExpiring ? T.red+"05" : "transparent" }}
-                      onMouseEnter={e => e.currentTarget.style.background = T.bg}
-                      onMouseLeave={e => e.currentTarget.style.background = isExpiring ? T.red+"05" : "transparent"}>
-                      <td style={{ padding: "10px 14px", color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{t.staff_name}</td>
-                      <td style={{ padding: "10px 14px", color: T.textSecondary, fontSize: 12 }}>{t.training_name}</td>
-                      <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 11 }}>{t.training_type}</td>
-                      <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 11 }}>{t.provider || "—"}</td>
-                      <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 11 }}>{t.date_completed || "—"}</td>
-                      <td style={{ padding: "10px 14px", color: isExpiring ? T.red : T.textMuted, fontSize: 11, fontWeight: isExpiring ? 700 : 400 }}>{t.expiry_date || "—"}{isExpiring && " ⚠"}</td>
-                      <td style={{ padding: "10px 14px" }}><StatusPill status={t.status} /></td>
-                    </tr>
-                  );
-                })}
-                {training.length === 0 && <tr><td colSpan={7} style={{ padding: "30px 0", textAlign: "center", color: T.textMuted }}>No training records yet</td></tr>}
-              </tbody>
-            </table>
-          </div>
         </div>
-      )}
 
-      {/* ════ MODALS ════ */}
+        {/* ── Right Panel ── */}
+        {selectedLead && <LeadPanel lead={selectedLead} />}
+      </div>
 
-      {/* Leave Request Modal */}
-      {leaveModal && (
-        <Modal title="Add Leave Request" onClose={() => setLeaveModal(false)}>
-          <Field label="Staff Member *"><StaffSelect value={leaveForm.staff_id} onChange={(id, name) => setLeaveForm({...leaveForm, staff_id: id, staff_name: name})} /></Field>
-          <Field label="Leave Type">
-            <select value={leaveForm.leave_type} onChange={e => setLeaveForm({...leaveForm, leave_type: e.target.value})} style={inputStyle}>
-              {["Annual","Sick","Emergency","Maternity/Paternity","Study","Other"].map(t => <option key={t}>{t}</option>)}
-            </select>
-          </Field>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="Start Date *"><input type="date" value={leaveForm.start_date} onChange={e => setLeaveForm({...leaveForm, start_date: e.target.value})} style={inputStyle} /></Field>
-            <Field label="End Date *"><input type="date" value={leaveForm.end_date} onChange={e => setLeaveForm({...leaveForm, end_date: e.target.value})} style={inputStyle} /></Field>
-          </div>
-          {leaveForm.start_date && leaveForm.end_date && <div style={{ color: T.cyan, fontSize: 12, marginBottom: 14, fontWeight: 700 }}>📅 {calcDays(leaveForm.start_date, leaveForm.end_date)} days requested</div>}
-          <Field label="Reason"><textarea value={leaveForm.reason} onChange={e => setLeaveForm({...leaveForm, reason: e.target.value})} rows={3} style={{...inputStyle, resize: "vertical"}} placeholder="Reason for leave..." /></Field>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={saveLeave} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Submit Leave Request"}</button>
-            <button onClick={() => setLeaveModal(false)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
-          </div>
-        </Modal>
-      )}
-
-      {/* Performance Review Modal */}
-      {reviewModal && (
-        <Modal title="Add Performance Review" onClose={() => setReviewModal(null)}>
-          {!reviewModal.staff_id ? (
-            <Field label="Staff Member *"><StaffSelect value={reviewForm.staff_id} onChange={(id, name) => setReviewForm({...reviewForm, staff_id: id, staff_name: name})} /></Field>
-          ) : (
-            <div style={{ background: T.cyan+"12", border: `1px solid ${T.cyan}30`, borderRadius: 8, padding: "10px 14px", marginBottom: 16, color: T.cyan, fontSize: 13, fontWeight: 700 }}>{reviewModal.staff_name}</div>
-          )}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="Review Period *"><input value={reviewForm.review_period} onChange={e => setReviewForm({...reviewForm, review_period: e.target.value})} style={inputStyle} placeholder="e.g. Q1 2026" /></Field>
-            <Field label="Events Delivered"><input type="number" value={reviewForm.events_delivered} onChange={e => setReviewForm({...reviewForm, events_delivered: parseInt(e.target.value)||0})} style={inputStyle} /></Field>
-          </div>
-          <Field label={`Performance Score: ${reviewForm.score}/10`}>
-            <input type="range" min="1" max="10" step="0.5" value={reviewForm.score} onChange={e => setReviewForm({...reviewForm, score: parseFloat(e.target.value)})}
-              style={{ width: "100%", accentColor: T.cyan }} />
-            <div style={{ display: "flex", justifyContent: "space-between", color: T.textMuted, fontSize: 10, marginTop: 2 }}><span>1 — Poor</span><span style={{ color: T.cyan, fontWeight: 700 }}>{reviewForm.score}/10</span><span>10 — Exceptional</span></div>
-          </Field>
-          <Field label="Strengths"><textarea value={reviewForm.strengths} onChange={e => setReviewForm({...reviewForm, strengths: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} placeholder="Key strengths observed..." /></Field>
-          <Field label="Areas for Improvement"><textarea value={reviewForm.improvements} onChange={e => setReviewForm({...reviewForm, improvements: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} placeholder="Areas to develop..." /></Field>
-          <Field label="Goals for Next Period"><textarea value={reviewForm.goals} onChange={e => setReviewForm({...reviewForm, goals: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} placeholder="Goals and objectives..." /></Field>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={() => { if(reviewModal.staff_id) setReviewForm(f => ({...f, staff_id: reviewModal.staff_id, staff_name: reviewModal.staff_name})); saveReview(); }} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Save Review"}</button>
-            <button onClick={() => setReviewModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
-          </div>
-        </Modal>
-      )}
-
-      {/* Training Log Modal */}
-      {trainingModal && (
-        <Modal title="Log Training" onClose={() => setTrainingModal(null)}>
-          <Field label="Staff Member *"><StaffSelect value={trainingForm.staff_id} onChange={(id, name) => setTrainingForm({...trainingForm, staff_id: id, staff_name: name})} /></Field>
-          <Field label="Training Name *"><input value={trainingForm.training_name} onChange={e => setTrainingForm({...trainingForm, training_name: e.target.value})} style={inputStyle} placeholder="e.g. Event Safety Certification" /></Field>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="Training Type">
-              <select value={trainingForm.training_type} onChange={e => setTrainingForm({...trainingForm, training_type: e.target.value})} style={inputStyle}>
-                {["Internal","External","Certification","Workshop","Online","Conference"].map(t => <option key={t}>{t}</option>)}
+      {/* ── New Lead Modal ── */}
+      {modal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setModal(false)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 520, padding: 28, maxHeight: "90vh", overflow: "auto" }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 20 }}>New Lead</div>
+            {[
+              ["Company *", "company", "text", "Company name"],
+              ["Contact Name", "contact_name", "text", "Full name"],
+              ["Email", "email", "email", "email@company.com"],
+              ["Phone", "phone", "text", "+233 XX XXX XXXX"],
+              ["Value (GHS)", "value", "number", "Estimated deal value"],
+              ["Source", "source", "text", "Referral, LinkedIn, Cold call..."],
+            ].map(([label, key, type, placeholder]) => (
+              <div key={key} style={{ marginBottom: 12 }}>
+                <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 4 }}>{label}</label>
+                <input type={type} value={form[key]} onChange={e => setForm({...form, [key]: e.target.value})} placeholder={placeholder} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+              </div>
+            ))}
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 4 }}>Stage</label>
+              <select value={form.status} onChange={e => setForm({...form, status: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                {STAGES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
               </select>
-            </Field>
-            <Field label="Provider / Institution"><input value={trainingForm.provider} onChange={e => setTrainingForm({...trainingForm, provider: e.target.value})} style={inputStyle} placeholder="Who delivered it?" /></Field>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="Date Completed"><input type="date" value={trainingForm.date_completed} onChange={e => setTrainingForm({...trainingForm, date_completed: e.target.value})} style={inputStyle} /></Field>
-            <Field label="Expiry Date (if applicable)"><input type="date" value={trainingForm.expiry_date} onChange={e => setTrainingForm({...trainingForm, expiry_date: e.target.value})} style={inputStyle} /></Field>
-          </div>
-          <Field label="Notes"><textarea value={trainingForm.notes} onChange={e => setTrainingForm({...trainingForm, notes: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} /></Field>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={saveTraining} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Save Training Record"}</button>
-            <button onClick={() => setTrainingModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
-          </div>
-        </Modal>
-      )}
-
-      {/* Training Need Modal */}
-      {needModal && (
-        <Modal title="Flag Training Need" onClose={() => setNeedModal(false)}>
-          <Field label="Staff Member *"><StaffSelect value={needForm.staff_id} onChange={(id, name) => setNeedForm({...needForm, staff_id: id, staff_name: name})} /></Field>
-          <Field label="Training Required *"><input value={needForm.training_required} onChange={e => setNeedForm({...needForm, training_required: e.target.value})} style={inputStyle} placeholder="e.g. Client Management, Protocol Training" /></Field>
-          <Field label="Priority">
-            <select value={needForm.priority} onChange={e => setNeedForm({...needForm, priority: e.target.value})} style={inputStyle}>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
-          </Field>
-          <Field label="Reason / Context"><textarea value={needForm.reason} onChange={e => setNeedForm({...needForm, reason: e.target.value})} rows={3} style={{...inputStyle, resize: "vertical"}} placeholder="Why is this training needed?" /></Field>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={saveNeed} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.amber}, ${T.amber}99)`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Flag Training Need"}</button>
-            <button onClick={() => setNeedModal(false)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
-          </div>
-        </Modal>
-      )}
-    </div>
-  );
-};
-
-const CalendarView = ({ user, onNavigate }) => {
-  const [today] = useState(new Date());
-  const [current, setCurrent] = useState(new Date());
-  const [items, setItems] = useState([]);
-  const [selectedDay, setSelectedDay] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [itinModal, setItinModal] = useState(false);
-  const [itinForm, setItinForm] = useState({ title: "", week_start: "", rows: [{ date: "", time: "", company: "", action: "", notes: "" }] });
-  const [itinSaving, setItinSaving] = useState(false);
-  const [itineraries, setItineraries] = useState([]);
-  const [viewItinModal, setViewItinModal] = useState(null);
-  const [opportunities, setOpportunitys] = useState([]);
-  const [opps, setOpps] = useState([]);
-
-  const role = user?.role;
-  const uid = user?.id;
-  const email = user?.email;
-
-  const typeColors = {
-    task: "#00C8FF",
-    event: "#00E5C8",
-    opportunity: "#F59E0B",
-    rff: "#E879F9",
-    invoice: "#C9A84C",
-    activity: "#3B7BFF",
-    smtask: "#10B981",
-    itinerary: "#F472B6",
-  };
-
-  const loadOpportunitysOpps = async () => {
-    const [{ data: l }, { data: o }, { data: itins }] = await Promise.all([
-      supabase.from("opportunities").select("id, company, contact_name, status"),
-      supabase.from("leads").select("id, company, sector, status").neq("status","Converted"),
-      uid ? supabase.from("itineraries").select("*").eq("created_by", uid).order("created_at", { ascending: false }) : Promise.resolve({ data: [] }),
-    ]);
-    setOpportunitys(l || []);
-    setOpps(o || []);
-    setItineraries(itins || []);
-  };
-
-  const load = async () => {
-    setLoading(true);
-    const all = [];
-
-    // ── TASKS ──
-    const taskQ = ["CEO","Country Manager"].includes(role)
-      ? supabase.from("tasks").select("*")
-      : supabase.from("tasks").select("*").eq("assignee_id", uid);
-    const { data: tasks } = await taskQ;
-    (tasks || []).forEach(t => {
-      if (t.deadline) all.push({ id: "task-"+t.id, date: t.deadline.slice(0,10), type: "task", label: t.name, sub: t.assignee_name || "", status: t.status, nav: "tasks" });
-    });
-
-    // ── EVENTS (projects) ──
-    if (!["Vendor"].includes(role)) {
-      let evQ;
-      if (["Client"].includes(role)) {
-        const { data: clientData } = await supabase.from("clients").select("id").eq("email", email).single();
-        if (clientData) evQ = await supabase.from("projects").select("*").eq("client_id", clientData.id);
-      } else {
-        evQ = await supabase.from("projects").select("*");
-      }
-      const events = evQ?.data || [];
-      events.forEach(e => {
-        if (e.event_date) all.push({ id: "ev-"+e.id+"-d", date: e.event_date, type: "event", label: e.name, sub: "Event Day", nav: "events" });
-        if (e.deadline) all.push({ id: "ev-"+e.id+"-dl", date: e.deadline.slice(0,10), type: "event", label: e.name, sub: "Planning Deadline", nav: "events" });
-      });
-    }
-
-    // ── LEADS (CEO, Admin, Sales & Marketing) ──
-    if (["CEO","Country Manager","Sales & Marketing"].includes(role)) {
-      const { data: opportunities } = await supabase.from("opportunities").select("*");
-      (opportunities || []).forEach(l => {
-        if (l.created_at) all.push({ id: "opportunity-"+l.id, date: l.created_at.slice(0,10), type: "opportunity", label: l.company, sub: "Opportunity Created · " + l.status, nav: "crm" });
-        if (l.closed_date) all.push({ id: "opportunity-"+l.id+"-c", date: l.closed_date, type: "opportunity", label: l.company, sub: "Opportunity Closed · Won", nav: "crm" });
-      });
-    }
-
-    // ── RFFs ──
-    if (["CEO","Country Manager","Vendor Manager"].includes(role)) {
-      const { data: rffs } = await supabase.from("rffs").select("*");
-      (rffs || []).filter(r => r.deadline).forEach(r => {
-        const dl = r.deadline.slice(0,10);
-        all.push({ id: "rff-"+r.id, date: dl, type: "rff", label: r.title || "RFF", sub: "RFF Deadline · " + (r.event_name || r.status || ""), nav: "vendors" });
-      });
-    } else if (role === "Vendor") {
-      const { data: assignments } = await supabase.from("rff_vendor_assignments").select("*, rffs(*)").eq("vendor_id", uid);
-      (assignments || []).forEach(a => {
-        const r = a.rffs;
-        if (r?.deadline) all.push({ id: "rff-"+r.id, date: r.deadline.slice(0,10), type: "rff", label: r.title || "RFF", sub: "RFF Deadline · " + (a.status || ""), nav: "my-rffs" });
-      });
-    }
-
-    // ── S&M TASKS ──
-    if (["CEO","Country Manager","Sales & Marketing"].includes(role)) {
-      const smQ = ["CEO","Country Manager"].includes(role)
-        ? supabase.from("tasks").select("*").not("assignee_id","is",null)
-        : supabase.from("tasks").select("*").eq("assignee_id", uid);
-      const { data: smTasks } = await smQ;
-      (smTasks || []).forEach(t => {
-        if (t.deadline && !["CEO","Country Manager"].includes(role)) {
-          all.push({ id: "smt-"+t.id, date: t.deadline.slice(0,10), type: "smtask", label: t.name, sub: "S&M Task", nav: "sm-tasks" });
-        }
-      });
-    }
-
-    // ── CLIENT INVOICES ──
-    if (role === "Client") {
-      const { data: clientData } = await supabase.from("clients").select("id").eq("email", email).single();
-      if (clientData) {
-        const { data: invs } = await supabase.from("client_invoices").select("*").eq("client_id", clientData.id);
-        (invs || []).forEach(inv => {
-          if (inv.created_at) all.push({ id: "inv-"+inv.id, date: inv.created_at.slice(0,10), type: "invoice", label: inv.title || "Invoice", sub: "Invoice", nav: "client-finance" });
-        });
-      }
-    }
-
-    // ── FINANCE INVOICES ──
-    if (["CEO","Country Manager","Finance Manager"].includes(role)) {
-      const { data: invs } = await supabase.from("invoices").select("*");
-      (invs || []).forEach(inv => {
-        if (inv.created_at) all.push({ id: "finv-"+inv.id, date: inv.created_at.slice(0,10), type: "invoice", label: inv.vendor_name || "Invoice", sub: "Invoice · " + (inv.status || ""), nav: "invoices" });
-      });
-    }
-
-    // ── ITINERARIES ──
-    if (["CEO","Sales & Marketing"].includes(role)) {
-      const { data: itins } = await supabase.from("itineraries").select("*").eq("created_by", uid);
-      (itins || []).forEach(itin => {
-        (itin.items || []).forEach((item, idx) => {
-          if (item.date) all.push({
-            id: "itin-"+itin.id+"-"+idx,
-            date: item.date,
-            type: "itinerary",
-            label: item.company || item.title || "Itinerary Item",
-            sub: itin.title + " · " + (item.time || "") + " · " + (item.action || ""),
-            nav: "calendar"
-          });
-        });
-      });
-    }
-
-    setItems(all);
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const year = current.getFullYear();
-  const month = current.getMonth();
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const monthName = current.toLocaleString("default", { month: "long" });
-  const todayStr = today.toISOString().slice(0,10);
-
-  const itemsByDate = {};
-  items.forEach(item => {
-    if (!itemsByDate[item.date]) itemsByDate[item.date] = [];
-    itemsByDate[item.date].push(item);
-  });
-
-  const dayItems = selectedDay ? (itemsByDate[selectedDay] || []) : [];
-
-  const typeLabel = { task: "Task", event: "Event", opportunity: "Opportunity", rff: "RFF", invoice: "Invoice", activity: "Activity", smtask: "S&M Task", itinerary: "Itinerary" };
-
-  return (
-    <div style={{ animation: "fadeUp 0.35s ease" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-        <div>
-          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Personal</div>
-          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Calendar</h2>
-          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{items.length} items across all your activities</div>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
-          {["CEO","Sales & Marketing"].includes(role) && (
-            <button onClick={() => setItinModal(true)} style={{ background: `linear-gradient(135deg, #F472B6, #E879F9)`, border: "none", color: "#fff", padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>+ Create Itinerary</button>
-          )}
-          {["CEO","Strategy & Events Opportunity","Vendor Manager","Sales & Marketing","Vendor"].includes(role) && (
-            <button onClick={() => {
-              const feedUrl = `https://workroom.stretchfield.com/api/calendar-feed?user_id=${uid}`;
-              navigator.clipboard.writeText(feedUrl).then(() => alert(
-                "✅ Calendar URL copied!\n\n" +
-                "iPhone / Mac Calendar:\n" +
-                "1. Settings → Calendar → Accounts\n" +
-                "2. Add Account → Other\n" +
-                "3. Add Subscribed Calendar\n" +
-                "4. Paste URL → Next → Save\n\n" +
-                "Mac Calendar App:\n" +
-                "1. File → New Calendar Subscription\n" +
-                "2. Paste URL → Subscribe\n" +
-                "3. Set refresh to Every Hour → OK\n\n" +
-                "Google Calendar (Android):\n" +
-                "1. Open calendar.google.com on desktop\n" +
-                "2. Other Calendars → + → From URL\n" +
-                "3. Paste URL → Add Calendar"
-              ));
-            }} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: "none", color: "#fff", padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>📱 Sync to Phone</button>
-          )}
-          {/* Legend */}
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            {Object.entries(typeColors).map(([type, color]) => (
-              <div key={type} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
-                <span style={{ color: T.textMuted, fontSize: 10, textTransform: "capitalize" }}>{typeLabel[type]}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: selectedDay ? "1fr 320px" : "1fr", gap: 20 }}>
-        {/* Calendar grid */}
-        <div>
-          {/* Month nav */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <button onClick={() => setCurrent(new Date(year, month - 1, 1))} style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.textPrimary, width: 34, height: 34, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>‹</button>
-            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 18 }}>{monthName} {year}</div>
-            <button onClick={() => setCurrent(new Date(year, month + 1, 1))} style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.textPrimary, width: 34, height: 34, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>›</button>
-          </div>
-
-          {/* Day headers */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
-            {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
-              <div key={d} style={{ textAlign: "center", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", padding: "6px 0" }}>{d}</div>
-            ))}
-          </div>
-
-          {/* Day cells */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
-            {Array.from({ length: firstDay }).map((_, i) => <div key={"e"+i} />)}
-            {Array.from({ length: daysInMonth }).map((_, i) => {
-              const day = i + 1;
-              const dateStr = `${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
-              const dayItems = itemsByDate[dateStr] || [];
-              const isToday = dateStr === todayStr;
-              const isSelected = dateStr === selectedDay;
-              const isPast = dateStr < todayStr;
-
-              return (
-                <div key={day} onClick={() => setSelectedDay(isSelected ? null : dateStr)}
-                  style={{
-                    minHeight: 80, padding: "6px 8px", borderRadius: 8, cursor: "pointer",
-                    background: isSelected ? T.cyan + "18" : isToday ? T.teal + "12" : T.surface,
-                    border: `1px solid ${isSelected ? T.cyan + "60" : isToday ? T.teal + "40" : T.border}`,
-                    opacity: isPast && !isToday ? 0.7 : 1,
-                    transition: "all 0.15s",
-                  }}
-                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.borderColor = T.cyan + "40"; }}
-                  onMouseLeave={e => { if (!isSelected) e.currentTarget.style.borderColor = isToday ? T.teal + "40" : T.border; }}>
-                  <div style={{ color: isToday ? T.teal : T.textPrimary, fontWeight: isToday ? 900 : 600, fontSize: 12, marginBottom: 4 }}>
-                    {isToday ? <span style={{ background: T.teal, color: "#fff", borderRadius: "50%", width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11 }}>{day}</span> : day}
-                  </div>
-                  {dayItems.slice(0,3).map((item, idx) => (
-                    <div key={idx} style={{ background: typeColors[item.type] + "25", borderLeft: `2px solid ${typeColors[item.type]}`, borderRadius: 3, padding: "1px 4px", marginBottom: 2, fontSize: 9, color: typeColors[item.type], fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {item.label}
-                    </div>
-                  ))}
-                  {dayItems.length > 3 && <div style={{ color: T.textMuted, fontSize: 9 }}>+{dayItems.length - 3} more</div>}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Day detail panel */}
-        {selectedDay && (
-          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 20, height: "fit-content", position: "sticky", top: 20 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div>
-                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Selected</div>
-                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 16 }}>{new Date(selectedDay + "T12:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}</div>
-              </div>
-              <button onClick={() => setSelectedDay(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, width: 28, height: 28, borderRadius: 6, cursor: "pointer", fontSize: 16 }}>×</button>
             </div>
-
-            {dayItems.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "30px 0", color: T.textMuted, fontSize: 13 }}>Nothing scheduled</div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {dayItems.map((item, idx) => (
-                  <div key={idx} onClick={() => { if (onNavigate) onNavigate(item.nav); }}
-                    style={{ padding: "10px 12px", background: T.bg, border: `1px solid ${typeColors[item.type]}30`, borderLeft: `3px solid ${typeColors[item.type]}`, borderRadius: 8, cursor: onNavigate ? "pointer" : "default", transition: "box-shadow 0.15s" }}
-                    onMouseEnter={e => e.currentTarget.style.boxShadow = `0 2px 12px ${typeColors[item.type]}20`}
-                    onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13, marginBottom: 2 }}>{item.label}</div>
-                        <div style={{ color: T.textMuted, fontSize: 11 }}>{item.sub}</div>
-                      </div>
-                      <span style={{ background: typeColors[item.type] + "20", color: typeColors[item.type], borderRadius: 20, padding: "2px 8px", fontSize: 9, fontWeight: 800, textTransform: "uppercase", flexShrink: 0, marginLeft: 8 }}>{typeLabel[item.type]}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* ── Itineraries list below calendar ── */}
-      {["CEO","Sales & Marketing"].includes(role) && itineraries.length > 0 && (
-        <div style={{ marginTop: 32 }}>
-          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 12 }}>Your Itineraries</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
-            {itineraries.map(itin => (
-              <div key={itin.id} onClick={() => setViewItinModal(itin)}
-                style={{ background: T.surface, border: `1px solid ${T.border}`, borderTop: "2px solid #F472B6", borderRadius: 10, padding: "14px 16px", cursor: "pointer" }}
-                onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 20px #F472B620"}
-                onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
-                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 4 }}>{itin.title}</div>
-                <div style={{ color: T.textMuted, fontSize: 11 }}>Week of {new Date(itin.week_start + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>
-                <div style={{ color: "#F472B6", fontSize: 11, marginTop: 6, fontWeight: 700 }}>{(itin.items || []).length} stops</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Create Itinerary Modal ── */}
-      {itinModal && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setItinModal(false)}>
-          <div style={{ background: T.surface, border: `1px solid #F472B640`, borderRadius: 16, width: "100%", maxWidth: 800, maxHeight: "90vh", overflow: "auto", padding: 28, boxShadow: "0 24px 80px rgba(0,0,0,0.5)" }} onClick={e => e.stopPropagation()}>
-            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 20, marginBottom: 4 }}>Create Weekly Itinerary</div>
-            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>Build a weekly outreach or visit schedule from your opportunities and leads</div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
-              <div>
-                <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Itinerary Title</label>
-                <input value={itinForm.title} onChange={e => setItinForm({ ...itinForm, title: e.target.value })} placeholder="e.g. Banking Sector Outreach Week" style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
-              </div>
-              <div>
-                <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Week Starting</label>
-                <input type="date" value={itinForm.week_start} onChange={e => setItinForm({ ...itinForm, week_start: e.target.value })} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
-              </div>
-            </div>
-
-            {/* Rows */}
             <div style={{ marginBottom: 16 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "120px 80px 1fr 1fr 1fr 32px", gap: 8, marginBottom: 8 }}>
-                {["Date","Time","Company","Action","Notes",""].map((h, i) => (
-                  <div key={i} style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</div>
-                ))}
-              </div>
-              {itinForm.rows.map((row, idx) => (
-                <div key={idx} style={{ display: "grid", gridTemplateColumns: "120px 80px 1fr 1fr 1fr 32px", gap: 8, marginBottom: 8 }}>
-                  <input type="date" value={row.date} onChange={e => { const rows = [...itinForm.rows]; rows[idx].date = e.target.value; setItinForm({ ...itinForm, rows }); }} style={{ padding: "7px 8px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
-                  <input value={row.time} onChange={e => { const rows = [...itinForm.rows]; rows[idx].time = e.target.value; setItinForm({ ...itinForm, rows }); }} placeholder="9:00am" style={{ padding: "7px 8px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
-                  <select value={row.company} onChange={e => { const rows = [...itinForm.rows]; rows[idx].company = e.target.value; setItinForm({ ...itinForm, rows }); }} style={{ padding: "7px 8px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: row.company ? T.textPrimary : T.textMuted, fontSize: 12, fontFamily: "inherit", outline: "none" }}>
-                    <option value="">Select company...</option>
-                    {opportunities.length > 0 && <optgroup label="── Opportunitys ──">{opportunities.map(l => <option key={"l"+l.id} value={l.company}>{l.company}</option>)}</optgroup>}
-                    {opps.length > 0 && <optgroup label="── Leads ──">{opps.map(o => <option key={"o"+o.id} value={o.company}>{o.company}</option>)}</optgroup>}
-                  </select>
-                  <input value={row.action} onChange={e => { const rows = [...itinForm.rows]; rows[idx].action = e.target.value; setItinForm({ ...itinForm, rows }); }} placeholder="e.g. Cold call, Site visit" style={{ padding: "7px 8px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
-                  <input value={row.notes} onChange={e => { const rows = [...itinForm.rows]; rows[idx].notes = e.target.value; setItinForm({ ...itinForm, rows }); }} placeholder="Notes..." style={{ padding: "7px 8px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
-                  <button onClick={() => { const rows = itinForm.rows.filter((_, i) => i !== idx); setItinForm({ ...itinForm, rows: rows.length ? rows : [{ date: "", time: "", company: "", action: "", notes: "" }] }); }} style={{ background: T.red + "18", border: `1px solid ${T.red}30`, color: T.red, borderRadius: 6, cursor: "pointer", fontSize: 14, fontWeight: 700 }}>×</button>
-                </div>
-              ))}
-              <button onClick={() => setItinForm({ ...itinForm, rows: [...itinForm.rows, { date: "", time: "", company: "", action: "", notes: "" }] })} style={{ background: "none", border: `1px dashed ${T.border}`, color: T.textMuted, padding: "7px 16px", borderRadius: 6, cursor: "pointer", fontSize: 12, width: "100%", marginTop: 4 }}>+ Add Row</button>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 4 }}>Assign To</label>
+              <select value={form.assigned_to} onChange={e => { const m = members.find(x => x.id === e.target.value); setForm({...form, assigned_to: e.target.value, assigned_name: m?.name||""}); }} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                <option value="">Unassigned</option>
+                {members.map(m => <option key={m.id} value={m.id}>{m.name} — {m.role}</option>)}
+              </select>
             </div>
-
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 4 }}>Notes</label>
+              <textarea value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} rows={2} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box" }} />
+            </div>
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={async () => {
-                if (!itinForm.title || !itinForm.week_start) return;
-                setItinSaving(true);
-                const validRows = itinForm.rows.filter(r => r.date && r.company);
-                await supabase.from("itineraries").insert({
-                  title: itinForm.title,
-                  week_start: itinForm.week_start,
-                  created_by: uid,
-                  created_by_name: user?.name || "",
-                  items: validRows,
-                });
-                setItinSaving(false);
-                setItinModal(false);
-                setItinForm({ title: "", week_start: "", rows: [{ date: "", time: "", company: "", action: "", notes: "" }] });
-                load();
-                loadOpportunitysOpps();
-              }} disabled={itinSaving || !itinForm.title || !itinForm.week_start} style={{ background: "linear-gradient(135deg, #F472B6, #E879F9)", border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, opacity: (!itinForm.title || !itinForm.week_start) ? 0.5 : 1 }}>{itinSaving ? "Saving..." : "Save & Add to Calendar"}</button>
-              <button onClick={() => setItinModal(false)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── View Itinerary Modal ── */}
-      {viewItinModal && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setViewItinModal(null)}>
-          <div style={{ background: T.surface, border: `1px solid #F472B640`, borderRadius: 16, width: "100%", maxWidth: 700, maxHeight: "85vh", overflow: "auto", padding: 28 }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
-              <div>
-                <div style={{ color: "#F472B6", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>Itinerary</div>
-                <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 20 }}>{viewItinModal.title}</div>
-                <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Week of {new Date(viewItinModal.week_start + "T12:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
-              </div>
-              <button onClick={() => setViewItinModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {(viewItinModal.items || []).sort((a,b) => (a.date > b.date ? 1 : -1)).map((item, idx) => (
-                <div key={idx} style={{ display: "grid", gridTemplateColumns: "140px 70px 1fr 1fr", gap: 12, padding: "12px 14px", background: T.bg, border: `1px solid ${T.border}`, borderLeft: "3px solid #F472B6", borderRadius: 8 }}>
-                  <div><div style={{ color: T.textMuted, fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>Date</div><div style={{ color: T.textPrimary, fontSize: 12, fontWeight: 700 }}>{new Date(item.date + "T12:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}</div></div>
-                  <div><div style={{ color: T.textMuted, fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>Time</div><div style={{ color: T.textPrimary, fontSize: 12 }}>{item.time || "—"}</div></div>
-                  <div><div style={{ color: T.textMuted, fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>Company</div><div style={{ color: "#F472B6", fontSize: 12, fontWeight: 700 }}>{item.company}</div><div style={{ color: T.textMuted, fontSize: 11 }}>{item.action}</div></div>
-                  <div><div style={{ color: T.textMuted, fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>Notes</div><div style={{ color: T.textSecondary, fontSize: 12 }}>{item.notes || "—"}</div></div>
-                </div>
-              ))}
-            </div>
-            <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
-              <button onClick={async () => { if (!window.confirm("Delete this itinerary?")) return; await supabase.from("itineraries").delete().eq("id", viewItinModal.id); setViewItinModal(null); loadOpportunitysOpps(); load(); }} style={{ background: T.red + "18", border: `1px solid ${T.red}40`, color: T.red, padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Delete Itinerary</button>
-              <button onClick={() => setViewItinModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>Close</button>
+              <button onClick={handleCreate} disabled={saving || !form.company} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13, opacity: !form.company ? 0.6 : 1 }}>{saving ? "Saving..." : "Create Lead"}</button>
+              <button onClick={() => setModal(false)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
             </div>
           </div>
         </div>
@@ -8916,564 +6190,6 @@ const CalendarView = ({ user, onNavigate }) => {
     </div>
   );
 };
-
-const NotificationsView = ({ user, onNavigate }) => {
-  const [notes, setNotes] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-    setNotes(data || []);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    load();
-    const sub = supabase.channel('notif-view-' + user.id)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: 'user_id=eq.' + user.id }, () => load())
-      .subscribe();
-    return () => supabase.removeChannel(sub);
-  }, [user.id]);
-
-  const getNavTarget = (note) => {
-    const typeMap = {
-      invoice: 'invoices', task: 'tasks', quote: 'vendors', rff: 'vendors',
-      crm: 'crm', approval: 'vendors', event: 'events', finance: 'finance',
-      budget: 'budgets', expense: 'expenses', scorecard: 'scorecards',
-    };
-    return typeMap[note.type] || null;
-  };
-
-  const handleNoteClick = async (note) => {
-    // Mark as read
-    await supabase.from('notifications').update({ read: true }).eq('id', note.id);
-    load();
-    // Navigate to source
-    const target = getNavTarget(note);
-    if (target && onNavigate) {
-      // Deep-link routing by notification title keywords
-      let resolvedTarget = "notifications";
-      const t = note.title?.toLowerCase() || "";
-      const m = note.message?.toLowerCase() || "";
-      if (t.includes("task") || t.includes("comment") || t.includes("replied")) resolvedTarget = "tasks";
-      else if (t.includes("rff approved") || t.includes("rff declined") || t.includes("rff resubmitted")) resolvedTarget = "vendors";
-      else if (t.includes("vendor application") || t.includes("vendor onboarding")) resolvedTarget = "vendor-onboarding";
-      else if (t.includes("quote submitted")) resolvedTarget = "quotes-received";
-      else if (t.includes("contract award") && t.includes("pending")) resolvedTarget = "contract-awards";
-      else if (t.includes("contract award confirmed") || t.includes("gig confirmed")) resolvedTarget = "purchase-orders";
-      else if (t.includes("purchase order")) resolvedTarget = "vendor-invoices-submit";
-      else if (t.includes("invoice received")) resolvedTarget = "vendor-invoices";
-      else if (t.includes("opportunity") || t.includes("crm")) resolvedTarget = "crm";
-      else if (t.includes("opportunity") || t.includes("converted")) resolvedTarget = "leads";
-      else if (t.includes("vendor assigned") || t.includes("new rff assignment")) resolvedTarget = "rffs";
-      else if (note.type === "rff") resolvedTarget = "vendors";
-      else if (note.type === "task") resolvedTarget = "tasks";
-      onNavigate(resolvedTarget, note.resource_id || null);
-    }
-  };
-
-  const markRead = async (id) => {
-    await supabase.from('notifications').update({ read: true }).eq('id', id);
-    load();
-  };
-
-  const markAllRead = async () => {
-    await supabase.from('notifications').update({ read: true }).eq('user_id', user.id);
-    load();
-  };
-
-  const deleteNote = async (id) => {
-    await supabase.from('notifications').delete().eq('id', id);
-    load();
-  };
-
-  const typeIcon = (type) => {
-    const icons = { invoice: '🧾', task: '✅', quote: '💬', info: 'ℹ️', event: '📁' };
-    return icons[type] || '🔔';
-  };
-
-  const unread = notes.filter(n => !n.read).length;
-
-  return (
-    <div style={{ animation: "fadeUp 0.35s ease" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
-        <div>
-          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>System</div>
-          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Notifications</h2>
-          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{unread > 0 ? <span style={{ color: T.cyan, fontWeight: 700 }}>{unread} unread</span> : "All caught up"}</div>
-        </div>
-        {unread > 0 && <Btn small onClick={markAllRead}>✓ Mark All Read</Btn>}
-      </div>
-      {loading ? (
-        <div style={{ color: T.textMuted, textAlign: "center", padding: 60 }}>Loading...</div>
-      ) : notes.length === 0 ? (
-        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
-          <div style={{ fontSize: 40, marginBottom: 16 }}>🔔</div>
-          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No notifications</div>
-          <div style={{ color: T.textMuted, fontSize: 13 }}>You're all caught up.</div>
-        </div>
-      ) : (
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-          {notes.map((n, i) => (
-            <div key={n.id} onClick={() => { if (!n.read) markRead(n.id); handleNoteClick(n); }} style={{
-              display: "flex", alignItems: "flex-start", gap: 14,
-              padding: "16px 20px",
-              borderBottom: i < notes.length - 1 ? `1px solid ${T.border}44` : "none",
-              background: !n.read ? T.cyan + "08" : "transparent",
-              cursor: "pointer", transition: "background 0.15s",
-            }}
-              onMouseEnter={e => e.currentTarget.style.background = !n.read ? T.cyan + "12" : T.bg + "80"}
-              onMouseLeave={e => e.currentTarget.style.background = !n.read ? T.cyan + "08" : "transparent"}
-            >
-              <div style={{ fontSize: 18, flexShrink: 0, marginTop: 2 }}>{typeIcon(n.type)}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: !n.read ? T.textPrimary : T.textMuted, fontSize: 13, fontWeight: !n.read ? 700 : 500 }}>{n.title}</div>
-                {n.message && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>{n.message}</div>}
-                <div style={{ color: T.textMuted, fontSize: 10, marginTop: 5 }}>
-                  {new Date(n.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
-                {!n.read && <div style={{ width: 7, height: 7, borderRadius: "50%", background: T.cyan, boxShadow: `0 0 6px ${T.cyan}` }} />}
-                <button onClick={(e) => { e.stopPropagation(); deleteNote(n.id); }} style={{ background: "none", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 16, padding: "2px 6px", borderRadius: 4, transition: "color 0.15s" }}
-                  onMouseEnter={e => e.currentTarget.style.color = T.red}
-                  onMouseLeave={e => e.currentTarget.style.color = T.textMuted}
-                >×</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const useIsMobile = () => {
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth <= 768);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, []);
-  return isMobile;
-};
-
-export default function StretchfieldWorkRoom({ user: propUser, profile: propProfile, onLogout }) {
-  const [activeTab, setActiveTab] = useState("dashboard");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [pendingResourceId, setPendingResourceId] = useState(null);
-  const [showAccountSettings, setShowAccountSettings] = useState(false);
-  const isMobile = useIsMobile();
-
-  const buildUser = (p) => p ? {
-    id: p.id,
-    name: p.name,
-    role: p.role,
-    email: p.email,
-    avatar: p.avatar,
-    avatar_url: p.avatar_url || null,
-    phone: p.phone || "",
-  } : null;
-
-  const [currentUser, setCurrentUser] = useState(() => buildUser(propProfile));
-
-  // Sync if propProfile changes (e.g. on login)
-  React.useEffect(() => {
-    if (propProfile) setCurrentUser(buildUser(propProfile));
-  }, [propProfile?.id]);
-
-  useEffect(() => {
-    if (!currentUser?.id) return;
-    const fetchUnread = async () => {
-      const { data } = await supabase.from('notifications').select('id').eq('user_id', currentUser.id).eq('read', false);
-      setUnreadCount((data || []).length);
-    };
-    fetchUnread();
-    const sub = supabase.channel('live-notif-' + currentUser.id)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: 'user_id=eq.' + currentUser.id }, () => fetchUnread())
-      .subscribe();
-    return () => supabase.removeChannel(sub);
-  }, [currentUser?.id]);
-
-  if (!currentUser) return (
-    <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16, fontFamily: "DM Sans, sans-serif" }}>
-      <div style={{ width: 44, height: 44, border: `3px solid ${T.border}`, borderTop: `3px solid ${T.cyan}`, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-      <div style={{ color: T.textMuted, fontSize: 13, letterSpacing: "0.06em" }}>Loading WorkRoom...</div>
-    </div>
-  );
-
-  const renderContent = () => {
-    try {
-    const role = currentUser.role;
-    switch (activeTab) {
-      case "dashboard":
-        if (role === "CEO") return <CEODashboard onTab={setActiveTab} user={currentUser} />;
-        if (role === "Board of Directors") return <BoardDashboard user={currentUser} />;
-        if (role === "Country Manager") return <StaffDashboard user={currentUser} />;
-        if (role === "Vendor") return <VendorDashboard user={currentUser} />;
-        if (role === "Client") return <ClientDashboard user={currentUser} />;
-        if (role === "Finance Manager") return <FinanceManagerDashboard user={currentUser} onTab={setActiveTab} />;
-        if (role === "Sales & Marketing") return <CRMDashboardSM user={currentUser} />;
-        if (role === "Strategy & Events Opportunity") return <StaffDashboard user={currentUser} />;
-        if (role === "Vendor Manager") return <VendorManagerDashboard user={currentUser} />;
-        return <StaffDashboard user={currentUser} />;
-      case "events": return <EventsView user={currentUser} userRole={currentUser.role} />;
-      case "tasks": return <TasksView userRole={currentUser.role} openTaskId={pendingResourceId} onOpenHandled={() => setPendingResourceId(null)} />;
-      case "vendors": return <VendorsView />;
-      case "invoices": return <InvoicesView />;
-      case "clients": return <ClientsView user={currentUser} />;
-      case "users": return <UsersView user={currentUser} />;
-      case "crm": return <CRMView user={currentUser} />;
-      case "crm-insights": return ["CEO","Country Manager"].includes(currentUser.role) ? <CRMDashboardCEO user={currentUser} /> : <CRMDashboardSM user={currentUser} />;
-      case "sm-tasks": return <SMTasksView user={currentUser} />;
-      case "strategy-overview": return <StrategyOverviewView />;
-      case "opportunities": return <OpportunitiesView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
-      case "client-financials": return <CEOClientFinanceView user={currentUser} />;
-      case "client-finance": return <ClientFinanceView user={currentUser} />;
-      case "feedback-summary": return <FeedbackView userRole={currentUser.role} />;
-      case "finance": return <FinanceDashboard user={currentUser} onTab={setActiveTab} />;
-      case "finance-approvals": return <FinanceApprovalsView user={currentUser} />;
-      case "scorecards": return <VendorScorecardsView user={currentUser} />;
-      case "vendor-ratings": return <VendorRatingsView user={currentUser} />;
-      case "rff-approvals": return <RFFApprovalsView user={currentUser} />;
-      case "vendor-assignment": return <VendorAssignmentView user={currentUser} />;
-      case "scorecards": return <VendorScorecardsView user={currentUser} />;
-      case "vendor-ratings": return <VendorRatingsView user={currentUser} />;
-      case "rff-approvals": return <RFFApprovalsView user={currentUser} />;
-      case "vendor-assignment": return <VendorAssignmentView user={currentUser} />;
-      case "budgets": return <BudgetView user={currentUser} />;
-      case "expenses": return <ExpenseView user={currentUser} />;
-      case "finance-reports": return <FinanceReportsView user={currentUser} />;
-      case "feedback": return <FeedbackView userRole={currentUser.role} />;
-      case "calendar": return <CalendarView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
-      case "zoho-books": return <ZohoBooksView user={currentUser} />;
-      case "vendor-onboarding": return <VendorOnboardingView user={currentUser} />;
-      case "event-analysis": return <EventTypeAnalysisView user={currentUser} />;
-      case "impact-intelligence": return <ImpactIntelligenceSummary user={currentUser} />;
-      case "hr": return <HRView user={currentUser} />;
-      case "strategy-map": return <StrategyMapView user={currentUser} />;
-      case "quotes-received": return <QuotesReceivedView user={currentUser} />;
-      case "quote-comparison": return <QuoteComparisonView user={currentUser} />;
-      case "contract-awards": return <ContractAwardApprovalView user={currentUser} />;
-      case "gig-confirmation": return <GigConfirmationView user={currentUser} />;
-      case "purchase-orders": return <PurchaseOrderView user={currentUser} />;
-      case "vendor-invoices": return <FinanceInvoicesView user={currentUser} />;
-      case "vendor-invoices-submit": return <VendorInvoiceView user={currentUser} />;
-      case "notifications": return <NotificationsView user={currentUser} onNavigate={(tab, resourceId) => { setActiveTab(tab); if (resourceId) setPendingResourceId(resourceId); }} />;
-      case "rffs": return <VendorRFFsView user={currentUser} />;
-      case "quotes": return <VendorQuotesView user={currentUser} />;
-      case "vendor-tasks": return <VendorTasksView user={currentUser} />;
-      case "client-events": return <ClientEventsView user={currentUser} />;
-      case "client-docs": return <div style={{ color: T.textSecondary }}>Documents will appear here.</div>;
-      default: return null;
-    }
-    } catch(e) {
-      return <div style={{color:"red", padding:20}}>{e.message} — {e.stack?.split("\n")[1]}</div>;
-    }
-  };
-
-  return (
-    <ThemeProvider>
-    <div className="sf-layout" style={{ display: "flex", height: "100vh", background: T.bg, fontFamily: "'DM Sans', sans-serif", color: T.textPrimary, overflow: "hidden" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;0,9..40,900&family=Cormorant+Garamond:wght@300;400;500;600;700&display=swap');
-        * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: ${T.bg}; } ::-webkit-scrollbar-thumb { background: ${T.border}44; border-radius: 3px; }
-        input, select, textarea { font-family: inherit; }
-        .sf-bottom-nav { display: none; }
-        .sf-mobile-header { display: none; }
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-        .sf-animate { animation: fadeUp 0.35s ease forwards; }
-        @media (max-width: 768px) {
-          .sf-mobile-header { display: flex !important; }
-          .sf-sidebar { display: none !important; }
-          .sf-content { padding: 16px !important; padding-top: 72px !important; }
-          .sf-layout { flex-direction: column !important; }
-        }
-      `}</style>
-
-      <div className="sf-sidebar" style={{ display: isMobile ? "none" : "flex", width: sidebarCollapsed ? 58 : 228, background: T.bgDeep, borderRight: `1px solid ${T.border}`, flexDirection: "column", transition: "width 0.28s cubic-bezier(0.22,1,0.36,1)", flexShrink: 0, overflow: "hidden", position: "relative" }}>
-        <div style={{ position: "absolute", top: 0, right: 0, width: 1, height: "100%", background: `linear-gradient(180deg, transparent, ${T.cyan}25, ${T.magenta}18, transparent)`, pointerEvents: "none" }} />
-        <div style={{ padding: "16px 12px 14px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 10, minHeight: 60 }}>
-          <img src={LOGO_SRC} alt="S" style={{ width: 28, height: 28, objectFit: "contain", flexShrink: 0, borderRadius: 6 }} />
-          {!sidebarCollapsed && (
-            <div>
-              <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13, letterSpacing: "0.05em" }}>Stretchfield</div>
-              <div style={{ color: T.textMuted, fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", marginTop: 1 }}>WorkRoom</div>
-            </div>
-          )}
-        </div>
-        <nav style={{ flex: 1, padding: "10px 8px", overflowY: "auto" }}>
-          {(() => {
-            const navItems = getNavItems(currentUser.role);
-            const isCEONav = currentUser.role === "CEO";
-
-            if (!isCEONav) {
-              return navItems.map(item => {
-                const active = activeTab === item.id;
-                return (
-                  <button key={item.id} onClick={() => setActiveTab(item.id)} style={{
-                    width: "100%", display: "flex", alignItems: "center", gap: 10,
-                    padding: "9px 10px", borderRadius: 6, border: "none", cursor: "pointer",
-                    background: active ? T.cyan + "18" : "none",
-                    color: active ? T.cyan : T.textMuted,
-                    fontWeight: active ? 700 : 400, fontSize: 11,
-                    marginBottom: 1, textAlign: "left",
-                    borderLeft: active ? `2px solid ${T.cyan}` : "2px solid transparent",
-                    letterSpacing: "0.04em", textTransform: "uppercase",
-                    transition: "all 0.15s", whiteSpace: "nowrap", overflow: "hidden",
-                  }}
-                    onMouseEnter={e => { if (!active) { e.currentTarget.style.background = T.surface; e.currentTarget.style.color = T.textSecondary; } }}
-                    onMouseLeave={e => { if (!active) { e.currentTarget.style.background = "none"; e.currentTarget.style.color = T.textMuted; } }}
-                  >
-                    <span style={{ fontSize: 5, flexShrink: 0, color: active ? T.cyan : T.textGhost }}>■</span>
-                    {!sidebarCollapsed && item.label}
-                  </button>
-                );
-              });
-            }
-
-            // CEO grouped nav
-            return navItems.map(item => {
-              if (!item.children) {
-                // Top level single item (Dashboard, Notifications, Calendar)
-                const active = activeTab === item.id;
-                return (
-                  <button key={item.id} onClick={() => setActiveTab(item.id)} style={{
-                    width: "100%", display: "flex", alignItems: "center", gap: 8,
-                    padding: "9px 10px", borderRadius: 6, border: "none", cursor: "pointer",
-                    background: active ? T.cyan+"18" : "none",
-                    color: active ? T.cyan : T.textMuted,
-                    fontWeight: active ? 700 : 400, fontSize: 11,
-                    marginBottom: 2, textAlign: "left",
-                    borderLeft: active ? `2px solid ${T.cyan}` : "2px solid transparent",
-                    letterSpacing: "0.04em", textTransform: "uppercase",
-                    transition: "all 0.15s",
-                  }}>
-                    {!sidebarCollapsed && item.label}
-                    {sidebarCollapsed && item.label?.slice(0,2)}
-                  </button>
-                );
-              }
-
-              // Group item with children
-              const isGroupActive = item.children.some(c => c.id === activeTab);
-              const [groupOpen, setGroupOpen] = React.useState(isGroupActive);
-
-              return (
-                <div key={item.id} style={{ marginBottom: 2 }}>
-                  <button onClick={() => setGroupOpen(o => !o)} style={{
-                    width: "100%", display: "flex", alignItems: "center", gap: 8,
-                    padding: "8px 10px", borderRadius: 6, border: "none", cursor: "pointer",
-                    background: isGroupActive ? T.cyan+"10" : "none",
-                    color: isGroupActive ? T.cyan : T.textSecondary,
-                    fontWeight: 700, fontSize: 10,
-                    textAlign: "left", letterSpacing: "0.06em", textTransform: "uppercase",
-                    transition: "all 0.15s",
-                  }}>
-                    {!sidebarCollapsed && (
-                      <>
-                        <span style={{ flex: 1 }}>{item.label}</span>
-                        <span style={{ fontSize: 9, transition: "transform 0.2s", transform: groupOpen ? "rotate(180deg)" : "rotate(0deg)", opacity: 0.5 }}>▾</span>
-                      </>
-                    )}
-                    {sidebarCollapsed && <span style={{ fontSize: 9 }}>▾</span>}
-                  </button>
-                  {groupOpen && !sidebarCollapsed && (
-                    <div style={{ paddingLeft: 12, marginTop: 2 }}>
-                      {item.children.map(child => {
-                        const active = activeTab === child.id;
-                        return (
-                          <button key={child.id} onClick={() => setActiveTab(child.id)} style={{
-                            width: "100%", display: "flex", alignItems: "center", gap: 8,
-                            padding: "7px 10px", borderRadius: 5, border: "none", cursor: "pointer",
-                            background: active ? T.cyan+"20" : "none",
-                            color: active ? T.cyan : T.textMuted,
-                            fontWeight: active ? 700 : 400, fontSize: 11,
-                            marginBottom: 1, textAlign: "left",
-                            borderLeft: active ? `2px solid ${T.cyan}` : "2px solid transparent",
-                            letterSpacing: "0.03em",
-                            transition: "all 0.15s",
-                          }}
-                            onMouseEnter={e => { if (!active) { e.currentTarget.style.background = T.surface; e.currentTarget.style.color = T.textSecondary; } }}
-                            onMouseLeave={e => { if (!active) { e.currentTarget.style.background = "none"; e.currentTarget.style.color = T.textMuted; } }}
-                          >
-                            <span style={{ fontSize: 4, color: active ? T.cyan : T.textGhost }}>●</span>
-                            {child.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            });
-          })()}
-        </nav>
-        <div style={{ padding: "10px 10px 12px", borderTop: `1px solid ${T.border}` }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px", borderRadius: 6, marginBottom: 8 }}>
-            <Avatar initials={currentUser.avatar} size={28} color={T.cyan} />
-            {!sidebarCollapsed && <div style={{ overflow: "hidden", flex: 1 }}>
-              <div style={{ color: T.textPrimary, fontSize: 11, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{currentUser.name}</div>
-              <div style={{ color: T.textMuted, fontSize: 10 }}>{currentUser.role}</div>
-            </div>}
-          </div>
-          {!sidebarCollapsed && <div style={{ marginBottom: 6 }}><ThemeToggle /></div>}
-          <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} style={{ width: "100%", background: "none", border: `1px solid ${T.border}`, color: T.textMuted, borderRadius: 6, padding: "5px", cursor: "pointer", fontSize: 13, transition: "all 0.15s" }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = T.cyan + "60"; e.currentTarget.style.color = T.cyan; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.textMuted; }}
-          >{sidebarCollapsed ? "›" : "‹"}</button>
-        </div>
-      </div>
-
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <div style={{ padding: "0 24px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${T.border}`, background: T.bgDeep, flexShrink: 0, position: "relative" }}>
-          {/* Left — breadcrumb */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
-            <span style={{ color: T.textMuted, fontSize: 11, letterSpacing: "0.04em", whiteSpace: "nowrap" }}>Stretchfield / {currentUser.name.split(" ")[0]}</span>
-          </div>
-
-          {/* Centre — tagline */}
-          <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", pointerEvents: "none", textAlign: "center", maxWidth: "calc(100% - 480px)" }}>
-            <span style={{
-              fontFamily: "'Cormorant Garamond', Georgia, serif",
-              fontStyle: "italic",
-              fontWeight: 500,
-              fontSize: 12,
-              letterSpacing: "0.06em",
-              background: `linear-gradient(90deg, ${T.textMuted}, ${T.textPrimary}, ${T.textMuted})`,
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              display: "block",
-            }}>We don't plan events. We engineer impact.</span>
-          </div>
-
-          {/* Right — controls */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, justifyContent: "flex-end" }}>
-            <span style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.04em" }}>{currentUser.name}</span>
-            <div style={{ background: T.cyan + "18", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "3px 12px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>{currentUser.role}</div>
-            <button onClick={() => setActiveTab("notifications")} style={{ position: "relative", background: activeTab === "notifications" ? T.cyan + "18" : "none", border: "1px solid " + (activeTab === "notifications" ? T.cyan + "40" : T.border), color: activeTab === "notifications" ? T.cyan : T.textMuted, width: 34, height: 34, borderRadius: 8, cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}>
-              🔔
-              {unreadCount > 0 && (
-                <span style={{ position: "absolute", top: -5, right: -5, background: T.red, color: "#fff", fontSize: 9, fontWeight: 900, borderRadius: "50%", width: 17, height: 17, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid " + T.bgDeep, boxShadow: `0 0 8px ${T.red}80` }}>
-                  {unreadCount > 9 ? "9+" : unreadCount}
-                </span>
-              )}
-            </button>
-            <button onClick={onLogout} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "5px 14px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", transition: "all 0.15s" }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = T.red + "60"; e.currentTarget.style.color = T.red; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.textMuted; }}
-            >Sign Out</button>
-          </div>
-        </div>
-
-        <div className="sf-content" style={{ flex: 1, overflowY: "auto", padding: isMobile ? "72px 16px 16px" : 24 }}>
-          {renderContent()}
-        </div>
-      </div>
-
-      {/* Mobile Header */}
-      <div className="sf-mobile-header" style={{ display: isMobile ? "flex" : "none", position: "fixed", top: 0, left: 0, right: 0, height: 56, background: T.surface, borderBottom: `1px solid ${T.border}`, alignItems: "center", justifyContent: "space-between", padding: "0 16px", zIndex: 200 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: `linear-gradient(135deg, ${T.cyan}, #3B7BFF)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 900, color: "#000" }}>S</div>
-          <span style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>WorkRoom</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <button onClick={() => setActiveTab('notifications')} style={{ position: "relative", background: "none", border: "1px solid " + T.border, color: T.textMuted, width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            🔔
-            {unreadCount > 0 && (
-              <span style={{ position: "absolute", top: -4, right: -4, background: "#F43F5E", color: "#fff", fontSize: 9, fontWeight: 800, borderRadius: "50%", width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid " + T.bg }}>
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
-            )}
-          </button>
-          <div style={{ background: T.cyan + "22", border: `1px solid ${T.cyan}44`, color: T.cyan, padding: "3px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>{currentUser.role}</div>
-          <button onClick={onLogout} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>Sign Out</button>
-          <button onClick={() => setMobileMenuOpen(true)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textPrimary, padding: "6px 10px", borderRadius: 4, cursor: "pointer", fontSize: 18, lineHeight: 1 }}>☰</button>
-        </div>
-      </div>
-
-      {/* Mobile Drawer */}
-      {mobileMenuOpen && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }} onClick={() => setMobileMenuOpen(false)}>
-          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: T.bgDeep, borderRadius: "24px 24px 0 0", borderTop: `1px solid ${T.border}`, boxShadow: `0 -8px 48px rgba(0,0,0,0.4)`, overflow: "hidden" }} onClick={e => e.stopPropagation()}>
-
-            {/* Pull handle */}
-            <div style={{ width: 36, height: 3, borderRadius: 2, background: T.border, margin: "14px auto 0" }} />
-
-            {/* User identity */}
-            <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "18px 24px 14px", borderBottom: `1px solid ${T.border}` }}>
-              <Avatar initials={currentUser.avatar} size={40} color={T.cyan} />
-              <div>
-                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{currentUser.name}</div>
-                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2, textTransform: "uppercase", letterSpacing: "0.08em" }}>{currentUser.role}</div>
-              </div>
-            </div>
-
-            {/* Tagline */}
-            <div style={{ textAlign: "center", padding: "12px 24px 10px", borderBottom: `1px solid ${T.border}44` }}>
-              <span style={{
-                fontFamily: "'Cormorant Garamond', Georgia, serif",
-                fontStyle: "italic",
-                fontWeight: 500,
-                fontSize: 13,
-                letterSpacing: "0.06em",
-                color: T.textMuted,
-              }}>We don't plan events. We engineer impact.</span>
-            </div>
-
-            {/* Nav items */}
-            <div style={{ padding: "8px 0 16px", overflowY: "auto", maxHeight: "55vh" }}>
-              {getNavItems(currentUser.role).map(item => {
-                const active = activeTab === item.id;
-                return (
-                  <button key={item.id} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }} style={{
-                    width: "100%", display: "flex", alignItems: "center", gap: 16,
-                    padding: "13px 24px", background: active ? T.cyan + "14" : "none",
-                    border: "none", cursor: "pointer", textAlign: "left",
-                    borderLeft: active ? `3px solid ${T.cyan}` : "3px solid transparent",
-                    transition: "all 0.15s",
-                  }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: active ? T.cyan : T.border, boxShadow: active ? `0 0 8px ${T.cyan}` : "none", flexShrink: 0, transition: "all 0.15s" }} />
-                    <span style={{ color: active ? T.cyan : T.textPrimary, fontWeight: active ? 700 : 500, fontSize: 14, letterSpacing: "0.04em", textTransform: "uppercase" }}>{item.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Bottom — theme toggle + sign out */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px 36px", borderTop: `1px solid ${T.border}` }}>
-              <ThemeToggle compact />
-              <button onClick={onLogout} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "6px 16px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600, letterSpacing: "0.06em" }}>Sign Out</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-      {showAccountSettings && (
-        <AccountSettingsModal
-          user={currentUser}
-          onClose={() => setShowAccountSettings(false)}
-          onUpdate={(updated) => {
-            setCurrentUser(updated);
-            setShowAccountSettings(false);
-          }}
-        />
-      )}
-    </ThemeProvider>
-  );
-}
 
 const CRMDashboardCEO = ({ user }) => {
   const [opportunities, setOpportunitys] = useState([]);

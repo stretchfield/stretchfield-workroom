@@ -6191,6 +6191,417 @@ const CRMView = ({ user }) => {
   );
 };
 
+export default function StretchfieldWorkRoom({ user: propUser, profile: propProfile, onLogout }) {
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingResourceId, setPendingResourceId] = useState(null);
+  const [showAccountSettings, setShowAccountSettings] = useState(false);
+  const isMobile = useIsMobile();
+
+  const buildUser = (p) => p ? {
+    id: p.id,
+    name: p.name,
+    role: p.role,
+    email: p.email,
+    avatar: p.avatar,
+    avatar_url: p.avatar_url || null,
+    phone: p.phone || "",
+  } : null;
+
+  const [currentUser, setCurrentUser] = useState(() => buildUser(propProfile));
+
+  // Sync if propProfile changes (e.g. on login)
+  React.useEffect(() => {
+    if (propProfile) setCurrentUser(buildUser(propProfile));
+  }, [propProfile?.id]);
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const fetchUnread = async () => {
+      const { data } = await supabase.from('notifications').select('id').eq('user_id', currentUser.id).eq('read', false);
+      setUnreadCount((data || []).length);
+    };
+    fetchUnread();
+    const sub = supabase.channel('live-notif-' + currentUser.id)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: 'user_id=eq.' + currentUser.id }, () => fetchUnread())
+      .subscribe();
+    return () => supabase.removeChannel(sub);
+  }, [currentUser?.id]);
+
+  if (!currentUser) return (
+    <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16, fontFamily: "DM Sans, sans-serif" }}>
+      <div style={{ width: 44, height: 44, border: `3px solid ${T.border}`, borderTop: `3px solid ${T.cyan}`, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+      <div style={{ color: T.textMuted, fontSize: 13, letterSpacing: "0.06em" }}>Loading WorkRoom...</div>
+    </div>
+  );
+
+  const renderContent = () => {
+    try {
+    const role = currentUser.role;
+    switch (activeTab) {
+      case "dashboard":
+        if (role === "CEO") return <CEODashboard onTab={setActiveTab} user={currentUser} />;
+        if (role === "Board of Directors") return <BoardDashboard user={currentUser} />;
+        if (role === "Country Manager") return <StaffDashboard user={currentUser} />;
+        if (role === "Vendor") return <VendorDashboard user={currentUser} />;
+        if (role === "Client") return <ClientDashboard user={currentUser} />;
+        if (role === "Finance Manager") return <FinanceManagerDashboard user={currentUser} onTab={setActiveTab} />;
+        if (role === "Sales & Marketing") return <CRMDashboardSM user={currentUser} />;
+        if (role === "Strategy & Events Opportunity") return <StaffDashboard user={currentUser} />;
+        if (role === "Vendor Manager") return <VendorManagerDashboard user={currentUser} />;
+        return <StaffDashboard user={currentUser} />;
+      case "events": return <EventsView user={currentUser} userRole={currentUser.role} />;
+      case "tasks": return <TasksView userRole={currentUser.role} openTaskId={pendingResourceId} onOpenHandled={() => setPendingResourceId(null)} />;
+      case "vendors": return <VendorsView />;
+      case "invoices": return <InvoicesView />;
+      case "clients": return <ClientsView user={currentUser} />;
+      case "users": return <UsersView user={currentUser} />;
+      case "crm": return <CRMView user={currentUser} />;
+      case "crm-insights": return ["CEO","Country Manager"].includes(currentUser.role) ? <CRMDashboardCEO user={currentUser} /> : <CRMDashboardSM user={currentUser} />;
+      case "sm-tasks": return <SMTasksView user={currentUser} />;
+      case "strategy-overview": return <StrategyOverviewView />;
+      case "opportunities": return <OpportunitiesView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
+      case "client-financials": return <CEOClientFinanceView user={currentUser} />;
+      case "client-finance": return <ClientFinanceView user={currentUser} />;
+      case "feedback-summary": return <FeedbackView userRole={currentUser.role} />;
+      case "finance": return <FinanceDashboard user={currentUser} onTab={setActiveTab} />;
+      case "finance-approvals": return <FinanceApprovalsView user={currentUser} />;
+      case "scorecards": return <VendorScorecardsView user={currentUser} />;
+      case "vendor-ratings": return <VendorRatingsView user={currentUser} />;
+      case "rff-approvals": return <RFFApprovalsView user={currentUser} />;
+      case "vendor-assignment": return <VendorAssignmentView user={currentUser} />;
+      case "scorecards": return <VendorScorecardsView user={currentUser} />;
+      case "vendor-ratings": return <VendorRatingsView user={currentUser} />;
+      case "rff-approvals": return <RFFApprovalsView user={currentUser} />;
+      case "vendor-assignment": return <VendorAssignmentView user={currentUser} />;
+      case "budgets": return <BudgetView user={currentUser} />;
+      case "expenses": return <ExpenseView user={currentUser} />;
+      case "finance-reports": return <FinanceReportsView user={currentUser} />;
+      case "feedback": return <FeedbackView userRole={currentUser.role} />;
+      case "calendar": return <CalendarView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
+      case "zoho-books": return <ZohoBooksView user={currentUser} />;
+      case "vendor-onboarding": return <VendorOnboardingView user={currentUser} />;
+      case "event-analysis": return <EventTypeAnalysisView user={currentUser} />;
+      case "impact-intelligence": return <ImpactIntelligenceSummary user={currentUser} />;
+      case "hr": return <HRView user={currentUser} />;
+      case "strategy-map": return <StrategyMapView user={currentUser} />;
+      case "quotes-received": return <QuotesReceivedView user={currentUser} />;
+      case "quote-comparison": return <QuoteComparisonView user={currentUser} />;
+      case "contract-awards": return <ContractAwardApprovalView user={currentUser} />;
+      case "gig-confirmation": return <GigConfirmationView user={currentUser} />;
+      case "purchase-orders": return <PurchaseOrderView user={currentUser} />;
+      case "vendor-invoices": return <FinanceInvoicesView user={currentUser} />;
+      case "vendor-invoices-submit": return <VendorInvoiceView user={currentUser} />;
+      case "notifications": return <NotificationsView user={currentUser} onNavigate={(tab, resourceId) => { setActiveTab(tab); if (resourceId) setPendingResourceId(resourceId); }} />;
+      case "rffs": return <VendorRFFsView user={currentUser} />;
+      case "quotes": return <VendorQuotesView user={currentUser} />;
+      case "vendor-tasks": return <VendorTasksView user={currentUser} />;
+      case "client-events": return <ClientEventsView user={currentUser} />;
+      case "client-docs": return <div style={{ color: T.textSecondary }}>Documents will appear here.</div>;
+      default: return null;
+    }
+    } catch(e) {
+      return <div style={{color:"red", padding:20}}>{e.message} — {e.stack?.split("\n")[1]}</div>;
+    }
+  };
+
+  return (
+    <ThemeProvider>
+    <div className="sf-layout" style={{ display: "flex", height: "100vh", background: T.bg, fontFamily: "'DM Sans', sans-serif", color: T.textPrimary, overflow: "hidden" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;0,9..40,900&family=Cormorant+Garamond:wght@300;400;500;600;700&display=swap');
+        * { box-sizing: border-box; }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: ${T.bg}; } ::-webkit-scrollbar-thumb { background: ${T.border}44; border-radius: 3px; }
+        input, select, textarea { font-family: inherit; }
+        .sf-bottom-nav { display: none; }
+        .sf-mobile-header { display: none; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        .sf-animate { animation: fadeUp 0.35s ease forwards; }
+        @media (max-width: 768px) {
+          .sf-mobile-header { display: flex !important; }
+          .sf-sidebar { display: none !important; }
+          .sf-content { padding: 16px !important; padding-top: 72px !important; }
+          .sf-layout { flex-direction: column !important; }
+        }
+      `}</style>
+
+      <div className="sf-sidebar" style={{ display: isMobile ? "none" : "flex", width: sidebarCollapsed ? 58 : 228, background: T.bgDeep, borderRight: `1px solid ${T.border}`, flexDirection: "column", transition: "width 0.28s cubic-bezier(0.22,1,0.36,1)", flexShrink: 0, overflow: "hidden", position: "relative" }}>
+        <div style={{ position: "absolute", top: 0, right: 0, width: 1, height: "100%", background: `linear-gradient(180deg, transparent, ${T.cyan}25, ${T.magenta}18, transparent)`, pointerEvents: "none" }} />
+        <div style={{ padding: "16px 12px 14px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 10, minHeight: 60 }}>
+          <img src={LOGO_SRC} alt="S" style={{ width: 28, height: 28, objectFit: "contain", flexShrink: 0, borderRadius: 6 }} />
+          {!sidebarCollapsed && (
+            <div>
+              <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13, letterSpacing: "0.05em" }}>Stretchfield</div>
+              <div style={{ color: T.textMuted, fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", marginTop: 1 }}>WorkRoom</div>
+            </div>
+          )}
+        </div>
+        <nav style={{ flex: 1, padding: "10px 8px", overflowY: "auto" }}>
+          {(() => {
+            const navItems = getNavItems(currentUser.role);
+            const isCEONav = currentUser.role === "CEO";
+
+            if (!isCEONav) {
+              return navItems.map(item => {
+                const active = activeTab === item.id;
+                return (
+                  <button key={item.id} onClick={() => setActiveTab(item.id)} style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: 10,
+                    padding: "9px 10px", borderRadius: 6, border: "none", cursor: "pointer",
+                    background: active ? T.cyan + "18" : "none",
+                    color: active ? T.cyan : T.textMuted,
+                    fontWeight: active ? 700 : 400, fontSize: 11,
+                    marginBottom: 1, textAlign: "left",
+                    borderLeft: active ? `2px solid ${T.cyan}` : "2px solid transparent",
+                    letterSpacing: "0.04em", textTransform: "uppercase",
+                    transition: "all 0.15s", whiteSpace: "nowrap", overflow: "hidden",
+                  }}
+                    onMouseEnter={e => { if (!active) { e.currentTarget.style.background = T.surface; e.currentTarget.style.color = T.textSecondary; } }}
+                    onMouseLeave={e => { if (!active) { e.currentTarget.style.background = "none"; e.currentTarget.style.color = T.textMuted; } }}
+                  >
+                    <span style={{ fontSize: 5, flexShrink: 0, color: active ? T.cyan : T.textGhost }}>■</span>
+                    {!sidebarCollapsed && item.label}
+                  </button>
+                );
+              });
+            }
+
+            // CEO grouped nav
+            return navItems.map(item => {
+              if (!item.children) {
+                // Top level single item (Dashboard, Notifications, Calendar)
+                const active = activeTab === item.id;
+                return (
+                  <button key={item.id} onClick={() => setActiveTab(item.id)} style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: 8,
+                    padding: "9px 10px", borderRadius: 6, border: "none", cursor: "pointer",
+                    background: active ? T.cyan+"18" : "none",
+                    color: active ? T.cyan : T.textMuted,
+                    fontWeight: active ? 700 : 400, fontSize: 11,
+                    marginBottom: 2, textAlign: "left",
+                    borderLeft: active ? `2px solid ${T.cyan}` : "2px solid transparent",
+                    letterSpacing: "0.04em", textTransform: "uppercase",
+                    transition: "all 0.15s",
+                  }}>
+                    {!sidebarCollapsed && item.label}
+                    {sidebarCollapsed && item.label?.slice(0,2)}
+                  </button>
+                );
+              }
+
+              // Group item with children
+              const isGroupActive = item.children.some(c => c.id === activeTab);
+              const [groupOpen, setGroupOpen] = React.useState(isGroupActive);
+
+              return (
+                <div key={item.id} style={{ marginBottom: 2 }}>
+                  <button onClick={() => setGroupOpen(o => !o)} style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: 8,
+                    padding: "8px 10px", borderRadius: 6, border: "none", cursor: "pointer",
+                    background: isGroupActive ? T.cyan+"10" : "none",
+                    color: isGroupActive ? T.cyan : T.textSecondary,
+                    fontWeight: 700, fontSize: 10,
+                    textAlign: "left", letterSpacing: "0.06em", textTransform: "uppercase",
+                    transition: "all 0.15s",
+                  }}>
+                    {!sidebarCollapsed && (
+                      <>
+                        <span style={{ flex: 1 }}>{item.label}</span>
+                        <span style={{ fontSize: 9, transition: "transform 0.2s", transform: groupOpen ? "rotate(180deg)" : "rotate(0deg)", opacity: 0.5 }}>▾</span>
+                      </>
+                    )}
+                    {sidebarCollapsed && <span style={{ fontSize: 9 }}>▾</span>}
+                  </button>
+                  {groupOpen && !sidebarCollapsed && (
+                    <div style={{ paddingLeft: 12, marginTop: 2 }}>
+                      {item.children.map(child => {
+                        const active = activeTab === child.id;
+                        return (
+                          <button key={child.id} onClick={() => setActiveTab(child.id)} style={{
+                            width: "100%", display: "flex", alignItems: "center", gap: 8,
+                            padding: "7px 10px", borderRadius: 5, border: "none", cursor: "pointer",
+                            background: active ? T.cyan+"20" : "none",
+                            color: active ? T.cyan : T.textMuted,
+                            fontWeight: active ? 700 : 400, fontSize: 11,
+                            marginBottom: 1, textAlign: "left",
+                            borderLeft: active ? `2px solid ${T.cyan}` : "2px solid transparent",
+                            letterSpacing: "0.03em",
+                            transition: "all 0.15s",
+                          }}
+                            onMouseEnter={e => { if (!active) { e.currentTarget.style.background = T.surface; e.currentTarget.style.color = T.textSecondary; } }}
+                            onMouseLeave={e => { if (!active) { e.currentTarget.style.background = "none"; e.currentTarget.style.color = T.textMuted; } }}
+                          >
+                            <span style={{ fontSize: 4, color: active ? T.cyan : T.textGhost }}>●</span>
+                            {child.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            });
+          })()}
+        </nav>
+        <div style={{ padding: "10px 10px 12px", borderTop: `1px solid ${T.border}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px", borderRadius: 6, marginBottom: 8 }}>
+            <Avatar initials={currentUser.avatar} size={28} color={T.cyan} />
+            {!sidebarCollapsed && <div style={{ overflow: "hidden", flex: 1 }}>
+              <div style={{ color: T.textPrimary, fontSize: 11, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{currentUser.name}</div>
+              <div style={{ color: T.textMuted, fontSize: 10 }}>{currentUser.role}</div>
+            </div>}
+          </div>
+          {!sidebarCollapsed && <div style={{ marginBottom: 6 }}><ThemeToggle /></div>}
+          <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} style={{ width: "100%", background: "none", border: `1px solid ${T.border}`, color: T.textMuted, borderRadius: 6, padding: "5px", cursor: "pointer", fontSize: 13, transition: "all 0.15s" }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = T.cyan + "60"; e.currentTarget.style.color = T.cyan; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.textMuted; }}
+          >{sidebarCollapsed ? "›" : "‹"}</button>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ padding: "0 24px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${T.border}`, background: T.bgDeep, flexShrink: 0, position: "relative" }}>
+          {/* Left — breadcrumb */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
+            <span style={{ color: T.textMuted, fontSize: 11, letterSpacing: "0.04em", whiteSpace: "nowrap" }}>Stretchfield / {currentUser.name.split(" ")[0]}</span>
+          </div>
+
+          {/* Centre — tagline */}
+          <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", pointerEvents: "none", textAlign: "center", maxWidth: "calc(100% - 480px)" }}>
+            <span style={{
+              fontFamily: "'Cormorant Garamond', Georgia, serif",
+              fontStyle: "italic",
+              fontWeight: 500,
+              fontSize: 12,
+              letterSpacing: "0.06em",
+              background: `linear-gradient(90deg, ${T.textMuted}, ${T.textPrimary}, ${T.textMuted})`,
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              display: "block",
+            }}>We don't plan events. We engineer impact.</span>
+          </div>
+
+          {/* Right — controls */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, justifyContent: "flex-end" }}>
+            <span style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.04em" }}>{currentUser.name}</span>
+            <div style={{ background: T.cyan + "18", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "3px 12px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>{currentUser.role}</div>
+            <button onClick={() => setActiveTab("notifications")} style={{ position: "relative", background: activeTab === "notifications" ? T.cyan + "18" : "none", border: "1px solid " + (activeTab === "notifications" ? T.cyan + "40" : T.border), color: activeTab === "notifications" ? T.cyan : T.textMuted, width: 34, height: 34, borderRadius: 8, cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}>
+              🔔
+              {unreadCount > 0 && (
+                <span style={{ position: "absolute", top: -5, right: -5, background: T.red, color: "#fff", fontSize: 9, fontWeight: 900, borderRadius: "50%", width: 17, height: 17, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid " + T.bgDeep, boxShadow: `0 0 8px ${T.red}80` }}>
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </button>
+            <button onClick={onLogout} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "5px 14px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", transition: "all 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = T.red + "60"; e.currentTarget.style.color = T.red; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.textMuted; }}
+            >Sign Out</button>
+          </div>
+        </div>
+
+        <div className="sf-content" style={{ flex: 1, overflowY: "auto", padding: isMobile ? "72px 16px 16px" : 24 }}>
+          {renderContent()}
+        </div>
+      </div>
+
+      {/* Mobile Header */}
+      <div className="sf-mobile-header" style={{ display: isMobile ? "flex" : "none", position: "fixed", top: 0, left: 0, right: 0, height: 56, background: T.surface, borderBottom: `1px solid ${T.border}`, alignItems: "center", justifyContent: "space-between", padding: "0 16px", zIndex: 200 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: `linear-gradient(135deg, ${T.cyan}, #3B7BFF)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 900, color: "#000" }}>S</div>
+          <span style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>WorkRoom</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button onClick={() => setActiveTab('notifications')} style={{ position: "relative", background: "none", border: "1px solid " + T.border, color: T.textMuted, width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            🔔
+            {unreadCount > 0 && (
+              <span style={{ position: "absolute", top: -4, right: -4, background: "#F43F5E", color: "#fff", fontSize: 9, fontWeight: 800, borderRadius: "50%", width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid " + T.bg }}>
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </button>
+          <div style={{ background: T.cyan + "22", border: `1px solid ${T.cyan}44`, color: T.cyan, padding: "3px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>{currentUser.role}</div>
+          <button onClick={onLogout} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>Sign Out</button>
+          <button onClick={() => setMobileMenuOpen(true)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textPrimary, padding: "6px 10px", borderRadius: 4, cursor: "pointer", fontSize: 18, lineHeight: 1 }}>☰</button>
+        </div>
+      </div>
+
+      {/* Mobile Drawer */}
+      {mobileMenuOpen && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }} onClick={() => setMobileMenuOpen(false)}>
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: T.bgDeep, borderRadius: "24px 24px 0 0", borderTop: `1px solid ${T.border}`, boxShadow: `0 -8px 48px rgba(0,0,0,0.4)`, overflow: "hidden" }} onClick={e => e.stopPropagation()}>
+
+            {/* Pull handle */}
+            <div style={{ width: 36, height: 3, borderRadius: 2, background: T.border, margin: "14px auto 0" }} />
+
+            {/* User identity */}
+            <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "18px 24px 14px", borderBottom: `1px solid ${T.border}` }}>
+              <Avatar initials={currentUser.avatar} size={40} color={T.cyan} />
+              <div>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{currentUser.name}</div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2, textTransform: "uppercase", letterSpacing: "0.08em" }}>{currentUser.role}</div>
+              </div>
+            </div>
+
+            {/* Tagline */}
+            <div style={{ textAlign: "center", padding: "12px 24px 10px", borderBottom: `1px solid ${T.border}44` }}>
+              <span style={{
+                fontFamily: "'Cormorant Garamond', Georgia, serif",
+                fontStyle: "italic",
+                fontWeight: 500,
+                fontSize: 13,
+                letterSpacing: "0.06em",
+                color: T.textMuted,
+              }}>We don't plan events. We engineer impact.</span>
+            </div>
+
+            {/* Nav items */}
+            <div style={{ padding: "8px 0 16px", overflowY: "auto", maxHeight: "55vh" }}>
+              {getNavItems(currentUser.role).map(item => {
+                const active = activeTab === item.id;
+                return (
+                  <button key={item.id} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }} style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: 16,
+                    padding: "13px 24px", background: active ? T.cyan + "14" : "none",
+                    border: "none", cursor: "pointer", textAlign: "left",
+                    borderLeft: active ? `3px solid ${T.cyan}` : "3px solid transparent",
+                    transition: "all 0.15s",
+                  }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: active ? T.cyan : T.border, boxShadow: active ? `0 0 8px ${T.cyan}` : "none", flexShrink: 0, transition: "all 0.15s" }} />
+                    <span style={{ color: active ? T.cyan : T.textPrimary, fontWeight: active ? 700 : 500, fontSize: 14, letterSpacing: "0.04em", textTransform: "uppercase" }}>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Bottom — theme toggle + sign out */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px 36px", borderTop: `1px solid ${T.border}` }}>
+              <ThemeToggle compact />
+              <button onClick={onLogout} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "6px 16px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600, letterSpacing: "0.06em" }}>Sign Out</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+      {showAccountSettings && (
+        <AccountSettingsModal
+          user={currentUser}
+          onClose={() => setShowAccountSettings(false)}
+          onUpdate={(updated) => {
+            setCurrentUser(updated);
+            setShowAccountSettings(false);
+          }}
+        />
+      )}
+    </ThemeProvider>
+  );
+}
+
 const CRMDashboardCEO = ({ user }) => {
   const [opportunities, setOpportunitys] = useState([]);
   const [targets, setTargets] = useState([]);

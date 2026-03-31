@@ -9104,8 +9104,9 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
   }, [currentUser?.id]);
 
   if (!currentUser) return (
-    <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", color: T.textMuted, fontFamily: "DM Sans, sans-serif" }}>
-      Loading...
+    <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16, fontFamily: "DM Sans, sans-serif" }}>
+      <div style={{ width: 44, height: 44, border: `3px solid ${T.border}`, borderTop: `3px solid ${T.cyan}`, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+      <div style={{ color: T.textMuted, fontSize: 13, letterSpacing: "0.06em" }}>Loading WorkRoom...</div>
     </div>
   );
 
@@ -10071,6 +10072,7 @@ const FinanceDashboard = ({ user, onTab }) => {
     setPOs(po.data || []);
     setClientInvoices(ci.data || []);
     setVendorInvoices(vi.data || []);
+    setFinanceLoading(false);
   };
 
   useEffect(() => { load(); }, []);

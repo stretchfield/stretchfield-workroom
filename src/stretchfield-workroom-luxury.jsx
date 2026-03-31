@@ -16,6 +16,16 @@ const sendEmail = async (to, subject, html) => {
 
 const BASE_URL = "https://workroom.stretchfield.com";
 
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = React.useState(window.innerWidth < 768);
+  React.useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
+};
+
 // ── Auto-generate password from email ──
 const generatePassword = (email) => {
   if (!email || !email.includes("@")) return "Stretch@2026";

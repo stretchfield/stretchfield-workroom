@@ -14,7 +14,7 @@ const sendEmail = async (to, subject, html) => {
   }
 };
 
-const BASE_URL = "https://stretchfield-workroom.vercel.app";
+const BASE_URL = "https://workroom.stretchfield.com";
 
 // ── Auto-generate password from email ──
 const generatePassword = (email) => {
@@ -74,7 +74,7 @@ const sendNotificationEmail = async (userId, title, message, actionTab) => {
   try {
     const { data: profile } = await supabase.from("profiles").select("name, email").eq("id", userId).single();
     if (!profile?.email) return;
-    const actionUrl = actionTab ? `https://stretchfield-workroom.vercel.app?tab=${actionTab}` : "https://stretchfield-workroom.vercel.app";
+    const actionUrl = actionTab ? `https://workroom.stretchfield.com?tab=${actionTab}` : "https://workroom.stretchfield.com";
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
         <div style="background:#060B14;padding:28px 32px;border-radius:8px 8px 0 0;">
@@ -3386,7 +3386,7 @@ const EventsView = ({ user, userRole }) => {
                 <div key={sl.id} onClick={async () => {
                   await supabase.from("projects").update({ assigned_to: sl.id, assigned_to_name: sl.name }).eq("id", assignModal.id);
                   await supabase.from("notifications").insert({ user_id: sl.id, title: "Event Assigned to You", message: `CEO assigned you to opportunity "${assignModal.name}". Check your Events tab.`, type: "task" });
-                  if (sl.email) await sendEmail(sl.email, `Event Assigned — ${assignModal.name}`, notifEmailHtml({ name: sl.name, title: "Event Assigned to You", message: `CEO has assigned you as Strategy Opportunity for <strong>${assignModal.name}</strong>. Please log in to view the event details.`, actionUrl: "https://stretchfield-workroom.vercel.app", actionLabel: "View Event" }));
+                  if (sl.email) await sendEmail(sl.email, `Event Assigned — ${assignModal.name}`, notifEmailHtml({ name: sl.name, title: "Event Assigned to You", message: `CEO has assigned you as Strategy Opportunity for <strong>${assignModal.name}</strong>. Please log in to view the event details.`, actionUrl: "https://workroom.stretchfield.com", actionLabel: "View Event" }));
                   setAssignModal(null);
                   load();
                 }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: assignModal.assigned_to === sl.id ? T.amber+"15" : T.bg, border: `1px solid ${assignModal.assigned_to === sl.id ? T.amber : T.border}`, borderRadius: 10, cursor: "pointer" }}
@@ -8655,7 +8655,7 @@ const CalendarView = ({ user, onNavigate }) => {
           )}
           {["CEO","Strategy & Events Opportunity","Vendor Manager","Sales & Marketing","Vendor"].includes(role) && (
             <button onClick={() => {
-              const feedUrl = `https://stretchfield-workroom.vercel.app/api/calendar-feed?user_id=${uid}`;
+              const feedUrl = `https://workroom.stretchfield.com/api/calendar-feed?user_id=${uid}`;
               navigator.clipboard.writeText(feedUrl).then(() => alert(
                 "✅ Calendar URL copied!\n\n" +
                 "iPhone / Mac Calendar:\n" +
@@ -10081,7 +10081,7 @@ const FinanceDashboard = ({ user, onTab }) => {
     const { data: ceos } = await supabase.from('profiles').select('id, email, name').eq('role', 'CEO');
     for (const ceo of ceos || []) {
       await supabase.from('notifications').insert({ user_id: ceo.id, title: 'Payment Voucher Raised', message: `${user.name} raised voucher ${voucherNumber} for GHS ${parseFloat(vForm.amount).toLocaleString()} — ${vForm.description}`, type: 'rff' });
-      if (ceo.email) await sendEmail(ceo.email, `Payment Voucher — ${voucherNumber}`, notifEmailHtml({ name: ceo.name, title: 'Payment Voucher Raised', message: `Finance Manager raised voucher <strong>${voucherNumber}</strong> for <strong>GHS ${parseFloat(vForm.amount).toLocaleString()}</strong>.<br><br>Payee: ${vForm.payee}<br>Description: ${vForm.description}<br>Type: ${vForm.payment_type}`, actionUrl: 'https://stretchfield-workroom.vercel.app', actionLabel: 'Review Voucher' }));
+      if (ceo.email) await sendEmail(ceo.email, `Payment Voucher — ${voucherNumber}`, notifEmailHtml({ name: ceo.name, title: 'Payment Voucher Raised', message: `Finance Manager raised voucher <strong>${voucherNumber}</strong> for <strong>GHS ${parseFloat(vForm.amount).toLocaleString()}</strong>.<br><br>Payee: ${vForm.payee}<br>Description: ${vForm.description}<br>Type: ${vForm.payment_type}`, actionUrl: 'https://workroom.stretchfield.com', actionLabel: 'Review Voucher' }));
     }
     setSaving(false);
     setVoucherModal(null);
@@ -10096,7 +10096,7 @@ const FinanceDashboard = ({ user, onTab }) => {
     const { data: fms } = await supabase.from('profiles').select('id, email, name').eq('role', 'Finance Manager');
     for (const fm of fms || []) {
       await supabase.from('notifications').insert({ user_id: fm.id, title: 'Voucher Approved', message: `Voucher ${v.voucher_number} has been approved. Proceed with payment.`, type: 'rff' });
-      if (fm.email) await sendEmail(fm.email, `Voucher Approved — ${v.voucher_number}`, notifEmailHtml({ name: fm.name, title: 'Voucher Approved — Action Required', message: `Voucher <strong>${v.voucher_number}</strong> for <strong>GHS ${(v.amount||0).toLocaleString()}</strong> has been approved by CEO. Please proceed with payment within 3 working days.`, actionUrl: 'https://stretchfield-workroom.vercel.app', actionLabel: 'View Voucher' }));
+      if (fm.email) await sendEmail(fm.email, `Voucher Approved — ${v.voucher_number}`, notifEmailHtml({ name: fm.name, title: 'Voucher Approved — Action Required', message: `Voucher <strong>${v.voucher_number}</strong> for <strong>GHS ${(v.amount||0).toLocaleString()}</strong> has been approved by CEO. Please proceed with payment within 3 working days.`, actionUrl: 'https://workroom.stretchfield.com', actionLabel: 'View Voucher' }));
     }
     load();
   };

@@ -10067,7 +10067,7 @@ const FinanceDashboard = ({ user, onTab }) => {
     setPettyCash(pc.data || null);
     setPettyCashVouchers(pcv.data || []);
     setDailyBalances(db.data || []);
-    setEvents(countryEvents);
+    setEvents(ev.data || []);
     setClients(cl.data || []);
     setPOs(po.data || []);
     setClientInvoices(ci.data || []);

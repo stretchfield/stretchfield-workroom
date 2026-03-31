@@ -836,21 +836,38 @@ const CEODashboard = ({ onTab, user }) => {
   const [rffs, setRffs] = useState([]);
   const [unreadNotifs, setUnreadNotifs] = useState([]);
 
+  const [loading, setLoading] = React.useState(true);
+
   useEffect(() => {
-    supabase.from('projects').select('*').order('created_at', { ascending: false }).then(({ data }) => setEvents(data || []));
-    supabase.from('invoices').select('*').order('created_at', { ascending: false }).then(({ data }) => setInvoices(data || []));
-    supabase.from('tasks').select('*').then(({ data }) => setTasks(data || []));
-    supabase.from('clients').select('*').then(({ data }) => setClients(data || []));
-    supabase.from('feedback').select('*').order('created_at', { ascending: false }).then(({ data }) => setFeedback(data || []));
-    supabase.from('opportunities').select('*').then(({ data }) => setOpportunitys(data || []));
-    supabase.from('sales_targets').select('*').then(({ data }) => setTargets(data || []));
-    supabase.from('rffs').select('*').then(({ data }) => {
-      setRffs(data || []);
-      const unique = [...new Set((data || []).map(r => r.vendor).filter(Boolean))];
-      setVendors(unique);
-    });
-    supabase.from('profiles').select('*').eq('role', 'Vendor').then(({ data }) => setVendorProfiles(data || []));
-    supabase.from('vendor_scorecards').select('*').order('created_at', { ascending: false }).then(({ data }) => setScorecards(data || []));
+    const loadAll = async () => {
+      setLoading(true);
+      const [ev, inv, tk, cl, fb, op, tg, rf, vp, sc] = await Promise.all([
+        supabase.from('projects').select('*').order('created_at', { ascending: false }),
+        supabase.from('invoices').select('*').order('created_at', { ascending: false }),
+        supabase.from('tasks').select('*'),
+        supabase.from('clients').select('*'),
+        supabase.from('feedback').select('*').order('created_at', { ascending: false }),
+        supabase.from('opportunities').select('*'),
+        supabase.from('sales_targets').select('*'),
+        supabase.from('rffs').select('*'),
+        supabase.from('profiles').select('*').eq('role', 'Vendor'),
+        supabase.from('vendor_scorecards').select('*').order('created_at', { ascending: false }),
+      ]);
+      setEvents(ev.data || []);
+      setInvoices(inv.data || []);
+      setTasks(tk.data || []);
+      setClients(cl.data || []);
+      setFeedback(fb.data || []);
+      setOpportunitys(op.data || []);
+      setTargets(tg.data || []);
+      const rffData = rf.data || [];
+      setRffs(rffData);
+      setVendors([...new Set(rffData.map(r => r.vendor).filter(Boolean))]);
+      setVendorProfiles(vp.data || []);
+      setScorecards(sc.data || []);
+      setLoading(false);
+    };
+    loadAll();
   }, []);
 
   // Live unread notifications for CEO - polls every 5s + realtime
@@ -866,6 +883,13 @@ const CEODashboard = ({ onTab, user }) => {
     const interval = setInterval(fetch, 5000);
     return () => { supabase.removeChannel(sub); clearInterval(interval); };
   }, [user?.id]);
+
+  if (loading) return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", flexDirection: "column", gap: 16 }}>
+      <div style={{ width: 40, height: 40, border: `3px solid ${T.border}`, borderTop: `3px solid ${T.cyan}`, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+      <div style={{ color: T.textMuted, fontSize: 13 }}>Loading dashboard...</div>
+    </div>
+  );
 
   const pendingInvoices = invoices.filter(i => i.status === 'pending');
   const openTasks = tasks.filter(t => t.status !== 'completed');

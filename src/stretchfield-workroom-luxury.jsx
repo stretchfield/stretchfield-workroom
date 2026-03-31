@@ -6201,6 +6201,158 @@ const CRMView = ({ user }) => {
   );
 };
 
+const SMTasksView = ({ user }) => {
+  const [tasks, setTasks] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [detailTask, setDetailTask] = useState(null);
+  const [form, setForm] = useState({ name: "", notes: "", deadline: "", assigned_to: "", assigned_name: "" });
+  const [members, setMembers] = useState([]);
+  const [saving, setSaving] = useState(false);
+
+  const canCreate = ["CEO", "Country Manager", "Sales & Marketing"].includes(user?.role);
+
+  const load = async () => {
+    const [t, m] = await Promise.all([
+      supabase.from("tasks").select("*").eq("task_type", "sm").order("created_at", { ascending: false }),
+      supabase.from("profiles").select("*").in("role", ["CEO", "Country Manager", "Sales & Marketing"]),
+    ]);
+    setTasks(t.data || []);
+    setMembers(m.data || []);
+  };
+
+  useEffect(() => { load(); }, [user.id]);
+
+  const handleCreate = async () => {
+    if (!form.name) return;
+    setSaving(true);
+    await supabase.from("tasks").insert({
+      name: form.name, notes: form.notes, deadline: form.deadline || null,
+      assignee_id: form.assigned_to || null, assignee_name: form.assigned_name || "",
+      assigned_by: user.id, status: "pending", progress: 0,
+      task_type: "sm", visible_to_client: false,
+    });
+    setModal(false);
+    setForm({ name: "", notes: "", deadline: "", assigned_to: "", assigned_name: "" });
+    setSaving(false);
+    load();
+  };
+
+  const handleUpdate = async () => {
+    await supabase.from("tasks").update({
+      progress: detailTask.progress, status: detailTask.status, notes: detailTask.notes,
+    }).eq("id", detailTask.id);
+    setDetailTask(null);
+    load();
+  };
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Sales</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>S&M Tasks</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Sales & Marketing internal tasks</div>
+        </div>
+        {canCreate && <Btn onClick={() => setModal(true)}>+ New Task</Btn>}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Total Tasks", value: tasks.length, color: T.cyan },
+          { label: "In Progress", value: tasks.filter(t => t.status === "in-progress").length, color: T.amber },
+          { label: "Completed", value: tasks.filter(t => t.status === "completed").length, color: T.teal },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+      {tasks.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>📋</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No S&M tasks yet</div>
+          <div style={{ color: T.textMuted, fontSize: 13 }}>Tasks between CEO and Sales & Marketing appear here.</div>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
+          {tasks.map((t, idx) => {
+            const pct = t.progress || 0;
+            const barColor = t.status === "completed" ? T.teal : pct > 66 ? T.cyan : pct > 33 ? T.amber : T.magenta;
+            return (
+              <div key={t.id} onClick={() => setDetailTask({ ...t })} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px", cursor: "pointer", transition: "box-shadow 0.2s, border-color 0.2s" }}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 4px 24px ${T.cyan}12`; e.currentTarget.style.borderColor = T.cyan + "40"; }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = T.border; }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</div>
+                    {t.assignee_name && <div style={{ color: T.cyan, fontSize: 10, fontWeight: 700 }}>→ {t.assignee_name}</div>}
+                    {t.notes && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4, fontStyle: "italic", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.notes}</div>}
+                  </div>
+                  <Badge status={t.status} />
+                </div>
+                <div style={{ height: 3, background: T.border + "44", borderRadius: 2, marginBottom: 6 }}>
+                  <div style={{ height: "100%", width: pct + "%", background: barColor, borderRadius: 2 }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <div style={{ color: T.textMuted, fontSize: 10 }}>{pct}% complete</div>
+                  {t.deadline && <div style={{ color: T.textMuted, fontSize: 10 }}>Due {t.deadline}</div>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {modal && (
+        <Modal title="New S&M Task" onClose={() => setModal(false)}>
+          <Input label="Task Name" placeholder="e.g. Prepare pitch deck" value={form.name} onChange={v => setForm({ ...form, name: v })} />
+          <Select label="Assign To" options={[{ value: "", label: "Select..." }, ...members.map(m => ({ value: m.id, label: m.name + " — " + m.role }))]}
+            value={form.assigned_to}
+            onChange={v => { const m = members.find(x => x.id === v); setForm({ ...form, assigned_to: v, assigned_name: m ? m.name : "" }); }} />
+          <Input label="Deadline" type="date" value={form.deadline} onChange={v => setForm({ ...form, deadline: v })} />
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Notes</div>
+            <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}
+              placeholder="Task details..."
+              style={{ width: "100%", minHeight: 80, background: T.bg, border: "1px solid " + T.border, borderRadius: 6, padding: 10, color: T.textPrimary, fontSize: 13, resize: "vertical", fontFamily: "inherit" }} />
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <Btn onClick={handleCreate} disabled={saving}>{saving ? "Saving..." : "Create Task"}</Btn>
+            <Btn variant="ghost" onClick={() => setModal(false)}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+      {detailTask && (
+        <Modal title="Update Task" onClose={() => setDetailTask(null)}>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 12 }}>{detailTask.name}</div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Progress: {detailTask.progress || 0}%</div>
+            <input type="range" min="0" max="100" value={detailTask.progress || 0}
+              onChange={e => setDetailTask({ ...detailTask, progress: parseInt(e.target.value) })}
+              style={{ width: "100%", accentColor: T.cyan }} />
+          </div>
+          <Select label="Status" options={[
+            { value: "pending", label: "Pending" },
+            { value: "in-progress", label: "In Progress" },
+            { value: "completed", label: "Completed" },
+          ]} value={detailTask.status} onChange={v => setDetailTask({ ...detailTask, status: v })} />
+          <div style={{ marginBottom: 16, marginTop: 8 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Notes</div>
+            <textarea value={detailTask.notes || ""} onChange={e => setDetailTask({ ...detailTask, notes: e.target.value })}
+              style={{ width: "100%", minHeight: 80, background: T.bg, border: "1px solid " + T.border, borderRadius: 6, padding: 10, color: T.textPrimary, fontSize: 13, resize: "vertical", fontFamily: "inherit" }} />
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <Btn onClick={handleUpdate}>Save</Btn>
+            <Btn variant="ghost" onClick={() => setDetailTask(null)}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+// ─── FEEDBACK VIEW ────────────────────────────────────────────────────────────
+
 export default function StretchfieldWorkRoom({ user: propUser, profile: propProfile, onLogout }) {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);

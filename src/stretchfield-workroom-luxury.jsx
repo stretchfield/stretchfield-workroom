@@ -1239,7 +1239,7 @@ const VendorManagerDashboard = ({ user }) => {
       </div>
 
       {/* KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 12, marginBottom: 24 }}>
         {[
           { label: "Total Vendors", value: vendors.length, color: T.cyan },
           { label: "Active Events", value: events.length, color: T.teal },
@@ -1267,7 +1267,7 @@ const VendorManagerDashboard = ({ user }) => {
       )}
 
       {/* Two column layout */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 16, marginBottom: 24 }}>
 
         {/* Upcoming Events */}
         <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px" }}>
@@ -1408,7 +1408,7 @@ const StaffDashboard = ({ user }) => {
       </div>
 
       {/* KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginBottom: 24 }}>
         {[
           { label: "Active Events", value: events.length, color: T.cyan },
           { label: "Pending Tasks", value: pending.length, sub: dueSoon.length > 0 ? dueSoon.length + " due soon" : null, color: T.amber },
@@ -1548,7 +1548,7 @@ const VendorDashboard = ({ user }) => {
       </div>
 
       {/* KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 12, marginBottom: 24 }}>
         {[
           { label: "Open RFFs", value: pendingRffs.length, color: T.cyan },
           { label: "Quotes Submitted", value: submittedRffs.length, color: T.amber },
@@ -1606,7 +1606,7 @@ const VendorDashboard = ({ user }) => {
       )}
 
       {/* RFFs + Tasks grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 16, marginBottom: 16 }}>
         <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
           <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.06em" }}>My RFFs</div>
           {rffs.length === 0 ? (
@@ -1771,7 +1771,7 @@ const CEOClientFinanceView = ({ user }) => {
       </div>
 
       {/* Client + Event selectors */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 24 }}>
         <div>
           <label style={labelStyle}>Select Client</label>
           <select value={selectedClient || ""} onChange={e => { setSelectedClient(e.target.value); setSelectedEvent(null); }}
@@ -1792,7 +1792,7 @@ const CEOClientFinanceView = ({ user }) => {
       {selectedEvent && (
         <>
           {/* Summary strip */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginBottom: 20 }}>
             {[
               { label: "Agreed Budget", value: agreedBudget > 0 ? `GHS ${agreedBudget.toLocaleString()}` : "Not set", color: T.cyan },
               { label: "Total Recorded Spend", value: `GHS ${totalSpent.toLocaleString()}`, color: T.amber },
@@ -1820,7 +1820,7 @@ const CEOClientFinanceView = ({ user }) => {
           {tab === "budget" && (
             <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "22px 24px" }}>
               <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 18 }}>{currentBudget ? "Update Budget" : "Set Budget"}</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 16 }}>
                 <div>
                   <label style={labelStyle}>Agreed Budget (GHS)</label>
                   <input type="number" value={budgetForm.agreed_budget} onChange={e => setBudgetForm({ ...budgetForm, agreed_budget: e.target.value })} placeholder="e.g. 50000" style={inputStyle} />
@@ -1916,7 +1916,7 @@ const CEOClientFinanceView = ({ user }) => {
             <div>
               <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "22px 24px", marginBottom: 16 }}>
                 <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Upload Invoice</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 12, marginBottom: 12 }}>
                   <div>
                     <label style={labelStyle}>Invoice Title</label>
                     <input value={invoiceForm.title} onChange={e => setInvoiceForm({ ...invoiceForm, title: e.target.value })} placeholder="e.g. Final Invoice — Brand Event 2025" style={inputStyle} />
@@ -2913,7 +2913,7 @@ const EventImpactView = ({ user, project }) => {
 
             <div style={sectionStyle}>Impact Objective</div>
             <div style={{ marginBottom: 12 }}><label style={labelStyle}>In one sentence, what must change as a result of this event?</label><textarea value={briefForm.impact_objective} onChange={e => setBriefForm({...briefForm, impact_objective: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} /></div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 12, marginBottom: 12 }}>
               <div><label style={labelStyle}>Who specifically should change?</label><input value={briefForm.target_audience} onChange={e => setBriefForm({...briefForm, target_audience: e.target.value})} style={inputStyle} placeholder="Target audience segment" /></div>
               <div><label style={labelStyle}>How will you know it changed?</label><input value={briefForm.observable_signal} onChange={e => setBriefForm({...briefForm, observable_signal: e.target.value})} style={inputStyle} placeholder="Observable signal" /></div>
             </div>
@@ -2922,11 +2922,11 @@ const EventImpactView = ({ user, project }) => {
             {[1,2,3].map(n => (
               <div key={n} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
                 <div style={{ color: archetype.color, fontSize: 11, fontWeight: 800, marginBottom: 8 }}>KPI {n}</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 8 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 10, marginBottom: 8 }}>
                   <div><label style={labelStyle}>Name</label><input value={briefForm[`kpi${n}_name`]} onChange={e => setBriefForm({...briefForm, [`kpi${n}_name`]: e.target.value})} style={inputStyle} /></div>
                   <div><label style={labelStyle}>Target</label><input value={briefForm[`kpi${n}_target`]} onChange={e => setBriefForm({...briefForm, [`kpi${n}_target`]: e.target.value})} style={inputStyle} /></div>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 10 }}>
                   <div><label style={labelStyle}>Measurement Method</label><input value={briefForm[`kpi${n}_method`]} onChange={e => setBriefForm({...briefForm, [`kpi${n}_method`]: e.target.value})} style={inputStyle} /></div>
                   <div><label style={labelStyle}>When Measured</label><input value={briefForm[`kpi${n}_timing`]} onChange={e => setBriefForm({...briefForm, [`kpi${n}_timing`]: e.target.value})} style={inputStyle} /></div>
                 </div>
@@ -2934,7 +2934,7 @@ const EventImpactView = ({ user, project }) => {
             ))}
 
             <div style={sectionStyle}>Measurement Tools</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 8, marginBottom: 16 }}>
               {[
                 ["tool_pre_survey", "Pre-Event Survey / Baseline"],
                 ["tool_digital_tracking", "Digital Tracking System"],
@@ -3014,7 +3014,7 @@ const EventImpactView = ({ user, project }) => {
             ].map(({ section, fields }) => (
               <div key={section}>
                 <div style={sectionStyle}>{section}</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 8 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginBottom: 8 }}>
                   {fields.map(([key, label, type]) => (
                     <div key={key}>
                       <label style={labelStyle}>{label}</label>
@@ -3029,7 +3029,7 @@ const EventImpactView = ({ user, project }) => {
             {(postForm.satisfaction_score || postForm.nps_score) && (
               <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
                 <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 12 }}>vs. Industry Benchmarks</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 10 }}>
                   {[
                     ["Satisfaction", postForm.satisfaction_score, "7.1/10", "8.5+/10"],
                     ["NPS", postForm.nps_score, "+22", "+50"],
@@ -3059,7 +3059,7 @@ const EventImpactView = ({ user, project }) => {
 
             <div style={sectionStyle}>The Problem (Before Stretchfield)</div>
             <div style={{ marginBottom: 10 }}><label style={labelStyle}>What was the business challenge?</label><textarea value={reportForm.problem_challenge} onChange={e => setReportForm({...reportForm, problem_challenge: e.target.value})} rows={2} style={{...inputStyle, resize:"vertical"}} /></div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 12, marginBottom: 12 }}>
               <div><label style={labelStyle}>What wasn't working?</label><textarea value={reportForm.problem_previous} onChange={e => setReportForm({...reportForm, problem_previous: e.target.value})} rows={2} style={{...inputStyle, resize:"vertical"}} /></div>
               <div><label style={labelStyle}>Cost of inaction?</label><textarea value={reportForm.problem_inaction} onChange={e => setReportForm({...reportForm, problem_inaction: e.target.value})} rows={2} style={{...inputStyle, resize:"vertical"}} /></div>
             </div>
@@ -3073,9 +3073,9 @@ const EventImpactView = ({ user, project }) => {
             ))}
 
             <div style={sectionStyle}>Measured Outcomes</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 10, marginBottom: 16 }}>
               {[1,2,3,4].map(n => (
-                <div key={n} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, background: T.bg, padding: "10px 12px", borderRadius: 8, border: `1px solid ${T.border}` }}>
+                <div key={n} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 8, background: T.bg, padding: "10px 12px", borderRadius: 8, border: `1px solid ${T.border}` }}>
                   <div><label style={labelStyle}>Metric {n}</label><input value={reportForm[`metric${n}_label`]} onChange={e => setReportForm({...reportForm, [`metric${n}_label`]: e.target.value})} style={inputStyle} placeholder="Label" /></div>
                   <div><label style={labelStyle}>Value</label><input value={reportForm[`metric${n}_value`]} onChange={e => setReportForm({...reportForm, [`metric${n}_value`]: e.target.value})} style={inputStyle} placeholder="e.g. 87%" /></div>
                 </div>
@@ -3967,11 +3967,11 @@ const OpportunitiesView = ({ user, onNavigate }) => {
         <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setModal(false)}>
           <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 540, padding: 28, boxShadow: `0 24px 80px rgba(0,0,0,0.4)`, animation: "fadeUp 0.25s ease" }} onClick={e => e.stopPropagation()}>
             <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 20 }}>Add Opportunity</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
               <div><label style={labelStyle}>Company Name</label><input value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} style={inputStyle} placeholder="e.g. Ecobank Ghana" /></div>
               <div><label style={labelStyle}>Sector</label><input value={form.sector} onChange={e => setForm({ ...form, sector: e.target.value })} style={inputStyle} placeholder="e.g. Banking" /></div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
               <div><label style={labelStyle}>Presence</label>
                 <select value={form.presence} onChange={e => setForm({ ...form, presence: e.target.value })} style={inputStyle}>
                   <option value="GH">GH Only</option>
@@ -4006,11 +4006,11 @@ const OpportunitiesView = ({ user, onNavigate }) => {
         <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setEditModal(null)}>
           <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 540, padding: 28, boxShadow: `0 24px 80px rgba(0,0,0,0.4)`, animation: "fadeUp 0.25s ease" }} onClick={e => e.stopPropagation()}>
             <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 20 }}>Edit — {editModal.company}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
               <div><label style={labelStyle}>Company Name</label><input value={editModal.company} onChange={e => setEditModal({ ...editModal, company: e.target.value })} style={inputStyle} /></div>
               <div><label style={labelStyle}>Sector</label><input value={editModal.sector || ""} onChange={e => setEditModal({ ...editModal, sector: e.target.value })} style={inputStyle} /></div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
               <div><label style={labelStyle}>Presence</label>
                 <select value={editModal.presence || "GH"} onChange={e => setEditModal({ ...editModal, presence: e.target.value })} style={inputStyle}>
                   <option value="GH">GH Only</option>
@@ -4275,7 +4275,7 @@ const TasksView = ({ userRole, openTaskId, onOpenHandled }) => {
       </div>
 
       {/* KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginBottom: 24 }}>
         {[
           { label: "Pending", value: pending, color: T.amber },
           { label: "In Progress", value: inProg, color: T.cyan },
@@ -4619,7 +4619,7 @@ const VendorsView = ({ user }) => {
       )}
 
       {/* KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 12, marginBottom: 24 }}>
         {[
           { label: "Pending Approval", value: totalPending, color: T.amber },
           { label: "CEO Approved", value: totalApproved, color: T.teal },
@@ -4857,7 +4857,7 @@ const InvoicesView = () => {
       </div>
 
       {/* Summary strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginBottom: 24 }}>
         {[
           { label: "Pending", value: "GHS " + totalPending.toLocaleString(), count: invoices.filter(i => i.status === "pending").length, color: T.amber },
           { label: "Approved", value: "GHS " + totalApproved.toLocaleString(), count: invoices.filter(i => i.status === "approved").length, color: T.teal },
@@ -6050,7 +6050,7 @@ const CRMView = ({ user }) => {
       </div>
 
       {/* ── KPI Strip ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 10, marginBottom: 20 }}>
         {[
           { label: "Total Leads", value: leads.length, color: T.cyan },
           { label: "Pipeline Value", value: "GHS "+totalPipeline.toLocaleString(), color: T.amber },
@@ -6255,7 +6255,7 @@ const SMTasksView = ({ user }) => {
         </div>
         {canCreate && <Btn onClick={() => setModal(true)}>+ New Task</Btn>}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginBottom: 24 }}>
         {[
           { label: "Total Tasks", value: tasks.length, color: T.cyan },
           { label: "In Progress", value: tasks.filter(t => t.status === "in-progress").length, color: T.amber },
@@ -6475,17 +6475,30 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;0,9..40,900&family=Cormorant+Garamond:wght@300;400;500;600;700&display=swap');
         * { box-sizing: border-box; }
+        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
         ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: ${T.bg}; } ::-webkit-scrollbar-thumb { background: ${T.border}44; border-radius: 3px; }
         input, select, textarea { font-family: inherit; }
         .sf-bottom-nav { display: none; }
         .sf-mobile-header { display: none; }
+        .sf-drawer { display: none; }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+        @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .sf-animate { animation: fadeUp 0.35s ease forwards; }
         @media (max-width: 768px) {
           .sf-mobile-header { display: flex !important; }
           .sf-sidebar { display: none !important; }
-          .sf-content { padding: 16px !important; padding-top: 72px !important; }
+          .sf-bottom-nav { display: flex !important; }
+          .sf-drawer { display: flex !important; }
+          .sf-content { padding: 12px !important; padding-top: 68px !important; padding-bottom: 76px !important; margin-left: 0 !important; }
           .sf-layout { flex-direction: column !important; }
+          .sf-hide-mobile { display: none !important; }
+          .sf-full-mobile { width: 100% !important; max-width: 100% !important; }
+          .sf-stack-mobile { flex-direction: column !important; }
+          .sf-card-mobile { border-radius: 12px !important; }
+          table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+          input, select, textarea, button { font-size: 16px !important; }
         }
       `}</style>
 
@@ -6694,6 +6707,107 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       </div>
 
       {/* Mobile Drawer */}
+      {/* ── Mobile Bottom Navigation ── */}
+      {isMobile && (() => {
+        const role = currentUser.role;
+        const bottomTabs = {
+          "CEO": [
+            { id: "dashboard", icon: "⊞", label: "Home" },
+            { id: "events", icon: "📅", label: "Events" },
+            { id: "crm", icon: "📈", label: "Leads" },
+            { id: "vendors", icon: "🏭", label: "Vendors" },
+            { id: "finance", icon: "💼", label: "Finance" },
+          ],
+          "Country Manager": [
+            { id: "dashboard", icon: "⊞", label: "Home" },
+            { id: "events", icon: "📅", label: "Events" },
+            { id: "vendors", icon: "🏭", label: "Vendors" },
+            { id: "finance", icon: "💼", label: "Finance" },
+            { id: "tasks", icon: "✅", label: "Tasks" },
+          ],
+          "Strategy & Events Lead": [
+            { id: "dashboard", icon: "⊞", label: "Home" },
+            { id: "events", icon: "📅", label: "Events" },
+            { id: "tasks", icon: "✅", label: "Tasks" },
+            { id: "calendar", icon: "📆", label: "Calendar" },
+            { id: "notifications", icon: "🔔", label: "Alerts" },
+          ],
+          "Vendor Manager": [
+            { id: "dashboard", icon: "⊞", label: "Home" },
+            { id: "vendors", icon: "🏭", label: "Vendors" },
+            { id: "vendor-assignment", icon: "📋", label: "Assign" },
+            { id: "quote-comparison", icon: "⚖️", label: "Quotes" },
+            { id: "calendar", icon: "📆", label: "Calendar" },
+          ],
+          "Finance Manager": [
+            { id: "dashboard", icon: "⊞", label: "Home" },
+            { id: "finance", icon: "💼", label: "Finance" },
+            { id: "purchase-orders", icon: "📄", label: "POs" },
+            { id: "vendor-invoices", icon: "🧾", label: "Invoices" },
+            { id: "calendar", icon: "📆", label: "Calendar" },
+          ],
+          "Sales & Marketing": [
+            { id: "dashboard", icon: "⊞", label: "Home" },
+            { id: "opportunities", icon: "🎯", label: "Leads" },
+            { id: "crm", icon: "📈", label: "Pipeline" },
+            { id: "sm-tasks", icon: "✅", label: "Tasks" },
+            { id: "calendar", icon: "📆", label: "Calendar" },
+          ],
+          "Vendor": [
+            { id: "dashboard", icon: "⊞", label: "Home" },
+            { id: "rffs", icon: "📋", label: "RFFs" },
+            { id: "quotes", icon: "💬", label: "Quotes" },
+            { id: "vendor-invoices-submit", icon: "🧾", label: "Invoices" },
+            { id: "vendor-tasks", icon: "✅", label: "Tasks" },
+          ],
+          "Client": [
+            { id: "dashboard", icon: "⊞", label: "Home" },
+            { id: "client-events", icon: "📅", label: "Events" },
+            { id: "client-finance", icon: "💼", label: "Finance" },
+            { id: "notifications", icon: "🔔", label: "Alerts" },
+            { id: "calendar", icon: "📆", label: "Calendar" },
+          ],
+        };
+        const tabs = bottomTabs[role] || [
+          { id: "dashboard", icon: "⊞", label: "Home" },
+          { id: "notifications", icon: "🔔", label: "Alerts" },
+          { id: "calendar", icon: "📆", label: "Calendar" },
+        ];
+        return (
+          <div className="sf-bottom-nav" style={{
+            position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 500,
+            background: T.bgDeep, borderTop: `1px solid ${T.border}`,
+            display: "none", alignItems: "center", justifyContent: "space-around",
+            padding: "6px 0 max(6px, env(safe-area-inset-bottom))",
+            backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
+          }}>
+            {tabs.map(tab => {
+              const active = activeTab === tab.id;
+              return (
+                <button key={tab.id} onClick={() => { setActiveTab(tab.id); setMobileMenuOpen(false); }} style={{
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                  background: "none", border: "none", cursor: "pointer", padding: "6px 12px",
+                  flex: 1, minWidth: 0,
+                }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 10,
+                    background: active ? T.cyan+"20" : "none",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 16, transition: "all 0.15s",
+                    transform: active ? "scale(1.1)" : "scale(1)",
+                  }}>{tab.icon}</div>
+                  <span style={{ color: active ? T.cyan : T.textMuted, fontSize: 9, fontWeight: active ? 700 : 400, letterSpacing: "0.04em" }}>{tab.label}</span>
+                  {tab.id === "notifications" && unreadCount > 0 && (
+                    <div style={{ position: "absolute", top: 4, width: 6, height: 6, borderRadius: "50%", background: T.red }} />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
+
+      {/* ── Mobile Drawer (full nav) ── */}
       {mobileMenuOpen && (
         <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }} onClick={() => setMobileMenuOpen(false)}>
           <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: T.bgDeep, borderRadius: "24px 24px 0 0", borderTop: `1px solid ${T.border}`, boxShadow: `0 -8px 48px rgba(0,0,0,0.4)`, overflow: "hidden" }} onClick={e => e.stopPropagation()}>
@@ -6849,7 +6963,7 @@ const CRMDashboardCEO = ({ user }) => {
       </div>
 
       {/* Rep Performance + Revenue by Client */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 16, marginBottom: 16 }}>
         <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
           <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>Rep Performance vs Target</div>
           {repStats.length === 0 ? <div style={{ color: T.textMuted, fontSize: 13 }}>No reps yet.</div>
@@ -7057,7 +7171,7 @@ const CRMDashboardSM = ({ user }) => {
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 16 }}>
         {/* Pipeline by Stage */}
         <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
           <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>Pipeline by Stage</div>
@@ -8176,7 +8290,7 @@ const FinanceReportsView = ({ user }) => {
       </div>
 
       {/* KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginBottom: 24 }}>
         {[
           { label: "Revenue", value: "GHS " + periodRevenue.toLocaleString(), color: T.teal, grad: `linear-gradient(135deg, ${T.teal}20, ${T.teal}08)` },
           { label: "Gross Profit", value: "GHS " + grossProfit.toLocaleString(), sub: margin + "% margin", color: grossProfit >= 0 ? T.cyan : T.red, grad: `linear-gradient(135deg, ${grossProfit >= 0 ? T.cyan : T.red}20, transparent)` },
@@ -8980,7 +9094,7 @@ const ContractAwardApprovalView = ({ user }) => {
         <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{awards.filter(a => a.status === "pending_ceo").length} pending your approval</div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 12, marginBottom: 24 }}>
         {[
           { label: "Pending Approval", value: awards.filter(a => a.status === "pending_ceo").length, color: T.amber },
           { label: "Approved", value: awards.filter(a => ["approved_ceo","confirmed","po_created"].includes(a.status)).length, color: T.teal },
@@ -9026,7 +9140,7 @@ const ContractAwardApprovalView = ({ user }) => {
           <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 560, padding: 28 }} onClick={e => e.stopPropagation()}>
             <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Contract Award Review</div>
             <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>{previewAward.vendor_name}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, background: T.bg, borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 12, background: T.bg, borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
               {[
                 ["Vendor", previewAward.vendor_name],
                 ["Quoted Amount", `GHS ${(previewAward.quoted_amount||0).toLocaleString()}`],
@@ -9335,7 +9449,7 @@ const PurchaseOrderView = ({ user }) => {
             <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Create Purchase Order</div>
             <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>{poModal.vendor_name}</div>
             <div style={{ background: T.bg, borderRadius: 10, padding: "12px 16px", marginBottom: 16 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 10 }}>
                 {[["Vendor", poModal.vendor_name], ["Amount", `GHS ${(poModal.quoted_amount||0).toLocaleString()}`]].map(([l,v]) => (
                   <div key={l}><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{l}</div><div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600, marginTop: 3 }}>{v}</div></div>
                 ))}
@@ -9647,7 +9761,7 @@ const QuotesReceivedView = ({ user }) => {
       </div>
 
       {/* KPI Strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 12, marginBottom: 24 }}>
         {[
           { label: "Total RFFs", value: filteredRffs.length, color: T.cyan },
           { label: "RFFs with Quotes", value: rffsWithQuotes.length, color: T.teal },
@@ -9899,7 +10013,7 @@ const QuoteComparisonView = ({ user }) => {
       {selectedRff && (
         <>
           {/* Budget vs Quotes KPI */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 12, marginBottom: 24 }}>
             {[
               { label: selectedCategory === "all" ? "Total Budget" : selectedCategory + " Budget", value: `GHS ${activeBudget.toLocaleString()}`, color: T.cyan },
               { label: "Quotes Received", value: quotedAssignments.length, color: T.teal },
@@ -10054,7 +10168,7 @@ const QuoteComparisonView = ({ user }) => {
           <div style={{ background: T.surface, border: `1px solid #10B98140`, borderRadius: 16, width: "100%", maxWidth: 500, padding: 28 }} onClick={e => e.stopPropagation()}>
             <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Award Contract</div>
             <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>Nominate {awardModal.vendor_name} for this RFF</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16, background: T.bg, borderRadius: 8, padding: "12px 14px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 12, marginBottom: 16, background: T.bg, borderRadius: 8, padding: "12px 14px" }}>
               <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Vendor</div><div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13, marginTop: 3 }}>{awardModal.vendor_name}</div></div>
               <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Original Quote</div><div style={{ color: "#10B981", fontWeight: 900, fontSize: 16, marginTop: 3 }}>GHS {(awardModal.quote_amount || 0).toLocaleString()}</div></div>
               <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Proposed Budget</div><div style={{ color: T.cyan, fontWeight: 700, fontSize: 13, marginTop: 3 }}>GHS {totalBudget.toLocaleString()}</div></div>
@@ -10159,7 +10273,7 @@ const RFFApprovalsView = ({ user }) => {
       </div>
 
       {/* KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginBottom: 24 }}>
         {[
           { label: "Pending Review", value: pending.length, color: T.amber },
           { label: "Approved", value: rffs.filter(r => r.approved).length, color: T.teal },
@@ -10465,7 +10579,7 @@ const VendorApplicationModal = ({ user, onClose, onSubmitted }) => {
 
         {/* Vendor Info */}
         <div style={sectionStyle}>Vendor Information</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
           <div><label style={labelStyle}>Vendor Name *</label><input value={form.vendor_name} onChange={e => setForm({...form, vendor_name: e.target.value})} style={inputStyle} placeholder="Company / Vendor name" /></div>
           <div><label style={labelStyle}>Vendor Type</label>
             <select value={form.vendor_type} onChange={e => setForm({...form, vendor_type: e.target.value})} style={inputStyle}>
@@ -10474,11 +10588,11 @@ const VendorApplicationModal = ({ user, onClose, onSubmitted }) => {
             </select>
           </div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
           <div><label style={labelStyle}>Contact Person *</label><input value={form.contact_person} onChange={e => setForm({...form, contact_person: e.target.value})} style={inputStyle} placeholder="Full name" /></div>
           <div><label style={labelStyle}>Contact Email *</label><input type="email" value={form.contact_email} onChange={e => setForm({...form, contact_email: e.target.value})} style={inputStyle} placeholder="email@company.com" /></div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
           <div><label style={labelStyle}>Phone Number</label><input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} style={inputStyle} placeholder="+233 XX XXX XXXX" /></div>
           <div><label style={labelStyle}>Country</label><input value={form.country} onChange={e => setForm({...form, country: e.target.value})} style={inputStyle} placeholder="Ghana" /></div>
         </div>
@@ -10486,7 +10600,7 @@ const VendorApplicationModal = ({ user, onClose, onSubmitted }) => {
 
         {/* Documents */}
         <div style={sectionStyle}>Documents</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
           <div>
             <label style={labelStyle}>Business Registration Certificate</label>
             <div onClick={() => busRegRef.current.click()} style={{ border: `2px dashed ${T.border}`, borderRadius: 8, padding: "14px", textAlign: "center", cursor: "pointer", background: T.bg }}
@@ -10509,19 +10623,19 @@ const VendorApplicationModal = ({ user, onClose, onSubmitted }) => {
 
         {/* Bank Details */}
         <div style={sectionStyle}>Bank Details</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
           <div><label style={labelStyle}>Bank Name</label><input value={form.bank_name} onChange={e => setForm({...form, bank_name: e.target.value})} style={inputStyle} placeholder="Bank name" /></div>
           <div><label style={labelStyle}>Bank Account Name</label><input value={form.bank_account_name} onChange={e => setForm({...form, bank_account_name: e.target.value})} style={inputStyle} placeholder="Account name" /></div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
           <div><label style={labelStyle}>Account Number</label><input value={form.account_no} onChange={e => setForm({...form, account_no: e.target.value})} style={inputStyle} placeholder="Account number" /></div>
           <div><label style={labelStyle}>Swift Code</label><input value={form.swift_code} onChange={e => setForm({...form, swift_code: e.target.value})} style={inputStyle} placeholder="SWIFT/BIC code" /></div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
           <div><label style={labelStyle}>Bank Address</label><input value={form.bank_address} onChange={e => setForm({...form, bank_address: e.target.value})} style={inputStyle} placeholder="Bank branch address" /></div>
           <div><label style={labelStyle}>Bank Telephone</label><input value={form.bank_phone} onChange={e => setForm({...form, bank_phone: e.target.value})} style={inputStyle} placeholder="+233 XX XXX XXXX" /></div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
           <div><label style={labelStyle}>Bank Email</label><input value={form.bank_email} onChange={e => setForm({...form, bank_email: e.target.value})} style={inputStyle} placeholder="bank@email.com" /></div>
           <div><label style={labelStyle}>Payment Terms</label><input value={form.payment_terms} onChange={e => setForm({...form, payment_terms: e.target.value})} style={inputStyle} placeholder="e.g. Net 30, 50% upfront" /></div>
         </div>
@@ -10863,7 +10977,7 @@ const EditVendorAppModal = ({ app, user, onClose, onResubmitted }) => {
 
         {/* Vendor Info */}
         <div style={sectionStyle}>Vendor Information</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
           <div><label style={labelStyle}>Vendor Name</label><input value={form.vendor_name} onChange={e => setForm({...form, vendor_name: e.target.value})} style={inputStyle} /></div>
           <div><label style={labelStyle}>Vendor Type</label>
             <select value={form.vendor_type} onChange={e => setForm({...form, vendor_type: e.target.value})} style={inputStyle}>
@@ -10872,11 +10986,11 @@ const EditVendorAppModal = ({ app, user, onClose, onResubmitted }) => {
             </select>
           </div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
           <div><label style={labelStyle}>Contact Person</label><input value={form.contact_person} onChange={e => setForm({...form, contact_person: e.target.value})} style={inputStyle} /></div>
           <div><label style={labelStyle}>Contact Email</label><input value={form.contact_email} onChange={e => setForm({...form, contact_email: e.target.value})} style={inputStyle} /></div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
           <div><label style={labelStyle}>Phone</label><input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} style={inputStyle} /></div>
           <div><label style={labelStyle}>Country</label><input value={form.country} onChange={e => setForm({...form, country: e.target.value})} style={inputStyle} /></div>
         </div>
@@ -10884,15 +10998,15 @@ const EditVendorAppModal = ({ app, user, onClose, onResubmitted }) => {
 
         {/* Bank Details */}
         <div style={sectionStyle}>Bank Details</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
           <div><label style={labelStyle}>Bank Name</label><input value={form.bank_name} onChange={e => setForm({...form, bank_name: e.target.value})} style={inputStyle} /></div>
           <div><label style={labelStyle}>Account Name</label><input value={form.bank_account_name} onChange={e => setForm({...form, bank_account_name: e.target.value})} style={inputStyle} /></div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
           <div><label style={labelStyle}>Account Number</label><input value={form.account_no} onChange={e => setForm({...form, account_no: e.target.value})} style={inputStyle} /></div>
           <div><label style={labelStyle}>Swift Code</label><input value={form.swift_code} onChange={e => setForm({...form, swift_code: e.target.value})} style={inputStyle} /></div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
           <div><label style={labelStyle}>Bank Address</label><input value={form.bank_address} onChange={e => setForm({...form, bank_address: e.target.value})} style={inputStyle} /></div>
           <div><label style={labelStyle}>Payment Terms</label><input value={form.payment_terms} onChange={e => setForm({...form, payment_terms: e.target.value})} style={inputStyle} /></div>
         </div>
@@ -11035,7 +11149,7 @@ const VendorOnboardingView = ({ user }) => {
                 ].map(({ section, fields }) => (
                   <div key={section}>
                     <div style={{ color: T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10, marginTop: 18, paddingBottom: 6, borderBottom: `1px solid ${T.cyan}30` }}>{section}</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 10 }}>
                       {fields.map(([key, label]) => (
                         <div key={key}>
                           <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 4 }}>{label}</label>
@@ -11444,7 +11558,7 @@ const FinanceApprovalsView = ({ user }) => {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginBottom: 24 }}>
         {[
           { label: "Pending Expenses", value: pendingExpenses.length, color: pendingExpenses.length > 0 ? T.amber : T.teal },
           { label: "Budget Requests", value: pendingBudgets.length, color: pendingBudgets.length > 0 ? T.magenta : T.teal },

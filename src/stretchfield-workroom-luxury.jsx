@@ -6765,6 +6765,715 @@ const CalendarView = ({ user, onNavigate }) => {
 };
 
 
+const EventTypeAnalysisView = ({ user }) => {
+  const [rffs, setRffs] = useState([]);
+  const [pos, setPOs] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [periodType, setPeriodType] = useState("year");
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const eventTypes = [
+    { key: "Conference/Seminar", code: "CS", color: "#00C8FF", label: "Conference / Seminar" },
+    { key: "Product Launch", code: "PL", color: "#E879F9", label: "Product Launch" },
+    { key: "Awards Ceremony", code: "AWD", color: "#F59E0B", label: "Awards Ceremony" },
+    { key: "Corporate Party", code: "CP", color: "#10B981", label: "Corporate Party" },
+    { key: "Other", code: "OTH", color: "#8B5CF6", label: "Other" },
+  ];
+
+  const load = async () => {
+    setLoading(true);
+    const [{ data: rf }, { data: po }, { data: inv }] = await Promise.all([
+      supabase.from("rffs").select("*").not("event_type", "is", null),
+      supabase.from("purchase_orders").select("*"),
+      supabase.from("vendor_invoices").select("*"),
+    ]);
+    setRffs(rf || []);
+    setPOs(po || []);
+    setInvoices(inv || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const getDateRange = () => {
+    if (periodType === "year") {
+      return { from: `${selectedYear}-01-01`, to: `${selectedYear}-12-31` };
+    }
+    return { from: startDate, to: endDate };
+  };
+
+  const { from, to } = getDateRange();
+
+  const filteredRffs = rffs.filter(r => {
+    if (!r.created_at) return false;
+    const d = r.created_at.slice(0, 10);
+    return (!from || d >= from) && (!to || d <= to);
+  });
+
+  const totalRffs = filteredRffs.length;
+  const totalBudget = filteredRffs.reduce((s, r) => s + (r.amount || 0), 0);
+
+  const typeStats = eventTypes.map(et => {
+    const typeRffs = filteredRffs.filter(r => r.event_type === et.key);
+    const typePOs = pos.filter(p => p.internal_po_number?.includes(`/ST/${et.code}/`));
+    const typeInvoices = invoices.filter(i => i.invoice_number?.includes(`/ST/${et.code}/`));
+    const totalAmt = typeRffs.reduce((s, r) => s + (r.amount || 0), 0);
+    const pct = totalRffs > 0 ? Math.round((typeRffs.length / totalRffs) * 100) : 0;
+    return { ...et, count: typeRffs.length, pct, totalAmt, poCount: typePOs.length, invoiceCount: typeInvoices.length, rffs: typeRffs };
+  });
+
+  const years = ["2024", "2025", "2026", "2027", "2028"];
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>CEO</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Event Type Analysis</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Distribution of RFFs, POs and invoices by event category</div>
+      </div>
+
+      {/* Period Selector */}
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px", marginBottom: 24 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 6 }}>
+            {["year", "custom"].map(pt => (
+              <button key={pt} onClick={() => setPeriodType(pt)} style={{ padding: "6px 16px", borderRadius: 20, cursor: "pointer", fontSize: 11, fontWeight: 700, border: `1px solid ${periodType === pt ? T.cyan : T.border}`, background: periodType === pt ? T.cyan+"20" : "none", color: periodType === pt ? T.cyan : T.textMuted, textTransform: "uppercase" }}>{pt === "year" ? "By Year" : "Custom Range"}</button>
+            ))}
+          </div>
+          {periodType === "year" ? (
+            <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} style={{ padding: "7px 14px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+              {years.map(y => <option key={y}>{y}</option>)}
+            </select>
+          ) : (
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ padding: "7px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+              <span style={{ color: T.textMuted }}>to</span>
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ padding: "7px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+            </div>
+          )}
+          <div style={{ marginLeft: "auto", color: T.textMuted, fontSize: 12 }}>{filteredRffs.length} RFFs in period</div>
+        </div>
+      </div>
+
+      {/* Summary KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Total RFFs", value: totalRffs, color: T.cyan },
+          { label: "Total POs", value: pos.length, color: T.teal },
+          { label: "Total Invoices", value: invoices.length, color: T.amber },
+          { label: "Most Active Type", value: typeStats.sort((a,b)=>b.count-a.count)[0]?.label?.split("/")[0] || "—", color: "#10B981" },
+        ].map((k,i) => (
+          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: i===3?16:20, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginTop: 4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Distribution Chart */}
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 24 }}>
+        <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 20 }}>RFF Distribution by Event Type</div>
+        {typeStats.sort((a,b) => b.count - a.count).map((et, i) => (
+          <div key={et.key} style={{ marginBottom: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 12, height: 12, borderRadius: "50%", background: et.color, flexShrink: 0 }} />
+                <span style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{et.label}</span>
+                <span style={{ background: et.color+"18", color: et.color, borderRadius: 20, padding: "1px 8px", fontSize: 10, fontWeight: 800 }}>ST/{et.code}</span>
+              </div>
+              <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
+                <span style={{ color: T.textMuted, fontSize: 12 }}>{et.count} RFF{et.count!==1?"s":""}</span>
+                <span style={{ color: et.color, fontWeight: 800, fontSize: 14 }}>{et.pct}%</span>
+              </div>
+            </div>
+            <div style={{ height: 28, background: T.border+"44", borderRadius: 6, overflow: "hidden", position: "relative" }}>
+              <div style={{ height: "100%", width: `${et.pct}%`, background: `linear-gradient(90deg, ${et.color}, ${et.color}99)`, borderRadius: 6, transition: "width 0.6s ease", minWidth: et.count > 0 ? 4 : 0 }} />
+              {et.count > 0 && <div style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#fff", fontSize: 11, fontWeight: 700 }}>{et.count} RFF{et.count!==1?"s":""}</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Detailed breakdown table */}
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
+        <div style={{ padding: "16px 20px", borderBottom: `1px solid ${T.border}` }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Detailed Breakdown</div>
+        </div>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
+              {["Event Type","Code Prefix","RFFs","POs Created","Invoices","% Share"].map(h => (
+                <th key={h} style={{ padding: "10px 16px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {typeStats.map((et, i) => (
+              <tr key={et.key} style={{ borderBottom: i < typeStats.length-1 ? `1px solid ${T.border}44` : "none" }}
+                onMouseEnter={e => e.currentTarget.style.background = T.bg}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                <td style={{ padding: "12px 16px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: et.color }} />
+                    <span style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{et.label}</span>
+                  </div>
+                </td>
+                <td style={{ padding: "12px 16px" }}><span style={{ background: et.color+"18", color: et.color, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 800 }}>ST/{et.code}/YY/###</span></td>
+                <td style={{ padding: "12px 16px", color: et.count > 0 ? T.textPrimary : T.textMuted, fontWeight: et.count > 0 ? 700 : 400, fontSize: 13 }}>{et.count}</td>
+                <td style={{ padding: "12px 16px", color: T.textPrimary, fontSize: 13 }}>{et.poCount}</td>
+                <td style={{ padding: "12px 16px", color: T.textPrimary, fontSize: 13 }}>{et.invoiceCount}</td>
+                <td style={{ padding: "12px 16px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ width: 60, height: 6, background: T.border+"44", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${et.pct}%`, background: et.color, borderRadius: 3 }} />
+                    </div>
+                    <span style={{ color: et.color, fontWeight: 800, fontSize: 12 }}>{et.pct}%</span>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {/* Totals row */}
+            <tr style={{ background: T.bg, borderTop: `2px solid ${T.border}` }}>
+              <td style={{ padding: "12px 16px", color: T.textPrimary, fontWeight: 900, fontSize: 13 }}>TOTAL</td>
+              <td style={{ padding: "12px 16px" }} />
+              <td style={{ padding: "12px 16px", color: T.cyan, fontWeight: 900, fontSize: 13 }}>{totalRffs}</td>
+              <td style={{ padding: "12px 16px", color: T.cyan, fontWeight: 900, fontSize: 13 }}>{pos.length}</td>
+              <td style={{ padding: "12px 16px", color: T.cyan, fontWeight: 900, fontSize: 13 }}>{invoices.length}</td>
+              <td style={{ padding: "12px 16px", color: T.cyan, fontWeight: 900, fontSize: 13 }}>100%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Monthly trend for selected year */}
+      {periodType === "year" && (
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 24px" }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 16 }}>Monthly Activity — {selectedYear}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(12,1fr)", gap: 6 }}>
+            {Array.from({length:12},(_,i)=>i+1).map(month => {
+              const monthRffs = filteredRffs.filter(r => {
+                const d = new Date(r.created_at);
+                return d.getFullYear() === parseInt(selectedYear) && d.getMonth()+1 === month;
+              });
+              const maxCount = Math.max(...Array.from({length:12},(_,i)=>filteredRffs.filter(r=>new Date(r.created_at).getMonth()===i).length), 1);
+              const heightPct = monthRffs.length > 0 ? Math.max((monthRffs.length/maxCount)*80, 10) : 0;
+              const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+              return (
+                <div key={month} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                  <div style={{ height: 80, display: "flex", alignItems: "flex-end", width: "100%" }}>
+                    <div style={{ width: "100%", height: `${heightPct}%`, background: monthRffs.length > 0 ? `linear-gradient(180deg, ${T.cyan}, ${T.teal})` : T.border+"44", borderRadius: "4px 4px 0 0", transition: "height 0.4s ease" }} />
+                  </div>
+                  {monthRffs.length > 0 && <div style={{ color: T.cyan, fontSize: 10, fontWeight: 800 }}>{monthRffs.length}</div>}
+                  <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 600 }}>{months[month-1]}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+
+
+const StrategyMapView = ({ user }) => {
+  const [events, setEvents] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [brief, setBrief] = useState(null);
+  const [scorecard, setScorecard] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const load = async () => {
+    const { data: ev } = await supabase.from("projects").select("*").order("event_date", { ascending: false });
+    setEvents(ev || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const loadEventData = async (eventId) => {
+    setLoading(true);
+    const [{ data: b }, { data: sc }] = await Promise.all([
+      supabase.from("event_impact_briefs").select("*").eq("project_id", eventId).single(),
+      supabase.from("event_scorecards").select("*").eq("project_id", eventId).single(),
+    ]);
+    setBrief(b || null);
+    setScorecard(sc || null);
+    setLoading(false);
+  };
+
+  const archetype = selectedEvent ? EVENT_ARCHETYPES[selectedEvent.event_category] : null;
+
+  const toolStatus = (val) => {
+    if (val === "Yes") return { color: "#10B981", icon: "✓" };
+    if (val === "No") return { color: T.red, icon: "✗" };
+    return { color: T.textMuted, icon: "—" };
+  };
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Strategic</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Strategy Map</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Event impact briefs and strategic parameters to inform your planning</div>
+      </div>
+
+      {/* Event selector */}
+      <div style={{ marginBottom: 24 }}>
+        <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 8 }}>Select Event</label>
+        <select value={selectedEvent?.id || ""} onChange={e => {
+          const ev = events.find(x => x.id === e.target.value);
+          setSelectedEvent(ev || null);
+          if (ev) loadEventData(ev.id);
+        }} style={{ width: "100%", maxWidth: 400, padding: "10px 14px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+          <option value="">Choose an event...</option>
+          {events.map(ev => (
+            <option key={ev.id} value={ev.id}>{ev.name} {ev.event_category ? `— ${ev.event_category}` : ""}</option>
+          ))}
+        </select>
+      </div>
+
+      {!selectedEvent && (
+        <div style={{ textAlign: "center", padding: "60px 0", background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>🗺</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>Select an event to view its strategy map</div>
+          <div style={{ color: T.textMuted, fontSize: 13 }}>The strategy map shows the impact brief, KPIs and scorecard parameters defined by the CEO.</div>
+        </div>
+      )}
+
+      {selectedEvent && loading && (
+        <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>Loading strategy data...</div>
+      )}
+
+      {selectedEvent && !loading && (
+        <div>
+          {/* Event header card */}
+          <div style={{ background: archetype ? archetype.color+"12" : T.surface, border: `1px solid ${archetype ? archetype.color+"40" : T.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <div style={{ color: archetype?.color || T.cyan, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>{selectedEvent.event_category || "Event"}</div>
+                <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 20 }}>{selectedEvent.name}</div>
+                <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{selectedEvent.client} · {selectedEvent.phase}</div>
+                {selectedEvent.event_date && <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>📅 {new Date(selectedEvent.event_date+"T12:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>}
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 4 }}>Completion</div>
+                <div style={{ color: archetype?.color || T.cyan, fontWeight: 900, fontSize: 24 }}>{selectedEvent.completion || 0}%</div>
+              </div>
+            </div>
+          </div>
+
+          {!brief && (
+            <div style={{ background: T.amber+"12", border: `1px solid ${T.amber}30`, borderRadius: 10, padding: "14px 18px", marginBottom: 20 }}>
+              <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>⚠ No Impact Brief set for this event yet</div>
+              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>The CEO or Strategy Opportunity needs to complete the Impact Brief in the Impact Intelligence tab first.</div>
+            </div>
+          )}
+
+          {brief && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+
+              {/* Impact Objective */}
+              <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
+                <div style={{ color: archetype?.color || T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>🎯 Impact Objective</div>
+                {brief.impact_objective && (
+                  <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
+                    <div style={{ color: T.textPrimary, fontSize: 13, lineHeight: 1.6 }}>{brief.impact_objective}</div>
+                  </div>
+                )}
+                {brief.target_audience && <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 4 }}><strong style={{ color: T.textSecondary }}>Who:</strong> {brief.target_audience}</div>}
+                {brief.observable_signal && <div style={{ color: T.textMuted, fontSize: 12 }}><strong style={{ color: T.textSecondary }}>Signal:</strong> {brief.observable_signal}</div>}
+              </div>
+
+              {/* Measurement Tools */}
+              <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
+                <div style={{ color: archetype?.color || T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>🔧 Measurement Tools</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {[
+                    ["Pre-Event Survey", brief.tool_pre_survey],
+                    ["Digital Tracking", brief.tool_digital_tracking],
+                    ["Live Monitoring", brief.tool_live_monitoring],
+                    ["Post-Event Survey", brief.tool_post_survey],
+                    ["30-Day Follow-Up", brief.tool_30day_survey],
+                    ["90-Day Tracking", brief.tool_90day_tracking],
+                    ["Social Listening", brief.tool_social_listening],
+                    ["Commercial Data", brief.tool_commercial_data],
+                  ].map(([label, val]) => {
+                    const s = toolStatus(val);
+                    return (
+                      <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: `1px solid ${T.border}33` }}>
+                        <span style={{ color: T.textSecondary, fontSize: 12 }}>{label}</span>
+                        <span style={{ color: s.color, fontSize: 12, fontWeight: 700 }}>{s.icon} {val || "—"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* KPIs */}
+          {brief && (brief.kpi1_name || brief.kpi2_name || brief.kpi3_name) && (
+            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px", marginBottom: 20 }}>
+              <div style={{ color: archetype?.color || T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>📊 Success KPIs</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
+                {[1,2,3].map(n => {
+                  const name = brief[`kpi${n}_name`];
+                  const target = brief[`kpi${n}_target`];
+                  const method = brief[`kpi${n}_method`];
+                  const timing = brief[`kpi${n}_timing`];
+                  if (!name) return null;
+                  return (
+                    <div key={n} style={{ background: T.bg, border: `1px solid ${archetype?.color || T.cyan}25`, borderTop: `2px solid ${archetype?.color || T.cyan}`, borderRadius: 8, padding: "12px 14px" }}>
+                      <div style={{ color: archetype?.color || T.cyan, fontSize: 10, fontWeight: 800, textTransform: "uppercase", marginBottom: 6 }}>KPI {n}</div>
+                      <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13, marginBottom: 6 }}>{name}</div>
+                      <div style={{ color: "#10B981", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Target: {target}</div>
+                      <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 2 }}>Method: {method}</div>
+                      <div style={{ color: T.textMuted, fontSize: 11 }}>When: {timing}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Scorecard dimensions */}
+          {archetype && (
+            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px", marginBottom: 20 }}>
+              <div style={{ color: archetype.color, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>⚖️ Impact Dimensions — What We Are Measuring</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {archetype.dimensions.map((dim, i) => {
+                  const score = scorecard ? scorecard[dim.key+"_score"] : null;
+                  return (
+                    <div key={dim.key} style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 14px", background: T.bg, borderRadius: 8, border: `1px solid ${T.border}` }}>
+                      <div style={{ width: 36, height: 36, borderRadius: "50%", background: archetype.color+"20", border: `2px solid ${archetype.color}40`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <span style={{ color: archetype.color, fontWeight: 900, fontSize: 12 }}>{Math.round(dim.weight*100)}%</span>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{dim.label}</div>
+                        <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{dim.description}</div>
+                        <div style={{ color: archetype.color, fontSize: 10, marginTop: 2 }}>Benchmark: {dim.benchmark}</div>
+                      </div>
+                      {score !== null && score !== undefined && parseFloat(score) > 0 ? (
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div style={{ color: getScoreLabel(parseFloat(score)).color, fontWeight: 900, fontSize: 20 }}>{score}</div>
+                          <div style={{ color: T.textMuted, fontSize: 9 }}>/10</div>
+                        </div>
+                      ) : (
+                        <div style={{ color: T.textMuted, fontSize: 11, flexShrink: 0 }}>Not scored</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Story intent */}
+          {brief && (brief.story_before || brief.story_design || brief.story_outcome) && (
+            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
+              <div style={{ color: archetype?.color || T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>✍️ Impact Story We Are Engineering</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {brief.story_before && <div style={{ background: T.bg, borderLeft: `3px solid ${T.red}`, borderRadius: 6, padding: "10px 14px" }}><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>Before Stretchfield</div><div style={{ color: T.textSecondary, fontSize: 13 }}>{brief.story_before}</div></div>}
+                {brief.story_design && <div style={{ background: T.bg, borderLeft: `3px solid ${archetype?.color||T.cyan}`, borderRadius: 6, padding: "10px 14px" }}><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>What We Are Engineering</div><div style={{ color: T.textSecondary, fontSize: 13 }}>{brief.story_design}</div></div>}
+                {brief.story_outcome && <div style={{ background: T.bg, borderLeft: `3px solid #10B981`, borderRadius: 6, padding: "10px 14px" }}><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>Intended Outcome</div><div style={{ color: T.textSecondary, fontSize: 13 }}>{brief.story_outcome}</div></div>}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+const ImpactIntelligenceSummary = ({ user }) => {
+  const [events, setEvents] = useState([]);
+  const [scorecards, setScorecardsData] = useState([]);
+  const [briefs, setBriefs] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    setLoading(true);
+    const [{ data: ev }, { data: sc }, { data: br }, { data: rp }] = await Promise.all([
+      supabase.from("projects").select("*").not("event_category", "is", null).order("event_date", { ascending: false }),
+      supabase.from("event_scorecards").select("*"),
+      supabase.from("event_impact_briefs").select("*"),
+      supabase.from("event_impact_reports").select("*"),
+    ]);
+    setEvents(ev || []);
+    setScorecardsData(sc || []);
+    setBriefs(br || []);
+    setReports(rp || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const getEventScore = (eventId) => {
+    const sc = scorecards.find(s => s.project_id === eventId);
+    return sc ? sc.overall_score : null;
+  };
+
+  const avgScore = scorecards.length > 0 ? (scorecards.reduce((s, sc) => s + (sc.overall_score || 0), 0) / scorecards.length).toFixed(1) : null;
+
+  const categoryStats = Object.keys(EVENT_ARCHETYPES).map(cat => {
+    const catEvents = events.filter(e => e.event_category === cat);
+    const catScores = catEvents.map(e => getEventScore(e.id)).filter(s => s !== null);
+    const avgCatScore = catScores.length > 0 ? (catScores.reduce((a,b) => a+b, 0) / catScores.length).toFixed(1) : null;
+    return { category: cat, count: catEvents.length, avgScore: avgCatScore, color: EVENT_ARCHETYPES[cat].color };
+  }).filter(c => c.count > 0);
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Strategic</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Impact Intelligence</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Cross-event impact scores, briefs and reports</div>
+      </div>
+
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Events Tracked", value: events.length, color: T.cyan },
+          { label: "Briefs Completed", value: briefs.length, color: T.teal },
+          { label: "Scorecards", value: scorecards.length, color: T.amber },
+          { label: "Avg Impact Score", value: avgScore ? `${avgScore}/10` : "—", color: avgScore >= 7 ? "#10B981" : avgScore >= 5 ? T.amber : T.red },
+        ].map((k,i) => (
+          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 20, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginTop: 4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Category performance */}
+      {categoryStats.length > 0 && (
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 24 }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 16 }}>Performance by Event Category</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px,1fr))", gap: 12 }}>
+            {categoryStats.map(cat => (
+              <div key={cat.category} style={{ background: T.bg, border: `1px solid ${cat.color}30`, borderTop: `3px solid ${cat.color}`, borderRadius: 10, padding: "14px 16px" }}>
+                <div style={{ color: cat.color, fontSize: 10, fontWeight: 800, textTransform: "uppercase", marginBottom: 4 }}>{cat.category}</div>
+                <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 28 }}>{cat.avgScore || "—"}<span style={{ fontSize: 14, color: T.textMuted }}>/10</span></div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>{cat.count} event{cat.count!==1?"s":""}</div>
+                {cat.avgScore && <div style={{ color: getScoreLabel(parseFloat(cat.avgScore)).color, fontSize: 11, fontWeight: 700, marginTop: 4 }}>{getScoreLabel(parseFloat(cat.avgScore)).label}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Events table */}
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ padding: "16px 20px", borderBottom: `1px solid ${T.border}` }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>All Events — Impact Status</div>
+        </div>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
+              {["Event","Category","Date","Brief","Score","Report","Action"].map(h => (
+                <th key={h} style={{ padding: "10px 16px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {events.map((ev, i) => {
+              const score = getEventScore(ev.id);
+              const hasBrief = briefs.some(b => b.project_id === ev.id);
+              const hasReport = reports.some(r => r.project_id === ev.id);
+              const archetype = EVENT_ARCHETYPES[ev.event_category];
+              return (
+                <tr key={ev.id} style={{ borderBottom: i < events.length-1 ? `1px solid ${T.border}44` : "none" }}
+                  onMouseEnter={e => e.currentTarget.style.background = T.bg}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  <td style={{ padding: "12px 16px", color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{ev.name}</td>
+                  <td style={{ padding: "12px 16px" }}>
+                    <span style={{ background: (archetype?.color||T.cyan)+"18", color: archetype?.color||T.cyan, border: `1px solid ${(archetype?.color||T.cyan)}30`, borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 800 }}>{ev.event_category}</span>
+                  </td>
+                  <td style={{ padding: "12px 16px", color: T.textMuted, fontSize: 12 }}>{ev.event_date ? new Date(ev.event_date+"T12:00:00").toLocaleDateString("en-GB") : "—"}</td>
+                  <td style={{ padding: "12px 16px" }}>
+                    <span style={{ color: hasBrief ? "#10B981" : T.amber, fontSize: 12, fontWeight: 700 }}>{hasBrief ? "✓ Done" : "Pending"}</span>
+                  </td>
+                  <td style={{ padding: "12px 16px" }}>
+                    {score !== null ? (
+                      <span style={{ color: getScoreLabel(score).color, fontWeight: 900, fontSize: 14 }}>{score}/10</span>
+                    ) : <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>}
+                  </td>
+                  <td style={{ padding: "12px 16px" }}>
+                    <span style={{ color: hasReport ? "#10B981" : T.textMuted, fontSize: 12, fontWeight: 700 }}>{hasReport ? "✓ Done" : "—"}</span>
+                  </td>
+                  <td style={{ padding: "12px 16px" }}>
+                    <button onClick={() => setSelectedEvent(selectedEvent?.id === ev.id ? null : ev)} style={{ background: (archetype?.color||T.cyan)+"15", border: `1px solid ${(archetype?.color||T.cyan)}30`, color: archetype?.color||T.cyan, padding: "4px 12px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
+                      {selectedEvent?.id === ev.id ? "Close" : "Open"}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+            {events.length === 0 && (
+              <tr><td colSpan={7} style={{ padding: "40px 0", textAlign: "center", color: T.textMuted, fontSize: 13 }}>No events with categories yet. Add event categories to start tracking impact.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Expanded event impact view */}
+      {selectedEvent && (
+        <div style={{ marginTop: 24 }}>
+          <EventImpactView user={user} project={selectedEvent} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+
+const NotificationsView = ({ user, onNavigate }) => {
+  const [notes, setNotes] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    setNotes(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    load();
+    const sub = supabase.channel('notif-view-' + user.id)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: 'user_id=eq.' + user.id }, () => load())
+      .subscribe();
+    return () => supabase.removeChannel(sub);
+  }, [user.id]);
+
+  const getNavTarget = (note) => {
+    const typeMap = {
+      invoice: 'invoices', task: 'tasks', quote: 'vendors', rff: 'vendors',
+      crm: 'crm', approval: 'vendors', event: 'events', finance: 'finance',
+      budget: 'budgets', expense: 'expenses', scorecard: 'scorecards',
+    };
+    return typeMap[note.type] || null;
+  };
+
+  const handleNoteClick = async (note) => {
+    // Mark as read
+    await supabase.from('notifications').update({ read: true }).eq('id', note.id);
+    load();
+    // Navigate to source
+    const target = getNavTarget(note);
+    if (target && onNavigate) {
+      // Deep-link routing by notification title keywords
+      let resolvedTarget = "notifications";
+      const t = note.title?.toLowerCase() || "";
+      const m = note.message?.toLowerCase() || "";
+      if (t.includes("task") || t.includes("comment") || t.includes("replied")) resolvedTarget = "tasks";
+      else if (t.includes("rff approved") || t.includes("rff declined") || t.includes("rff resubmitted")) resolvedTarget = "vendors";
+      else if (t.includes("vendor application") || t.includes("vendor onboarding")) resolvedTarget = "vendor-onboarding";
+      else if (t.includes("quote submitted")) resolvedTarget = "quotes-received";
+      else if (t.includes("contract award") && t.includes("pending")) resolvedTarget = "contract-awards";
+      else if (t.includes("contract award confirmed") || t.includes("gig confirmed")) resolvedTarget = "purchase-orders";
+      else if (t.includes("purchase order")) resolvedTarget = "vendor-invoices-submit";
+      else if (t.includes("invoice received")) resolvedTarget = "vendor-invoices";
+      else if (t.includes("opportunity") || t.includes("crm")) resolvedTarget = "crm";
+      else if (t.includes("opportunity") || t.includes("converted")) resolvedTarget = "leads";
+      else if (t.includes("vendor assigned") || t.includes("new rff assignment")) resolvedTarget = "rffs";
+      else if (note.type === "rff") resolvedTarget = "vendors";
+      else if (note.type === "task") resolvedTarget = "tasks";
+      onNavigate(resolvedTarget, note.resource_id || null);
+    }
+  };
+
+  const markRead = async (id) => {
+    await supabase.from('notifications').update({ read: true }).eq('id', id);
+    load();
+  };
+
+  const markAllRead = async () => {
+    await supabase.from('notifications').update({ read: true }).eq('user_id', user.id);
+    load();
+  };
+
+  const deleteNote = async (id) => {
+    await supabase.from('notifications').delete().eq('id', id);
+    load();
+  };
+
+  const typeIcon = (type) => {
+    const icons = { invoice: '🧾', task: '✅', quote: '💬', info: 'ℹ️', event: '📁' };
+    return icons[type] || '🔔';
+  };
+
+  const unread = notes.filter(n => !n.read).length;
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>System</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Notifications</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{unread > 0 ? <span style={{ color: T.cyan, fontWeight: 700 }}>{unread} unread</span> : "All caught up"}</div>
+        </div>
+        {unread > 0 && <Btn small onClick={markAllRead}>✓ Mark All Read</Btn>}
+      </div>
+      {loading ? (
+        <div style={{ color: T.textMuted, textAlign: "center", padding: 60 }}>Loading...</div>
+      ) : notes.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>🔔</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No notifications</div>
+          <div style={{ color: T.textMuted, fontSize: 13 }}>You're all caught up.</div>
+        </div>
+      ) : (
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+          {notes.map((n, i) => (
+            <div key={n.id} onClick={() => { if (!n.read) markRead(n.id); handleNoteClick(n); }} style={{
+              display: "flex", alignItems: "flex-start", gap: 14,
+              padding: "16px 20px",
+              borderBottom: i < notes.length - 1 ? `1px solid ${T.border}44` : "none",
+              background: !n.read ? T.cyan + "08" : "transparent",
+              cursor: "pointer", transition: "background 0.15s",
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = !n.read ? T.cyan + "12" : T.bg + "80"}
+              onMouseLeave={e => e.currentTarget.style.background = !n.read ? T.cyan + "08" : "transparent"}
+            >
+              <div style={{ fontSize: 18, flexShrink: 0, marginTop: 2 }}>{typeIcon(n.type)}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: !n.read ? T.textPrimary : T.textMuted, fontSize: 13, fontWeight: !n.read ? 700 : 500 }}>{n.title}</div>
+                {n.message && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>{n.message}</div>}
+                <div style={{ color: T.textMuted, fontSize: 10, marginTop: 5 }}>
+                  {new Date(n.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+                {!n.read && <div style={{ width: 7, height: 7, borderRadius: "50%", background: T.cyan, boxShadow: `0 0 6px ${T.cyan}` }} />}
+                <button onClick={(e) => { e.stopPropagation(); deleteNote(n.id); }} style={{ background: "none", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 16, padding: "2px 6px", borderRadius: 4, transition: "color 0.15s" }}
+                  onMouseEnter={e => e.currentTarget.style.color = T.red}
+                  onMouseLeave={e => e.currentTarget.style.color = T.textMuted}
+                >×</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function StretchfieldWorkRoom({ user: propUser, profile: propProfile, onLogout }) {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);

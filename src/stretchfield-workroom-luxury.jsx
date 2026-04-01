@@ -5982,14 +5982,14 @@ const CRMView = ({ user }) => {
   const addActivity = async (leadId, company) => {
     if (!actForm.notes) return;
     setAddingAct(true);
-    await supabase.from("crm_activities").insert({
+    const { error: actErr } = await supabase.from("crm_activities").insert({
       lead_id: leadId, type: actForm.type, notes: actForm.notes,
-      date: new Date().toISOString().slice(0,10),
       scheduled_date: actForm.scheduled_date || null,
       scheduled_time: actForm.scheduled_time || null,
       activity_type: actForm.type,
       created_by: user.id, created_by_name: user.name,
     });
+    if (actErr) { console.error("Activity insert error:", actErr.message); setAddingAct(false); return; }
     if (actForm.scheduled_date && ["call","meeting","demo","follow-up"].includes(actForm.type)) {
       await supabase.from("itineraries").insert({
         title: `${actForm.type.charAt(0).toUpperCase()+actForm.type.slice(1)} — ${company}`,

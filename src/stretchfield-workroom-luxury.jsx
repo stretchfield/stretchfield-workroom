@@ -6342,6 +6342,425 @@ const SMTasksView = ({ user }) => {
 
 // ─── FEEDBACK VIEW ────────────────────────────────────────────────────────────
 
+const CalendarView = ({ user, onNavigate }) => {
+  const [today] = useState(new Date());
+  const [current, setCurrent] = useState(new Date());
+  const [items, setItems] = useState([]);
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [itinModal, setItinModal] = useState(false);
+  const [itinForm, setItinForm] = useState({ title: "", week_start: "", rows: [{ date: "", time: "", company: "", action: "", notes: "" }] });
+  const [itinSaving, setItinSaving] = useState(false);
+  const [itineraries, setItineraries] = useState([]);
+  const [viewItinModal, setViewItinModal] = useState(null);
+  const [opportunities, setOpportunitys] = useState([]);
+  const [opps, setOpps] = useState([]);
+
+  const role = user?.role;
+  const uid = user?.id;
+  const email = user?.email;
+
+  const typeColors = {
+    task: "#00C8FF",
+    event: "#00E5C8",
+    opportunity: "#F59E0B",
+    rff: "#E879F9",
+    invoice: "#C9A84C",
+    activity: "#3B7BFF",
+    smtask: "#10B981",
+    itinerary: "#F472B6",
+  };
+
+  const loadOpportunitysOpps = async () => {
+    const [{ data: l }, { data: o }, { data: itins }] = await Promise.all([
+      supabase.from("opportunities").select("id, company, contact_name, status"),
+      supabase.from("leads").select("id, company, sector, status").neq("status","Converted"),
+      uid ? supabase.from("itineraries").select("*").eq("created_by", uid).order("created_at", { ascending: false }) : Promise.resolve({ data: [] }),
+    ]);
+    setOpportunitys(l || []);
+    setOpps(o || []);
+    setItineraries(itins || []);
+  };
+
+  const load = async () => {
+    setLoading(true);
+    const all = [];
+
+    // ── TASKS ──
+    const taskQ = ["CEO","Country Manager"].includes(role)
+      ? supabase.from("tasks").select("*")
+      : supabase.from("tasks").select("*").eq("assignee_id", uid);
+    const { data: tasks } = await taskQ;
+    (tasks || []).forEach(t => {
+      if (t.deadline) all.push({ id: "task-"+t.id, date: t.deadline.slice(0,10), type: "task", label: t.name, sub: t.assignee_name || "", status: t.status, nav: "tasks" });
+    });
+
+    // ── EVENTS (projects) ──
+    if (!["Vendor"].includes(role)) {
+      let evQ;
+      if (["Client"].includes(role)) {
+        const { data: clientData } = await supabase.from("clients").select("id").eq("email", email).single();
+        if (clientData) evQ = await supabase.from("projects").select("*").eq("client_id", clientData.id);
+      } else {
+        evQ = await supabase.from("projects").select("*");
+      }
+      const events = evQ?.data || [];
+      events.forEach(e => {
+        if (e.event_date) all.push({ id: "ev-"+e.id+"-d", date: e.event_date, type: "event", label: e.name, sub: "Event Day", nav: "events" });
+        if (e.deadline) all.push({ id: "ev-"+e.id+"-dl", date: e.deadline.slice(0,10), type: "event", label: e.name, sub: "Planning Deadline", nav: "events" });
+      });
+    }
+
+    // ── LEADS (CEO, Admin, Sales & Marketing) ──
+    if (["CEO","Country Manager","Sales & Marketing"].includes(role)) {
+      const { data: opportunities } = await supabase.from("opportunities").select("*");
+      (opportunities || []).forEach(l => {
+        if (l.created_at) all.push({ id: "opportunity-"+l.id, date: l.created_at.slice(0,10), type: "opportunity", label: l.company, sub: "Opportunity Created · " + l.status, nav: "crm" });
+        if (l.closed_date) all.push({ id: "opportunity-"+l.id+"-c", date: l.closed_date, type: "opportunity", label: l.company, sub: "Opportunity Closed · Won", nav: "crm" });
+      });
+    }
+
+    // ── RFFs ──
+    if (["CEO","Country Manager","Vendor Manager"].includes(role)) {
+      const { data: rffs } = await supabase.from("rffs").select("*");
+      (rffs || []).filter(r => r.deadline).forEach(r => {
+        const dl = r.deadline.slice(0,10);
+        all.push({ id: "rff-"+r.id, date: dl, type: "rff", label: r.title || "RFF", sub: "RFF Deadline · " + (r.event_name || r.status || ""), nav: "vendors" });
+      });
+    } else if (role === "Vendor") {
+      const { data: assignments } = await supabase.from("rff_vendor_assignments").select("*, rffs(*)").eq("vendor_id", uid);
+      (assignments || []).forEach(a => {
+        const r = a.rffs;
+        if (r?.deadline) all.push({ id: "rff-"+r.id, date: r.deadline.slice(0,10), type: "rff", label: r.title || "RFF", sub: "RFF Deadline · " + (a.status || ""), nav: "my-rffs" });
+      });
+    }
+
+    // ── S&M TASKS ──
+    if (["CEO","Country Manager","Sales & Marketing"].includes(role)) {
+      const smQ = ["CEO","Country Manager"].includes(role)
+        ? supabase.from("tasks").select("*").not("assignee_id","is",null)
+        : supabase.from("tasks").select("*").eq("assignee_id", uid);
+      const { data: smTasks } = await smQ;
+      (smTasks || []).forEach(t => {
+        if (t.deadline && !["CEO","Country Manager"].includes(role)) {
+          all.push({ id: "smt-"+t.id, date: t.deadline.slice(0,10), type: "smtask", label: t.name, sub: "S&M Task", nav: "sm-tasks" });
+        }
+      });
+    }
+
+    // ── CLIENT INVOICES ──
+    if (role === "Client") {
+      const { data: clientData } = await supabase.from("clients").select("id").eq("email", email).single();
+      if (clientData) {
+        const { data: invs } = await supabase.from("client_invoices").select("*").eq("client_id", clientData.id);
+        (invs || []).forEach(inv => {
+          if (inv.created_at) all.push({ id: "inv-"+inv.id, date: inv.created_at.slice(0,10), type: "invoice", label: inv.title || "Invoice", sub: "Invoice", nav: "client-finance" });
+        });
+      }
+    }
+
+    // ── FINANCE INVOICES ──
+    if (["CEO","Country Manager","Finance Manager"].includes(role)) {
+      const { data: invs } = await supabase.from("invoices").select("*");
+      (invs || []).forEach(inv => {
+        if (inv.created_at) all.push({ id: "finv-"+inv.id, date: inv.created_at.slice(0,10), type: "invoice", label: inv.vendor_name || "Invoice", sub: "Invoice · " + (inv.status || ""), nav: "invoices" });
+      });
+    }
+
+    // ── ITINERARIES ──
+    if (["CEO","Sales & Marketing"].includes(role)) {
+      const { data: itins } = await supabase.from("itineraries").select("*").eq("created_by", uid);
+      (itins || []).forEach(itin => {
+        (itin.items || []).forEach((item, idx) => {
+          if (item.date) all.push({
+            id: "itin-"+itin.id+"-"+idx,
+            date: item.date,
+            type: "itinerary",
+            label: item.company || item.title || "Itinerary Item",
+            sub: itin.title + " · " + (item.time || "") + " · " + (item.action || ""),
+            nav: "calendar"
+          });
+        });
+      });
+    }
+
+    setItems(all);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const year = current.getFullYear();
+  const month = current.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthName = current.toLocaleString("default", { month: "long" });
+  const todayStr = today.toISOString().slice(0,10);
+
+  const itemsByDate = {};
+  items.forEach(item => {
+    if (!itemsByDate[item.date]) itemsByDate[item.date] = [];
+    itemsByDate[item.date].push(item);
+  });
+
+  const dayItems = selectedDay ? (itemsByDate[selectedDay] || []) : [];
+
+  const typeLabel = { task: "Task", event: "Event", opportunity: "Opportunity", rff: "RFF", invoice: "Invoice", activity: "Activity", smtask: "S&M Task", itinerary: "Itinerary" };
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Personal</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Calendar</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{items.length} items across all your activities</div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
+          {["CEO","Sales & Marketing"].includes(role) && (
+            <button onClick={() => setItinModal(true)} style={{ background: `linear-gradient(135deg, #F472B6, #E879F9)`, border: "none", color: "#fff", padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>+ Create Itinerary</button>
+          )}
+          {["CEO","Strategy & Events Opportunity","Vendor Manager","Sales & Marketing","Vendor"].includes(role) && (
+            <button onClick={() => {
+              const feedUrl = `https://workroom.stretchfield.com/api/calendar-feed?user_id=${uid}`;
+              navigator.clipboard.writeText(feedUrl).then(() => alert(
+                "✅ Calendar URL copied!\n\n" +
+                "iPhone / Mac Calendar:\n" +
+                "1. Settings → Calendar → Accounts\n" +
+                "2. Add Account → Other\n" +
+                "3. Add Subscribed Calendar\n" +
+                "4. Paste URL → Next → Save\n\n" +
+                "Mac Calendar App:\n" +
+                "1. File → New Calendar Subscription\n" +
+                "2. Paste URL → Subscribe\n" +
+                "3. Set refresh to Every Hour → OK\n\n" +
+                "Google Calendar (Android):\n" +
+                "1. Open calendar.google.com on desktop\n" +
+                "2. Other Calendars → + → From URL\n" +
+                "3. Paste URL → Add Calendar"
+              ));
+            }} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: "none", color: "#fff", padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>📱 Sync to Phone</button>
+          )}
+          {/* Legend */}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {Object.entries(typeColors).map(([type, color]) => (
+              <div key={type} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
+                <span style={{ color: T.textMuted, fontSize: 10, textTransform: "capitalize" }}>{typeLabel[type]}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: selectedDay ? "1fr 320px" : "1fr", gap: 20 }}>
+        {/* Calendar grid */}
+        <div>
+          {/* Month nav */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <button onClick={() => setCurrent(new Date(year, month - 1, 1))} style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.textPrimary, width: 34, height: 34, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>‹</button>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 18 }}>{monthName} {year}</div>
+            <button onClick={() => setCurrent(new Date(year, month + 1, 1))} style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.textPrimary, width: 34, height: 34, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>›</button>
+          </div>
+
+          {/* Day headers */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
+            {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
+              <div key={d} style={{ textAlign: "center", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", padding: "6px 0" }}>{d}</div>
+            ))}
+          </div>
+
+          {/* Day cells */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+            {Array.from({ length: firstDay }).map((_, i) => <div key={"e"+i} />)}
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const day = i + 1;
+              const dateStr = `${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+              const dayItems = itemsByDate[dateStr] || [];
+              const isToday = dateStr === todayStr;
+              const isSelected = dateStr === selectedDay;
+              const isPast = dateStr < todayStr;
+
+              return (
+                <div key={day} onClick={() => setSelectedDay(isSelected ? null : dateStr)}
+                  style={{
+                    minHeight: 80, padding: "6px 8px", borderRadius: 8, cursor: "pointer",
+                    background: isSelected ? T.cyan + "18" : isToday ? T.teal + "12" : T.surface,
+                    border: `1px solid ${isSelected ? T.cyan + "60" : isToday ? T.teal + "40" : T.border}`,
+                    opacity: isPast && !isToday ? 0.7 : 1,
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.borderColor = T.cyan + "40"; }}
+                  onMouseLeave={e => { if (!isSelected) e.currentTarget.style.borderColor = isToday ? T.teal + "40" : T.border; }}>
+                  <div style={{ color: isToday ? T.teal : T.textPrimary, fontWeight: isToday ? 900 : 600, fontSize: 12, marginBottom: 4 }}>
+                    {isToday ? <span style={{ background: T.teal, color: "#fff", borderRadius: "50%", width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11 }}>{day}</span> : day}
+                  </div>
+                  {dayItems.slice(0,3).map((item, idx) => (
+                    <div key={idx} style={{ background: typeColors[item.type] + "25", borderLeft: `2px solid ${typeColors[item.type]}`, borderRadius: 3, padding: "1px 4px", marginBottom: 2, fontSize: 9, color: typeColors[item.type], fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {item.label}
+                    </div>
+                  ))}
+                  {dayItems.length > 3 && <div style={{ color: T.textMuted, fontSize: 9 }}>+{dayItems.length - 3} more</div>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Day detail panel */}
+        {selectedDay && (
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 20, height: "fit-content", position: "sticky", top: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div>
+                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Selected</div>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 16 }}>{new Date(selectedDay + "T12:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}</div>
+              </div>
+              <button onClick={() => setSelectedDay(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, width: 28, height: 28, borderRadius: 6, cursor: "pointer", fontSize: 16 }}>×</button>
+            </div>
+
+            {dayItems.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "30px 0", color: T.textMuted, fontSize: 13 }}>Nothing scheduled</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {dayItems.map((item, idx) => (
+                  <div key={idx} onClick={() => { if (onNavigate) onNavigate(item.nav); }}
+                    style={{ padding: "10px 12px", background: T.bg, border: `1px solid ${typeColors[item.type]}30`, borderLeft: `3px solid ${typeColors[item.type]}`, borderRadius: 8, cursor: onNavigate ? "pointer" : "default", transition: "box-shadow 0.15s" }}
+                    onMouseEnter={e => e.currentTarget.style.boxShadow = `0 2px 12px ${typeColors[item.type]}20`}
+                    onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13, marginBottom: 2 }}>{item.label}</div>
+                        <div style={{ color: T.textMuted, fontSize: 11 }}>{item.sub}</div>
+                      </div>
+                      <span style={{ background: typeColors[item.type] + "20", color: typeColors[item.type], borderRadius: 20, padding: "2px 8px", fontSize: 9, fontWeight: 800, textTransform: "uppercase", flexShrink: 0, marginLeft: 8 }}>{typeLabel[item.type]}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Itineraries list below calendar ── */}
+      {["CEO","Sales & Marketing"].includes(role) && itineraries.length > 0 && (
+        <div style={{ marginTop: 32 }}>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 12 }}>Your Itineraries</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+            {itineraries.map(itin => (
+              <div key={itin.id} onClick={() => setViewItinModal(itin)}
+                style={{ background: T.surface, border: `1px solid ${T.border}`, borderTop: "2px solid #F472B6", borderRadius: 10, padding: "14px 16px", cursor: "pointer" }}
+                onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 20px #F472B620"}
+                onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 4 }}>{itin.title}</div>
+                <div style={{ color: T.textMuted, fontSize: 11 }}>Week of {new Date(itin.week_start + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>
+                <div style={{ color: "#F472B6", fontSize: 11, marginTop: 6, fontWeight: 700 }}>{(itin.items || []).length} stops</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Create Itinerary Modal ── */}
+      {itinModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setItinModal(false)}>
+          <div style={{ background: T.surface, border: `1px solid #F472B640`, borderRadius: 16, width: "100%", maxWidth: 800, maxHeight: "90vh", overflow: "auto", padding: 28, boxShadow: "0 24px 80px rgba(0,0,0,0.5)" }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 20, marginBottom: 4 }}>Create Weekly Itinerary</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>Build a weekly outreach or visit schedule from your opportunities and leads</div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
+              <div>
+                <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Itinerary Title</label>
+                <input value={itinForm.title} onChange={e => setItinForm({ ...itinForm, title: e.target.value })} placeholder="e.g. Banking Sector Outreach Week" style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Week Starting</label>
+                <input type="date" value={itinForm.week_start} onChange={e => setItinForm({ ...itinForm, week_start: e.target.value })} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+              </div>
+            </div>
+
+            {/* Rows */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "120px 80px 1fr 1fr 1fr 32px", gap: 8, marginBottom: 8 }}>
+                {["Date","Time","Company","Action","Notes",""].map((h, i) => (
+                  <div key={i} style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</div>
+                ))}
+              </div>
+              {itinForm.rows.map((row, idx) => (
+                <div key={idx} style={{ display: "grid", gridTemplateColumns: "120px 80px 1fr 1fr 1fr 32px", gap: 8, marginBottom: 8 }}>
+                  <input type="date" value={row.date} onChange={e => { const rows = [...itinForm.rows]; rows[idx].date = e.target.value; setItinForm({ ...itinForm, rows }); }} style={{ padding: "7px 8px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+                  <input value={row.time} onChange={e => { const rows = [...itinForm.rows]; rows[idx].time = e.target.value; setItinForm({ ...itinForm, rows }); }} placeholder="9:00am" style={{ padding: "7px 8px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+                  <select value={row.company} onChange={e => { const rows = [...itinForm.rows]; rows[idx].company = e.target.value; setItinForm({ ...itinForm, rows }); }} style={{ padding: "7px 8px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: row.company ? T.textPrimary : T.textMuted, fontSize: 12, fontFamily: "inherit", outline: "none" }}>
+                    <option value="">Select company...</option>
+                    {opportunities.length > 0 && <optgroup label="── Opportunitys ──">{opportunities.map(l => <option key={"l"+l.id} value={l.company}>{l.company}</option>)}</optgroup>}
+                    {opps.length > 0 && <optgroup label="── Leads ──">{opps.map(o => <option key={"o"+o.id} value={o.company}>{o.company}</option>)}</optgroup>}
+                  </select>
+                  <input value={row.action} onChange={e => { const rows = [...itinForm.rows]; rows[idx].action = e.target.value; setItinForm({ ...itinForm, rows }); }} placeholder="e.g. Cold call, Site visit" style={{ padding: "7px 8px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+                  <input value={row.notes} onChange={e => { const rows = [...itinForm.rows]; rows[idx].notes = e.target.value; setItinForm({ ...itinForm, rows }); }} placeholder="Notes..." style={{ padding: "7px 8px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+                  <button onClick={() => { const rows = itinForm.rows.filter((_, i) => i !== idx); setItinForm({ ...itinForm, rows: rows.length ? rows : [{ date: "", time: "", company: "", action: "", notes: "" }] }); }} style={{ background: T.red + "18", border: `1px solid ${T.red}30`, color: T.red, borderRadius: 6, cursor: "pointer", fontSize: 14, fontWeight: 700 }}>×</button>
+                </div>
+              ))}
+              <button onClick={() => setItinForm({ ...itinForm, rows: [...itinForm.rows, { date: "", time: "", company: "", action: "", notes: "" }] })} style={{ background: "none", border: `1px dashed ${T.border}`, color: T.textMuted, padding: "7px 16px", borderRadius: 6, cursor: "pointer", fontSize: 12, width: "100%", marginTop: 4 }}>+ Add Row</button>
+            </div>
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={async () => {
+                if (!itinForm.title || !itinForm.week_start) return;
+                setItinSaving(true);
+                const validRows = itinForm.rows.filter(r => r.date && r.company);
+                await supabase.from("itineraries").insert({
+                  title: itinForm.title,
+                  week_start: itinForm.week_start,
+                  created_by: uid,
+                  created_by_name: user?.name || "",
+                  items: validRows,
+                });
+                setItinSaving(false);
+                setItinModal(false);
+                setItinForm({ title: "", week_start: "", rows: [{ date: "", time: "", company: "", action: "", notes: "" }] });
+                load();
+                loadOpportunitysOpps();
+              }} disabled={itinSaving || !itinForm.title || !itinForm.week_start} style={{ background: "linear-gradient(135deg, #F472B6, #E879F9)", border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, opacity: (!itinForm.title || !itinForm.week_start) ? 0.5 : 1 }}>{itinSaving ? "Saving..." : "Save & Add to Calendar"}</button>
+              <button onClick={() => setItinModal(false)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── View Itinerary Modal ── */}
+      {viewItinModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setViewItinModal(null)}>
+          <div style={{ background: T.surface, border: `1px solid #F472B640`, borderRadius: 16, width: "100%", maxWidth: 700, maxHeight: "85vh", overflow: "auto", padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+              <div>
+                <div style={{ color: "#F472B6", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>Itinerary</div>
+                <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 20 }}>{viewItinModal.title}</div>
+                <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Week of {new Date(viewItinModal.week_start + "T12:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
+              </div>
+              <button onClick={() => setViewItinModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {(viewItinModal.items || []).sort((a,b) => (a.date > b.date ? 1 : -1)).map((item, idx) => (
+                <div key={idx} style={{ display: "grid", gridTemplateColumns: "140px 70px 1fr 1fr", gap: 12, padding: "12px 14px", background: T.bg, border: `1px solid ${T.border}`, borderLeft: "3px solid #F472B6", borderRadius: 8 }}>
+                  <div><div style={{ color: T.textMuted, fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>Date</div><div style={{ color: T.textPrimary, fontSize: 12, fontWeight: 700 }}>{new Date(item.date + "T12:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}</div></div>
+                  <div><div style={{ color: T.textMuted, fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>Time</div><div style={{ color: T.textPrimary, fontSize: 12 }}>{item.time || "—"}</div></div>
+                  <div><div style={{ color: T.textMuted, fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>Company</div><div style={{ color: "#F472B6", fontSize: 12, fontWeight: 700 }}>{item.company}</div><div style={{ color: T.textMuted, fontSize: 11 }}>{item.action}</div></div>
+                  <div><div style={{ color: T.textMuted, fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>Notes</div><div style={{ color: T.textSecondary, fontSize: 12 }}>{item.notes || "—"}</div></div>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
+              <button onClick={async () => { if (!window.confirm("Delete this itinerary?")) return; await supabase.from("itineraries").delete().eq("id", viewItinModal.id); setViewItinModal(null); loadOpportunitysOpps(); load(); }} style={{ background: T.red + "18", border: `1px solid ${T.red}40`, color: T.red, padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Delete Itinerary</button>
+              <button onClick={() => setViewItinModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 export default function StretchfieldWorkRoom({ user: propUser, profile: propProfile, onLogout }) {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);

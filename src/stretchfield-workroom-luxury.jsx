@@ -5794,14 +5794,7 @@ const CRMView = ({ user }) => {
   const canEdit = ["CEO", "Country Manager", "Sales & Marketing"].includes(user?.role);
   const canApprove = ["CEO", "Country Manager"].includes(user?.role);
 
-  const STAGES = [
-    { id: "new", label: "New", color: T.cyan },
-    { id: "contacted", label: "Contacted", color: T.blue },
-    { id: "qualified", label: "Qualified", color: T.amber },
-    { id: "proposal", label: "Proposal", color: "#E879F9" },
-    { id: "won", label: "Won", color: T.teal },
-    { id: "lost", label: "Lost", color: "#F43F5E" },
-  ];
+
 
   const load = async () => {
     const [l, a, p, m, c] = await Promise.all([

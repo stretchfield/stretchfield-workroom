@@ -6467,17 +6467,21 @@ const CalendarView = ({ user, onNavigate }) => {
       });
     }
 
-    // ── ITINERARIES ──
-    if (["CEO","Sales & Marketing"].includes(role)) {
-      const { data: itins } = await supabase.from("itineraries").select("*").eq("created_by", uid);
+    // ── ITINERARIES / FOLLOW-UPS ──
+    {
+      const { data: itins } = await supabase.from("itineraries").select("*");
       (itins || []).forEach(itin => {
-        (itin.items || []).forEach((item, idx) => {
+        // Parse items if stored as JSON string
+        let items = itin.items;
+        if (typeof items === "string") { try { items = JSON.parse(items); } catch(e) { items = []; } }
+        (items || []).forEach((item, idx) => {
           if (item.date) all.push({
             id: "itin-"+itin.id+"-"+idx,
             date: item.date,
             type: "itinerary",
-            label: item.company || item.title || "Itinerary Item",
-            sub: itin.title + " · " + (item.time || "") + " · " + (item.action || ""),
+            color: "#8B5CF6",
+            label: item.company || itin.title || "Follow-up",
+            sub: itin.title + (item.time ? " · " + item.time : "") + (item.action ? " · " + item.action : ""),
             nav: "calendar"
           });
         });

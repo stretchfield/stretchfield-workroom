@@ -5760,6 +5760,15 @@ const VendorTasksView = ({ user }) => {
 
 
 // ─── CRM VIEW ─────────────────────────────────────────────────────────────────
+const STAGES = [
+  { id: "new", label: "New", color: "#00C8FF" },
+  { id: "contacted", label: "Contacted", color: "#3B82F6" },
+  { id: "qualified", label: "Qualified", color: "#F59E0B" },
+  { id: "proposal", label: "Proposal", color: "#E879F9" },
+  { id: "won", label: "Won", color: "#00E5C8" },
+  { id: "lost", label: "Lost", color: "#F43F5E" },
+];
+
 const CRMView = ({ user }) => {
   const [leads, setLeads] = useState([]);
   const [activities, setActivities] = useState([]);
@@ -5885,144 +5894,7 @@ const CRMView = ({ user }) => {
   const typeIcons = { note: "📝", call: "📞", meeting: "🤝", email: "✉️", demo: "🎯", "follow-up": "🔄" };
 
   // ── KANBAN CARD ──
-  const LeadCard = ({ lead }) => {
-    const stage = STAGES.find(s => s.id === lead.status) || STAGES[0];
-    const leadActivities = activities.filter(a => a.lead_id === lead.id);
-    const lastAct = leadActivities[0];
-    const daysSince = lead.created_at ? Math.floor((new Date() - new Date(lead.created_at)) / (1000*60*60*24)) : 0;
-    const isSelected = selectedLead?.id === lead.id;
-
-    return (
-      <div onClick={() => setSelectedLead(isSelected ? null : lead)}
-        style={{ background: isSelected ? T.surface : T.bg, border: `1px solid ${isSelected ? stage.color+"80" : T.border}`, borderLeft: `3px solid ${stage.color}`, borderRadius: 10, padding: "14px 16px", cursor: "pointer", transition: "all 0.2s", marginBottom: 8 }}
-        onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.borderColor = stage.color+"50"; e.currentTarget.style.background = T.surface; }}}
-        onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.background = T.bg; }}}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lead.company}</div>
-            {lead.contact_name && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{lead.contact_name}</div>}
-          </div>
-          {lead.status === "won" && !lead.approved && <span style={{ background: T.amber+"20", color: T.amber, fontSize: 9, fontWeight: 800, borderRadius: 20, padding: "2px 7px", flexShrink: 0, marginLeft: 6 }}>CEO</span>}
-          {lead.status === "won" && lead.approved && <span style={{ background: "#10B98120", color: "#10B981", fontSize: 9, fontWeight: 800, borderRadius: 20, padding: "2px 7px", flexShrink: 0, marginLeft: 6 }}>✓</span>}
-        </div>
-        <div style={{ color: T.gold, fontWeight: 900, fontSize: 15, marginBottom: 8 }}>GHS {(lead.value||0).toLocaleString()}</div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <span style={{ color: T.textMuted, fontSize: 10 }}>{daysSince}d</span>
-            {lastAct && <span style={{ color: typeColors[lastAct.type]||T.textMuted, fontSize: 10 }}>{typeIcons[lastAct.type]}</span>}
-            <span style={{ color: T.textMuted, fontSize: 10 }}>{leadActivities.length} act.</span>
-          </div>
-          {lead.assigned_name && <span style={{ color: T.cyan, fontSize: 10, fontWeight: 600 }}>{lead.assigned_name.split(" ")[0]}</span>}
-        </div>
-      </div>
-    );
-  };
-
-  // ── LEAD DETAIL PANEL ──
-  const LeadPanel = ({ lead }) => {
-    const leadActivities = activities.filter(a => a.lead_id === lead.id).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
-    const stage = STAGES.find(s => s.id === lead.status) || STAGES[0];
-    return (
-      <div style={{ width: 380, flexShrink: 0, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 200px)", overflow: "hidden" }}>
-        {/* Panel Header */}
-        <div style={{ padding: "18px 20px", borderBottom: `1px solid ${T.border}`, background: stage.color+"08" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div>
-              <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 16 }}>{lead.company}</div>
-              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{lead.contact_name} {lead.phone ? "· "+lead.phone : ""}</div>
-              {lead.email && <div style={{ color: T.cyan, fontSize: 11, marginTop: 2 }}>{lead.email}</div>}
-            </div>
-            <button onClick={() => setSelectedLead(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, width: 28, height: 28, borderRadius: 6, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
-          </div>
-          <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
-            <span style={{ color: T.gold, fontWeight: 900, fontSize: 18 }}>GHS {(lead.value||0).toLocaleString()}</span>
-            <span style={{ background: stage.color+"20", color: stage.color, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{lead.status}</span>
-          </div>
-          {/* Stage selector */}
-          {canEdit && (
-            <div style={{ display: "flex", gap: 4, marginTop: 12, flexWrap: "wrap" }}>
-              {STAGES.map(s => (
-                <button key={s.id} onClick={() => updateStatus(lead.id, s.id)} style={{ padding: "3px 10px", borderRadius: 20, border: `1px solid ${lead.status === s.id ? s.color : T.border}`, background: lead.status === s.id ? s.color+"20" : "none", color: lead.status === s.id ? s.color : T.textMuted, fontSize: 10, fontWeight: 700, cursor: "pointer" }}>{s.label}</button>
-              ))}
-            </div>
-          )}
-          {/* CEO Approve button */}
-          {canApprove && lead.status === "won" && !lead.approved && (
-            <button onClick={() => { setApprovalModal(lead); const mc = existingClients.find(c => c.email === lead.email || c.company === lead.company); setMatchedClient(mc||null); }} style={{ marginTop: 10, width: "100%", padding: "8px", background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: "none", borderRadius: 8, cursor: "pointer", color: "#fff", fontSize: 12, fontWeight: 800 }}>✓ Approve — Create Client & Portal</button>
-          )}
-        </div>
-
-        {/* Notes */}
-        {lead.notes && (
-          <div style={{ padding: "12px 20px", borderBottom: `1px solid ${T.border}44`, background: T.bg }}>
-            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>Notes</div>
-            <div style={{ color: T.textSecondary, fontSize: 12, lineHeight: 1.5 }}>{lead.notes}</div>
-          </div>
-        )}
-
-        {/* Activity Feed */}
-        <div style={{ flex: 1, overflow: "auto", padding: "14px 20px" }}>
-          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Activity Timeline</div>
-
-          {/* Add Activity */}
-          {canEdit && (
-            <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "12px", marginBottom: 14 }}>
-              <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
-                {["call","meeting","email","note","demo","follow-up"].map(t => (
-                  <button key={t} onClick={() => setActForm(f => ({...f, type: t}))} style={{ padding: "2px 8px", borderRadius: 20, border: `1px solid ${actForm.type === t ? typeColors[t] : T.border}`, background: actForm.type === t ? typeColors[t]+"20" : "none", color: actForm.type === t ? typeColors[t] : T.textMuted, fontSize: 9, fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>
-                    {typeIcons[t]} {t}
-                  </button>
-                ))}
-              </div>
-              <textarea value={actForm.notes} onChange={e => setActForm(f => ({...f, notes: e.target.value}))} placeholder={`Log ${actForm.type}...`} rows={2} style={{ width: "100%", padding: "7px 10px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none", resize: "none", boxSizing: "border-box", marginBottom: 6 }} />
-              {["call","meeting","demo","follow-up"].includes(actForm.type) && (
-                <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
-                  <input type="date" value={actForm.scheduled_date} onChange={e => setActForm(f => ({...f, scheduled_date: e.target.value}))} style={{ flex: 1, padding: "5px 8px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 5, color: T.textPrimary, fontSize: 11, fontFamily: "inherit", outline: "none" }} />
-                  <input type="time" value={actForm.scheduled_time} onChange={e => setActForm(f => ({...f, scheduled_time: e.target.value}))} style={{ flex: 1, padding: "5px 8px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 5, color: T.textPrimary, fontSize: 11, fontFamily: "inherit", outline: "none" }} />
-                </div>
-              )}
-              {actForm.scheduled_date && <div style={{ color: "#8B5CF6", fontSize: 10, fontWeight: 700, marginBottom: 6 }}>📅 {actForm.scheduled_date}{actForm.scheduled_time ? " at "+actForm.scheduled_time : ""} → calendar</div>}
-              <button onClick={() => addActivity(lead.id, lead.company)} disabled={addingAct || !actForm.notes} style={{ background: T.cyan, border: "none", color: "#000", padding: "5px 14px", borderRadius: 5, cursor: "pointer", fontSize: 11, fontWeight: 800, opacity: !actForm.notes ? 0.5 : 1 }}>{addingAct ? "..." : "Log"}</button>
-            </div>
-          )}
-
-          {/* Timeline */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {leadActivities.length === 0 && <div style={{ color: T.textMuted, fontSize: 12, textAlign: "center", padding: "20px 0" }}>No activity yet</div>}
-            {leadActivities.map((act, i) => {
-              const color = typeColors[act.type] || T.textMuted;
-              return (
-                <div key={act.id} style={{ display: "flex", gap: 10 }}>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: color+"20", border: `1px solid ${color}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, flexShrink: 0 }}>{typeIcons[act.type]}</div>
-                    {i < leadActivities.length-1 && <div style={{ width: 1, flex: 1, background: T.border, marginTop: 4, minHeight: 12 }} />}
-                  </div>
-                  <div style={{ flex: 1, paddingBottom: 8 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
-                      <span style={{ color, fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{act.type}</span>
-                      <span style={{ color: T.textMuted, fontSize: 10 }}>{new Date(act.created_at).toLocaleDateString("en-GB")}</span>
-                    </div>
-                    <div style={{ color: T.textSecondary, fontSize: 12, lineHeight: 1.5 }}>{act.notes}</div>
-                    {act.scheduled_date && <div style={{ color: "#8B5CF6", fontSize: 10, fontWeight: 700, marginTop: 3 }}>📅 {act.scheduled_date}{act.scheduled_time ? " at "+act.scheduled_time : ""}</div>}
-                    <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>— {act.created_by_name}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Panel Footer */}
-        {canEdit && (
-          <div style={{ padding: "12px 20px", borderTop: `1px solid ${T.border}`, display: "flex", gap: 8 }}>
-            <button onClick={() => handleDelete(lead.id)} style={{ background: T.red+"15", border: `1px solid ${T.red}30`, color: T.red, padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>Delete</button>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const handleDelete = async (id) => {
+      const handleDelete = async (id) => {
     if (!window.confirm("Delete this lead?")) return;
     await supabase.from("opportunities").update({ converted_lead_id: null }).eq("converted_lead_id", id);
     await supabase.from("opportunities").delete().eq("id", id);

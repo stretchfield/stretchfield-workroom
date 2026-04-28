@@ -5972,7 +5972,7 @@ const CRMView = ({ user }) => {
     setModal(false);
     setForm({ company: "", contact_name: "", email: "", phone: "", source: "", value: "", notes: "", status: "new", assigned_to: "", assigned_name: "" });
     setSaving(false);
-    load();
+    await load();
   };
 
   const updateStatus = async (leadId, newStatus) => {

@@ -3652,7 +3652,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
   const canManage = ["CEO", "Sales & Marketing"].includes(user?.role);
 
   const load = async () => {
-    const { data } = await supabase.from("opportunities").select("*").order("company");
+    const { data } = await supabase.from("leads").select("*").order("company");
     setLeads(data || []);
   };
 
@@ -3718,7 +3718,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
   const handleAdd = async () => {
     if (!form.company) return;
     setSaving(true);
-    await supabase.from("opportunities").insert({ ...form });
+    await supabase.from("leads").insert({ ...form });
     // form already includes contact_name, contact_email, contact_phone
     setSaving(false);
     setModal(false);
@@ -3728,7 +3728,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
 
   const handleUpdate = async () => {
     setSaving(true);
-    await supabase.from("opportunities").update({
+    await supabase.from("leads").update({
       company: editModal.company, sector: editModal.sector,
       presence: editModal.presence, event_fit: editModal.event_fit,
       notes: editModal.notes, status: editModal.status,
@@ -3742,38 +3742,1345 @@ const OpportunitiesView = ({ user, onNavigate }) => {
     load();
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm("Remove this opportunity?")) return;
+    await supabase.from("leads").delete().eq("id", id);
+    load();
+  };
 
   const handleConvert = async (opp) => {
-    if (!window.confirm(`Convert ${opp.company} to a Lead? They will appear in the Leads Pipeline.`)) return;
+    if (!window.confirm(`Convert ${opp.company} to a Lead? It will appear in the Leads Pipeline.`)) return;
     setSaving(true);
-    const { data: newLead, error } = await supabase.from("leads").insert({
+    const { data: opportunity, error } = await supabase.from("opportunities").insert({
       company: opp.company,
       contact_name: opp.contact_name || "",
-      email: opp.contact_email || opp.email || "",
-      phone: opp.contact_phone || opp.phone || "",
+      email: opp.contact_email || "",
+      phone: opp.contact_phone || "",
       status: "new",
       value: 0,
-      notes: `Converted from Opportunities.\n\nEvent Fit: ${opp.event_fit || ""}\n\nNotes: ${opp.notes || ""}`,
-      source: "Opportunities",
+      notes: `Converted from Leads Portal.\n\nEvent Fit: ${opp.event_fit || ""}\n\nOpportunity Notes: ${opp.notes || ""}`,
+      source: "Leads Portal",
       created_by: user?.id,
       assigned_to: user?.id,
       assigned_name: user?.name || "",
     }).select().single();
-    if (!error && newLead) {
-      await supabase.from("opportunities").update({
+    console.log("Opportunity insert result:", opportunity, error);
+    if (!error && opportunity) {
+      await supabase.from("leads").update({
         status: "Converted",
+        converted_opportunity_id: opportunity.id,
         updated_at: new Date().toISOString(),
       }).eq("id", opp.id);
       setSaving(false);
       load();
+      // Navigate to CRM tab
       if (onNavigate) onNavigate("crm");
     } else {
-      console.error("Convert error:", error);
       setSaving(false);
     }
   };
 
-  
+  const inputStyle = { width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
+  const labelStyle = { color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 };
+
+  const PresencePills = ({ presence }) => (
+    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+      {(presence || "").split("+").map(p => (
+        <span key={p} style={{ background: (presenceColors[p] || T.textMuted) + "18", color: presenceColors[p] || T.textMuted, border: `1px solid ${presenceColors[p] || T.textMuted}30`, borderRadius: 20, padding: "1px 8px", fontSize: 9, fontWeight: 800 }}>{p}</span>
+      ))}
+    </div>
+  );
+
+  const converted = leads.filter(o => o.status === "Converted").length;
+  const qualified = leads.filter(o => o.status === "Qualified").length;
+  const contacted = leads.filter(o => o.status === "Contacted").length;
+  const panAfrica = leads.filter(o => o.presence === "GH+NG+KE").length;
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>CRM</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Opportunities</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{leads.length} target companies · {converted} converted to leads</div>
+        </div>
+        {canManage && (
+          <button onClick={() => setModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, letterSpacing: "0.06em" }}>+ Add Opportunity</button>
+        )}
+      </div>
+
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Total", value: leads.length, color: T.blue },
+          { label: "Contacted", value: contacted, color: T.amber },
+          { label: "Qualified", value: qualified, color: T.teal },
+          { label: "Converted", value: converted, color: "#10B981" },
+          { label: "Pan-Africa", value: panAfrica, color: T.magenta },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 20, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search company or sector..." style={{ ...inputStyle, width: 220, flex: "none" }} />
+        <select value={sectorFilter} onChange={e => setSectorFilter(e.target.value)} style={{ ...inputStyle, width: "auto", flex: "none" }}>
+          <option value="all">All Sectors</option>
+          {sectors.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={presenceFilter} onChange={e => setPresenceFilter(e.target.value)} style={{ ...inputStyle, width: "auto", flex: "none" }}>
+          <option value="all">All Presence</option>
+          <option value="GH+NG+KE">GH + NG + KE</option>
+          <option value="GH+NG">GH + NG</option>
+          <option value="GH+KE">GH + KE</option>
+          <option value="GH">GH Only</option>
+        </select>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ ...inputStyle, width: "auto", flex: "none" }}>
+          <option value="all">All Status</option>
+          {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <span style={{ color: T.textMuted, fontSize: 11, marginLeft: "auto" }}>{filtered.length} results</span>
+      </div>
+
+      {/* Table */}
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${T.border}`, background: T.bg }}>
+                {["Company", "Sector", "Presence", "Event Fit", "Notes", "Status", ""].map((h, i) => (
+                  <th key={i} style={{ padding: "12px 16px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((o, i) => {
+                const statusColor = statusColors[o.status] || T.textMuted;
+                return (
+                  <React.Fragment key={o.id}>
+                  <tr style={{ borderBottom: expandedOpp !== o.id && i < filtered.length - 1 ? `1px solid ${T.border}44` : "none", transition: "background 0.15s" }}
+                    onMouseEnter={e => e.currentTarget.style.background = T.bg}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                    <td style={{ padding: "12px 16px" }}>
+                      <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{o.company}</div>
+                      {o.contact_name && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>👤 {o.contact_name}</div>}
+                      {o.contact_email && <div style={{ color: T.cyan, fontSize: 11 }}>✉ {o.contact_email}</div>}
+                      {o.contact_phone && <div style={{ color: T.textMuted, fontSize: 11 }}>📞 {o.contact_phone}</div>}
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <span style={{ color: T.textMuted, fontSize: 12 }}>{o.sector}</span>
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <PresencePills presence={o.presence} />
+                    </td>
+                    <td style={{ padding: "12px 16px", maxWidth: 200 }}>
+                      <span style={{ color: T.textSecondary, fontSize: 12, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{o.event_fit}</span>
+                    </td>
+                    <td style={{ padding: "12px 16px", maxWidth: 200 }}>
+                      <span style={{ color: T.textMuted, fontSize: 12, fontStyle: "italic", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{o.notes}</span>
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <span style={{ background: statusColor + "18", color: statusColor, border: `1px solid ${statusColor}30`, borderRadius: 20, padding: "3px 10px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap" }}>{o.status}</span>
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      {canManage && (
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button onClick={() => setEditModal({ ...o })} style={{ background: T.cyan + "15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>Edit</button>
+                          <button onClick={() => { const isOpen = expandedOpp === o.id; setExpandedOpp(isOpen ? null : o.id); if (!isOpen) loadActivities(o.id); }} style={{ background: expandedOpp === o.id ? "#8B5CF620" : T.surface, border: `1px solid ${expandedOpp === o.id ? "#8B5CF6" : T.border}`, color: expandedOpp === o.id ? "#8B5CF6" : T.textMuted, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>
+                            💬 {(oppActivities[o.id]||[]).length > 0 ? oppActivities[o.id].length : "Notes"}
+                          </button>
+                          {o.status !== "Converted" && (
+                            <button onClick={() => handleConvert(o)} style={{ background: "#10B98115", border: "1px solid #10B98130", color: "#10B981", padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>→ Lead</button>
+                          )}
+                          <button onClick={() => handleDelete(o.id)} style={{ background: T.red + "15", border: `1px solid ${T.red}30`, color: T.red, padding: "4px 8px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>×</button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                  {/* Notes Thread Row */}
+                  {expandedOpp === o.id && (
+                    <tr key={o.id + "_notes"}>
+                      <td colSpan={8} style={{ padding: "0 12px 12px", background: T.bg }}>
+                        <div style={{ border: `1px solid #8B5CF630`, borderRadius: 10, padding: "14px 16px", background: T.surface }}>
+                          <div style={{ color: "#8B5CF6", fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Notes & Follow-ups — {o.company}</div>
+
+                          {/* Add Activity */}
+                          {canManage && (
+                            <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "12px 14px", marginBottom: 12 }}>
+                              <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+                                {["note","call","meeting","email","demo","follow-up"].map(t => (
+                                  <button key={t} onClick={() => setActForm(f => ({...f, type: t}))} style={{ padding: "3px 10px", borderRadius: 20, border: `1px solid ${actForm.type === t ? "#8B5CF6" : T.border}`, background: actForm.type === t ? "#8B5CF620" : "none", color: actForm.type === t ? "#8B5CF6" : T.textMuted, fontSize: 10, fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>{t}</button>
+                                ))}
+                              </div>
+                              <textarea value={actForm.content} onChange={e => setActForm(f => ({...f, content: e.target.value}))} placeholder={`Add ${actForm.type}...`} rows={2} style={{ width: "100%", padding: "8px 10px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none", resize: "none", boxSizing: "border-box", marginBottom: 6 }} />
+                              {["call","meeting","demo","follow-up"].includes(actForm.type) && (
+                                <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                                  <input type="date" value={actForm.scheduled_date} onChange={e => setActForm(f => ({...f, scheduled_date: e.target.value}))} style={{ flex: 1, padding: "6px 10px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+                                  <input type="time" value={actForm.scheduled_time} onChange={e => setActForm(f => ({...f, scheduled_time: e.target.value}))} style={{ flex: 1, padding: "6px 10px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+                                </div>
+                              )}
+                              {actForm.scheduled_date && <div style={{ color: "#8B5CF6", fontSize: 11, fontWeight: 700, marginBottom: 6 }}>📅 Will be added to calendar on {actForm.scheduled_date}{actForm.scheduled_time ? " at " + actForm.scheduled_time : ""}</div>}
+                              <button onClick={() => addActivity(o.id, o.company)} disabled={addingAct || !actForm.content} style={{ background: "#8B5CF6", border: "none", color: "#fff", padding: "6px 16px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700, opacity: !actForm.content ? 0.5 : 1 }}>{addingAct ? "Adding..." : "Add"}</button>
+                            </div>
+                          )}
+
+                          {/* Thread */}
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            {(oppActivities[o.id]||[]).length === 0 && <div style={{ color: T.textMuted, fontSize: 12, textAlign: "center", padding: "8px 0" }}>No notes yet.</div>}
+                            {(oppActivities[o.id]||[]).map(act => {
+                              const typeColors = { note: T.textMuted, call: T.teal, meeting: T.cyan, email: T.blue, demo: T.amber, "follow-up": "#8B5CF6" };
+                              const color = typeColors[act.type] || T.textMuted;
+                              return (
+                                <div key={act.id} style={{ background: T.bg, border: `1px solid ${T.border}`, borderLeft: `3px solid ${color}`, borderRadius: 6, padding: "10px 12px" }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                                    <span style={{ background: color+"18", color, borderRadius: 20, padding: "1px 8px", fontSize: 9, fontWeight: 800, textTransform: "uppercase" }}>{act.type}</span>
+                                    <span style={{ color: T.textMuted, fontSize: 10 }}>{new Date(act.created_at).toLocaleDateString("en-GB")} · {act.created_by_name}</span>
+                                  </div>
+                                  <div style={{ color: T.textPrimary, fontSize: 12, lineHeight: 1.5 }}>{act.content}</div>
+                                  {act.scheduled_date && <div style={{ color: "#8B5CF6", fontSize: 11, fontWeight: 700, marginTop: 4 }}>📅 {act.scheduled_date}{act.scheduled_time ? " at " + act.scheduled_time : ""} — on calendar</div>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+          {filtered.length === 0 && (
+            <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted, fontSize: 13 }}>No leads match your filters.</div>
+          )}
+        </div>
+      </div>
+
+      {/* Add Modal */}
+      {modal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setModal(false)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 540, padding: 28, boxShadow: `0 24px 80px rgba(0,0,0,0.4)`, animation: "fadeUp 0.25s ease" }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 20 }}>Add Opportunity</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
+              <div><label style={labelStyle}>Company Name</label><input value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} style={inputStyle} placeholder="e.g. Ecobank Ghana" /></div>
+              <div><label style={labelStyle}>Sector</label><input value={form.sector} onChange={e => setForm({ ...form, sector: e.target.value })} style={inputStyle} placeholder="e.g. Banking" /></div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
+              <div><label style={labelStyle}>Presence</label>
+                <select value={form.presence} onChange={e => setForm({ ...form, presence: e.target.value })} style={inputStyle}>
+                  <option value="GH">GH Only</option>
+                  <option value="GH+NG">GH + NG</option>
+                  <option value="GH+KE">GH + KE</option>
+                  <option value="GH+NG+KE">GH + NG + KE</option>
+                </select>
+              </div>
+              <div><label style={labelStyle}>Status</label>
+                <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} style={inputStyle}>
+                  {statuses.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Event Fit</label><input value={form.event_fit} onChange={e => setForm({ ...form, event_fit: e.target.value })} style={inputStyle} placeholder="e.g. Brand activations, product launches" /></div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
+              <div><label style={labelStyle}>Contact Name</label><input value={form.contact_name} onChange={e => setForm({ ...form, contact_name: e.target.value })} style={inputStyle} placeholder="John Mensah" /></div>
+              <div><label style={labelStyle}>Email</label><input value={form.contact_email} onChange={e => setForm({ ...form, contact_email: e.target.value })} style={inputStyle} placeholder="john@company.com" /></div>
+              <div><label style={labelStyle}>Phone</label><input value={form.contact_phone} onChange={e => setForm({ ...form, contact_phone: e.target.value })} style={inputStyle} placeholder="+233 XX XXX XXXX" /></div>
+            </div>
+            <div style={{ marginBottom: 20 }}><label style={labelStyle}>Notes</label><textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3} style={{ ...inputStyle, resize: "vertical" }} placeholder="Follow-up notes, strategy, contact info..." /></div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={handleAdd} disabled={saving || !form.company} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, opacity: !form.company ? 0.5 : 1 }}>{saving ? "Saving..." : "Add Opportunity"}</button>
+              <button onClick={() => setModal(false)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setEditModal(null)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 540, padding: 28, boxShadow: `0 24px 80px rgba(0,0,0,0.4)`, animation: "fadeUp 0.25s ease" }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 20 }}>Edit — {editModal.company}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
+              <div><label style={labelStyle}>Company Name</label><input value={editModal.company} onChange={e => setEditModal({ ...editModal, company: e.target.value })} style={inputStyle} /></div>
+              <div><label style={labelStyle}>Sector</label><input value={editModal.sector || ""} onChange={e => setEditModal({ ...editModal, sector: e.target.value })} style={inputStyle} /></div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
+              <div><label style={labelStyle}>Presence</label>
+                <select value={editModal.presence || "GH"} onChange={e => setEditModal({ ...editModal, presence: e.target.value })} style={inputStyle}>
+                  <option value="GH">GH Only</option>
+                  <option value="GH+NG">GH + NG</option>
+                  <option value="GH+KE">GH + KE</option>
+                  <option value="GH+NG+KE">GH + NG + KE</option>
+                </select>
+              </div>
+              <div><label style={labelStyle}>Status</label>
+                <select value={editModal.status || "New"} onChange={e => setEditModal({ ...editModal, status: e.target.value })} style={inputStyle}>
+                  {statuses.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Event Fit</label><input value={editModal.event_fit || ""} onChange={e => setEditModal({ ...editModal, event_fit: e.target.value })} style={inputStyle} /></div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
+              <div><label style={labelStyle}>Contact Name</label><input value={editModal.contact_name || ""} onChange={e => setEditModal({ ...editModal, contact_name: e.target.value })} style={inputStyle} placeholder="John Mensah" /></div>
+              <div><label style={labelStyle}>Email</label><input value={editModal.contact_email || ""} onChange={e => setEditModal({ ...editModal, contact_email: e.target.value })} style={inputStyle} placeholder="john@company.com" /></div>
+              <div><label style={labelStyle}>Phone</label><input value={editModal.contact_phone || ""} onChange={e => setEditModal({ ...editModal, contact_phone: e.target.value })} style={inputStyle} placeholder="+233 XX XXX XXXX" /></div>
+            </div>
+            <div style={{ marginBottom: 20 }}><label style={labelStyle}>Notes / Follow-up</label><textarea value={editModal.notes || ""} onChange={e => setEditModal({ ...editModal, notes: e.target.value })} rows={3} style={{ ...inputStyle, resize: "vertical" }} /></div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={handleUpdate} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>{saving ? "Saving..." : "Save Changes"}</button>
+              <button onClick={() => setEditModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const TaskCommentThread = ({ task, user }) => {
+  const [comments, setComments] = React.useState([]);
+  const [newComment, setNewComment] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
+
+  const canSeeComments = ["CEO", "Strategy & Events Opportunity"].includes(user?.role) || user?.id === task.assignee_id;
+  const canComment = ["CEO", "Strategy & Events Opportunity"].includes(user?.role) || user?.id === task.assignee_id;
+
+  const loadComments = async () => {
+    const { data } = await supabase.from("task_comments").select("*").eq("task_id", task.id).order("created_at", { ascending: true });
+    setComments(data || []);
+  };
+
+  React.useEffect(() => { loadComments(); }, [task.id]);
+
+  const handleSubmit = async () => {
+    if (!newComment.trim()) return;
+    setSaving(true);
+    await supabase.from("task_comments").insert({
+      task_id: task.id,
+      author_id: user.id,
+      author_name: user.name,
+      author_role: user.role,
+      message: newComment.trim(),
+    });
+    // Notify assignee if CEO or Strategy Opportunity comments
+    if (["CEO", "Strategy & Events Opportunity"].includes(user.role) && task.assignee_id && task.assignee_id !== user.id) {
+      await supabase.from("notifications").insert({
+        user_id: task.assignee_id,
+        title: `${user.name} commented on your task`,
+        message: `"${task.name}" — ${newComment.trim().slice(0, 80)}`,
+        type: "task",
+        resource_id: task.id,
+      });
+    }
+    // Notify CEO + Strategy Opportunity if assignee replies
+    if (!["CEO", "Strategy & Events Opportunity"].includes(user.role)) {
+      const { data: recipients } = await supabase.from("profiles").select("id").in("role", ["CEO", "Strategy & Events Opportunity"]);
+      for (const r of (recipients || [])) {
+        if (r.id !== user.id) {
+          await supabase.from("notifications").insert({
+            user_id: r.id,
+            title: `${user.name} replied on task`,
+            message: `"${task.name}" — ${newComment.trim().slice(0, 80)}`,
+            type: "task",
+            resource_id: task.id,
+          });
+        }
+      }
+    }
+    setNewComment("");
+    setSaving(false);
+    loadComments();
+  };
+
+  if (!canSeeComments) return null;
+
+  return (
+    <div style={{ marginTop: 20, borderTop: `1px solid ${T.border}`, paddingTop: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+        <div style={{ width: 5, height: 5, borderRadius: "50%", background: T.cyan, boxShadow: `0 0 6px ${T.cyan}` }} />
+        <span style={{ color: T.textPrimary, fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em" }}>Private Thread</span>
+        <span style={{ color: T.textMuted, fontSize: 10 }}>— CEO · Strategy Opportunity · You</span>
+      </div>
+
+      {/* Comment bubbles */}
+      {comments.length === 0 ? (
+        <div style={{ color: T.textMuted, fontSize: 12, fontStyle: "italic", marginBottom: 14 }}>No comments yet.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14, maxHeight: 260, overflowY: "auto", paddingRight: 4 }}>
+          {comments.map(c => {
+            const isMe = c.author_id === user.id;
+            const isCEO = c.author_role === "CEO";
+            const bubbleColor = isCEO ? T.cyan : c.author_role === "Strategy & Events Opportunity" ? T.teal : T.amber;
+            return (
+              <div key={c.id} style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" }}>
+                <div style={{ maxWidth: "85%", background: isMe ? bubbleColor + "20" : T.bg, border: `1px solid ${bubbleColor}30`, borderRadius: isMe ? "12px 12px 4px 12px" : "12px 12px 12px 4px", padding: "10px 14px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 5 }}>
+                    <span style={{ color: bubbleColor, fontSize: 11, fontWeight: 800 }}>{isMe ? "You" : c.author_name}</span>
+                    <span style={{ color: T.textMuted, fontSize: 10 }}>{new Date(c.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                  </div>
+                  <div style={{ color: T.textPrimary, fontSize: 13 }}>{c.message}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Reply input */}
+      {canComment && (
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+          <textarea
+            value={newComment}
+            onChange={e => setNewComment(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); }}}
+            placeholder={["CEO","Strategy & Events Opportunity"].includes(user?.role) ? "Add a comment..." : "Reply to this thread..."}
+            rows={2}
+            style={{ flex: 1, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "8px 12px", color: T.textPrimary, fontSize: 13, resize: "none", fontFamily: "inherit", outline: "none", transition: "border-color 0.15s" }}
+            onFocus={e => e.target.style.borderColor = T.cyan + "60"}
+            onBlur={e => e.target.style.borderColor = T.border}
+          />
+          <button onClick={handleSubmit} disabled={saving || !newComment.trim()} style={{
+            background: T.cyan + "20", border: `1px solid ${T.cyan}40`, color: T.cyan,
+            padding: "10px 18px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700,
+            opacity: !newComment.trim() ? 0.4 : 1, transition: "opacity 0.15s",
+          }}>
+            {saving ? "..." : "Send"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const TasksView = ({ userRole, openTaskId, onOpenHandled }) => {
+  const [tasks, setTasks] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [awardedVendors, setAwardedVendors] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [detailTask, setDetailTask] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ name: '', project_id: '', deadline: '', status: 'pending', assignee_id: '', assignee_name: '', assigned_by: '' });
+
+  const canEdit = ['CEO', 'Country Manager', 'Strategy & Events Opportunity', 'Vendor Manager', 'Vendor', 'Sales & Marketing'].includes(userRole);
+  const canToggleVisibility = ['CEO','Country Manager'].includes(userRole);
+
+  const openDetail = (task) => {
+    setDetailTask(task);
+    setEditForm({
+      name: task.name,
+      deadline: task.deadline || '',
+      status: task.status,
+      progress: task.progress || 0,
+      notes: task.notes || '',
+      assignee_id: task.assignee_id || '',
+      assignee_name: task.assignee_name || '',
+    });
+  };
+
+  const handleUpdate = async () => {
+    setSaving(true);
+    await supabase.from('tasks').update({
+      name: editForm.name,
+      deadline: editForm.deadline || null,
+      status: editForm.status,
+      progress: parseInt(editForm.progress),
+      notes: editForm.notes,
+      assignee_id: editForm.assignee_id || null,
+      assignee_name: editForm.assignee_name || '',
+    }).eq('id', detailTask.id);
+    setSaving(false);
+    setDetailTask(null);
+    load();
+  };
+
+  const load = async () => {
+    const [t, p, m, awards] = await Promise.all([
+      supabase.from('tasks').select('*').order('created_at', { ascending: false }),
+      supabase.from('projects').select('*'),
+      supabase.from('profiles').select('*').not('role', 'in', '("Client","Vendor")'),
+      supabase.from('rff_awards').select('*, rffs(project_id, event_name), profiles!vendor_id(id, name, email, role)').in('status', ['confirmed','po_created']),
+    ]);
+    setTasks(t.data || []);
+    setProjects(p.data || []);
+    setMembers(m.data || []);
+    // Build awarded vendors list with their event
+    const vendorIds = [...new Set((awards.data || []).map(a => a.vendor_id))];
+    if (vendorIds.length > 0) {
+      const { data: vendorProfiles } = await supabase.from('profiles').select('*').in('id', vendorIds);
+      // Attach event info to each vendor
+      const vendorsWithEvents = (vendorProfiles || []).map(v => ({
+        ...v,
+        awardedEventIds: (awards.data || []).filter(a => a.vendor_id === v.id).map(a => a.rffs?.project_id).filter(Boolean),
+      }));
+      setAwardedVendors(vendorsWithEvents);
+    } else {
+      setAwardedVendors([]);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  // Auto-open task from notification deep-link
+  useEffect(() => {
+    if (openTaskId && tasks.length > 0) {
+      const task = tasks.find(t => t.id === openTaskId);
+      if (task) {
+        openDetail(task);
+        if (onOpenHandled) onOpenHandled();
+      }
+    }
+  }, [openTaskId, tasks]);
+
+  const handleCreate = async () => {
+    setSaving(true);
+    const { error } = await supabase.from('tasks').insert({ 
+      name: form.name, 
+      project_id: form.project_id || null, 
+      deadline: form.deadline || null, 
+      status: form.status, 
+      progress: 0, 
+      comments: 0,
+      assignee_id: form.assignee_id || null,
+      assignee_name: form.assignee_name || '',
+      assigned_by: form.assigned_by || ''
+    });
+    if (error) { alert('Error: ' + error.message); setSaving(false); return; }
+    setModal(false);
+    setForm({ name: '', event_id: '', project_id: '', client_id: '', deadline: '', status: 'pending' });
+    setSaving(false);
+    load();
+  };
+
+  const pending = tasks.filter(t => t.status === "pending").length;
+  const inProg = tasks.filter(t => t.status === "in-progress").length;
+  const done = tasks.filter(t => t.status === "completed").length;
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Workload</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Event Tasks</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{tasks.length} total · {inProg} in progress · {done} completed</div>
+        </div>
+        {canEdit && <Btn onClick={() => setModal(true)}>+ New Task</Btn>}
+      </div>
+
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Pending", value: pending, color: T.amber },
+          { label: "In Progress", value: inProg, color: T.cyan },
+          { label: "Completed", value: done, color: T.teal },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "16px 18px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {tasks.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>✅</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No tasks yet</div>
+          <div style={{ color: T.textMuted, fontSize: 13 }}>Click "+ New Task" to get started.</div>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
+          {tasks.map((t, idx) => {
+            const proj = projects.find(p => p.id === t.project_id);
+            const pct = t.progress || 0;
+            const barColor = t.status === "completed" ? T.teal : pct > 66 ? T.cyan : pct > 33 ? T.amber : T.magenta;
+            return (
+              <div key={t.id} onClick={() => openDetail(t)} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px", cursor: "pointer", transition: "box-shadow 0.2s, border-color 0.2s" }}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 4px 24px ${T.cyan}12`; e.currentTarget.style.borderColor = T.cyan + "40"; }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = T.border; }}
+              >
+                {/* Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, letterSpacing: "-0.01em", marginBottom: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</div>
+                    {proj && <div style={{ color: T.cyan, fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>{proj.name}</div>}
+                    {proj?.client && <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{proj.client}</div>}
+                  </div>
+                  <Badge status={t.status} />
+                </div>
+
+                {/* Progress bar */}
+                <div style={{ height: 3, background: T.border + "44", borderRadius: 2, marginBottom: 6 }}>
+                  <div style={{ height: "100%", width: pct + "%", background: barColor, borderRadius: 2, transition: "width 0.4s ease" }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <div style={{ color: T.textMuted, fontSize: 10 }}>{pct}% complete</div>
+                  {t.deadline && <div style={{ color: T.textMuted, fontSize: 10 }}>Due {t.deadline}</div>}
+                </div>
+
+                {/* Assignee + visibility */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 8, borderTop: `1px solid ${T.border}44` }}>
+                  <div style={{ color: t.assignee_name ? T.cyan : T.textMuted, fontSize: 10, fontWeight: t.assignee_name ? 600 : 400 }}>
+                    {t.assignee_name ? "→ " + t.assignee_name : "Unassigned"}
+                  </div>
+                  {canToggleVisibility && (
+                    <button onClick={async (e) => {
+                      e.stopPropagation();
+                      await supabase.from("tasks").update({ visible_to_client: !t.visible_to_client }).eq("id", t.id);
+                      load();
+                    }} style={{
+                      background: t.visible_to_client ? T.teal + "18" : "none",
+                      border: `1px solid ${t.visible_to_client ? T.teal + "50" : T.border}`,
+                      color: t.visible_to_client ? T.teal : T.textMuted,
+                      padding: "2px 8px", borderRadius: 20, cursor: "pointer", fontSize: 9, fontWeight: 700,
+                    }}>
+                      {t.visible_to_client ? "👁 Client" : "Hidden"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Task Detail Modal */}
+      {detailTask && (
+        <Modal title={canEdit ? "Edit Task" : "Task Details"} onClose={() => setDetailTask(null)}>
+          <div style={{ color: T.cyan, fontSize: 12, fontWeight: 600, marginBottom: 16 }}>
+            📁 {projects.find(p => p.id === detailTask.project_id)?.name || 'No Event'}
+          </div>
+          {canEdit ? (
+            <>
+              <Input label="Task Name" value={editForm.name} onChange={v => setEditForm({ ...editForm, name: v })} />
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Progress: {editForm.progress}%</div>
+                <input type="range" min="0" max="100" value={editForm.progress}
+                  onChange={e => setEditForm({ ...editForm, progress: e.target.value })}
+                  style={{ width: '100%', accentColor: T.cyan }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: T.textMuted, fontSize: 11, marginTop: 4 }}>
+                  <span>0%</span><span>50%</span><span>100%</span>
+                </div>
+              </div>
+              <Select label="Status" options={[
+                { value: 'pending', label: 'Pending' },
+                { value: 'in-progress', label: 'In Progress' },
+                { value: 'completed', label: 'Completed' },
+              ]} value={editForm.status} onChange={v => setEditForm({ ...editForm, status: v })} />
+              <Select label="Assigned To" options={[{ value: '', label: 'Select...' }, ...members.map(m => ({ value: m.id, label: m.name + ' — ' + m.role }))]}
+                value={editForm.assignee_id}
+                onChange={v => { const m = members.find(x => x.id === v); setEditForm({ ...editForm, assignee_id: v, assignee_name: m ? m.name : '' }); }} />
+              <Input label="Deadline" type="date" value={editForm.deadline} onChange={v => setEditForm({ ...editForm, deadline: v })} />
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Notes</div>
+                <textarea value={editForm.notes} onChange={e => setEditForm({ ...editForm, notes: e.target.value })}
+                  placeholder="Add notes, updates or comments..."
+                  style={{ width: '100%', minHeight: 100, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, padding: 10, color: T.textPrimary, fontSize: 13, resize: 'vertical', fontFamily: 'inherit' }} />
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                <Btn onClick={handleUpdate} disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</Btn>
+                <Btn variant="ghost" onClick={() => setDetailTask(null)}>Cancel</Btn>
+              </div>
+            </>
+          ) : (
+            <div>
+              <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 12 }}>{detailTask.name}</div>
+              <ProgressBar value={detailTask.progress || 0} />
+              <div style={{ color: T.textSecondary, fontSize: 13, marginTop: 8 }}>{detailTask.progress || 0}% complete</div>
+              {detailTask.assignee_name && <div style={{ color: T.textSecondary, fontSize: 13, marginTop: 8 }}>👤 {detailTask.assignee_name}</div>}
+              {detailTask.deadline && <div style={{ color: T.textMuted, fontSize: 13, marginTop: 4 }}>📅 Due {detailTask.deadline}</div>}
+              {detailTask.notes && <div style={{ color: T.textSecondary, fontSize: 13, marginTop: 12, padding: 12, background: T.bg, borderRadius: 6 }}>{detailTask.notes}</div>}
+            </div>
+          )}
+        </Modal>
+      )}
+
+      {modal && (
+        <Modal title="New Task" onClose={() => setModal(false)}>
+          <Input label="Task Name" placeholder="Describe the task" value={form.name} onChange={v => setForm({ ...form, name: v })} />
+          <Select label="Event" options={[{ value: '', label: 'Select event...' }, ...projects.map(p => ({ value: p.id, label: p.name }))]} value={form.project_id} onChange={v => { const proj = projects.find(p => p.id === v); setForm({ ...form, project_id: v, client_id: proj?.client_id || '' }); }} />
+          {(() => {
+            // Get vendors awarded to this event
+            const eventVendors = form.project_id
+              ? awardedVendors.filter(a => a.rffs?.project_id === form.project_id).map(a => ({
+                  value: a.vendor_id,
+                  label: a.vendor_name + ' — Vendor',
+                  isVendor: true,
+                }))
+              : [];
+            const staffOptions = members.map(m => ({ value: m.id, label: m.name + ' — ' + m.role }));
+            const allOptions = [
+              { value: '', label: 'Select assignee...' },
+              ...staffOptions,
+              ...(eventVendors.length > 0 ? [{ value: '__divider__', label: '── Awarded Vendors ──', disabled: true }, ...eventVendors] : []),
+            ];
+            return (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Assign To (Person Responsible)</div>
+                <select value={form.assignee_id} onChange={e => {
+                  const v = e.target.value;
+                  if (v === '__divider__') return;
+                  const m = members.find(x => x.id === v);
+                  const vendor = awardedVendors.find(a => a.vendor_id === v);
+                  setForm({ ...form, assignee_id: v, assignee_name: m ? m.name : vendor ? vendor.vendor_name : '' });
+                }} style={{ width: '100%', padding: '9px 12px', background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: 'inherit', outline: 'none' }}>
+                  {allOptions.map((o, i) => <option key={i} value={o.value} disabled={o.disabled}>{o.label}</option>)}
+                </select>
+                {form.project_id && eventVendors.length > 0 && <div style={{ color: T.teal, fontSize: 11, marginTop: 4 }}>✓ {eventVendors.length} awarded vendor{eventVendors.length !== 1 ? "s" : ""} available for this event</div>}
+                {form.project_id && eventVendors.length === 0 && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>No confirmed vendors for this event yet</div>}
+              </div>
+            );
+          })()}
+          <Select label="Assigned By" options={[{ value: '', label: 'Select assignor...' }, ...members.map(m => ({ value: m.id, label: m.name + ' — ' + m.role }))]} value={form.assigned_by} onChange={v => setForm({ ...form, assigned_by: v })} />
+          <Input label="Deadline" type="date" value={form.deadline} onChange={v => setForm({ ...form, deadline: v })} />
+          <Select label="Status" options={[
+            { value: 'pending', label: 'Pending' },
+            { value: 'in-progress', label: 'In Progress' },
+            { value: 'completed', label: 'Completed' },
+          ]} value={form.status} onChange={v => setForm({ ...form, status: v })} />
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <Btn onClick={handleCreate} disabled={saving}>{saving ? 'Saving...' : 'Create Task'}</Btn>
+            <Btn variant="ghost" onClick={() => setModal(false)}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+const VendorsView = ({ user }) => {
+  const [rffs, setRffs] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [expandedEvent, setExpandedEvent] = useState(null);
+  const [showAppModal, setShowAppModal] = useState(false);
+  const [showApprovalsPanel, setShowApprovalsPanel] = useState(false);
+  const [vendorApps, setVendorApps] = useState([]);
+  const [expandedRff, setExpandedRff] = useState(null);
+  const [form, setForm] = useState({ title: '', description: '', client_id: '', client_name: '', project_id: '', event_name: '', deadline: '', event_type: '' });
+  const [file, setFile] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [resubmitModal, setResubmitModal] = useState(null);
+  const [resubmitFile, setResubmitFile] = useState(null);
+  const [resubmitNotes, setResubmitNotes] = useState('');
+  const isVendorManager = user?.role === 'Vendor Manager';
+
+  const load = async () => {
+    const [r, e, c, apps] = await Promise.all([
+      supabase.from('rffs').select('*').order('created_at', { ascending: false }),
+      supabase.from('projects').select('*'),
+      supabase.from('clients').select('*'),
+      supabase.from('vendor_applications').select('*').order('created_at', { ascending: false }),
+    ]);
+    // Show all RFFs for Vendor Manager/CEO/Admin
+    setRffs(r.data || []);
+    setEvents(e.data || []);
+    setClients(c.data || []);
+    setVendorApps(apps.data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const generateRffCode = async (eventType) => {
+    const typeMap = { "Conference/Seminar": "CS", "Product Launch": "PL", "Awards Ceremony": "AWD", "Corporate Party": "CP", "Other": "OTH" };
+    const prefix = typeMap[eventType] || "GEN";
+    const year = new Date().getFullYear().toString().slice(-2);
+    // Get or create sequence for this type+year
+    const { data: seq } = await supabase.from("rff_sequences").select("*").eq("event_type", prefix).eq("year", parseInt("20"+year)).single();
+    let nextSeq = 1;
+    if (seq) {
+      nextSeq = (seq.last_sequence || 0) + 1;
+      await supabase.from("rff_sequences").update({ last_sequence: nextSeq }).eq("id", seq.id);
+    } else {
+      await supabase.from("rff_sequences").insert({ event_type: prefix, year: parseInt("20"+year), last_sequence: 1 });
+    }
+    return `ST/${prefix}/${year}/${String(nextSeq).padStart(3, "0")}`;
+  };
+
+  const handleCreate = async () => {
+    if (!form.client_id || !form.project_id) { setError('Client and event are required.'); return; }
+    if (!form.event_type) { setError('Please select an event type.'); return; }
+    setSaving(true); setError('');
+    let document_url = '';
+    let document_name = '';
+    if (file) {
+      const ext = file.name.split('.').pop();
+      const filename = `rff_${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from('rffs').upload(filename, file);
+      if (uploadErr) { setError('Upload failed: ' + uploadErr.message); setSaving(false); return; }
+      const { data: urlData } = supabase.storage.from('rffs').getPublicUrl(filename);
+      document_url = urlData.publicUrl;
+      document_name = file.name;
+    }
+    const rffCode = await generateRffCode(form.event_type);
+    const { error } = await supabase.from('rffs').insert({
+      title: rffCode, description: form.description,
+      client_id: form.client_id, client_name: form.client_name,
+      project_id: form.project_id, event_name: form.event_name,
+      deadline: form.deadline || null, document_url, document_name,
+      status: 'pending', submitted_for_approval: true, approved: false,
+      event_type: form.event_type, rff_code: rffCode,
+    });
+    if (error) { setError(error.message); setSaving(false); return; }
+    setModal(false);
+    setForm({ title: '', description: '', client_id: '', client_name: '', project_id: '', event_name: '', deadline: '', event_type: '' });
+    setFile(null); setSaving(false); load();
+  };
+
+  const handleResubmit = async () => {
+    setSaving(true);
+    let document_url = resubmitModal.document_url || '';
+    let document_name = resubmitModal.document_name || '';
+    if (resubmitFile) {
+      const ext = resubmitFile.name.split('.').pop();
+      const filename = `rff_${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from('rffs').upload(filename, resubmitFile);
+      if (!uploadErr) {
+        const { data: urlData } = supabase.storage.from('rffs').getPublicUrl(filename);
+        document_url = urlData.publicUrl;
+        document_name = resubmitFile.name;
+      }
+    }
+    await supabase.from('rffs').update({
+      status: 'pending',
+      approved: false,
+      submitted_for_approval: true,
+      declined_notes: null,
+      document_url,
+      document_name,
+      status_notes: resubmitNotes,
+    }).eq('id', resubmitModal.id);
+    // Notify CEO
+    const { data: ceos } = await supabase.from('profiles').select('id').in('role', ['CEO', 'Country Manager']);
+    if (ceos) await Promise.all(ceos.map(c => supabase.from('notifications').insert({ user_id: c.id, title: 'RFF Resubmitted', message: `RFF "${resubmitModal.title}" has been revised and resubmitted for approval.`, type: 'rff' })));
+    setResubmitModal(null); setResubmitFile(null); setResubmitNotes('');
+    setSaving(false); load();
+  };
+
+  // Group RFFs by event
+  const grouped = events.reduce((acc, e) => {
+    const eventRffs = rffs.filter(r => r.project_id === e.id);
+    if (eventRffs.length > 0) acc[e.id] = { event: e, rffs: eventRffs };
+    return acc;
+  }, {});
+
+  const totalPending = rffs.filter(r => r.status === 'pending').length;
+  const totalApproved = rffs.filter(r => r.approved).length;
+  const totalQuotes = rffs.filter(r => r.status === 'quote-submitted').length;
+  const totalDeclined = rffs.filter(r => r.status === 'declined').length;
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Procurement</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Vendors & RFFs</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{rffs.length} requests across {Object.keys(grouped).length} event{Object.keys(grouped).length !== 1 ? "s" : ""}</div>
+        </div>
+        <Btn onClick={() => setModal(true)}>+ New RFF</Btn>
+      </div>
+
+      {/* Vendor Applications Panel — CEO */}
+      {showApprovalsPanel && user?.role === "CEO" && (
+        <div style={{ marginBottom: 24, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 20 }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 16, marginBottom: 16 }}>Vendor Applications</div>
+          <VendorApprovalsPanel user={user} onLoginCreated={load} />
+        </div>
+      )}
+
+      {/* Vendor Manager — approved vendors with account status */}
+      {user?.role === "Vendor Manager" && vendorApps.filter(a => ["approved","login-created"].includes(a.status)).length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 12 }}>Approved Vendors — Account Status</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+            {vendorApps.filter(a => ["approved","login-created"].includes(a.status)).map(app => (
+              <div key={app.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${app.status === "login-created" ? "#10B981" : T.amber}`, borderRadius: 10, padding: "14px 16px" }}>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 2 }}>{app.vendor_name}</div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 6 }}>{app.vendor_type} · {app.contact_person}</div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 8 }}>{app.contact_email}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: app.status === "login-created" ? "#10B981" : T.amber }} />
+                  <span style={{ color: app.status === "login-created" ? "#10B981" : T.amber, fontSize: 11, fontWeight: 700 }}>
+                    {app.status === "login-created" ? "Portal Access Granted" : "Awaiting Login Creation"}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Pending Approval", value: totalPending, color: T.amber },
+          { label: "CEO Approved", value: totalApproved, color: T.teal },
+          { label: "Quotes In", value: totalQuotes, color: T.cyan },
+          { label: "Declined", value: totalDeclined, color: T.red },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "16px 18px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {Object.keys(grouped).length === 0 ? (
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>📋</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No RFFs yet</div>
+          <div style={{ color: T.textMuted, fontSize: 13 }}>Create an RFF and assign it to a client event.</div>
+        </div>
+      ) : <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>{Object.values(grouped).map(({ event: e, rffs: eventRffs }) => (
+        <div key={e.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+          {/* Event Group Header */}
+          <button onClick={() => setExpandedEvent(expandedEvent === e.id ? null : e.id)} style={{
+            width: "100%", background: expandedEvent === e.id ? T.cyan + "08" : "none",
+            border: "none", borderBottom: expandedEvent === e.id ? `1px solid ${T.border}` : "none",
+            padding: "16px 20px", cursor: "pointer",
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 4, height: 36, background: `linear-gradient(180deg, ${T.cyan}, ${T.teal})`, borderRadius: 2, flexShrink: 0 }} />
+              <div style={{ textAlign: "left" }}>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{e.name}</div>
+                <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{e.client} · {eventRffs.length} RFF{eventRffs.length > 1 ? "s" : ""}</div>
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", gap: 5 }}>
+                {["pending","quote-submitted","approved","declined"].map(s => {
+                  const count = eventRffs.filter(r => r.status === s).length;
+                  if (!count) return null;
+                  return <Badge key={s} status={s} />;
+                })}
+              </div>
+              <span style={{ color: T.textMuted, fontSize: 16, transition: "transform 0.2s", display: "inline-block", transform: expandedEvent === e.id ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+            </div>
+          </button>
+
+          {expandedEvent === e.id && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 12, padding: "16px 20px" }}>
+              {eventRffs.map(r => (
+                <div key={r.id} style={{ marginBottom: 0 }}>
+                  <div onClick={() => setExpandedRff(expandedRff === r.id ? null : r.id)} style={{ cursor: "pointer", background: T.bg, border: `1px solid ${T.border}`, borderTop: `2px solid ${T.cyan}`, borderRadius: 10, padding: "16px 18px", transition: "box-shadow 0.2s" }}
+                    onMouseEnter={e => e.currentTarget.style.boxShadow = `0 4px 20px ${T.cyan}12`}
+                    onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                      <div>
+                        <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{r.title}</div>
+                        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>📅 Due {r.deadline}</div>
+                        {/* Status indicators for Vendor Manager */}
+                        {isVendorManager && r.status === 'pending' && r.submitted_for_approval && (
+                          <div style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", background: T.amber + "15", border: "1px solid " + T.amber + "33", borderRadius: 20 }}>
+                            <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.amber }} />
+                            <span style={{ color: T.amber, fontSize: 11, fontWeight: 700 }}>Pending CEO Approval</span>
+                          </div>
+                        )}
+                        {isVendorManager && r.status === 'approved' && (
+                          <div style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", background: T.teal + "15", border: "1px solid " + T.teal + "33", borderRadius: 20 }}>
+                            <span style={{ color: T.teal, fontSize: 11, fontWeight: 700 }}>✓ Approved by CEO</span>
+                          </div>
+                        )}
+                        {r.status === 'declined' && r.declined_notes && (
+                          <div style={{ marginTop: 6, padding: "8px 10px", background: "#F43F5E10", border: "1px solid #F43F5E33", borderRadius: 6 }}>
+                            <div style={{ color: "#F43F5E", fontSize: 11, fontWeight: 700 }}>⛔ Declined by CEO</div>
+                            <div style={{ color: T.textSecondary, fontSize: 11, marginTop: 2 }}>{r.declined_notes}</div>
+                            {isVendorManager && (
+                              <button onClick={e => { e.stopPropagation(); setResubmitModal(r); setResubmitNotes(''); setResubmitFile(null); }} style={{ marginTop: 8, padding: "5px 12px", background: T.cyan + "20", border: "1px solid " + T.cyan + "44", borderRadius: 6, cursor: "pointer", color: T.cyan, fontSize: 11, fontWeight: 700 }}>
+                                🔄 Revise & Resubmit
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {r.description && <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 4 }}>{r.description}</div>}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Badge status={r.status} />
+                        <span style={{ color: T.textMuted, fontSize: 14 }}>{expandedRff === r.id ? '▾' : '▸'}</span>
+                      </div>
+                    </div>
+                    {r.document_url && (
+                      <a href={r.document_url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        color: T.cyan, fontSize: 12, fontWeight: 600, textDecoration: 'none',
+                        background: T.cyan + '15', padding: '5px 12px', borderRadius: 6,
+                        border: `1px solid ${T.cyan}33`,
+                      }}>📄 {r.document_name || 'Download RFF'}</a>
+                    )}
+                    {['CEO','Country Manager'].includes(user?.role) && !r.approved && (
+                      <button onClick={async (e) => { e.stopPropagation(); await supabase.from('rffs').update({ approved: true, approved_by: user.id }).eq('id', r.id); load(); }} style={{
+                        marginLeft: 8, background: T.teal + '20', border: `1px solid ${T.teal}`, color: T.teal,
+                        padding: '5px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                      }}>✓ Approve RFF</button>
+                    )}
+                    {r.approved && <span style={{ marginLeft: 8, color: T.teal, fontSize: 12, fontWeight: 600 }}>✓ Approved for Vendors</span>}
+                  </div>
+
+                  {/* Quotes submitted for this RFF */}
+                  {expandedRff === r.id && (
+                    <div style={{ marginTop: 8, paddingLeft: 16 }}>
+                      {r.status === 'pending' ? (
+                        <div style={{ color: T.textMuted, fontSize: 13, padding: '12px 16px', background: T.surface, borderRadius: 8, border: `1px solid ${T.border}` }}>
+                          ⏳ No quotes submitted yet
+                        </div>
+                      ) : (
+                        <Card style={{ borderLeft: `3px solid ${T.cyan}` }}>
+                          <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>Quote Received</div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{r.vendor || 'Vendor'}</div>
+                            {(() => { const vp = vendors.find(v => v.name === r.vendor); if (!vp || !vp.vendor_scorecard_count) return <span style={{ fontSize: 10, color: T.textMuted, padding: '2px 8px', borderRadius: 20, border: '1px solid ' + T.border }}>Unrated</span>; const t = getTier(vp.vendor_score || 0); return <span style={{ fontSize: 10, fontWeight: 700, color: t.color, padding: '2px 8px', borderRadius: 20, background: t.bg, border: '1px solid ' + t.color + '44' }}>{t.label} {vp.vendor_score}%</span>; })()}
+                          </div>
+                              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Amount: <span style={{ color: T.amber, fontWeight: 700 }}>GHS {(r.amount || 0).toLocaleString()}</span></div>
+                            </div>
+                            <Badge status={r.status} />
+                          </div>
+                          {r.quote_url && (
+                            <a href={r.quote_url} target="_blank" rel="noopener noreferrer" style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 12,
+                              color: T.teal, fontSize: 12, fontWeight: 600, textDecoration: 'none',
+                              background: T.teal + '15', padding: '5px 12px', borderRadius: 6,
+                              border: `1px solid ${T.teal}33`,
+                            }}>📎 {r.quote_filename || 'View Quote'}</a>
+                          )}
+                          {r.status === 'quote-submitted' && (
+                            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                              <Btn small onClick={async () => {
+                                await supabase.from('rffs').update({ status: 'quote-approved' }).eq('id', r.id);
+                                load();
+                              }}>✓ Approve Quote</Btn>
+                              <Btn small variant="ghost" onClick={async () => {
+                                await supabase.from('rffs').update({ status: 'pending', amount: null, vendor: null, quote_url: null, quote_filename: null }).eq('id', r.id);
+                                load();
+                              }}>✕ Reject</Btn>
+                            </div>
+                          )}
+                          {r.status === 'quote-approved' && <div style={{ color: T.teal, fontSize: 12, fontWeight: 600, marginTop: 12 }}>✓ Quote Approved</div>}
+                        </Card>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}</div>}
+
+      }{modal && (
+        <Modal title="New RFF" onClose={() => { setModal(false); setError(''); }}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>Event Type *</div>
+            <select value={form.event_type} onChange={e => setForm({ ...form, event_type: e.target.value })} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${form.event_type ? T.border : T.amber}`, borderRadius: 8, color: form.event_type ? T.textPrimary : T.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+              <option value="">Select event type...</option>
+              <option value="Conference/Seminar">Conference / Seminar (ST/CS)</option>
+              <option value="Product Launch">Product Launch (ST/PL)</option>
+              <option value="Awards Ceremony">Awards Ceremony (ST/AWD)</option>
+              <option value="Corporate Party">Corporate Party (ST/CP)</option>
+              <option value="Other">Other (ST/OTH)</option>
+            </select>
+          </div>
+          {form.event_type && (
+            <div style={{ marginBottom: 14, padding: "8px 12px", background: T.cyan+"12", border: `1px solid ${T.cyan}30`, borderRadius: 8 }}>
+              <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>RFF Code Preview</div>
+              <div style={{ color: T.cyan, fontWeight: 900, fontSize: 16 }}>ST/{{"Conference/Seminar":"CS","Product Launch":"PL","Awards Ceremony":"AWD","Corporate Party":"CP","Other":"OTH"}[form.event_type]}/{new Date().getFullYear().toString().slice(-2)}/###</div>
+            </div>
+          )}
+          <Input label="Description" placeholder="Brief description of what's needed" value={form.description} onChange={v => setForm({ ...form, description: v })} />
+          <Select label="Client" options={[{ value: '', label: 'Select client...' }, ...clients.map(c => ({ value: c.id, label: c.company || c.name }))]}
+            value={form.client_id}
+            onChange={v => { const c = clients.find(x => x.id === v); setForm({ ...form, client_id: v, client_name: c ? c.name : '', project_id: '', event_name: '' }); }} />
+          <Select label="Event" options={[{ value: '', label: form.client_id ? 'Select event...' : 'Select client first...' }, ...events.filter(e => e.client_id === form.client_id).map(e => ({ value: e.id, label: e.name }))]}
+            value={form.project_id}
+            onChange={v => { const e = events.find(x => x.id === v); setForm({ ...form, project_id: v, event_name: e ? e.name : '' }); }} />
+          <Input label="Deadline" type="date" value={form.deadline} onChange={v => setForm({ ...form, deadline: v })} />
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Upload RFF Document (PDF)</div>
+            <input type="file" accept=".pdf" onChange={e => setFile(e.target.files[0])} style={{
+              width: '100%', padding: '10px', background: T.bg,
+              border: `1px solid ${T.border}`, borderRadius: 6,
+              color: T.textSecondary, fontSize: 13, cursor: 'pointer',
+            }} />
+            {file && <div style={{ color: T.cyan, fontSize: 12, marginTop: 6 }}>✓ {file.name}</div>}
+          </div>
+          {error && <div style={{ color: '#F43F5E', fontSize: 12, marginTop: 4 }}>{error}</div>}
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <Btn onClick={handleCreate} disabled={saving}>{saving ? 'Uploading...' : 'Create RFF'}</Btn>
+            <Btn variant="ghost" onClick={() => { setModal(false); setError(''); }}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+const InvoicesView = () => {
+  const [invoices, setInvoices] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [form, setForm] = useState({ vendor: '', amount: '', status: 'pending', date: '' });
+  const [saving, setSaving] = useState(false);
+
+  const load = async () => {
+    const { data } = await supabase.from('invoices').select('*').order('created_at', { ascending: false });
+    setInvoices(data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleApprove = async (id) => {
+    await supabase.from('invoices').update({ status: 'approved' }).eq('id', id);
+    load();
+  };
+
+  // Summary stats
+  const totalPending = invoices.filter(i => i.status === "pending").reduce((a, i) => a + (i.amount || 0), 0);
+  const totalApproved = invoices.filter(i => i.status === "approved").reduce((a, i) => a + (i.amount || 0), 0);
+  const totalPaid = invoices.filter(i => i.status === "paid").reduce((a, i) => a + (i.amount || 0), 0);
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Invoices</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Review and approve vendor invoices</div>
+      </div>
+
+      {/* Summary strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Pending", value: "GHS " + totalPending.toLocaleString(), count: invoices.filter(i => i.status === "pending").length, color: T.amber },
+          { label: "Approved", value: "GHS " + totalApproved.toLocaleString(), count: invoices.filter(i => i.status === "approved").length, color: T.teal },
+          { label: "Paid", value: "GHS " + totalPaid.toLocaleString(), count: invoices.filter(i => i.status === "paid").length, color: T.cyan },
+        ].map((s, i) => (
+          <div key={i} style={{ padding: "16px 18px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${s.color}`, borderRadius: 10 }}>
+            <div style={{ color: s.color, fontSize: 18, fontWeight: 900 }}>{s.value}</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+              <div style={{ color: T.textPrimary, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>{s.label}</div>
+              <div style={{ color: T.textMuted, fontSize: 11 }}>{s.count} invoice{s.count !== 1 ? "s" : ""}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {invoices.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>🧾</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No invoices yet</div>
+          <div style={{ color: T.textMuted, fontSize: 13 }}>Invoices submitted by vendors will appear here.</div>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
+          {invoices.map(inv => (
+            <div key={inv.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px", transition: "box-shadow 0.2s" }}
+              onMouseEnter={e => e.currentTarget.style.boxShadow = `0 4px 24px ${T.cyan}10`}
+              onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                <div>
+                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{inv.vendor}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>{inv.event_name || "—"}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{inv.date}</div>
+                </div>
+                <Badge status={inv.status} />
+              </div>
+              <div style={{ color: T.gold, fontSize: 20, fontWeight: 900, marginBottom: 12 }}>GHS {(inv.amount || 0).toLocaleString()}</div>
+              {inv.status === "pending" && (
+                <Btn small onClick={() => handleApprove(inv.id)}>✓ Approve</Btn>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const VendorRFFsView = ({ user }) => {
+  const [rffs, setRffs] = useState([]);
+  const [quoteModal, setQuoteModal] = useState(null);
+  const [quoteAmount, setQuoteAmount] = useState('');
+  const [quoteFile, setQuoteFile] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const loadRffs = async () => {
+    console.log("VendorRFFsView - user.id:", user?.id, "user:", user);
+    const { data: myAssignments, error: aErr } = await supabase.from("rff_vendor_assignments").select("rff_id").eq("vendor_id", user.id);
+    console.log("Assignments:", myAssignments, "Error:", aErr);
+    if (!myAssignments || myAssignments.length === 0) { setRffs([]); return; }
+    const rffIds = myAssignments.map(a => a.rff_id);
+    const { data, error: rErr } = await supabase.from("rffs").select("*").in("id", rffIds).order("created_at", { ascending: false });
+    console.log("RFFs:", data, "Error:", rErr);
+    setRffs(data || []);
+  };
+
+  useEffect(() => { loadRffs(); }, []);
+
+  const handleSubmitQuote = async () => {
+    if (!quoteAmount) { setError('Please enter your quote amount.'); return; }
+    setSaving(true); setError('');
+
+    let quote_url = '';
+    let quote_filename = '';
+
+    if (quoteFile) {
+      const ext = quoteFile.name.split('.').pop();
+      const filename = `quote_${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from('rffs').upload(filename, quoteFile);
+      if (uploadErr) { setError('Upload failed: ' + uploadErr.message); setSaving(false); return; }
+      const { data: urlData } = supabase.storage.from('rffs').getPublicUrl(filename);
+      quote_url = urlData.publicUrl;
+      quote_filename = quoteFile.name;
+    }
+
+    // Save quote to rff_vendor_assignments
+    await supabase.from('rff_vendor_assignments').update({
+      quote_amount: parseFloat(quoteAmount),
+      quote_document_url: quote_url,
+      quote_submitted_at: new Date().toISOString(),
+      quote_notes: quoteFile?.name || "",
+      status: 'quote-submitted',
+    }).eq('rff_id', quoteModal.id).eq('vendor_id', user.id);
+
+    // Also update RFF status
+    await supabase.from('rffs').update({
+      status: 'quote-submitted',
+      quote_url,
+      quote_filename,
+    }).eq('id', quoteModal.id);
+
+    // Notify Vendor Manager
+    const { data: vms } = await supabase.from('profiles').select('id').eq('role', 'Vendor Manager');
+    if (vms) await Promise.all(vms.map(vm => supabase.from('notifications').insert({
+      user_id: vm.id,
+      title: 'Quote Submitted',
+      message: `${user.name} submitted a quote of GHS ${parseFloat(quoteAmount).toLocaleString()} for "${quoteModal.title}"`,
+      type: 'rff',
+    })));
+
+    setQuoteModal(null);
+    setQuoteAmount('');
+    setQuoteFile(null);
+    setSaving(false);
+    loadRffs();
+  };
+
+  return (
+    <div>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, animation: "fadeUp 0.35s ease" }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Procurement</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Available RFFs</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Browse and submit your quotes</div>
+      </div>
+      {rffs.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>📋</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No open RFFs</div>
+          <div style={{ color: T.textMuted, fontSize: 13 }}>New RFFs will appear here when available.</div>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
+          {rffs.map(r => (
+            <div key={r.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderTop: `3px solid ${T.cyan}`, borderRadius: 12, padding: "18px 20px", transition: "box-shadow 0.2s" }}
+              onMouseEnter={e => e.currentTarget.style.boxShadow = `0 4px 24px ${T.cyan}12`}
+              onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{r.title}</div>
+                  <div style={{ color: T.cyan, fontSize: 11, marginTop: 4, fontWeight: 700 }}>{r.client_name}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{r.event_name} · Due {r.deadline}</div>
+                  {r.description && <div style={{ color: T.textMuted, fontSize: 12, marginTop: 8, fontStyle: "italic" }}>{r.description}</div>}
+                </div>
+                <Badge status={r.status} />
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${T.border}44` }}>
+                {r.document_url && (
+                  <a href={r.document_url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.cyan, fontSize: 11, fontWeight: 700, textDecoration: "none", background: T.cyan + "12", padding: "6px 12px", borderRadius: 8, border: `1px solid ${T.cyan}30` }}>📄 Download</a>
+                )}
+                <Btn small onClick={() => { setQuoteModal(r); setQuoteAmount(""); }}>Submit Quote</Btn>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {quoteModal && (
+        <Modal title={`Submit Quote — ${quoteModal.title}`} onClose={() => { setQuoteModal(null); setError(''); }}>
+          <div style={{ color: T.textSecondary, fontSize: 13, marginBottom: 16, padding: '10px 14px', background: T.cyan + '10', borderRadius: 8, border: `1px solid ${T.cyan}22` }}>
+            Client: <strong style={{ color: T.cyan }}>{quoteModal.client_name}</strong> · Event: <strong style={{ color: T.textPrimary }}>{quoteModal.event_name}</strong>
+          </div>
+          <Input label="Quote Amount (GHS )" type="number" placeholder="e.g. 5000" value={quoteAmount} onChange={v => setQuoteAmount(v)} />
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Attach Invoice / Quotation Document</div>
+            <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx" onChange={e => setQuoteFile(e.target.files[0])} style={{
+              width: '100%', padding: '10px', background: T.bg,
+              border: `1px solid ${T.border}`, borderRadius: 6,
+              color: T.textSecondary, fontSize: 13, cursor: 'pointer',
+            }} />
+            {quoteFile && <div style={{ color: T.cyan, fontSize: 12, marginTop: 6 }}>✓ {quoteFile.name}</div>}
+          </div>
+          {error && <div style={{ color: '#F43F5E', fontSize: 12, marginBottom: 8 }}>{error}</div>}
+          <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+            <Btn onClick={handleSubmitQuote} disabled={saving}>{saving ? 'Submitting...' : 'Submit Quote'}</Btn>
+            <Btn variant="ghost" onClick={() => { setQuoteModal(null); setError(''); }}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+const UsersView = ({ user }) => {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState(false);
+  const [editModal, setEditModal] = useState(null);
+  const [editForm, setEditForm] = useState({ name: '', role: '', country: '', phone: '', newPassword: '' });
+  const [form, setForm] = useState({ name: '', email: '', role: 'Country Manager', password: '', country: 'Ghana' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const roleColors = {
+    'CEO': T.cyan, 'Country Manager': T.blue, 'Vendor Manager': T.magenta,
+    'Strategy & Events Opportunity': T.amber, 'Sales & Marketing': '#EC4899',
+    'Vendor': '#06B6D4', 'Client': '#84CC16',
+  };
+
+  const load = async () => {
+    setLoading(true);
+    const { data } = await supabase.from('profiles').select('*').order('name');
+    setUsers(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleCreate = async () => {
+    if (!form.name || !form.email || !form.password) { setError('All fields required.'); return; }
+    setSaving(true); setError('');
+    const { data: authData, error: authErr } = await supabase.auth.signUp({ email: form.email, password: form.password });
+    if (authErr) { setError(authErr.message); setSaving(false); return; }
+    const uid = authData.user?.id;
+    const initials = form.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    await supabase.from('profiles').insert({ id: uid, name: form.name, email: form.email, role: form.role, avatar: initials });
+    setModal(false);
+    setForm({ name: '', email: '', role: 'Country Manager', password: '' });
+    setSaving(false);
+    load();
+  };
+
   const handleDelete = async (id) => {
     if (!window.confirm('Remove this user? This cannot be undone.')) return;
     try {
@@ -4495,18 +5802,8 @@ const LeadCard = ({ lead, selectedLead, setSelectedLead, activities }) => {
   );
 };
 
-const LeadPanel = ({ lead, activities, canEdit, canApprove, addActivity, updateStatus, handleDelete, setApprovalModal, existingClients, setMatchedClient }) => {
+const LeadPanel = ({ lead, activities, canEdit, canApprove, actForm, setActForm, addingAct, addActivity, updateStatus, handleDelete, setApprovalModal, existingClients, setMatchedClient }) => {
   const stage = STAGES.find(s => s.id === lead.status) || STAGES[0];
-  const [actForm, setActForm] = React.useState({ type: "call", notes: "", scheduled_date: "", scheduled_time: "" });
-  const [addingAct, setAddingActLocal] = React.useState(false);
-
-  const handleLog = async () => {
-    if (!actForm.notes) return;
-    setAddingActLocal(true);
-    await addActivity(lead.id, lead.company, actForm);
-    setActForm({ type: "call", notes: "", scheduled_date: "", scheduled_time: "" });
-    setAddingActLocal(false);
-  };
   const leadActivities = (activities || []).filter(a => a.lead_id === lead.id).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
   const tColors = { note: T.textMuted, call: T.teal, meeting: T.cyan, email: T.blue, demo: T.amber, "follow-up": "#8B5CF6" };
   const tIcons = { note: "📝", call: "📞", meeting: "🤝", email: "✉️", demo: "🎯", "follow-up": "🔄" };
@@ -4560,7 +5857,7 @@ const LeadPanel = ({ lead, activities, canEdit, canApprove, addActivity, updateS
               </div>
             )}
             {actForm.scheduled_date && <div style={{ color: "#8B5CF6", fontSize: 10, fontWeight: 700, marginBottom: 6 }}>📅 {actForm.scheduled_date}{actForm.scheduled_time ? " at "+actForm.scheduled_time : ""} → calendar</div>}
-            <button onClick={handleLog} disabled={addingActLocal || !actForm.notes} style={{ background: T.cyan, border: "none", color: "#000", padding: "5px 14px", borderRadius: 5, cursor: "pointer", fontSize: 11, fontWeight: 800, opacity: !actForm.notes ? 0.5 : 1 }}>{addingActLocal ? "..." : "Log"}</button>
+            <button onClick={() => addActivity(lead.id, lead.company)} disabled={addingAct || !actForm.notes} style={{ background: T.cyan, border: "none", color: "#000", padding: "5px 14px", borderRadius: 5, cursor: "pointer", fontSize: 11, fontWeight: 800, opacity: !actForm.notes ? 0.5 : 1 }}>{addingAct ? "..." : "Log"}</button>
           </div>
         )}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -4665,7 +5962,7 @@ const CRMView = ({ user }) => {
     setModal(false);
     setForm({ company: "", contact_name: "", email: "", phone: "", source: "", value: "", notes: "", status: "new", assigned_to: "", assigned_name: "" });
     setSaving(false);
-    await load();
+    load();
   };
 
   const updateStatus = async (leadId, newStatus) => {
@@ -4685,14 +5982,14 @@ const CRMView = ({ user }) => {
   const addActivity = async (leadId, company) => {
     if (!actForm.notes) return;
     setAddingAct(true);
-    const { error: actErr } = await supabase.from("crm_activities").insert({
+    await supabase.from("crm_activities").insert({
       lead_id: leadId, type: actForm.type, notes: actForm.notes,
+      date: new Date().toISOString().slice(0,10),
       scheduled_date: actForm.scheduled_date || null,
       scheduled_time: actForm.scheduled_time || null,
       activity_type: actForm.type,
       created_by: user.id, created_by_name: user.name,
     });
-    if (actErr) { console.error("Activity insert error:", actErr.message); setAddingAct(false); return; }
     if (actForm.scheduled_date && ["call","meeting","demo","follow-up"].includes(actForm.type)) {
       await supabase.from("itineraries").insert({
         title: `${actForm.type.charAt(0).toUpperCase()+actForm.type.slice(1)} — ${company}`,
@@ -4716,7 +6013,7 @@ const CRMView = ({ user }) => {
   // ── KANBAN CARD ──
       const handleDelete = async (id) => {
     if (!window.confirm("Delete this lead?")) return;
-    await supabase.from("leads").update({ converted_lead_id: null }).eq("converted_lead_id", id);
+    await supabase.from("opportunities").update({ converted_lead_id: null }).eq("converted_lead_id", id);
     await supabase.from("leads").delete().eq("id", id);
     setSelectedLead(null);
     load();
@@ -4844,7 +6141,7 @@ const CRMView = ({ user }) => {
         </div>
 
         {/* ── Right Panel ── */}
-        {selectedLead && <LeadPanel key={selectedLead.id} lead={selectedLead} activities={activities} canEdit={canEdit} canApprove={canApprove} addActivity={addActivity} updateStatus={updateStatus} handleDelete={handleDelete} setApprovalModal={setApprovalModal} existingClients={existingClients} setMatchedClient={setMatchedClient} />}
+        {selectedLead && <LeadPanel lead={selectedLead} activities={activities} canEdit={canEdit} canApprove={canApprove} actForm={actForm} setActForm={setActForm} addingAct={addingAct} addActivity={addActivity} updateStatus={updateStatus} handleDelete={handleDelete} setApprovalModal={setApprovalModal} existingClients={existingClients} setMatchedClient={setMatchedClient} />}
       </div>
 
       {/* ── New Lead Modal ── */}
@@ -5077,7 +6374,7 @@ const CalendarView = ({ user, onNavigate }) => {
   const loadOpportunitysOpps = async () => {
     const [{ data: l }, { data: o }, { data: itins }] = await Promise.all([
       supabase.from("opportunities").select("id, company, contact_name, status"),
-      supabase.from("opportunities").select("id, company, sector, status").neq("status","Converted"),
+      supabase.from("leads").select("id, company, sector, status").neq("status","Converted"),
       uid ? supabase.from("itineraries").select("*").eq("created_by", uid).order("created_at", { ascending: false }) : Promise.resolve({ data: [] }),
     ]);
     setOpportunitys(l || []);
@@ -6887,7 +8184,7 @@ const CRMDashboardSM = ({ user }) => {
 
   const load = async () => {
     const [l, t] = await Promise.all([
-      supabase.from("opportunities").select("*").or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`),
+      supabase.from("opportunities").select("*").or("assigned_to.eq." + user.id + ",created_by.eq." + user.id),
       supabase.from("sales_targets").select("*").eq("rep_id", user.id).order("created_at", { ascending: false }).limit(1),
     ]);
     setOpportunitys(l.data || []);
@@ -7492,7 +8789,7 @@ const FinanceDashboard = ({ user, onTab }) => {
             <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em' }}>Finance Operations</h2>
             <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>
               Vouchers · Estimates · Petty Cash · Daily Balances
-              {['Country Manager'].includes(user?.role) && <span style={{ marginLeft: 8, background: (user?.country === 'Nigeria') ? '#10B98120' : T.amber+'20', color: (user?.country === 'Nigeria') ? '#10B981' : T.amber, borderRadius: 20, padding: '1px 8px', fontSize: 10, fontWeight: 700 }}>{user?.country === 'Nigeria' ? '🇳🇬' : '🇬🇭'} {user?.country || 'Ghana'} only</span>}
+              {user?.role === 'Country Manager' && <span style={{ marginLeft: 8, background: userCountry === 'Nigeria' ? '#10B98120' : T.amber+'20', color: userCountry === 'Nigeria' ? '#10B981' : T.amber, borderRadius: 20, padding: '1px 8px', fontSize: 10, fontWeight: 700 }}>{userCountry === 'Nigeria' ? '🇳🇬' : '🇬🇭'} {userCountry} only</span>}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -11311,216 +12608,6 @@ const VendorAssignmentView = ({ user }) => {
     </div>
   );
 };
-
-const UsersView = ({ user }) => {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState(false);
-  const [editModal, setEditModal] = useState(null);
-  const [editForm, setEditForm] = useState({ name: '', role: '', country: '', phone: '', newPassword: '' });
-  const [form, setForm] = useState({ name: '', email: '', role: 'Country Manager', password: '', country: 'Ghana' });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-
-  const roleColors = {
-    'CEO': T.cyan, 'Country Manager': T.blue, 'Vendor Manager': T.magenta,
-    'Strategy & Events Opportunity': T.amber, 'Sales & Marketing': '#EC4899',
-    'Vendor': '#06B6D4', 'Client': '#84CC16',
-  };
-
-  const load = async () => {
-    setLoading(true);
-    const { data } = await supabase.from('profiles').select('*').order('name');
-    setUsers(data || []);
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const handleCreate = async () => {
-    if (!form.name || !form.email || !form.password) { setError('All fields required.'); return; }
-    setSaving(true); setError('');
-    const { data: authData, error: authErr } = await supabase.auth.signUp({ email: form.email, password: form.password });
-    if (authErr) { setError(authErr.message); setSaving(false); return; }
-    const uid = authData.user?.id;
-    const initials = form.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-    await supabase.from('profiles').insert({ id: uid, name: form.name, email: form.email, role: form.role, avatar: initials });
-    setModal(false);
-    setForm({ name: '', email: '', role: 'Country Manager', password: '' });
-    setSaving(false);
-    load();
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm('Remove this user? This cannot be undone.')) return;
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(
-        'https://okbduzenceoknkjqnrha.supabase.co/functions/v1/delete-user',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session?.access_token}`,
-          },
-          body: JSON.stringify({ userId: id }),
-        }
-      );
-      const result = await res.json();
-      if (result.error) { alert('Delete failed: ' + result.error); return; }
-      setUsers(prev => prev.filter(u => u.id !== id));
-    } catch (err) {
-      alert('Delete failed: ' + err.message);
-    }
-  };
-
-  return (
-    <div>
-      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-        <div>
-          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Administration</div>
-          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>User Management</h2>
-          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{users.length} total users</div>
-        </div>
-        <Btn onClick={() => setModal(true)}>+ Add User</Btn>
-      </div>
-
-      {/* KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px,1fr))", gap: 12, marginBottom: 24 }}>
-        {[...new Set(users.map(u => u.role))].map((role, i) => {
-          const roleColors = { "CEO": T.cyan, "Country Manager": T.teal, "Vendor Manager": T.amber, "Strategy & Events Opportunity": T.magenta, "Finance Manager": T.gold, "Sales & Marketing": T.blue, "Vendor": T.textSecondary, "Client": "#10B981", "Board of Directors": "#8B5CF6" };
-          const color = roleColors[role] || T.textMuted;
-          return (
-            <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${color}`, borderRadius: 10 }}>
-              <div style={{ color: color, fontSize: 20, fontWeight: 900 }}>{users.filter(u => u.role === role).length}</div>
-              <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: 4 }}>{role}</div>
-            </div>
-          );
-        })}
-      </div>
-      {loading ? (
-        <div style={{ color: T.textMuted, textAlign: 'center', padding: 60 }}>Loading...</div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-          {users.map(u => (
-            <Card key={u.id}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
-                <Avatar initials={u.avatar || '??'} size={44} color={roleColors[u.role] || T.textMuted} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{u.name}</div>
-                  <div style={{ color: T.textMuted, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ background: (roleColors[u.role] || T.textMuted) + '22', color: roleColors[u.role] || T.textMuted, padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700 }}>{u.role}</span>
-                {u.email !== user?.email && (
-                  <div style={{ display: "flex", gap: 4 }}>
-                    <button onClick={() => openEdit(u)} style={{ background: T.cyan+"18", border: `1px solid ${T.cyan}40`, color: T.cyan, width: 28, height: 28, borderRadius: 6, cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>✎</button>
-                    <button onClick={() => handleDelete(u.id)} style={{ background: 'none', border: 'none', color: T.textMuted, cursor: 'pointer', fontSize: 18, padding: '2px 6px' }}>×</button>
-                  </div>
-                )}
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
-      {/* Edit User Modal */}
-      {editModal && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setEditModal(null)}>
-          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 480, padding: 28 }} onClick={e => e.stopPropagation()}>
-            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Edit User</div>
-            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>{editModal.email}</div>
-
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Full Name</label>
-              <input value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
-            </div>
-
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Role</label>
-              <select value={editForm.role} onChange={e => setEditForm({...editForm, role: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
-                <option value="Country Manager">Country Manager</option>
-                <option value="Vendor Manager">Vendor Manager</option>
-                <option value="Strategy & Events Opportunity">Strategy & Events Opportunity</option>
-                <option value="Sales & Marketing">Sales & Marketing</option>
-                <option value="Finance Manager">Finance Manager</option>
-                <option value="Board of Directors">Board of Directors</option>
-                <option value="Vendor">Vendor</option>
-                <option value="Client">Client</option>
-              </select>
-            </div>
-
-            {editForm.role === 'Country Manager' && (
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Country</label>
-                <select value={editForm.country} onChange={e => setEditForm({...editForm, country: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
-                  <option value="Ghana">Ghana 🇬🇭</option>
-                  <option value="Nigeria">Nigeria 🇳🇬</option>
-                </select>
-              </div>
-            )}
-
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Phone</label>
-              <input value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} placeholder="+233 XX XXX XXXX" />
-            </div>
-
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>New Password (leave blank to keep current)</label>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input type="text" value={editForm.newPassword} onChange={e => setEditForm({...editForm, newPassword: e.target.value})}
-                  style={{ flex: 1, padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}
-                  placeholder="Leave blank to keep current" />
-                <button onClick={() => setEditForm({...editForm, newPassword: generatePassword(editModal.email)})}
-                  style={{ background: T.cyan+"15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "9px 14px", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>⚡ Generate</button>
-              </div>
-            </div>
-
-            {error && <div style={{ color: T.red, fontSize: 12, marginBottom: 12 }}>{error}</div>}
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={handleUserUpdate} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Save Changes"}</button>
-              <button onClick={() => setEditModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {modal && (
-        <Modal title="Add New User" onClose={() => { setModal(false); setError(''); }}>
-          <Input label="Full Name" placeholder="e.g. Ama Mensah" value={form.name} onChange={v => setForm({ ...form, name: v })} />
-          <Input label="Email" type="email" placeholder="user@stretchfield.com" value={form.email} onChange={v => setForm({ ...form, email: v, password: generatePassword(v) })} />
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Password</label>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input type="text" value={form.password} onChange={e => setForm({...form, password: e.target.value})} placeholder="Auto-generated from email" style={{ flex: 1, padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
-              <button type="button" onClick={() => setForm({...form, password: generatePassword(form.email)})} style={{ background: T.cyan+"15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "9px 14px", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>⚡ Generate</button>
-            </div>
-            {form.email && !form.password && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 5 }}>Click Generate to auto-create from email</div>}
-            {form.password && <div style={{ color: T.teal, fontSize: 11, marginTop: 5 }}>✓ Password set — will be emailed to user on creation</div>}
-          </div>
-          <Select label="Role" options={[
-            { value: 'Country Manager', label: 'Country Manager' },
-            { value: 'Vendor Manager', label: 'Vendor Manager' },
-            { value: 'Strategy & Events Opportunity', label: 'Strategy & Events Opportunity' },
-            { value: 'Sales & Marketing', label: 'Sales & Marketing' },
-            { value: 'Finance Manager', label: 'Finance Manager' },
-            { value: 'Board of Directors', label: 'Board of Directors' },
-            { value: 'Vendor', label: 'Vendor' },
-            { value: 'Client', label: 'Client' },
-          ]} value={form.role} onChange={v => setForm({ ...form, role: v })} />
-          {error && <div style={{ color: '#F43F5E', fontSize: 12, marginTop: 4 }}>{error}</div>}
-          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <Btn onClick={handleCreate} disabled={saving}>{saving ? 'Creating...' : 'Create User'}</Btn>
-            <Btn variant="ghost" onClick={() => { setModal(false); setError(''); }}>Cancel</Btn>
-          </div>
-        </Modal>
-      )}
-    </div>
-  );
-};
-
-
-
 
 // ─── FINANCE APPROVALS VIEW ───────────────────────────────────────────────────
 const FinanceApprovalsView = ({ user }) => {

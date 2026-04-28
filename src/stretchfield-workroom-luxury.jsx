@@ -3739,7 +3739,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
     if (presenceFilter !== "all") f = f.filter(o => o.presence === presenceFilter);
     if (statusFilter !== "all") f = f.filter(o => o.status === statusFilter);
     setFiltered(f);
-  }, [leads, search, sectorFilter, presenceFilter, statusFilter]);
+  }, [opportunities, search, sectorFilter, presenceFilter, statusFilter]);
 
   const sectors = [...new Set(opportunities.map(o => o.sector).filter(Boolean))].sort();
   const statuses = ["New", "Contacted", "Qualified", "Converted"];

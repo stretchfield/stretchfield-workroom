@@ -3652,8 +3652,8 @@ const OpportunitiesView = ({ user, onNavigate }) => {
   const canManage = ["CEO", "Sales & Marketing"].includes(user?.role);
 
   const load = async () => {
-    const { data } = await supabase.from("leads").select("*").order("company");
-    setLeads(data || []);
+    const { data } = await supabase.from("opportunities").select("*").order("company");
+    setOpportunities(data || []);
   };
 
   const loadActivities = async (oppId) => {
@@ -3718,7 +3718,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
   const handleAdd = async () => {
     if (!form.company) return;
     setSaving(true);
-    await supabase.from("leads").insert({ ...form });
+    await supabase.from("opportunities").insert({ ...form });
     // form already includes contact_name, contact_email, contact_phone
     setSaving(false);
     setModal(false);
@@ -3728,7 +3728,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
 
   const handleUpdate = async () => {
     setSaving(true);
-    await supabase.from("leads").update({
+    await supabase.from("opportunities").update({
       company: editModal.company, sector: editModal.sector,
       presence: editModal.presence, event_fit: editModal.event_fit,
       notes: editModal.notes, status: editModal.status,
@@ -3744,7 +3744,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
 
   const handleDelete = async (id) => {
     if (!window.confirm("Remove this opportunity?")) return;
-    await supabase.from("leads").delete().eq("id", id);
+    await supabase.from("opportunities").delete().eq("id", id);
     load();
   };
 
@@ -3766,7 +3766,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
     }).select().single();
     console.log("Opportunity insert result:", opportunity, error);
     if (!error && opportunity) {
-      await supabase.from("leads").update({
+      await supabase.from("opportunities").update({
         status: "Converted",
         converted_opportunity_id: opportunity.id,
         updated_at: new Date().toISOString(),
@@ -7473,6 +7473,763 @@ const NotificationsView = ({ user, onNavigate }) => {
     </div>
   );
 };
+
+const ZohoBooksView = ({ user }) => {
+  const [connected, setConnected] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [tab, setTab] = useState("invoices");
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState("");
+  const [clients, setClients] = useState([]);
+  const [vendors, setVendors] = useState([]);
+
+  const tabs = [
+    { id: "invoices", label: "Invoices" },
+    { id: "estimates", label: "Quotes / Estimates" },
+    { id: "payments", label: "Payments Received" },
+    { id: "expenses", label: "Expenses" },
+    { id: "bills", label: "Bills" },
+    { id: "purchaseorders", label: "Purchase Orders" },
+    { id: "contacts", label: "Contacts" },
+    { id: "sync", label: "⟳ Sync" },
+  ];
+
+  const checkConnection = async () => {
+    setChecking(true);
+    try {
+      const res = await fetch("/api/zoho-sync?action=status");
+      const json = await res.json();
+      setConnected(!!json.connected);
+    } catch {
+      setConnected(false);
+    }
+    setChecking(false);
+  };
+
+  const fetchTab = async (t) => {
+    setLoading(true);
+    setData([]);
+    try {
+      const res = await fetch(`/api/zoho-sync?action=${t}`);
+      const json = await res.json();
+      const key = Object.keys(json).find(k => Array.isArray(json[k]));
+      setData(key ? json[key] : []);
+    } catch {
+      setData([]);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    checkConnection();
+    // Check if just connected via OAuth callback
+    if (window.location.search.includes("zoho=connected")) {
+      setSyncMsg("✅ Zoho Books connected successfully!");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (connected && tab !== "sync") fetchTab(tab);
+  }, [connected, tab]);
+
+  const loadLocalData = async () => {
+    const [{ data: cl }, { data: vn }] = await Promise.all([
+      supabase.from("clients").select("*").order("name"),
+      supabase.from("profiles").select("*").eq("role", "Vendor"),
+    ]);
+    setClients(cl || []);
+    setVendors(vn || []);
+  };
+
+  useEffect(() => { loadLocalData(); }, []);
+
+  const syncClient = async (client) => {
+    setSyncing(true);
+    setSyncMsg("");
+    try {
+      const res = await fetch("/api/zoho-sync?action=sync-client", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client }),
+      });
+      const json = await res.json();
+      if (json.contact) setSyncMsg(`✅ ${client.name} synced to Zoho Books`);
+      else setSyncMsg(`⚠ ${json.message || "Sync failed"}`);
+    } catch (e) {
+      setSyncMsg("❌ Error: " + e.message);
+    }
+    setSyncing(false);
+  };
+
+  const syncVendor = async (vendor) => {
+    setSyncing(true);
+    setSyncMsg("");
+    try {
+      const res = await fetch("/api/zoho-sync?action=sync-vendor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vendor }),
+      });
+      const json = await res.json();
+      if (json.contact) setSyncMsg(`✅ ${vendor.name} synced to Zoho Books`);
+      else setSyncMsg(`⚠ ${json.message || "Sync failed"}`);
+    } catch (e) {
+      setSyncMsg("❌ Error: " + e.message);
+    }
+    setSyncing(false);
+  };
+
+  // Column definitions per tab
+  const columns = {
+    invoices: ["Invoice #", "Customer", "Date", "Due Date", "Amount", "Status"],
+    estimates: ["Estimate #", "Customer", "Date", "Expiry", "Amount", "Status"],
+    payments: ["Payment #", "Customer", "Date", "Amount", "Mode"],
+    expenses: ["Date", "Category", "Description", "Amount", "Status"],
+    bills: ["Bill #", "Vendor", "Date", "Due Date", "Amount", "Status"],
+    purchaseorders: ["PO #", "Vendor", "Date", "Expected", "Amount", "Status"],
+    contacts: ["Name", "Type", "Email", "Phone", "Balance"],
+  };
+
+  const getRow = (item, t) => {
+    if (t === "invoices") return [item.invoice_number, item.customer_name, item.date, item.due_date, `${item.currency_code} ${(item.total || 0).toLocaleString()}`, item.status];
+    if (t === "estimates") return [item.estimate_number, item.customer_name, item.date, item.expiry_date, `${item.currency_code} ${(item.total || 0).toLocaleString()}`, item.status];
+    if (t === "payments") return [item.payment_number, item.customer_name, item.date, `${item.currency_code} ${(item.amount || 0).toLocaleString()}`, item.payment_mode];
+    if (t === "expenses") return [item.date, item.account_name, item.description || item.reference_number, `${item.currency_code} ${(item.total || 0).toLocaleString()}`, item.status];
+    if (t === "bills") return [item.bill_number, item.vendor_name, item.date, item.due_date, `${item.currency_code} ${(item.total || 0).toLocaleString()}`, item.status];
+    if (t === "purchaseorders") return [item.purchaseorder_number, item.vendor_name, item.date, item.delivery_date, `${item.currency_code} ${(item.total || 0).toLocaleString()}`, item.status];
+    if (t === "contacts") return [item.contact_name, item.contact_type, item.email, item.phone, `${item.currency_code || ""} ${(item.outstanding_receivable_amount || 0).toLocaleString()}`];
+    return [];
+  };
+
+  const statusColor = (s) => {
+    if (!s) return T.textMuted;
+    const sl = s.toLowerCase();
+    if (["paid","accepted","received","open"].includes(sl)) return T.teal;
+    if (["overdue","expired"].includes(sl)) return T.red;
+    if (["draft","pending","sent"].includes(sl)) return T.amber;
+    return T.textMuted;
+  };
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Zoho Books</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Live sync with your Zoho Books Professional account</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {checking ? (
+            <span style={{ color: T.textMuted, fontSize: 12 }}>Checking connection...</span>
+          ) : connected ? (
+            <span style={{ background: T.teal + "18", color: T.teal, border: `1px solid ${T.teal}30`, borderRadius: 20, padding: "4px 14px", fontSize: 11, fontWeight: 700 }}>● Connected</span>
+          ) : (
+            <a href="/api/zoho-auth" style={{ background: `linear-gradient(135deg, #E67E22, #F39C12)`, border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, textDecoration: "none" }}>Connect Zoho Books</a>
+          )}
+          {connected && <button onClick={() => { if (tab !== "sync") fetchTab(tab); }} style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.textMuted, padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>↻ Refresh</button>}
+          {connected && <a href="https://books.zoho.com" target="_blank" rel="noopener noreferrer" style={{ background: `linear-gradient(135deg, #E67E22, #F39C12)`, color: "#fff", padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>Open Zoho Books ↗</a>}
+        </div>
+      </div>
+
+      {!connected && !checking && (
+        <div style={{ textAlign: "center", padding: "60px 0", background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>📚</div>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 18, marginBottom: 8 }}>Connect Zoho Books</div>
+          <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 24 }}>Click "Connect Zoho Books" above to authorise access to your account.</div>
+          <a href="/api/zoho-auth" style={{ background: `linear-gradient(135deg, #E67E22, #F39C12)`, color: "#fff", padding: "12px 28px", borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: "none" }}>Connect Now</a>
+        </div>
+      )}
+
+      {connected && (
+        <>
+          {/* Tabs */}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
+            {tabs.map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)} style={{
+                padding: "6px 16px", borderRadius: 20, cursor: "pointer", fontSize: 11, fontWeight: 700,
+                border: `1px solid ${tab === t.id ? "#E67E22" : T.border}`,
+                background: tab === t.id ? "#E67E2220" : "none",
+                color: tab === t.id ? "#E67E22" : T.textMuted,
+                letterSpacing: "0.04em", textTransform: "uppercase", transition: "all 0.15s",
+              }}>{t.label}</button>
+            ))}
+          </div>
+
+          {/* Sync tab */}
+          {tab === "sync" && (
+            <div>
+              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 16, marginBottom: 16 }}>Sync WorkRoom Data to Zoho Books</div>
+              {syncMsg && <div style={{ padding: "10px 14px", background: T.teal + "12", border: `1px solid ${T.teal}30`, borderRadius: 8, color: T.teal, fontSize: 13, marginBottom: 16 }}>{syncMsg}</div>}
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                {/* Clients */}
+                <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 20 }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Clients → Zoho Customers</div>
+                  <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 14 }}>Push WorkRoom clients to Zoho Books as customer contacts</div>
+                  {clients.map(c => (
+                    <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: `1px solid ${T.border}44` }}>
+                      <div>
+                        <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{c.name}</div>
+                        <div style={{ color: T.textMuted, fontSize: 11 }}>{c.email}</div>
+                      </div>
+                      <button onClick={() => syncClient(c)} disabled={syncing} style={{ background: "#E67E2218", border: "1px solid #E67E2230", color: "#E67E22", padding: "4px 12px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
+                        {c.zoho_contact_id ? "Re-sync" : "→ Zoho"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Vendors */}
+                <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 20 }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Vendors → Zoho Vendors</div>
+                  <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 14 }}>Push WorkRoom vendors to Zoho Books as vendor contacts</div>
+                  {vendors.map(v => (
+                    <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: `1px solid ${T.border}44` }}>
+                      <div>
+                        <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{v.name}</div>
+                        <div style={{ color: T.textMuted, fontSize: 11 }}>{v.email}</div>
+                      </div>
+                      <button onClick={() => syncVendor(v)} disabled={syncing} style={{ background: "#E67E2218", border: "1px solid #E67E2230", color: "#E67E22", padding: "4px 12px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>→ Zoho</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Data table */}
+          {tab !== "sync" && (
+            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+              {loading ? (
+                <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted }}>Loading from Zoho Books...</div>
+              ) : data.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted, fontSize: 13 }}>No {tab} found in Zoho Books. <a href="https://books.zoho.com" target="_blank" rel="noopener noreferrer" style={{ color: "#E67E22", fontWeight: 700 }}>Create one in Zoho Books ↗</a></div>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
+                    <thead>
+                      <tr style={{ borderBottom: `1px solid ${T.border}`, background: T.bg }}>
+                        {(columns[tab] || []).map((h, i) => (
+                          <th key={i} style={{ padding: "12px 16px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.map((item, idx) => {
+                        const row = getRow(item, tab);
+                        return (
+                          <tr key={idx} style={{ borderBottom: idx < data.length - 1 ? `1px solid ${T.border}44` : "none" }}
+                            onMouseEnter={e => e.currentTarget.style.background = T.bg}
+                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                            {row.map((cell, ci) => (
+                              <td key={ci} style={{ padding: "11px 16px", fontSize: 12 }}>
+                                {ci === row.length - 1 && tab !== "contacts" && tab !== "payments" ? (
+                                  <span style={{ background: statusColor(cell) + "18", color: statusColor(cell), border: `1px solid ${statusColor(cell)}30`, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{cell}</span>
+                                ) : (
+                                  <span style={{ color: ci === 0 ? T.textPrimary : T.textSecondary, fontWeight: ci === 0 ? 700 : 400 }}>{cell}</span>
+                                )}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
+
+const HRView = ({ user }) => {
+  const [hrTab, setHrTab] = useState("staff");
+  const [staff, setStaff] = useState([]);
+  const [leaveRequests, setLeaveRequests] = useState([]);
+  const [reviews, setReviews] = useState([]);
+  const [training, setTraining] = useState([]);
+  const [trainingNeeds, setTrainingNeeds] = useState([]);
+  const [saving, setSaving] = useState(false);
+
+  // Modals
+  const [leaveModal, setLeaveModal] = useState(false);
+  const [reviewModal, setReviewModal] = useState(null);
+  const [trainingModal, setTrainingModal] = useState(null);
+  const [needModal, setNeedModal] = useState(false);
+
+  // Forms
+  const [leaveForm, setLeaveForm] = useState({ staff_id: "", staff_name: "", leave_type: "Annual", start_date: "", end_date: "", reason: "" });
+  const [reviewForm, setReviewForm] = useState({ staff_id: "", staff_name: "", review_period: "", score: 7, strengths: "", improvements: "", goals: "", events_delivered: 0 });
+  const [trainingForm, setTrainingForm] = useState({ staff_id: "", staff_name: "", training_name: "", training_type: "Internal", provider: "", date_completed: "", expiry_date: "", notes: "" });
+  const [needForm, setNeedForm] = useState({ staff_id: "", staff_name: "", training_required: "", priority: "medium", reason: "" });
+
+  const load = async () => {
+    const [s, l, r, t, n] = await Promise.all([
+      supabase.from("profiles").select("*").not("role", "in", '("Client","Vendor","Board of Directors")').order("name"),
+      supabase.from("leave_requests").select("*").order("created_at", { ascending: false }),
+      supabase.from("performance_reviews").select("*").order("created_at", { ascending: false }),
+      supabase.from("training_records").select("*").order("created_at", { ascending: false }),
+      supabase.from("training_needs").select("*").order("created_at", { ascending: false }),
+    ]);
+    setStaff(s.data || []);
+    setLeaveRequests(l.data || []);
+    setReviews(r.data || []);
+    setTraining(t.data || []);
+    setTrainingNeeds(n.data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const calcDays = (start, end) => {
+    if (!start || !end) return 0;
+    return Math.ceil((new Date(end) - new Date(start)) / (1000*60*60*24)) + 1;
+  };
+
+  const saveLeave = async () => {
+    if (!leaveForm.staff_id || !leaveForm.start_date || !leaveForm.end_date) { alert("Please fill all required fields."); return; }
+    setSaving(true);
+    const days = calcDays(leaveForm.start_date, leaveForm.end_date);
+    await supabase.from("leave_requests").insert({ ...leaveForm, days_requested: days, status: "pending" });
+    // Notify staff member
+    await supabase.from("notifications").insert({ user_id: leaveForm.staff_id, title: "Leave Request Submitted", message: `Your ${leaveForm.leave_type} leave request for ${days} day(s) has been submitted for approval.`, type: "task" });
+    setSaving(false);
+    setLeaveModal(false);
+    setLeaveForm({ staff_id: "", staff_name: "", leave_type: "Annual", start_date: "", end_date: "", reason: "" });
+    load();
+  };
+
+  const approveLeave = async (id, staffId, approved) => {
+    await supabase.from("leave_requests").update({ status: approved ? "approved" : "declined", approved_by: user.id, approved_at: new Date().toISOString() }).eq("id", id);
+    await supabase.from("notifications").insert({ user_id: staffId, title: approved ? "Leave Approved" : "Leave Declined", message: `Your leave request has been ${approved ? "approved" : "declined"} by CEO.`, type: "task" });
+    load();
+  };
+
+  const saveReview = async () => {
+    if (!reviewForm.staff_id || !reviewForm.review_period) { alert("Please fill all required fields."); return; }
+    setSaving(true);
+    await supabase.from("performance_reviews").insert({ ...reviewForm, reviewed_by: user.id, review_date: new Date().toISOString().slice(0,10) });
+    await supabase.from("notifications").insert({ user_id: reviewForm.staff_id, title: "Performance Review Added", message: `Your performance review for ${reviewForm.review_period} has been completed.`, type: "task" });
+    setSaving(false);
+    setReviewModal(null);
+    setReviewForm({ staff_id: "", staff_name: "", review_period: "", score: 7, strengths: "", improvements: "", goals: "", events_delivered: 0 });
+    load();
+  };
+
+  const saveTraining = async () => {
+    if (!trainingForm.staff_id || !trainingForm.training_name) { alert("Please fill all required fields."); return; }
+    setSaving(true);
+    await supabase.from("training_records").insert({ ...trainingForm, status: trainingForm.date_completed ? "completed" : "pending", created_by: user.id });
+    setSaving(false);
+    setTrainingModal(null);
+    setTrainingForm({ staff_id: "", staff_name: "", training_name: "", training_type: "Internal", provider: "", date_completed: "", expiry_date: "", notes: "" });
+    load();
+  };
+
+  const saveNeed = async () => {
+    if (!needForm.staff_id || !needForm.training_required) { alert("Please fill all required fields."); return; }
+    setSaving(true);
+    await supabase.from("training_needs").insert({ ...needForm, status: "open", created_by: user.id });
+    setSaving(false);
+    setNeedModal(false);
+    setNeedForm({ staff_id: "", staff_name: "", training_required: "", priority: "medium", reason: "" });
+    load();
+  };
+
+  const inputStyle = { width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
+  const labelStyle = { color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 };
+  const sectionHead = { color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 16 };
+
+  const pendingLeave = leaveRequests.filter(l => l.status === "pending");
+  const expiringCerts = training.filter(t => t.expiry_date && new Date(t.expiry_date) <= new Date(Date.now() + 30*24*60*60*1000) && t.status === "completed");
+  const openNeeds = trainingNeeds.filter(n => n.status === "open");
+
+  const staffSelect = [{ value: "", label: "Select staff member..." }, ...staff.map(s => ({ value: s.id, label: `${s.name} — ${s.role}` }))];
+
+  const StatusPill = ({ status }) => {
+    const map = { pending: [T.amber, "Pending"], approved: ["#10B981", "Approved"], declined: [T.red, "Declined"], completed: ["#10B981", "Completed"], open: [T.amber, "Open"], in_progress: [T.cyan, "In Progress"] };
+    const [color, label] = map[status] || [T.textMuted, status];
+    return <span style={{ background: color+"18", color, border: `1px solid ${color}30`, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 800 }}>{label}</span>;
+  };
+
+  const PriorityPill = ({ priority }) => {
+    const map = { high: [T.red, "High"], medium: [T.amber, "Medium"], low: [T.teal, "Low"] };
+    const [color, label] = map[priority] || [T.textMuted, priority];
+    return <span style={{ background: color+"18", color, border: `1px solid ${color}30`, borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>{label}</span>;
+  };
+
+  const Modal = ({ title, onClose, children, maxWidth = 580 }) => (
+    <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
+      <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth, maxHeight: "90vh", overflow: "auto", padding: 28 }} onClick={e => e.stopPropagation()}>
+        <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 20 }}>{title}</div>
+        {children}
+      </div>
+    </div>
+  );
+
+  const Field = ({ label, children }) => (
+    <div style={{ marginBottom: 14 }}><label style={labelStyle}>{label}</label>{children}</div>
+  );
+
+  const StaffSelect = ({ value, onChange }) => (
+    <select value={value} onChange={e => { const s = staff.find(x => x.id === e.target.value); onChange(e.target.value, s?.name || ""); }} style={inputStyle}>
+      {staffSelect.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  );
+
+  const hrTabs = [
+    { id: "staff", label: "Staff Records", badge: 0 },
+    { id: "leave", label: "Leave", badge: pendingLeave.length },
+    { id: "performance", label: "Performance", badge: 0 },
+    { id: "training", label: "Training", badge: expiringCerts.length + openNeeds.length },
+  ];
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>People</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800 }}>Human Resources</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{staff.length} staff members · {pendingLeave.length} leave pending · {openNeeds.length} training needs open</div>
+      </div>
+
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Total Staff", value: staff.length, color: T.cyan },
+          { label: "Leave Pending", value: pendingLeave.length, color: T.amber },
+          { label: "Training Needs", value: openNeeds.length, color: T.red },
+          { label: "Expiring Certs", value: expiringCerts.length, color: expiringCerts.length > 0 ? T.red : T.teal },
+        ].map((k,i) => (
+          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginTop: 4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* HR Tabs */}
+      <div style={{ display: "flex", gap: 0, marginBottom: 24, borderBottom: `1px solid ${T.border}` }}>
+        {hrTabs.map(t => (
+          <button key={t.id} onClick={() => setHrTab(t.id)} style={{ padding: "10px 18px", border: "none", cursor: "pointer", background: "none", color: hrTab === t.id ? T.textPrimary : T.textMuted, fontWeight: hrTab === t.id ? 700 : 400, fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: hrTab === t.id ? `2px solid ${T.cyan}` : "2px solid transparent", marginBottom: -1, position: "relative" }}>
+            {t.label}
+            {t.badge > 0 && <span style={{ marginLeft: 5, background: T.amber, color: "#000", fontSize: 9, fontWeight: 900, borderRadius: 20, padding: "1px 5px" }}>{t.badge}</span>}
+          </button>
+        ))}
+      </div>
+
+      {/* ── STAFF RECORDS ── */}
+      {hrTab === "staff" && (
+        <div>
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
+                  {["Name","Role","Email","Country","Leave Taken","Reviews","Training"].map(h => (
+                    <th key={h} style={{ padding: "10px 14px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {staff.map((s, i) => {
+                  const staffLeave = leaveRequests.filter(l => l.staff_id === s.id && l.status === "approved").reduce((sum, l) => sum + (l.days_requested || 0), 0);
+                  const staffReviews = reviews.filter(r => r.staff_id === s.id).length;
+                  const staffTraining = training.filter(t => t.staff_id === s.id && t.status === "completed").length;
+                  const latestReview = reviews.filter(r => r.staff_id === s.id).sort((a,b) => new Date(b.created_at) - new Date(a.created_at))[0];
+                  const roleColor = { CEO: T.cyan, "Country Manager": T.teal, "Vendor Manager": T.amber, "Strategy & Events Lead": "#E879F9", "Finance Manager": "#F59E0B", "Sales & Marketing": T.blue }[s.role] || T.textMuted;
+                  return (
+                    <tr key={s.id} style={{ borderBottom: i < staff.length-1 ? `1px solid ${T.border}44` : "none" }}
+                      onMouseEnter={e => e.currentTarget.style.background = T.bg}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                      <td style={{ padding: "10px 14px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ width: 28, height: 28, borderRadius: "50%", background: roleColor+"20", border: `1px solid ${roleColor}40`, display: "flex", alignItems: "center", justifyContent: "center", color: roleColor, fontWeight: 800, fontSize: 10 }}>{(s.name||"?").slice(0,2).toUpperCase()}</div>
+                          <span style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{s.name}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: "10px 14px" }}><span style={{ background: roleColor+"15", color: roleColor, borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>{s.role}</span></td>
+                      <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 11 }}>{s.email}</td>
+                      <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 12 }}>{s.country || "Ghana"}</td>
+                      <td style={{ padding: "10px 14px", color: T.textPrimary, fontSize: 12, fontWeight: 600 }}>{staffLeave} days</td>
+                      <td style={{ padding: "10px 14px" }}>
+                        <div style={{ color: staffReviews > 0 ? T.teal : T.textMuted, fontSize: 12 }}>
+                          {staffReviews > 0 ? `${staffReviews} reviews` : "—"}
+                          {latestReview && <div style={{ color: T.textMuted, fontSize: 10 }}>Last: {latestReview.score}/10</div>}
+                        </div>
+                      </td>
+                      <td style={{ padding: "10px 14px", color: staffTraining > 0 ? T.cyan : T.textMuted, fontSize: 12 }}>{staffTraining > 0 ? `${staffTraining} completed` : "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── LEAVE MANAGEMENT ── */}
+      {hrTab === "leave" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div style={sectionHead}>Leave Requests</div>
+            <button onClick={() => setLeaveModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "9px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>+ Add Leave Request</button>
+          </div>
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
+                  {["Staff","Type","From","To","Days","Reason","Status","Actions"].map(h => (
+                    <th key={h} style={{ padding: "10px 14px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {leaveRequests.map((l, i) => (
+                  <tr key={l.id} style={{ borderBottom: i < leaveRequests.length-1 ? `1px solid ${T.border}44` : "none" }}
+                    onMouseEnter={e => e.currentTarget.style.background = T.bg}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                    <td style={{ padding: "10px 14px", color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{l.staff_name}</td>
+                    <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 12 }}>{l.leave_type}</td>
+                    <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 12 }}>{l.start_date}</td>
+                    <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 12 }}>{l.end_date}</td>
+                    <td style={{ padding: "10px 14px", color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{l.days_requested}</td>
+                    <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 11, maxWidth: 160 }}>{l.reason}</td>
+                    <td style={{ padding: "10px 14px" }}><StatusPill status={l.status} /></td>
+                    <td style={{ padding: "10px 14px" }}>
+                      {l.status === "pending" && (
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button onClick={() => approveLeave(l.id, l.staff_id, true)} style={{ background: "#10B98118", border: "1px solid #10B98130", color: "#10B981", padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>✓ Approve</button>
+                          <button onClick={() => approveLeave(l.id, l.staff_id, false)} style={{ background: T.red+"18", border: `1px solid ${T.red}30`, color: T.red, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>✗ Decline</button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {leaveRequests.length === 0 && <tr><td colSpan={8} style={{ padding: "30px 0", textAlign: "center", color: T.textMuted }}>No leave requests yet</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── PERFORMANCE REVIEWS ── */}
+      {hrTab === "performance" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div style={sectionHead}>Performance Reviews</div>
+            <button onClick={() => setReviewModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "9px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>+ Add Review</button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14 }}>
+            {staff.map(s => {
+              const staffReviews = reviews.filter(r => r.staff_id === s.id).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+              const latest = staffReviews[0];
+              const avgScore = staffReviews.length > 0 ? (staffReviews.reduce((sum,r) => sum + (r.score||0), 0) / staffReviews.length).toFixed(1) : null;
+              const scoreColor = avgScore >= 8 ? "#10B981" : avgScore >= 6 ? T.teal : avgScore >= 4 ? T.amber : T.red;
+              return (
+                <div key={s.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 18px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                    <div>
+                      <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{s.name}</div>
+                      <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{s.role}</div>
+                    </div>
+                    {avgScore && <div style={{ textAlign: "right" }}><div style={{ color: scoreColor, fontWeight: 900, fontSize: 22 }}>{avgScore}</div><div style={{ color: T.textMuted, fontSize: 9 }}>avg /10</div></div>}
+                  </div>
+                  {latest ? (
+                    <div>
+                      <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 4 }}>Latest: {latest.review_period} · Score: {latest.score}/10</div>
+                      {latest.strengths && <div style={{ color: T.textSecondary, fontSize: 11, marginBottom: 2 }}>✓ {latest.strengths?.slice(0,60)}...</div>}
+                      {latest.improvements && <div style={{ color: T.amber, fontSize: 11 }}>↑ {latest.improvements?.slice(0,60)}...</div>}
+                      <div style={{ color: T.textMuted, fontSize: 10, marginTop: 6 }}>{staffReviews.length} review{staffReviews.length !== 1 ? "s" : ""} total</div>
+                    </div>
+                  ) : (
+                    <div style={{ color: T.textMuted, fontSize: 12, fontStyle: "italic" }}>No reviews yet</div>
+                  )}
+                  <button onClick={() => setReviewModal({ staff_id: s.id, staff_name: s.name })} style={{ marginTop: 12, width: "100%", background: T.cyan+"12", border: `1px solid ${T.cyan}25`, color: T.cyan, padding: "6px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>+ Add Review</button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── TRAINING ── */}
+      {hrTab === "training" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div style={sectionHead}>Training & Development</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setNeedModal(true)} style={{ background: T.amber+"15", border: `1px solid ${T.amber}30`, color: T.amber, padding: "9px 16px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 12 }}>+ Training Need</button>
+              <button onClick={() => setTrainingModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "9px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>+ Log Training</button>
+            </div>
+          </div>
+
+          {/* Training Needs */}
+          {trainingNeeds.length > 0 && (
+            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 20 }}>
+              <div style={{ padding: "12px 16px", borderBottom: `1px solid ${T.border}`, color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>Training Needs — {openNeeds.length} open</div>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
+                  {["Staff","Training Required","Priority","Reason","Status"].map(h => <th key={h} style={{ padding: "8px 14px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>)}
+                </tr></thead>
+                <tbody>
+                  {trainingNeeds.map((n, i) => (
+                    <tr key={n.id} style={{ borderBottom: i < trainingNeeds.length-1 ? `1px solid ${T.border}44` : "none" }}
+                      onMouseEnter={e => e.currentTarget.style.background = T.bg}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                      <td style={{ padding: "10px 14px", color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{n.staff_name}</td>
+                      <td style={{ padding: "10px 14px", color: T.textSecondary, fontSize: 12 }}>{n.training_required}</td>
+                      <td style={{ padding: "10px 14px" }}><PriorityPill priority={n.priority} /></td>
+                      <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 11 }}>{n.reason}</td>
+                      <td style={{ padding: "10px 14px" }}>
+                        <select value={n.status} onChange={async e => { await supabase.from("training_needs").update({ status: e.target.value }).eq("id", n.id); load(); }} style={{ padding: "4px 8px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 11, fontFamily: "inherit", outline: "none" }}>
+                          <option value="open">Open</option>
+                          <option value="in_progress">In Progress</option>
+                          <option value="completed">Completed</option>
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Training Records */}
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ padding: "12px 16px", borderBottom: `1px solid ${T.border}`, color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>Training Records</div>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
+                {["Staff","Training","Type","Provider","Date","Expiry","Status"].map(h => <th key={h} style={{ padding: "8px 14px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {training.map((t, i) => {
+                  const isExpiring = t.expiry_date && new Date(t.expiry_date) <= new Date(Date.now() + 30*24*60*60*1000);
+                  return (
+                    <tr key={t.id} style={{ borderBottom: i < training.length-1 ? `1px solid ${T.border}44` : "none", background: isExpiring ? T.red+"05" : "transparent" }}
+                      onMouseEnter={e => e.currentTarget.style.background = T.bg}
+                      onMouseLeave={e => e.currentTarget.style.background = isExpiring ? T.red+"05" : "transparent"}>
+                      <td style={{ padding: "10px 14px", color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{t.staff_name}</td>
+                      <td style={{ padding: "10px 14px", color: T.textSecondary, fontSize: 12 }}>{t.training_name}</td>
+                      <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 11 }}>{t.training_type}</td>
+                      <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 11 }}>{t.provider || "—"}</td>
+                      <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 11 }}>{t.date_completed || "—"}</td>
+                      <td style={{ padding: "10px 14px", color: isExpiring ? T.red : T.textMuted, fontSize: 11, fontWeight: isExpiring ? 700 : 400 }}>{t.expiry_date || "—"}{isExpiring && " ⚠"}</td>
+                      <td style={{ padding: "10px 14px" }}><StatusPill status={t.status} /></td>
+                    </tr>
+                  );
+                })}
+                {training.length === 0 && <tr><td colSpan={7} style={{ padding: "30px 0", textAlign: "center", color: T.textMuted }}>No training records yet</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ════ MODALS ════ */}
+
+      {/* Leave Request Modal */}
+      {leaveModal && (
+        <Modal title="Add Leave Request" onClose={() => setLeaveModal(false)}>
+          <Field label="Staff Member *"><StaffSelect value={leaveForm.staff_id} onChange={(id, name) => setLeaveForm({...leaveForm, staff_id: id, staff_name: name})} /></Field>
+          <Field label="Leave Type">
+            <select value={leaveForm.leave_type} onChange={e => setLeaveForm({...leaveForm, leave_type: e.target.value})} style={inputStyle}>
+              {["Annual","Sick","Emergency","Maternity/Paternity","Study","Other"].map(t => <option key={t}>{t}</option>)}
+            </select>
+          </Field>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Field label="Start Date *"><input type="date" value={leaveForm.start_date} onChange={e => setLeaveForm({...leaveForm, start_date: e.target.value})} style={inputStyle} /></Field>
+            <Field label="End Date *"><input type="date" value={leaveForm.end_date} onChange={e => setLeaveForm({...leaveForm, end_date: e.target.value})} style={inputStyle} /></Field>
+          </div>
+          {leaveForm.start_date && leaveForm.end_date && <div style={{ color: T.cyan, fontSize: 12, marginBottom: 14, fontWeight: 700 }}>📅 {calcDays(leaveForm.start_date, leaveForm.end_date)} days requested</div>}
+          <Field label="Reason"><textarea value={leaveForm.reason} onChange={e => setLeaveForm({...leaveForm, reason: e.target.value})} rows={3} style={{...inputStyle, resize: "vertical"}} placeholder="Reason for leave..." /></Field>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={saveLeave} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Submit Leave Request"}</button>
+            <button onClick={() => setLeaveModal(false)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Performance Review Modal */}
+      {reviewModal && (
+        <Modal title="Add Performance Review" onClose={() => setReviewModal(null)}>
+          {!reviewModal.staff_id ? (
+            <Field label="Staff Member *"><StaffSelect value={reviewForm.staff_id} onChange={(id, name) => setReviewForm({...reviewForm, staff_id: id, staff_name: name})} /></Field>
+          ) : (
+            <div style={{ background: T.cyan+"12", border: `1px solid ${T.cyan}30`, borderRadius: 8, padding: "10px 14px", marginBottom: 16, color: T.cyan, fontSize: 13, fontWeight: 700 }}>{reviewModal.staff_name}</div>
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Field label="Review Period *"><input value={reviewForm.review_period} onChange={e => setReviewForm({...reviewForm, review_period: e.target.value})} style={inputStyle} placeholder="e.g. Q1 2026" /></Field>
+            <Field label="Events Delivered"><input type="number" value={reviewForm.events_delivered} onChange={e => setReviewForm({...reviewForm, events_delivered: parseInt(e.target.value)||0})} style={inputStyle} /></Field>
+          </div>
+          <Field label={`Performance Score: ${reviewForm.score}/10`}>
+            <input type="range" min="1" max="10" step="0.5" value={reviewForm.score} onChange={e => setReviewForm({...reviewForm, score: parseFloat(e.target.value)})}
+              style={{ width: "100%", accentColor: T.cyan }} />
+            <div style={{ display: "flex", justifyContent: "space-between", color: T.textMuted, fontSize: 10, marginTop: 2 }}><span>1 — Poor</span><span style={{ color: T.cyan, fontWeight: 700 }}>{reviewForm.score}/10</span><span>10 — Exceptional</span></div>
+          </Field>
+          <Field label="Strengths"><textarea value={reviewForm.strengths} onChange={e => setReviewForm({...reviewForm, strengths: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} placeholder="Key strengths observed..." /></Field>
+          <Field label="Areas for Improvement"><textarea value={reviewForm.improvements} onChange={e => setReviewForm({...reviewForm, improvements: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} placeholder="Areas to develop..." /></Field>
+          <Field label="Goals for Next Period"><textarea value={reviewForm.goals} onChange={e => setReviewForm({...reviewForm, goals: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} placeholder="Goals and objectives..." /></Field>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={() => { if(reviewModal.staff_id) setReviewForm(f => ({...f, staff_id: reviewModal.staff_id, staff_name: reviewModal.staff_name})); saveReview(); }} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Save Review"}</button>
+            <button onClick={() => setReviewModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Training Log Modal */}
+      {trainingModal && (
+        <Modal title="Log Training" onClose={() => setTrainingModal(null)}>
+          <Field label="Staff Member *"><StaffSelect value={trainingForm.staff_id} onChange={(id, name) => setTrainingForm({...trainingForm, staff_id: id, staff_name: name})} /></Field>
+          <Field label="Training Name *"><input value={trainingForm.training_name} onChange={e => setTrainingForm({...trainingForm, training_name: e.target.value})} style={inputStyle} placeholder="e.g. Event Safety Certification" /></Field>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Field label="Training Type">
+              <select value={trainingForm.training_type} onChange={e => setTrainingForm({...trainingForm, training_type: e.target.value})} style={inputStyle}>
+                {["Internal","External","Certification","Workshop","Online","Conference"].map(t => <option key={t}>{t}</option>)}
+              </select>
+            </Field>
+            <Field label="Provider / Institution"><input value={trainingForm.provider} onChange={e => setTrainingForm({...trainingForm, provider: e.target.value})} style={inputStyle} placeholder="Who delivered it?" /></Field>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Field label="Date Completed"><input type="date" value={trainingForm.date_completed} onChange={e => setTrainingForm({...trainingForm, date_completed: e.target.value})} style={inputStyle} /></Field>
+            <Field label="Expiry Date (if applicable)"><input type="date" value={trainingForm.expiry_date} onChange={e => setTrainingForm({...trainingForm, expiry_date: e.target.value})} style={inputStyle} /></Field>
+          </div>
+          <Field label="Notes"><textarea value={trainingForm.notes} onChange={e => setTrainingForm({...trainingForm, notes: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} /></Field>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={saveTraining} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Save Training Record"}</button>
+            <button onClick={() => setTrainingModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Training Need Modal */}
+      {needModal && (
+        <Modal title="Flag Training Need" onClose={() => setNeedModal(false)}>
+          <Field label="Staff Member *"><StaffSelect value={needForm.staff_id} onChange={(id, name) => setNeedForm({...needForm, staff_id: id, staff_name: name})} /></Field>
+          <Field label="Training Required *"><input value={needForm.training_required} onChange={e => setNeedForm({...needForm, training_required: e.target.value})} style={inputStyle} placeholder="e.g. Client Management, Protocol Training" /></Field>
+          <Field label="Priority">
+            <select value={needForm.priority} onChange={e => setNeedForm({...needForm, priority: e.target.value})} style={inputStyle}>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </Field>
+          <Field label="Reason / Context"><textarea value={needForm.reason} onChange={e => setNeedForm({...needForm, reason: e.target.value})} rows={3} style={{...inputStyle, resize: "vertical"}} placeholder="Why is this training needed?" /></Field>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={saveNeed} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.amber}, ${T.amber}99)`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Flag Training Need"}</button>
+            <button onClick={() => setNeedModal(false)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
 
 export default function StretchfieldWorkRoom({ user: propUser, profile: propProfile, onLogout }) {
   const [activeTab, setActiveTab] = useState("dashboard");

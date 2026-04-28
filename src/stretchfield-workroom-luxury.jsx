@@ -1,4 +1,35 @@
-import { supabase } from "./supabase";
+  const handleConvert = async (opp) => {
+    if (!window.confirm(`Convert ${opp.company} to a Lead? They will appear in the Leads Pipeline.`)) return;
+    setSaving(true);
+    const { data: newLead, error } = await supabase.from("leads").insert({
+      company: opp.company,
+      contact_name: opp.contact_name || "",
+      email: opp.contact_email || opp.email || "",
+      phone: opp.contact_phone || opp.phone || "",
+      status: "new",
+      value: 0,
+      notes: `Converted from Opportunities.\n\nEvent Fit: ${opp.event_fit || ""}\n\nNotes: ${opp.notes || ""}`,
+      source: "Opportunities",
+      created_by: user?.id,
+      assigned_to: user?.id,
+      assigned_name: user?.name || "",
+    }).select().single();
+    if (!error && newLead) {
+      await supabase.from("opportunities").update({
+        status: "Converted",
+        updated_at: new Date().toISOString(),
+      }).eq("id", opp.id);
+      setSaving(false);
+      load();
+      if (onNavigate) onNavigate("crm");
+    } else {
+      console.error("Convert error:", error?.message);
+      alert("Failed to convert: " + (error?.message || "Unknown error"));
+      setSaving(false);
+    }
+  };
+
+  import { supabase } from "./supabase";
 
 // ── Email helper ──
 const sendEmail = async (to, subject, html) => {

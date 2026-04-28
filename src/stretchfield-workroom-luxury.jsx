@@ -5802,8 +5802,18 @@ const LeadCard = ({ lead, selectedLead, setSelectedLead, activities }) => {
   );
 };
 
-const LeadPanel = ({ lead, activities, canEdit, canApprove, actForm, setActForm, addingAct, addActivity, updateStatus, handleDelete, setApprovalModal, existingClients, setMatchedClient }) => {
+const LeadPanel = ({ lead, activities, canEdit, canApprove, addActivity, updateStatus, handleDelete, setApprovalModal, existingClients, setMatchedClient }) => {
   const stage = STAGES.find(s => s.id === lead.status) || STAGES[0];
+  const [actForm, setActForm] = React.useState({ type: "call", notes: "", scheduled_date: "", scheduled_time: "" });
+  const [addingAct, setAddingActLocal] = React.useState(false);
+
+  const handleLog = async () => {
+    if (!actForm.notes) return;
+    setAddingActLocal(true);
+    await addActivity(lead.id, lead.company, actForm);
+    setActForm({ type: "call", notes: "", scheduled_date: "", scheduled_time: "" });
+    setAddingActLocal(false);
+  };
   const leadActivities = (activities || []).filter(a => a.lead_id === lead.id).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
   const tColors = { note: T.textMuted, call: T.teal, meeting: T.cyan, email: T.blue, demo: T.amber, "follow-up": "#8B5CF6" };
   const tIcons = { note: "📝", call: "📞", meeting: "🤝", email: "✉️", demo: "🎯", "follow-up": "🔄" };
@@ -5857,7 +5867,7 @@ const LeadPanel = ({ lead, activities, canEdit, canApprove, actForm, setActForm,
               </div>
             )}
             {actForm.scheduled_date && <div style={{ color: "#8B5CF6", fontSize: 10, fontWeight: 700, marginBottom: 6 }}>📅 {actForm.scheduled_date}{actForm.scheduled_time ? " at "+actForm.scheduled_time : ""} → calendar</div>}
-            <button onClick={() => addActivity(lead.id, lead.company)} disabled={addingAct || !actForm.notes} style={{ background: T.cyan, border: "none", color: "#000", padding: "5px 14px", borderRadius: 5, cursor: "pointer", fontSize: 11, fontWeight: 800, opacity: !actForm.notes ? 0.5 : 1 }}>{addingAct ? "..." : "Log"}</button>
+            <button onClick={handleLog} disabled={addingActLocal || !actForm.notes} style={{ background: T.cyan, border: "none", color: "#000", padding: "5px 14px", borderRadius: 5, cursor: "pointer", fontSize: 11, fontWeight: 800, opacity: !actForm.notes ? 0.5 : 1 }}>{addingActLocal ? "..." : "Log"}</button>
           </div>
         )}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -6141,7 +6151,7 @@ const CRMView = ({ user }) => {
         </div>
 
         {/* ── Right Panel ── */}
-        {selectedLead && <LeadPanel lead={selectedLead} activities={activities} canEdit={canEdit} canApprove={canApprove} actForm={actForm} setActForm={setActForm} addingAct={addingAct} addActivity={addActivity} updateStatus={updateStatus} handleDelete={handleDelete} setApprovalModal={setApprovalModal} existingClients={existingClients} setMatchedClient={setMatchedClient} />}
+        {selectedLead && <LeadPanel key={selectedLead.id} lead={selectedLead} activities={activities} canEdit={canEdit} canApprove={canApprove} addActivity={addActivity} updateStatus={updateStatus} handleDelete={handleDelete} setApprovalModal={setApprovalModal} existingClients={existingClients} setMatchedClient={setMatchedClient} />}
       </div>
 
       {/* ── New Lead Modal ── */}

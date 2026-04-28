@@ -5933,8 +5933,8 @@ const CRMView = ({ user }) => {
   const load = async () => {
     const [l, a, p, m, c] = await Promise.all([
       ["CEO", "Country Manager", "Sales & Marketing"].includes(user?.role)
-        ? supabase.from("opportunities").select("*").order("created_at", { ascending: false })
-        : supabase.from("opportunities").select("*").or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`).order("created_at", { ascending: false }),
+        ? supabase.from("leads").select("*").order("created_at", { ascending: false })
+        : supabase.from("leads").select("*").or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`).order("created_at", { ascending: false }),
       supabase.from("crm_activities").select("*").order("created_at", { ascending: false }),
       supabase.from("proposals").select("*").order("created_at", { ascending: false }),
       supabase.from("profiles").select("*").not("role", "in", '("Client","Vendor")'),
@@ -5963,7 +5963,7 @@ const CRMView = ({ user }) => {
   const handleCreate = async () => {
     if (!form.company) return;
     setSaving(true);
-    await supabase.from("opportunities").insert({
+    await supabase.from("leads").insert({
       company: form.company, contact_name: form.contact_name, email: form.email,
       phone: form.phone, source: form.source, value: parseFloat(form.value) || 0,
       notes: form.notes, status: form.status || "new", created_by: user.id,
@@ -5977,14 +5977,14 @@ const CRMView = ({ user }) => {
 
   const updateStatus = async (leadId, newStatus) => {
     if (newStatus === "won") {
-      await supabase.from("opportunities").update({ status: "won", pending_approval: true, closed_date: new Date().toISOString().slice(0,10), sales_cycle_days: Math.round((new Date() - new Date(leads.find(l=>l.id===leadId)?.created_at||new Date()))/(1000*60*60*24)) }).eq("id", leadId);
+      await supabase.from("leads").update({ status: "won", pending_approval: true, closed_date: new Date().toISOString().slice(0,10), sales_cycle_days: Math.round((new Date() - new Date(leads.find(l=>l.id===leadId)?.created_at||new Date()))/(1000*60*60*24)) }).eq("id", leadId);
       const { data: ceos } = await supabase.from("profiles").select("id, email, name").eq("role", "CEO");
       for (const ceo of ceos || []) {
         await supabase.from("notifications").insert({ user_id: ceo.id, title: "Lead Won — Action Required", message: `${leads.find(l=>l.id===leadId)?.company} has been marked as Won. Please review and approve.`, type: "crm" });
         if (ceo.email) await sendEmail(ceo.email, `Lead Won — ${leads.find(l=>l.id===leadId)?.company}`, notifEmailHtml({ name: ceo.name, title: "Lead Won — Your Approval Required", message: `<strong>${leads.find(l=>l.id===leadId)?.company}</strong> has been marked as Won. Please log in to review and approve.`, actionUrl: BASE_URL, actionLabel: "Review Lead" }));
       }
     } else {
-      await supabase.from("opportunities").update({ status: newStatus }).eq("id", leadId);
+      await supabase.from("leads").update({ status: newStatus }).eq("id", leadId);
     }
     load();
   };
@@ -6023,8 +6023,8 @@ const CRMView = ({ user }) => {
   // ── KANBAN CARD ──
       const handleDelete = async (id) => {
     if (!window.confirm("Delete this lead?")) return;
-    await supabase.from("opportunities").update({ converted_lead_id: null }).eq("converted_lead_id", id);
-    await supabase.from("opportunities").delete().eq("id", id);
+    await supabase.from("leads").update({ converted_lead_id: null }).eq("converted_lead_id", id);
+    await supabase.from("leads").delete().eq("id", id);
     setSelectedLead(null);
     load();
   };

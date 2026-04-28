@@ -3652,7 +3652,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
   const canManage = ["CEO", "Sales & Marketing"].includes(user?.role);
 
   const load = async () => {
-    const { data } = await supabase.from("leads").select("*").order("company");
+    const { data } = await supabase.from("opportunities").select("*").order("company");
     setLeads(data || []);
   };
 
@@ -3718,7 +3718,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
   const handleAdd = async () => {
     if (!form.company) return;
     setSaving(true);
-    await supabase.from("leads").insert({ ...form });
+    await supabase.from("opportunities").insert({ ...form });
     // form already includes contact_name, contact_email, contact_phone
     setSaving(false);
     setModal(false);
@@ -3728,7 +3728,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
 
   const handleUpdate = async () => {
     setSaving(true);
-    await supabase.from("leads").update({
+    await supabase.from("opportunities").update({
       company: editModal.company, sector: editModal.sector,
       presence: editModal.presence, event_fit: editModal.event_fit,
       notes: editModal.notes, status: editModal.status,
@@ -3744,7 +3744,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
 
   const handleDelete = async (id) => {
     if (!window.confirm("Remove this opportunity?")) return;
-    await supabase.from("leads").delete().eq("id", id);
+    await supabase.from("opportunities").delete().eq("id", id);
     load();
   };
 
@@ -3766,7 +3766,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
     }).select().single();
     console.log("Opportunity insert result:", opportunity, error);
     if (!error && opportunity) {
-      await supabase.from("leads").update({
+      await supabase.from("opportunities").update({
         status: "Converted",
         converted_opportunity_id: opportunity.id,
         updated_at: new Date().toISOString(),
@@ -6384,7 +6384,7 @@ const CalendarView = ({ user, onNavigate }) => {
   const loadOpportunitysOpps = async () => {
     const [{ data: l }, { data: o }, { data: itins }] = await Promise.all([
       supabase.from("opportunities").select("id, company, contact_name, status"),
-      supabase.from("leads").select("id, company, sector, status").neq("status","Converted"),
+      supabase.from("opportunities").select("id, company, sector, status").neq("status","Converted"),
       uid ? supabase.from("itineraries").select("*").eq("created_by", uid).order("created_at", { ascending: false }) : Promise.resolve({ data: [] }),
     ]);
     setOpportunitys(l || []);

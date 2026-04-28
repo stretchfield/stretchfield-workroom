@@ -3733,7 +3733,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
   useEffect(() => { load(); }, []);
 
   useEffect(() => {
-    let f = [...leads];
+    let f = [...opportunities];
     if (search) f = f.filter(o => o.company.toLowerCase().includes(search.toLowerCase()) || o.sector?.toLowerCase().includes(search.toLowerCase()));
     if (sectorFilter !== "all") f = f.filter(o => o.sector === sectorFilter);
     if (presenceFilter !== "all") f = f.filter(o => o.presence === presenceFilter);
@@ -3988,7 +3988,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
             </tbody>
           </table>
           {filtered.length === 0 && (
-            <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted, fontSize: 13 }}>No leads match your filters.</div>
+            <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted, fontSize: 13 }}>No opportunities match your filters.</div>
           )}
         </div>
       </div>

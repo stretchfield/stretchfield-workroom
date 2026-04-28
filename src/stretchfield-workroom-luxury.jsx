@@ -5934,7 +5934,7 @@ const CRMView = ({ user }) => {
     const [l, a, p, m, c] = await Promise.all([
       ["CEO", "Country Manager", "Sales & Marketing"].includes(user?.role)
         ? supabase.from("opportunities").select("*").order("created_at", { ascending: false })
-        : supabase.from("opportunities").select("*").or("assigned_to.eq." + user.id + ",created_by.eq." + user.id).order("created_at", { ascending: false }),
+        : supabase.from("opportunities").select("*").or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`).order("created_at", { ascending: false }),
       supabase.from("crm_activities").select("*").order("created_at", { ascending: false }),
       supabase.from("proposals").select("*").order("created_at", { ascending: false }),
       supabase.from("profiles").select("*").not("role", "in", '("Client","Vendor")'),
@@ -8194,7 +8194,7 @@ const CRMDashboardSM = ({ user }) => {
 
   const load = async () => {
     const [l, t] = await Promise.all([
-      supabase.from("opportunities").select("*").or("assigned_to.eq." + user.id + ",created_by.eq." + user.id),
+      supabase.from("opportunities").select("*").or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`),
       supabase.from("sales_targets").select("*").eq("rep_id", user.id).order("created_at", { ascending: false }).limit(1),
     ]);
     setOpportunitys(l.data || []);
@@ -8582,8 +8582,10 @@ const FinanceDashboard = ({ user, onTab }) => {
 
   const canApprove = ['CEO', 'Country Manager'].includes(user?.role);
   const isFinance = ['Finance Manager', 'CEO'].includes(user?.role);
+  const [financeLoading, setFinanceLoading] = useState(true);
 
   const load = async () => {
+    setFinanceLoading(true);
     const [v, est, pc, pcv, db, ev, cl, po, ci, vi] = await Promise.all([
       supabase.from('payment_vouchers').select('*').order('created_at', { ascending: false }),
       supabase.from('estimates').select('*').order('created_at', { ascending: false }),

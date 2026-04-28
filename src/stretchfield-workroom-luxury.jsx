@@ -11312,6 +11312,216 @@ const VendorAssignmentView = ({ user }) => {
   );
 };
 
+const UsersView = ({ user }) => {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState(false);
+  const [editModal, setEditModal] = useState(null);
+  const [editForm, setEditForm] = useState({ name: '', role: '', country: '', phone: '', newPassword: '' });
+  const [form, setForm] = useState({ name: '', email: '', role: 'Country Manager', password: '', country: 'Ghana' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const roleColors = {
+    'CEO': T.cyan, 'Country Manager': T.blue, 'Vendor Manager': T.magenta,
+    'Strategy & Events Opportunity': T.amber, 'Sales & Marketing': '#EC4899',
+    'Vendor': '#06B6D4', 'Client': '#84CC16',
+  };
+
+  const load = async () => {
+    setLoading(true);
+    const { data } = await supabase.from('profiles').select('*').order('name');
+    setUsers(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleCreate = async () => {
+    if (!form.name || !form.email || !form.password) { setError('All fields required.'); return; }
+    setSaving(true); setError('');
+    const { data: authData, error: authErr } = await supabase.auth.signUp({ email: form.email, password: form.password });
+    if (authErr) { setError(authErr.message); setSaving(false); return; }
+    const uid = authData.user?.id;
+    const initials = form.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    await supabase.from('profiles').insert({ id: uid, name: form.name, email: form.email, role: form.role, avatar: initials });
+    setModal(false);
+    setForm({ name: '', email: '', role: 'Country Manager', password: '' });
+    setSaving(false);
+    load();
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Remove this user? This cannot be undone.')) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        'https://okbduzenceoknkjqnrha.supabase.co/functions/v1/delete-user',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ userId: id }),
+        }
+      );
+      const result = await res.json();
+      if (result.error) { alert('Delete failed: ' + result.error); return; }
+      setUsers(prev => prev.filter(u => u.id !== id));
+    } catch (err) {
+      alert('Delete failed: ' + err.message);
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Administration</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>User Management</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{users.length} total users</div>
+        </div>
+        <Btn onClick={() => setModal(true)}>+ Add User</Btn>
+      </div>
+
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px,1fr))", gap: 12, marginBottom: 24 }}>
+        {[...new Set(users.map(u => u.role))].map((role, i) => {
+          const roleColors = { "CEO": T.cyan, "Country Manager": T.teal, "Vendor Manager": T.amber, "Strategy & Events Opportunity": T.magenta, "Finance Manager": T.gold, "Sales & Marketing": T.blue, "Vendor": T.textSecondary, "Client": "#10B981", "Board of Directors": "#8B5CF6" };
+          const color = roleColors[role] || T.textMuted;
+          return (
+            <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${color}`, borderRadius: 10 }}>
+              <div style={{ color: color, fontSize: 20, fontWeight: 900 }}>{users.filter(u => u.role === role).length}</div>
+              <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: 4 }}>{role}</div>
+            </div>
+          );
+        })}
+      </div>
+      {loading ? (
+        <div style={{ color: T.textMuted, textAlign: 'center', padding: 60 }}>Loading...</div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+          {users.map(u => (
+            <Card key={u.id}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+                <Avatar initials={u.avatar || '??'} size={44} color={roleColors[u.role] || T.textMuted} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{u.name}</div>
+                  <div style={{ color: T.textMuted, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ background: (roleColors[u.role] || T.textMuted) + '22', color: roleColors[u.role] || T.textMuted, padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700 }}>{u.role}</span>
+                {u.email !== user?.email && (
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button onClick={() => openEdit(u)} style={{ background: T.cyan+"18", border: `1px solid ${T.cyan}40`, color: T.cyan, width: 28, height: 28, borderRadius: 6, cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>✎</button>
+                    <button onClick={() => handleDelete(u.id)} style={{ background: 'none', border: 'none', color: T.textMuted, cursor: 'pointer', fontSize: 18, padding: '2px 6px' }}>×</button>
+                  </div>
+                )}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+      {/* Edit User Modal */}
+      {editModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setEditModal(null)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 480, padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Edit User</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>{editModal.email}</div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Full Name</label>
+              <input value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Role</label>
+              <select value={editForm.role} onChange={e => setEditForm({...editForm, role: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                <option value="Country Manager">Country Manager</option>
+                <option value="Vendor Manager">Vendor Manager</option>
+                <option value="Strategy & Events Opportunity">Strategy & Events Opportunity</option>
+                <option value="Sales & Marketing">Sales & Marketing</option>
+                <option value="Finance Manager">Finance Manager</option>
+                <option value="Board of Directors">Board of Directors</option>
+                <option value="Vendor">Vendor</option>
+                <option value="Client">Client</option>
+              </select>
+            </div>
+
+            {editForm.role === 'Country Manager' && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Country</label>
+                <select value={editForm.country} onChange={e => setEditForm({...editForm, country: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                  <option value="Ghana">Ghana 🇬🇭</option>
+                  <option value="Nigeria">Nigeria 🇳🇬</option>
+                </select>
+              </div>
+            )}
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Phone</label>
+              <input value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} placeholder="+233 XX XXX XXXX" />
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>New Password (leave blank to keep current)</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input type="text" value={editForm.newPassword} onChange={e => setEditForm({...editForm, newPassword: e.target.value})}
+                  style={{ flex: 1, padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}
+                  placeholder="Leave blank to keep current" />
+                <button onClick={() => setEditForm({...editForm, newPassword: generatePassword(editModal.email)})}
+                  style={{ background: T.cyan+"15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "9px 14px", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>⚡ Generate</button>
+              </div>
+            </div>
+
+            {error && <div style={{ color: T.red, fontSize: 12, marginBottom: 12 }}>{error}</div>}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={handleUserUpdate} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Save Changes"}</button>
+              <button onClick={() => setEditModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modal && (
+        <Modal title="Add New User" onClose={() => { setModal(false); setError(''); }}>
+          <Input label="Full Name" placeholder="e.g. Ama Mensah" value={form.name} onChange={v => setForm({ ...form, name: v })} />
+          <Input label="Email" type="email" placeholder="user@stretchfield.com" value={form.email} onChange={v => setForm({ ...form, email: v, password: generatePassword(v) })} />
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Password</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input type="text" value={form.password} onChange={e => setForm({...form, password: e.target.value})} placeholder="Auto-generated from email" style={{ flex: 1, padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+              <button type="button" onClick={() => setForm({...form, password: generatePassword(form.email)})} style={{ background: T.cyan+"15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "9px 14px", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>⚡ Generate</button>
+            </div>
+            {form.email && !form.password && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 5 }}>Click Generate to auto-create from email</div>}
+            {form.password && <div style={{ color: T.teal, fontSize: 11, marginTop: 5 }}>✓ Password set — will be emailed to user on creation</div>}
+          </div>
+          <Select label="Role" options={[
+            { value: 'Country Manager', label: 'Country Manager' },
+            { value: 'Vendor Manager', label: 'Vendor Manager' },
+            { value: 'Strategy & Events Opportunity', label: 'Strategy & Events Opportunity' },
+            { value: 'Sales & Marketing', label: 'Sales & Marketing' },
+            { value: 'Finance Manager', label: 'Finance Manager' },
+            { value: 'Board of Directors', label: 'Board of Directors' },
+            { value: 'Vendor', label: 'Vendor' },
+            { value: 'Client', label: 'Client' },
+          ]} value={form.role} onChange={v => setForm({ ...form, role: v })} />
+          {error && <div style={{ color: '#F43F5E', fontSize: 12, marginTop: 4 }}>{error}</div>}
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <Btn onClick={handleCreate} disabled={saving}>{saving ? 'Creating...' : 'Create User'}</Btn>
+            <Btn variant="ghost" onClick={() => { setModal(false); setError(''); }}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+
+
+
 // ─── FINANCE APPROVALS VIEW ───────────────────────────────────────────────────
 const FinanceApprovalsView = ({ user }) => {
   const [expenses, setExpenses] = useState([]);

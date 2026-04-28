@@ -8797,7 +8797,7 @@ const FinanceDashboard = ({ user, onTab }) => {
             <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em' }}>Finance Operations</h2>
             <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>
               Vouchers · Estimates · Petty Cash · Daily Balances
-              {isCountryManager && <span style={{ marginLeft: 8, background: userCountry === 'Nigeria' ? '#10B98120' : T.amber+'20', color: userCountry === 'Nigeria' ? '#10B981' : T.amber, borderRadius: 20, padding: '1px 8px', fontSize: 10, fontWeight: 700 }}>{userCountry === 'Nigeria' ? '🇳🇬' : '🇬🇭'} {userCountry} only</span>}
+              {['Country Manager'].includes(user?.role) && <span style={{ marginLeft: 8, background: (user?.country === 'Nigeria') ? '#10B98120' : T.amber+'20', color: (user?.country === 'Nigeria') ? '#10B981' : T.amber, borderRadius: 20, padding: '1px 8px', fontSize: 10, fontWeight: 700 }}>{user?.country === 'Nigeria' ? '🇳🇬' : '🇬🇭'} {user?.country || 'Ghana'} only</span>}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>

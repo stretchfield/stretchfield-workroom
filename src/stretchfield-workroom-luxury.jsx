@@ -6073,7 +6073,17 @@ const CRMView = ({ user }) => {
     await supabase.from("leads").delete().eq("id", id);
     setSelectedLead(null);
     load();
-  };
+  }
+
+  const handleReactivate = async (lead) => {
+    await supabase.from("leads").update({ status: "new", previous_status: "lost" }).eq("id", lead.id);
+    await supabase.from("crm_activities").insert({
+      lead_id: lead.id, type: "note",
+      notes: "Lead reactivated on " + new Date().toLocaleDateString("en-GB"),
+      activity_type: "note", created_by: user.id, created_by_name: user.name,
+    });
+    load();
+  };;
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>

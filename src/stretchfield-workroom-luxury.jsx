@@ -3786,10 +3786,10 @@ const OpportunitiesView = ({ user, onNavigate }) => {
     </div>
   );
 
-  const converted = leads.filter(o => o.status === "Converted").length;
-  const qualified = leads.filter(o => o.status === "Qualified").length;
-  const contacted = leads.filter(o => o.status === "Contacted").length;
-  const panAfrica = leads.filter(o => o.presence === "GH+NG+KE").length;
+  const converted = opportunities.filter(o => o.status === "Converted").length;
+  const qualified = opportunities.filter(o => o.status === "Qualified").length;
+  const contacted = opportunities.filter(o => o.status === "Contacted").length;
+  const panAfrica = opportunities.filter(o => o.presence === "GH+NG+KE").length;
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
@@ -3798,7 +3798,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
         <div>
           <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>CRM</div>
           <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Opportunities</h2>
-          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{leads.length} target companies · {converted} converted to leads</div>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{opportunities.length} target companies · {converted} converted to leads</div>
         </div>
         {canManage && (
           <button onClick={() => setModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, letterSpacing: "0.06em" }}>+ Add Opportunity</button>
@@ -3808,7 +3808,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
       {/* KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginBottom: 24 }}>
         {[
-          { label: "Total", value: leads.length, color: T.blue },
+          { label: "Total", value: opportunities.length, color: T.blue },
           { label: "Contacted", value: contacted, color: T.amber },
           { label: "Qualified", value: qualified, color: T.teal },
           { label: "Converted", value: converted, color: "#10B981" },
@@ -6036,7 +6036,7 @@ const CRMView = ({ user }) => {
       {/* ── KPI Strip ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 10, marginBottom: 20 }}>
         {[
-          { label: "Total Leads", value: leads.length, color: T.cyan },
+          { label: "Total Leads", value: opportunities.length, color: T.cyan },
           { label: "Pipeline Value", value: "GHS "+totalPipeline.toLocaleString(), color: T.amber },
           { label: "Won", value: wonCount, sub: "GHS "+totalWon.toLocaleString(), color: T.teal },
           { label: "Pending Approval", value: pendingApproval, color: pendingApproval > 0 ? T.red : T.textMuted },

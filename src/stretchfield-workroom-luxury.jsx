@@ -3634,7 +3634,7 @@ const EventsView = ({ user, userRole }) => {
 
 
 const OpportunitiesView = ({ user, onNavigate }) => {
-  const [leads, setLeads] = useState([]);
+  const [opportunities, setOpportunities] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [search, setSearch] = useState("");
   const [sectorFilter, setSectorFilter] = useState("all");
@@ -3652,8 +3652,8 @@ const OpportunitiesView = ({ user, onNavigate }) => {
   const canManage = ["CEO", "Sales & Marketing"].includes(user?.role);
 
   const load = async () => {
-    const { data } = await supabase.from("leads").select("*").order("company");
-    setLeads(data || []);
+    const { data } = await supabase.from("opportunities").select("*").order("company");
+    setOpportunities(data || []);
   };
 
   const loadActivities = async (oppId) => {
@@ -3702,15 +3702,15 @@ const OpportunitiesView = ({ user, onNavigate }) => {
   useEffect(() => { load(); }, []);
 
   useEffect(() => {
-    let f = [...leads];
+    let f = [...opportunities];
     if (search) f = f.filter(o => o.company.toLowerCase().includes(search.toLowerCase()) || o.sector?.toLowerCase().includes(search.toLowerCase()));
     if (sectorFilter !== "all") f = f.filter(o => o.sector === sectorFilter);
     if (presenceFilter !== "all") f = f.filter(o => o.presence === presenceFilter);
     if (statusFilter !== "all") f = f.filter(o => o.status === statusFilter);
     setFiltered(f);
-  }, [leads, search, sectorFilter, presenceFilter, statusFilter]);
+  }, [opportunities, search, sectorFilter, presenceFilter, statusFilter]);
 
-  const sectors = [...new Set(leads.map(o => o.sector).filter(Boolean))].sort();
+  const sectors = [...new Set(opportunities.map(o => o.sector).filter(Boolean))].sort();
   const statuses = ["New", "Contacted", "Qualified", "Converted"];
   const statusColors = { New: T.cyan, Contacted: T.amber, Qualified: T.teal, Converted: "#10B981" };
   const presenceColors = { GH: T.cyan, NG: T.amber, KE: T.teal };

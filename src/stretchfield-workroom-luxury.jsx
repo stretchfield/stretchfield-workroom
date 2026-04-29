@@ -1,30 +1,1764 @@
-  const handleConvert = async (opp) => {
-    if (!window.confirm(`Convert ${opp.company} to a Lead?`)) return;
-    setSaving(true);
-    const { data: newLead, error } = await supabase.from("leads").insert({
-      company: opp.company,
-      contact_name: opp.contact_name || "",
-      email: opp.contact_email || opp.email || "",
-      phone: opp.contact_phone || opp.phone || "",
-      status: "new",
-      value: 0,
-      notes: `Converted from Opportunities.\n\nEvent Fit: ${opp.event_fit || ""}`,
-      source: "Opportunities",
-      created_by: user?.id,
-      assigned_to: user?.id,
-      assigned_name: user?.name || "",
-    }).select().single();
-    if (!error && newLead) {
-      await supabase.from("opportunities").update({ status: "Converted", updated_at: new Date().toISOString() }).eq("id", opp.id);
-      setSaving(false);
-      load();
-      if (onNavigate) onNavigate("crm");
-    } else {
-      console.error("Convert error:", error?.message);
-      alert("Failed: " + (error?.message || "Unknown error"));
-      setSaving(false);
-    }
+import { supabase } from "./supabase";
+
+// ── Email helper ──
+const sendEmail = async (to, subject, html) => {
+  if (!to) return;
+  try {
+    await fetch("/api/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to, subject, html }),
+    });
+  } catch (e) {
+    console.log("Email send failed:", e.message);
+  }
+};
+
+const BASE_URL = "https://workroom.stretchfield.com";
+
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = React.useState(window.innerWidth < 768);
+  React.useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
+};
+
+// ── Auto-generate password from email ──
+const generatePassword = (email) => {
+  if (!email || !email.includes("@")) return "Stretch@2026";
+  const local = email.split("@")[0]; // part before @
+  const domain = email.split("@")[1].split(".")[0]; // domain without extension
+  // Take first 4 chars of local, capitalize first
+  const part1 = (local.slice(0, 4).charAt(0).toUpperCase() + local.slice(1, 4)).replace(/[^a-zA-Z0-9]/g, "");
+  // Take first 3 chars of domain
+  const part2 = domain.slice(0, 3);
+  // Add special char and number derived from email length
+  const num = (email.length % 9) + 1;
+  const specials = ["@", "#", "!", "$", "%"];
+  const special = specials[email.length % specials.length];
+  return `${part1}${special}${part2}${num}Sf`;
+};
+
+const emailHeader = (title) => `<div style="background:#060B14;padding:28px 32px;border-radius:8px 8px 0 0;"><div style="color:#00C8FF;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;margin-bottom:4px;">STRETCHFIELD</div><div style="color:#E8F0FF;font-size:20px;font-weight:800;">${title}</div></div>`;
+const emailFooter = () => `<div style="background:#060B14;padding:20px 32px;border-radius:0 0 8px 8px;text-align:center;"><div style="color:#3D5478;font-size:11px;font-style:italic;margin-bottom:6px;">We don't plan events. We engineer impact.</div><div style="color:#1A2E4A;font-size:10px;">© ${new Date().getFullYear()} Stretchfield · www.stretchfield.com</div></div>`;
+const emailBtn = (text, url) => `<a href="${url}" style="display:inline-block;background:linear-gradient(135deg,#00C8FF,#00E5C8);color:#060B14;padding:12px 28px;border-radius:8px;font-weight:800;font-size:13px;text-decoration:none;margin:16px 0;">${text}</a>`;
+const emailRow = (label, value) => `<tr><td style="padding:8px 0;color:#5A6E8A;font-size:12px;font-weight:700;text-transform:uppercase;width:140px;">${label}</td><td style="padding:8px 0;color:#0A1628;font-size:13px;font-weight:600;">${value}</td></tr>`;
+const emailWrap = (header, body) => `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;">${header}<div style="padding:28px 32px;background:#F0F2FA;">${body}</div>${emailFooter()}</div>`;
+
+const welcomeEmailHtml = ({ name, email, password, role }) => emailWrap(
+  emailHeader(`Welcome, ${name}!`),
+  `<p style="color:#0A1628;font-size:14px;margin:0 0 16px;">Your Stretchfield WorkRoom account has been created.</p>
+  <div style="background:#fff;border:1px solid #C2C9DC;border-radius:8px;padding:20px 24px;margin-bottom:20px;">
+    <table style="width:100%;border-collapse:collapse;">${emailRow("Role", role)}${emailRow("Email", email)}${emailRow("Password", `<code style="background:#E8EBF4;padding:2px 8px;border-radius:4px;">${password}</code>`)}</table>
+  </div>
+  <div style="background:#FFF3CD;border:1px solid #F59E0B;border-radius:6px;padding:10px 14px;margin-bottom:20px;color:#A86000;font-size:12px;">⚠ Please change your password after first login via Account Settings.</div>
+  ${emailBtn("Log In to WorkRoom", BASE_URL)}`
+);
+
+const notifEmailHtml = ({ name, title, message, actionUrl, actionLabel = "View in WorkRoom" }) => emailWrap(
+  emailHeader(title),
+  `<p style="color:#0A1628;font-size:14px;margin:0 0 20px;">Hi ${name || "there"},</p>
+  <div style="background:#fff;border:1px solid #C2C9DC;border-left:4px solid #00C8FF;border-radius:8px;padding:16px 20px;margin-bottom:20px;">
+    <p style="color:#0A1628;font-size:14px;margin:0;line-height:1.6;">${message}</p>
+  </div>
+  ${actionUrl ? emailBtn(actionLabel, actionUrl) : ""}
+  <p style="color:#5A6E8A;font-size:12px;margin-top:20px;">You're receiving this because you have an active Stretchfield WorkRoom account.</p>`
+);
+
+const poEmailHtml = ({ vendorName, poNumber, eventName, amount, currency, notes }) => emailWrap(
+  emailHeader(`Purchase Order — ${poNumber}`),
+  `<p style="color:#0A1628;font-size:14px;margin:0 0 16px;">Dear <strong>${vendorName}</strong>,</p>
+  <p style="color:#0A1628;font-size:14px;margin:0 0 20px;">A Purchase Order has been raised for your services. Please submit your invoice upon completion.</p>
+  <div style="background:#fff;border:1px solid #C2C9DC;border-radius:8px;padding:20px 24px;margin-bottom:20px;">
+    <table style="width:100%;border-collapse:collapse;">${emailRow("PO Number", `<strong style="color:#00C8FF;">${poNumber}</strong>`)}${emailRow("Event", eventName || "—")}${emailRow("Amount", `<strong>${currency} ${parseFloat(amount || 0).toLocaleString()}</strong>`)}${notes ? emailRow("Notes", notes) : ""}</table>
+  </div>
+  ${emailBtn("Submit Invoice in WorkRoom", BASE_URL)}`
+);
+
+
+
+const sendNotificationEmail = async (userId, title, message, actionTab) => {
+  try {
+    const { data: profile } = await supabase.from("profiles").select("name, email").eq("id", userId).single();
+    if (!profile?.email) return;
+    const actionUrl = actionTab ? `https://workroom.stretchfield.com?tab=${actionTab}` : "https://workroom.stretchfield.com";
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+        <div style="background:#060B14;padding:28px 32px;border-radius:8px 8px 0 0;">
+          <div style="color:#00C8FF;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;margin-bottom:4px;">STRETCHFIELD</div>
+          <div style="color:#E8F0FF;font-size:20px;font-weight:800;">${title}</div>
+        </div>
+        <div style="padding:28px 32px;background:#F0F2FA;">
+          <p style="color:#0A1628;font-size:14px;margin:0 0 20px;">Hi ${profile.name || "there"},</p>
+          <div style="background:#ffffff;border:1px solid #C2C9DC;border-left:4px solid #00C8FF;border-radius:8px;padding:16px 20px;margin-bottom:20px;">
+            <p style="color:#0A1628;font-size:14px;margin:0;line-height:1.6;">${message}</p>
+          </div>
+          <a href="${actionUrl}" style="display:inline-block;background:linear-gradient(135deg,#00C8FF,#00E5C8);color:#060B14;padding:12px 28px;border-radius:8px;font-weight:800;font-size:13px;text-decoration:none;">View in WorkRoom</a>
+          <p style="color:#5A6E8A;font-size:12px;margin-top:20px;">You're receiving this because you have an active account on Stretchfield WorkRoom.</p>
+        </div>
+        <div style="background:#060B14;padding:20px 32px;border-radius:0 0 8px 8px;text-align:center;">
+          <div style="color:#3D5478;font-size:11px;font-style:italic;margin-bottom:6px;">We don't plan events. We engineer impact.</div>
+          <div style="color:#1A2E4A;font-size:10px;">© ${new Date().getFullYear()} Stretchfield · www.stretchfield.com</div>
+        </div>
+      </div>`;
+    await sendEmail(profile.email, `Stretchfield — ${title}`, html);
+  } catch (e) {
+    console.warn("Notification email failed:", e.message);
+  }
+};
+import React, { useState, useEffect, useContext } from "react";
+import { getEvents, createEvent, updateEvent, getTasks, createTask, getProfiles, deleteProfile, updateTask, getInvoices, createInvoice, updateInvoice, getRFFs, createRFF, updateRFF, uploadRFFDocument } from "./dataService";
+
+// ─── LOGO ────────────────────────────────────────────────────────────────────
+const LOGO_SRC = "data:image/png;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QBMRXhpZgAATU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAADIKADAAQAAAABAAADIAAAAAD/7QA4UGhvdG9zaG9wIDMuMAA4QklNBAQAAAAAAAA4QklNBCUAAAAAABDUHYzZjwCyBOmACZjs+EJ+/8AAEQgDIAMgAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYSQVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/bAEMAAQEBAQEBAgEBAgMCAgIDBAMDAwMEBgQEBAQEBgcGBgYGBgYHBwcHBwcHBwgICAgICAkJCQkJCwsLCwsLCwsLC//bAEMBAgICAwMDBQMDBQsIBggLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLC//dAAQAMv/aAAwDAQACEQMRAD8A/g+wtGFpaK/VLI8y7EwtGFpaKLILsTC0YWloosguxMLRhaWiiyC7EwtGFpaKLILsTC0YWloosguxMLRhaWiiyC7EwtGFpaKLILsTC0YWloosguxMLRhaWiiyC7EwtGFpaKLILsTC0YWloosguxMLRhaWiiyC7EwtGFpaKLILsTC0YWloosguxMLRhaWiiyC7EwtGFpaKLILsTC0YWloosguxMLRhaWiiyC7EwtGFpaKLILsTC0YWloosguxMLRhaWiiyC7EwtGFpaKLILsTC0YWloosguxMLRhaWiiyC7EwtGFpaKLILsTC0YWloosguxMLRhaWiiyC7EwtGFpaKLILsTC0YWloosguxMLRhaWiiyC7EwtGFpaKLILsTC0YWloosguxMLRhaWiiyC7EwtGFpaKLILsTC0YWloosguxMLRhaWiiyC7EwtGFpaKLILsTC0YWloosguxMLRhaWiiyC7EwtGFpaKLILsTC0YWloosguxMLRhaWiiyC7EwtGFpaKLILsTC0YWloosguxMLRhaWiiyC7EwtGFpaKLILsTC0YWloosguxMLRhaWiiyC7EwtGFpaKTQXZ//Q/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/R/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/S/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/T/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/U/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/V/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/W/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/X/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/Q/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/R/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/S/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKK3NA0C+8Q332SzGFXDSyHpGnqfU+g7/rWlGlOrONKnG8m7JLqyoQcmoxV2YdFep/F/4QeL/gr4ubwt4sjBWVfOs7qMHybqA9HQnuOjKeVPBryyqxGHqUKsqFaLjOLs090/6/zNsXhK2FrSw+Ig4zi7NPdBRRRWJzhRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUMD/9P+D+ii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k9aZRRX5QlbRH70FFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQwP/1P4P6KKK/VDywooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACpIZpbeVZ4GKSIQyspwQR0II6EVHRQB+4H7Fv7Z8XxBjtvhZ8U7kJr6AR2d5IcC9A6Kx7TD/x/wD3uv6jWd10r+P2Gaa3mW4t2KSIQyspwQRyCCOhFft/+xZ+2lH8QY7b4VfFS5Ca8gEdneOcC9A6Kx7TD/x//e6/tvBXGyxUY5dmMv3m0Jv7X92X97s+uz13/BOP+APYc+Z5ZD3N5wX2f70f7vddN1pt+ttnddO9dTZ3fQ5rzKzuuBXV2d305r7vGYXc/GGj0yzu+ldELr/RpP8AdP8AKvObO6ro1uv9Hcf7J/lXy+LwuplbU/Fe1uM26c/wivtb9nJ8+D7t/W8YfkiV8EWt0ogj5/hH8q+4P2a7oSeD7xAfu3jH80Svq8DrVXofrWf07YWXqj6jjl456VdjlKn2rDikq/E5YhRzngAdc16sonwUom9E5JBj5J4x61+Y/wC3l+3xF8FoLv4LfBS7WTxnKpi1HUYiGTSFYcxxnobsjqekI/2/u5n7dP7d8fwZguvgz8F7tZPGMqmPUNRjIZNJVhykZ6G6I6npCP8Ab+7/AD5ySSTSNNMzSPIxd3YlmZmOSSTySTySetfkHG3GfsnPLsul7205rp3jF/zd39nZe9dx/VuBeA/rHLmWZR/d7wg/tdpSX8vZfa3fu/ESSSTSPPO7SSSMXd3JZmZjkkk8kk8knrTKKK/HkraI/dAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/9X+D+iiiv1Q8sKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKkhmlt5VngYpIhDKynBBHQgjoRUdFAH7jfsV/tpxfEGK2+FfxUuRHr6AR2d5IcC9A6Kx7TD/x//e6/qZZ3XQ1/HjDNLbyrPAxSRCGVlOCCOhBHQiv3G/Yp/bVj+IUdt8KvipciPX0Ajs7yQ4W9A6I57Tf+h/73X9q4M41WJUcuzGX7zaMn9r+7L+92fXZ67/gfiBwB7DnzPLIfu95wX2e8or+Xuvs7rTb9crO6ziuiS7/0Z/8AdP8AKvObO7HGK6Nbr/Rnx/dP8q+5xeFPxm2p+L9pdH7PHjptFfa37L18JdE1W2HVJ0Yj/eUj+lfBNpcf6NGQf4R/Kvr79lTU86nq+mgkmSOGQD/dLD/2YVvl7/fxX9bH7Jn1K+DqeVvzR9yxuWIC8k8DHevzd/bh/bpT4PQXXwd+Dd2sni+RTHqGoRkMulKw5SM9DdEdT0hH+30zf22f24I/hDFdfCD4P3SyeLZFMd/qEZDLpSsOUQ9DdEd+kQ/2/u/gxJJJLI00zM7uxZmY7mZm5JJPJJPJJ618Dx3xx7Jzy3LZe/tOa+z3jF/zfzS+zsveu4+hwRwN9Y5cxzGP7veEH9rtKS/l7L7W7934iSSSaRppmZ3dizuxLMzMckknkknkk9aZRRX4mkftwUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUMD/1v4P6KKK/VDywooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKkhmmt5luLdikiEMrKcEEcggjoRUdFAH7nfsT/ALa0fxDjtvhT8VbkJr6KI7O8kOBfAdEY/wDPYf8AkT/e6/qUl1/oz+6n+Vfx1wzTW0yXFu5jkjIZWU4II5BBHQiv3H/Yu/bZj+IVnD8KfirchPEEabLK9kOBfADhHPaYDv8Ax/73X9m4O4zWJUcvzGXv7Rk/teT/AL3Z9dnrv+CcfeH/ALByzPLIfu95wX2f70f7vdfZ3Wm3iNpcn7PGAP4R/KvNvG/7TuvfBlr7QvhldCLXr62a1nul5NlHIQSUPTzyBhT/AAA564rzn4o/GFfClkPDXhaUPqroBJMMFbZSPyMhHQfw9T2B+M2ZndpJGLMxLMzHJZjySSeSSeprzeKuL5Ur4LATtPaU107xi/5u7+zsve+H9FyrIIV/32LjeHSL6+bXby6+m48kksjSzMzu7FmZjuZmY5JJPJJPJJptFFflaR9sFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQwP/9f+D+iiiv1Q8sKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAqSGaa3mS4t3aOSNgyspwysOQQRyCD0NR0UAOd3kdpZGLM5LMzHJJPJJJ5JPcmm0UUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUMD/9D+D+iiiv1Q8sKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAorpvCHgrxl8Qdeh8K+AdJvdc1S4z5Vnp9u9zO+0ZO2ONWY4HXAr6wuP+Ca3/BRi00oa7dfAH4jx2JJUXD+FdTWIkZJG82+3Iwe/Y1EqkI6SaQ7M+KaK3fE3hfxN4K1668K+MtOutJ1Syfy7izvYXguIXxna8bhWU4IOCAayrS0ur+6isbGJ5p5nWOOONSzu7HAVQOSSeAB1qr9RFeivZv8AhnL9oX/oQ/EX/gruf/jdH/DOX7Qv/Qh+Iv8AwV3P/wAbqfaw/mQ7PseM0V7N/wAM5ftC/wDQh+Iv/BXc/wDxuq93+z78e9PtJb+/8Ea/BBAjSSSSabcKiIoyWYmPAAHJJ6Ue1h/MgszyGiur8J+BPHHj27lsPA2jX2tTwJ5kkdhbyXLomcbmEasQM8ZNd3/wzl+0L/0IfiL/AMFdz/8AG6bnFaNhZnjNFezf8M5ftC/9CH4i/wDBXc//ABuvIbu0urC6lsb6J4Z4XaOSORSro6nBVgeQQeCD0ojOL2YWK9FFeieGPhB8WfG2mf234M8L6vq9lvMf2iyspriLevVd8aMMjIyM03JLVsR53RXs3/DOX7Qv/Qh+Iv8AwV3P/wAbo/4Zy/aF/wChD8Rf+Cu5/wDjdT7WH8yHZ9jxmiuz8XfDj4h/D/7P/wAJ5oOo6J9r3+R9vtZbbzfLxu2eYq7tu5c4zjIz1rroP2efj/dQJc23gbxBJHIoZHXTLkqynkEER4IIo542vcLM8eor2b/hnL9oX/oQ/EX/AIK7n/43R/wzl+0L/wBCH4i/8Fdz/wDG6Paw/mQWfY8Zor2b/hnL9oX/AKEPxF/4K7n/AON149NDNbTPb3CNHJGxVlYYZWHBBB6EU4zi9mFiKiivZ/hZ+zj+0N8coZbj4J+A/EXjCOCQxStoel3OoBJAu4qxgjfDbTnB5xzTlJJXbEeMUV9G/EH9jz9rj4SaK/iT4q/Czxf4Z06NSz3WraHe2UCqOpLzQqoA7nNfOVKMlLWLuFgoor0Twx8IPiz420z+2/BnhfV9Xst5j+0WVlNcRb16rvjRhkZGRmm5Jatged0V3viv4VfFDwHYx6n458N6po1tM/lJLfWc1sjPgnaGkRQTgE4BzgVwVCaeqYBRXY+Efh58QPH7zx+A9C1DW2tQpmFhayXJjD527vLVtucHGeuDXR6x8Cvjd4e0yfW9f8G65Y2VshkmuLjTriKKNB1ZnZAqgepNJzinZvUdmeV0VveG/CvifxlqqaF4Q0261W+kVmW3s4XnlKqMkhEBYgDk8cV6R/wzl+0L/wBCH4i/8Fdz/wDG6HOK0bCx4zRXs3/DOX7Qv/Qh+Iv/AAV3P/xuj/hnL9oX/oQ/EX/gruf/AI3S9rD+ZBZ9jxmium0XwX4x8R6+3hTw9pN7f6ohcNZ20Dy3AMed4MaqW+XHzccd675/2df2gokMkngTxCqqMknS7kAAf9s6bnFbsLM8borR0jR9X8QanBomg2s19e3TiOG3t0aWWRz0VUUEsT6AV6r/AMM5ftC/9CH4i/8ABXc//G6HOK3YWPGaK9m/4Zy/aF/6EPxF/wCCu5/+N0f8M5ftC/8AQh+Iv/BXc/8Axul7WH8yCz7HjNFaOkaPq/iDU4NE0G1mvr26cRw29ujSyyOeiqiglifQCvVf+Gcv2hf+hD8Rf+Cu5/8AjdNzit2FjxmirV9Y32l302manC9vc27tFLFKpR43Q4ZWU4IIIwQRkGqtUIKK9E8MfCD4s+NtM/tvwZ4X1fV7LeY/tFlZTXEW9eq740YZGRkZrov+Gcv2hf8AoQ/EX/gruf8A43UOpBaNodmeM0V6R4l+Dnxd8GaU2u+MPCusaTYoyq1xeWM0EQZjgAu6BQSenPNeb1SknqmIKKKKYBRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFDA//0f4P6KKK/VDywooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAK/Sr/gkv8A8E6fFn/BUX9tXw/+y5oN+2j6U8M2q6/qiIJHstJtComkRTwZHd44Y85AkkUt8oNfmrX9nX/Blf4g8G2X7aHxc8N6k6Jr1/4NhlsAxwzW1vexfaQvr8zwkj0Ge1cWY1pUcNOpDdIunFOSTP7w/wBjr9hD9lH9gn4ZW3wq/ZZ8G2HhiwijVbi5ijD319IAoMt1csDLNI20El2wMYUAAAek6F+09+zV4o+KF38EfDPxD8M6j400/wD4+tAtdWtZtUg6n95apIZk4B+8g6V23xT8OeI/GHwx8R+EfB+of2Rq+q6XeWdjfcn7LczxMkUvHP7tyG454r/GW/ab/Ye/4KFf8Et/jdZ+Ifjb4V1rwZrehanHeaT4lgVprCa6gkLxT2t8gaGRiy7wpYSAffQEkV8bgMEsZKfPUtLpfqdlSfJay0P9bD9vP/gmn+x9/wAFHvhfd/Df9prwla6lcPC0dhrkEaw6vpsh5WS2ugN64YAmMkxPjDoy5Ff5V/xK/Yb+I3/BOH/gsD4W/ZS+J8yXkvh7xzoEtjqSKUiv9NuLyGS2uVB+7vjI8xckJIHTcduT/QHD/wAHsX7QccKJL8C/D8jqoDN/a9wNxHU4EPGa/nP/AOCt3/BTrxN/wVj/AGltK/aU8W+DrHwVe6Z4dtfD7WlhcPcpMLW4uZxMzuqHeRcbMY4VBzXtZTg8ZRcqdVWg0+qdn95jVnB6rc/2Rf8AhP8AwJ/0GrD/AMCY/wD4qug0/UtO1a1W90ueO5hbIEkTh1OODgjI4r/BUr/Wd/4NYv8AlCf8L/8Ar/8AEX/p2uq8vMsn+qUlU573dtrd/N9jWnW5nax/QPqmt6Lokay61dwWiucKZ5FjBPoNxGa+WP2xfHXgib9kb4pww6xYu7+ENcVVW4jJJNlNgAZr+XT/AIPVv+TO/g7/ANjlcf8ApFJX+cbWmXZL9YpKt7S2u1u3zFUrcrtY/tL/AODKj/k734yf9ifa/wDpalf6Ntf5yX/BlR/yd78ZP+xPtf8A0tSv7Sf+Cxn/ACik/aL/AOyeeIf/AEjlrLOIc2Pce9vyQ6LtTufpJXyB+1p+wN+x7+3N4KuPAn7UvgDSfFdvOjLHdXEAS/tmK7d9vdx7Z4XA6NG49DxX+I1out6z4b1a317w7dzWF9aOJYLm2kaKWJ16MjqQykdiCDX+vF/wboftDfG/9p3/AIJIfDT4mftAajda3r0T6npaateu0tzf2unXktvDLLIxLSOqp5TSElnMZZiWLEvH5VPBRjVjUvrbaz/MKdVTdrH+c9/wW5/4JNeJv+CS/wC1anw0s76XW/Afiu3k1TwrqkwAme2R9kltPjAM9sSodlAV1ZHAXcUX+6T/AINFP+UQtp/2OGt/+0a+QP8Ag9U0bw5P+xh8IPEF0B/a9r41mt7Y4GRbT2MzT4OMgF4ocjIzxwcDH1//AMGin/KIW0/7HDW//aNdWNxMq+WQnPfmt91yIRUarSP6bdT1nR9EhW41m7htI3O1WmkWME9cAsRzWJ/wn/gT/oNWH/gTH/8AFV/I1/wekf8AKPf4Y/8AZQ4P/Tbf1/ms1hgMk+s0VV9pb5X/AFKqVuV2sf3jf8Htev6Frn/DMv8AYl7BeeV/wme/yJFk27v7GxnaTjODj6V/bR+z9468EwfAXwRBPrFijpoGmqytcRggi3jyCM8Gv8NGivXq5Hz0KdH2nwX1tvd37mKr2k3bc/3ptM1nR9bha40a7hu40O1mhkWQA9cEqTzUmo6ppukWxvNWuIrWEEAvM4RcnoMnAr+Pv/gy3/5R7/E7/soc/wD6bbCvsP8A4Oxf+UNfiz/sYNB/9Klr5ieC5cX9W5uqV/XyOpTvHmP6Iv8AhP8AwJ/0GrD/AMCY/wD4qv8ADk+PNjfa7+0n4z0zRIXvLm88S6jFbxQKZHleS6cIqKuSxYkAAAkk8V4fX9QP/Bp3+xToH7UX/BSVvjB48s0vdB+Dul/2+kcmCjavNIIbHcpBz5Z82deRh4V+lfUYfBRy2nUrOfNp2t+rOWU/aNRsfv8A/wDBFb/g1q+Cfwh8AaN+0V/wUn0GDxh4/wBRjW8tvCF7iXSNGjkX5Y7uLlLy6wf3iyboI2+UK7KJD/ZDoHh/QfCujW/h3wvY2+m6fZoI4LW1iWGGJB0VEQBVHsABXO/E/wCJHgz4N/DbxB8XPiNeppvh/wAL6ddatqV3IcJBaWcbSyufZUUmv8nr/gp1/wAHDv7d37efxd1W4+GXjHXPhf8ADSKVotI8O6FfSWErWw3KJL+e2ZXuJpAcuhcwocBF43N4NGhicyquUpaL7l5Jf15m7lGmrH+t1NDDcQtb3Ch43BVlYZBB4IIPUGv5x/8AgrJ/wbd/scf8FAvCmo+PPgrpNh8LfiwoM1tq+lW6wWGoSgf6vULWMBHD/wDPdAsytgkuoKH/AD9/2Jf+C4v/AAUi/Ye+Jll418H/ABK1rxToqTI2oeHPEl9Nqem3kIJ3JsndzAzZJEsBRwcZLAbT/oBeCf8Ag60/4I3eIvBuk6/4q8c6p4f1O9s4J7vS59C1G4ksp5EDSQPLDbvFI0TEoXjZkYjKkjFaVctxmDqKdG7843/Ff0hKpCasz/Lc+N3wV+J/7OXxc8RfAr40aRPoPinwrfS6fqVjcDDxTRHBwRw6MMNG6ko6EMpKkE/6c3/Bop/yiFtP+xw1v/2jX8lH/By1+2F/wTj/AG+/jz4H/ad/Yd8TvrXiGbTJtI8WRS6Ze6czraMjWM/+kwRpI2x5YnIbcFSIYIHH9a//AAaKf8ohbT/scNb/APaNenm9WVTAQnONndXT+ZnSSVRpHzZ/wekf8o9/hj/2UOD/ANNt/X+azX+lN/wekf8AKPf4Y/8AZQ4P/Tbf1/ms12ZD/ui9WRX+M/uv/wCDIz/ke/2i/wDrw8Mf+jNQr+rH/guT/wAoiP2hP+xNv/5Cv5Tv+DIz/ke/2i/+vDwx/wCjNQr+rH/guT/yiI/aE/7E2/8A5CvAzL/kZfOP5I6Kf8M/z8/+DTb/AJTI+F/+xd17/wBJjX+rGzKilnOAOSTX+U5/wabf8pkfC/8A2Luvf+kxr/U38ff8iJrX/Xhc/wDotqOIP97+SDD/AAB/wn/gT/oNWH/gTH/8VR/wn/gT/oNWH/gTH/8AFV/g6UV3/wCrK/5+/wDkv/BM/rPkf10f8EA3WT/g5T8XuhDK1/47II5BBknr/Sj8ff8AIia1/wBeFz/6Lav8sj/g02/5TI+F/wDsXde/9JjX+pv4+/5ETWv+vC5/9FtXn57HlxKj2ijSh8J/jo/8EMP+UvX7Pn/Y4WX/ALNX+y3X+NJ/wQw/5S9fs+f9jhZf+zV/st1vxJ/Hh/h/Vk4b4WctN458FW8zW9xrFikiEqytcRggjgggngio/wDhP/An/QasP/AmP/4qv8T7/gox/wApCPjv/wBlD8Uf+nK4r41raHDalFS9rv5f8ETxPkfq7/wQw/5S9fs+f9jhZf8As1f7Ldf40n/BDD/lL1+z5/2OFl/7NX+y3WPEn8eH+H9WPDfCz/ER/wCCjH/KQj47/wDZQ/FH/pyuK+Na+yv+CjH/ACkI+O//AGUPxR/6crivjWvrqP8ADj6I5Huf6nP/AAaKf8ohbT/scNb/APaNf0/1/MB/waKf8ohbT/scNb/9o14p/wAHjvjfxp4D/YG+Guq+B9XvdGupfH8MTzWNxJbyNGdOviVLRspK5AOM4yBXwdeg62PnSTteTO6MuWmmf1zTQw3ELW9woeNwVZWGQQeCCD1Br8ff29v+CFP/AATh/wCCgnh++b4j+BLPwz4suE/ceKPDcMenanHKAQrSGNRHcgZ5W4RxgYBBAI/yh/hP+37+3D8DPE1r4v8AhJ8XPF2hX9pL5qNb6xdeWzcZEkTSGORWwAyurKwGCCK/0qP+Dcz/AILW+KP+CpPwi174V/tDLbRfFn4fxwy3t1aRiGHV9NmOyO8ESgLHKrjy50T5MlHUKH2J0YrK8Rgo+3hPRdVo0TGrGfutH+eb/wAFTP8Aglr+0F/wSm/aFb4L/GYLqmj6mslz4c8RW0ZjtNXs4yAzqpZjFNGWUTQlmMbEcsjI7fmfX+wJ/wAHBn7D/hz9t/8A4JhfEPR2sPtXijwJYT+LfDssahp0u9LjaWSJOMn7RAJISo6llPVRX+P3X0mU494qjeXxLR/5nPVp8r0CiiivUMgooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKGB//0v4P6KKK/VDywooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAK+q/2Kf2yfjd+wN+0j4c/ah/Z+vxZ+IPD0rExSgtbXltKNs1tcICN8MqEhhkEHDKVdVYfKlfrb/wAEkP8Agkj8Rf8Agrl8SfFvwu+GHjPR/COo+E9Mh1Vxq0c0n2iGWXyW8sQgn5GK7iePmFY4idONOTrfD1Kim3puf6Hv/BP7/g5T/wCCa/7bHhzTNK8beLLX4UeOrhUS50LxRMLWDz2JXFtfvttplY42AukpyAYwa/ey6tPCXj/w0bW9itNb0fUohlHVLm2uIm5HB3I6nr3Ff5yfi7/gzB/bM8OeFNT8Q6X8VfCmrXNhaTXENjb2t4JbmSJCyxJlMbnI2rnjJr+c/wDY/wD+Ckn7d/8AwTv8cQah+zp491nw3Hpl0TdeH7mWSXSZ2VwZYrmwlPlEsQVZtiyrk7WVua+UeUYfEc0sFV26O/5/8OdXtZR+NH+j1/wUA/4Nff8Agm5+2Jo2qeI/hFoKfB7x1PFI1tqXhtBFprXByU+0abkW5j3H5vIEEhH8fAFf5m37a37G3xu/YG/aR8R/svftA2As/EHh6VQJYiWtry2lG6G5t3IG+GVCCpwCDlWCurKP9pX9lr4q+Kvjr+zL8O/jb460N/DOt+MPDOk63qGkSBg9hdX9rHPLbkOA+Yncp84DcfMAciv4Kv8Ag9f8L+ELL9pL4H+MbCKJde1Hw3qlpeyLHiR7W0uY2tgz/wAQDzT7R/Dk+tVkmPre3+r1HdO/ysKtTXLzI/iUr/Wd/wCDWL/lCf8AC/8A6/8AxF/6drqv8mKv9Z3/AINYv+UJ/wAL/wDr/wDEX/p2uq9DiP8A3aP+JfkyMP8AEz81P+D1b/kzv4O/9jlcf+kUlf5xtf6OX/B6t/yZ38Hf+xyuP/SKSv8AONrbIf8AdI+r/Mmv8Z/aX/wZUf8AJ3vxk/7E+1/9LUr/AEHfjZ8HPh/+0N8IPE3wK+K1m2oeGfF+m3OkapbJK8DTWl2hjlQSRlXQsrEblYMOxzX+fF/wZUf8ne/GT/sT7X/0tSv7g/8Agp78TPHfwY/4J0/G/wCLfwv1OXRvEfhrwTrWpaZfwY8y2ura1keKRdwK5VgCMgivns4TePai9dPyR0Uf4Z+bul/8GuX/AARQ0vUrfUh8Kbq4NvIsgin8Qaq8T7TnDr9r+ZT3HQjiv2lhT4B/sjfBCGzVtG+Hvw98FaeI08x4tP03TrK2XuzFY40VRkkn3PNfhV/wbYf8FYdf/wCCkX7Id54K+OerjUviz8OLj7JrM8m1ZtSsLglrS9KKAASN0Em0Y3x7uN4Am/4OZv8Agmvrn7fP7BF144+GCzz+OfhM03iHTrKOVhHf2aJ/psBiAIebyQZLc43b1KKQJGzz1I1ZYhYfFVHo7XetvPUpNcvNFH8Wv/ByF/wV28M/8FOP2o9K8GfAu4ef4WfDJLm00i6YNH/al9csv2q92E/6oiNI4Nyhtisxx5m1f7Af+DRT/lELaf8AY4a3/wC0a/yxq/1Of+DRT/lELaf9jhrf/tGvezmhCjgY0obJr9TCjJym2z+lvxN/wh/2SP8A4TL7H5G/5PtuzZvwem/jOM++K4n/AIsT/wBQH/yXr+Uf/g9I/wCUe/wx/wCyhwf+m2/r/NZrzcvyX6zRVX2lvlf9TSpW5Xax/Rz/AMHVP/CN/wDD3/xP/wAIp9m+x/8ACP6Ft+ybfK3fZhnGzjPrX841FFfX4aj7GlGle9lY5JSu2z/Sm/4Mt/8AlHv8Tv8Asoc//ptsK+w/+DsX/lDX4s/7GDQf/Spa+PP+DLf/AJR7/E7/ALKHP/6bbCvsP/g7F/5Q1+LP+xg0H/0qWvjq3/I1X+Nfodkf4XyP8pav71P+DIKO0N3+01K6p56p4NCEgbwhOsbgO+CQue2QM9q/grr+q7/g0W/bE0X9nz/go1qXwD8YXUdppXxi0Y6ZbNJuGdY09zcWi5B2gPGbiMbhku6AEE4b6bOIOeDqKPr9zTOWi7TR/cx/wXon1e3/AOCPX7QEmhs6zHwtMrGPr5LSxrKPoYywb2zX+NzX+7V8avhF4I/aA+D/AIp+BvxLtftvh7xhpV3o2ow9C9texNFJtPOG2sSrDlTgjkV/j2/8FLf+CPX7ZH/BM74s6z4Y+KHhi/1XwVDPI2keMLG2eXS76y3Yjd5EDLbzYIEkEpVlfO3ehV28fhzEU4qdKTs27rzNsRF6M/Keivtj9ij/AIJ3/tgf8FB/iPZ/Dn9lvwXf6959ytvdaqYnj0nTx8u+S7uyvlRKisGK5MjDARGYhT/oa+A/+DQT/glnpHgjR9L8fzeLNY123soI9RvodVFtFc3aoBNKkQhPlo75ZUydoIGTjNezjM0oYZqM3d9lr95jClKWqP8ALyr/AFOf+DRT/lELaf8AY4a3/wC0a/kY/wCDjz/gnt/wT6/4Jo/FfwB+z/8Asf8A9rv4o1DT7nWPEY1PUftot7WV0jskCiNArSFJ3bJztCnGGBr+uf8A4NFP+UQtp/2OGt/+0a8zOcRGtgY1Yp2bW/zNaMeWbTP6f6K/jt/4PSP+Ue/wx/7KHB/6bb+v81mvMwGSfWaKq+0t8r/qaVK3K7WP97ivyn/4Lk/8oiP2hP8AsTb/APkK/lO/4MjP+R7/AGi/+vDwx/6M1Cv6sf8AguT/AMoiP2hP+xNv/wCQrjq4X6vjFRvezWu3ZlqXNC5/n5/8Gm3/ACmR8L/9i7r3/pMa/wBWGSOOWNopVDKwIIIyCD2Nf5T3/Bpt/wApkfC//Yu69/6TGv8AU48eMyeBtaZDgiwuSCP+ubV18Qf738kTh/gOK/4Z4+AH/QjeH/8AwWW3/wAbr+LX/g85+Gvw58CfAD4IXPgfQNN0aS48Qaqsr2NpFbs6rbREBjGqkgHpmv4WP+Gjf2hf+h88Rf8Ag0uf/jlcj4t+JvxJ8fQw2/jvxDqetR2zFolv7uW5WNm4JUSM2Ccc4r1cHkc6NaNV1L28jKddSi1Y/oc/4NNv+UyPhf8A7F3Xv/SY1/qb+Pv+RE1r/rwuf/RbV/lkf8Gm3/KZHwv/ANi7r3/pMa/1N/H3/Iia1/14XP8A6LavL4g/3v5I1w/wH+Oj/wAEMP8AlL1+z5/2OFl/7NX+y3X+NJ/wQw/5S9fs+f8AY4WX/s1f7Lda8Sfx4f4f1ZOG+Fnl15/wpT7XL9v/ALE8/e3meZ5G/fnndnnOeuec1+QH/Ber/hUH/DoD48f2D/Y/2z/hH18r7P5Pm7vtMP3dvOfpX+XD/wAFGP8AlIR8d/8Asofij/05XFfGtdWH4fs4Vfa9nt8+5MsRurH6u/8ABDD/AJS9fs+f9jhZf+zV/st1/jSf8EMP+UvX7Pn/AGOFl/7NX+y3XLxJ/Hh/h/VlYb4Wf4iP/BRj/lIR8d/+yh+KP/TlcV8a19lf8FGP+UhHx3/7KH4o/wDTlcV8a19dR/hx9Ecj3P8AU5/4NFP+UQtp/wBjhrf/ALRr5s/4PSP+Ue/wx/7KHB/6bb+vpP8A4NFP+UQtp/2OGt/+0a+bP+D0j/lHv8Mf+yhwf+m2/r4yl/yNf+3n+p2P+F8j/NZr+pv/AIM/rjWIf+CtdzHphcQS+BtZS72jgwia0YbvbzRH+OK/mT8CfD7x78UfFFt4I+Geiah4i1q9JW30/TLaS7upSOcJFErOx+gNf6ZH/BsT/wAEXfid/wAE8vAfiX9qD9qrS00n4l+PbWLTrPSmKSXGkaMjiVkmdMhZrqVY3kjDHYsUYbD7lX6HOcTTp4acJPVqyRz0YtyTP6hvilDp9z8MfEdvq4Q2kml3izCQ4TyzEwbcewxnNf4QVf7H3/BdX9tHQf2G/wDgmJ8TviTcX4svEHiHS5/C/hxVKedJqurxvBG0SuQGNuhkuWHOEhY7Wxg/44Nefw1TahUm9m1+F/8AM0xL1SCiiivpjmCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooYH//0/4P6KKK/VDywooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAK/S7/gkl/wUV8T/wDBLz9trw7+1DpFlJq2jpFLpPiHTYmCyXukXhXzkjLYAkRkjmiyQpkjUMQpNfmjRUVacakHCa0Y07O6P9xb9kn9s/8AZn/bl+E1j8aP2YPFtj4o0a7jR5Vt5ALqzkcZ8m6gJ8yCVehSQA9xkYNcD4l/4Jof8E9/GXxp/wCGivFfwX8Haj43N0t82sXGkW73L3aEMs7kph5lYAiVgXBAOciv8Wj4ZfFr4q/BXxSnjj4N+JtW8Ja3GhjTUNFvZrC6VGIJUSwOjgEqCRnGQPSv0m0//gu1/wAFf9M0EeHLb9oLxa1uAo3y3SzT/LgD9+6NN/CM/PzznOTn5afD1WMm6FTTzuvy3OpYhP4kf66f7S37Uv7P37Hvwq1D41/tJ+KrDwl4c05Cz3N7IFMj9o4Yxl5pWOAscasxPQV/kPf8Fl/+ClGr/wDBUz9t/Wv2iorSXTPDFjbR6J4ZsJ/9dBpVq7uhlAZlEsskkksgU4UvtBIUE/Avxl/aC+PH7RfiUeMvj/401zxvqyhlS813UJ9QmRWOSqvO7lV4HyjA4ryCvTyzKI4VupJ3l+RlUrOWnQK/1nf+DWL/AJQn/C//AK//ABF/6drqv8mKvrT4Wft8/t1/AvwTa/DT4JfGrx54O8OWLSPbaVofiPUNPsoWmcySFIIJ0jUu7FmIUZYknk10ZngZYqkqcXbW/wCDJpT5Xc/u+/4PVv8Akzv4O/8AY5XH/pFJX+cbX0d8a/2xf2uv2lNHs/Dv7RnxU8X+P9P06Y3Npa+JNcvdVhgmKlTJGl1NIqOVJBZQDjjpXzjV5dhHhqKpSd9xVJ80rn9pf/BlR/yd78ZP+xPtf/S1K/tJ/wCCxn/KKT9ov/snniH/ANI5a/x1Pgp+0l+0V+zXrF74h/Zz8feI/AF/qMIt7u58N6rc6VNPCrbhHI9rJGzoGGQrEjPNe1eMf+Ckn/BRP4i+FNR8B/EH4+fEbXdD1i3ks7/TtQ8U6ndWl1bzKVkimhkuGSSN1JDKylSDgivOxeTzrYr6wpJLTT0NIVko8tj2r/gj9/wUL8Sf8Ezv27fCH7RlrLK3hp5f7J8U2UZOLrRbwhZxtAYs8JC3EQGCZIlGcE1/st+E/FXhzx34V0zxv4PvItR0jWbSG+sbuBt0U9tcIJIpEPdXRgwPcGv8Gevs7wR/wUd/4KG/DPwjp3w/+G/x5+Ivh/QdIgW2sNN03xRqVpaWsCDCxwwxXCxxoo6KqgD0rTNMo+tSVSDs+vmFKryqzP1l/wCDlP8A4JaTf8E9/wBt+8+JXw00w2/wu+K0s+saMYY9tvYX5O69sARwoSRvOhXCgQyKig+Wxr+wb/g0U/5RC2n/AGOGt/8AtGv81v40/tnfthftJeHrXwj+0T8WPGXj7SbK4F5b2XiPXb3VLeG4CsglSO5mkRZAjsu4ANtYjOCa0vhF+3R+21+z94QHw++Avxi8ceCNAWZ7gaZoHiG/02zE0uN8nk288ce9sDc23JwM1eJy6rWwsaE5rmT39BRqJTckj/av+NP7O/7P/wC0l4etfCP7RPgXw94+0mxuBeW9l4j0y21W3huArIJUjuY5EWQI7LuADbWIzgmvmr/h1R/wS8/6Nu+Fv/hH6T/8i1/ka/8AD1f/AIKh/wDRyPxS/wDCw1b/AOSqP+Hq/wDwVD/6OR+KX/hYat/8lV5kcgxEVaNa33mv1iPY/pq/4PEP2VP2Xv2ZP+Gdf+Gbfht4W+Hv9t/8Jd/aP/CNaPaaT9s+zf2T5Pn/AGWKPzPL8yTZvzt3tjG45/ier3z44ftV/tQ/tN/2X/w0l8SfFPxC/sTz/wCzv+El1i71b7H9p2ed5H2qWTy/M8uPfsxu2LnO0Y8Dr6HBUJUaMac5Xavr87nPOSlK6P8ASm/4Mt/+Ue/xO/7KHP8A+m2wr7D/AODsX/lDX4s/7GDQf/Spa/zK/gt+2d+2F+zb4euvCP7O3xY8ZeAdJvbg3lxZeHNdvdLt5rgqqGV47aaNGkKIq7iC21QM4ArY+LP7eH7cXx78GzfDn46fGbx1408PXEkc0ul694i1DUbJ5IjuRmguJ5IyyHlSVyDyK8qeTTljPrPOrXTt6GqrLk5bHylWz4c8Ra74Q8Q2Hizwtdy6fqel3EV3aXUDFJYJ4GDxyIw5VkYBlI5BFY1Fe+0c5/qB/wDBFv8A4OYf2d/2xvBWi/Aj9tDW7HwB8XbWOKzF7futrpOvPkIkkEzkJDcyEjdBIV3Of3W7OxP6sYZobiFbi3YPG4DKynIIPIII6g1/gl19n/A3/gox+3v+zTYW+jfAb4yeMfC2m2qGOLT7HWLlLFFxjAtTIYOB0+TjtivmcXw7GUnKhK3k9jphiLK0j/bpr8Qf+Cq//BeL9jP/AIJjeCtS0e+1m08a/FLyWGneD9MuFknEx+619Im9bOIZBPmfvGX/AFaNzj/MS+J//BWr/gp18Y9NTRviJ8e/HN7ZIGBt49aubaFw2M+YkDxrJ043hsc4xk5/Peaaa5me4uHaSSRizMxyzMeSST1JqMNw5aSded12X+Y5Yj+VHvP7Uf7TXxh/bH+Pvib9pT486l/avinxXeNd3koGyJBgLHDEmTshiQLHGmTtRQMk8n/S7/4NFP8AlELaf9jhrf8A7Rr/ACxq+p/hF+3R+21+z94QHw++Avxi8ceCNAWZ7gaZoHiG/wBNsxNLjfJ5NvPHHvbA3NtycDNevmOA+sUFRg0rNfgY06nLK7P7/wD/AIPSP+Ue/wAMf+yhwf8Aptv6/wA1mvpX40/tnfthftJeHrXwj+0T8WPGXj7SbK4F5b2XiPXb3VLeG4CsglSO5mkRZAjsu4ANtYjOCa+aq0y7CPDUVSk77iqT5pXP7r/+DIz/AJHv9ov/AK8PDH/ozUK/qx/4Lk/8oiP2hP8AsTb/APkK/wAhX4I/tSftNfszT6jdfs3/ABF8T/D6XWFiS/fw1q93pLXSwbjGJjayxmQIXbaGzt3HHU16t45/4KN/8FC/if4Q1D4ffEv48fETxFoGrwtbX2m6n4o1K7s7qF/vRywy3DRyIe6spBrzsVk86uK+sKStdaelv8jWFZKHLY/Yj/g02/5TI+F/+xd17/0mNf6m/j7/AJETWv8Arwuf/RbV/hf/AAm+M/xh+AfjKL4jfArxZrPgrxDBHJDHqmg38+nXqRyja6rPbvHIFccMA2COtfU1x/wVP/4KeXcD2t1+0d8UJYpVKOj+L9WKsrcEEG6wQR1FGZZPPE1vaxklpYKdZRVrHwdRRRXvnOf0qf8ABpt/ymR8L/8AYu69/wCkxr/U38ff8iJrX/Xhc/8Aotq/wv8A4TfGf4w/APxlF8RvgV4s1nwV4hgjkhj1TQb+fTr1I5RtdVnt3jkCuOGAbBHWvqa4/wCCp/8AwU8u4Htbr9o74oSxSqUdH8X6sVZW4IIN1ggjqK8DMsnnia3tYyS0sdFOsoq1j2z/AIIYf8pev2fP+xwsv/Zq/wBluv8ABz8C+PPHPwv8X6f8QfhnrV/4d1/SJluLHU9MuZLS8tZl6SRTRMskbjsysCK+y/8Ah6v/AMFQ/wDo5H4pf+Fhq3/yVV5plM8VUU4ySsrCpVVFWaP9ePxH/wAEy/8Agm74x8Q3/i7xd+z58NdV1bVbiW8vb288KaXPcXNxOxeSWWR7Yu8juSzMxLMxJJJrG/4dUf8ABLz/AKNu+Fv/AIR+k/8AyLX+Rr/w9X/4Kh/9HI/FL/wsNW/+SqP+Hq//AAVD/wCjkfil/wCFhq3/AMlVw/2Dif8An9+Zp7ePY9m/4IYf8pev2fP+xwsv/Zq/2W6/wc/Avjzxz8L/ABfp/wAQfhnrV/4d1/SJluLHU9MuZLS8tZl6SRTRMskbjsysCK+y/wDh6v8A8FQ/+jkfil/4WGrf/JVd2aZTPFVFOMkrKxnSqqKs0f63fin/AIJN/wDBMjxx4n1Hxp4x+AXgPVNX1i6mvb68utCtJZ7i5uHMkssjtGWZ3dizMTkk5Nfh5/wcOf8ABNb/AIJ9/AD/AII9fF/4t/BD4L+DfCXijSf+Ef8AsWq6To1ta3lv5+t2EMnlyxoGXfFI6Ng8qxB4NfwD/wDD1f8A4Kh/9HI/FL/wsNW/+Sq4H4n/APBQH9vL43eBr74YfGf42+PvF/hrU/K+2aTrXiTUb+xuPJkWWPzYJ53jfZIiOu5TtdQw5ANc+HybEU6kJutdJp216FSrRaasf6QH/Bop/wAohbT/ALHDW/8A2jX9LHinwT4M8dWceneNtIstYt4X8yOK+t0uEV8EbgsgYA4JGRzg1/iK/CL9uj9tr9n7wgPh98BfjF448EaAsz3A0zQPEN/ptmJpcb5PJt54497YG5tuTgZr1D/h6v8A8FQ/+jkfil/4WGrf/JVZ4nIKlWtOoppXbY410klY/wBpbwz4E8D+CojB4N0ax0lGyCtlbx24OTk8Io6mvjX9uD/gpt+xJ/wTu8GyeLP2p/HdholyULWmjQuLnV70jbxBZxkyuMuuXIWNNwLuo5r/ACGte/4Kaf8ABSLxTpzaR4n/AGg/iVqVo/3oLrxZqk0Z4I5V7kg8Ejp0NfF2palqOs6jPq+rzyXV3dSPNPPM5eSSRyWZmZiSzMSSSTknrU0uG3zXq1NPJf5g8T2R+w3/AAWY/wCCxfxj/wCCt3x5i8T6xBJ4c+HXhlpYfC/hsSb/ACEk4e5uWHyyXcwA3kfLGoEaZwzv+NlFFfTUaMKUFTpqyRzNtu7CiiitBBRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUMD//U/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigD2Lxd+zx+0B8P/hronxm8eeBfEOieD/ErBdI12/0y5ttN1BipcC2upI1hmJUFv3btwCegrx2v6lf2e/2ZfhN+2Z+zh/wTl/ZZ+Nkmr2/h/xv4h+KGnTXGiXUNpeQMb6zdZFee2uoyAV5Ux8g/eFfBE37Hv7Dfxc+D/xj8V/szTeOBrvwBNpq2sR6/e2Bg8S6B9tjsbqa0SCzVtLuI5JUdY5Xv08s5LFvlrhhjo3amtbv0+JxX3tGjp9j8YaK/po+Jn/BLb/gnAv/AAUZl/4Ja/CbVfiNH4613TrV9F8Q6peabNpdlq99pcWpW1ldWkdlDNdQuH2vdxz27RswUW8gUufhXxv+zH+wr+x9p3wv8G/tlQePPEPi34h+GdL8X6rN4V1Kw0u18N6briCWziNrd2F7LqF0ICJ5ozPYqu5YwxJZ1qGOpysop3aulbp3/ATptH5A0V/Sb+3h/wAETfhf8F/iN8F/A/7K+pa14it/Gniu58H+KL3UtQtZ4bG82Wl/Zygx2dsbSO40e6S/ZZ1lMS7wWIjLP6D8FP8AgjT+yN+1H4csPEXwYtPiDoug+PT4s/4RXxR4o1zSNOtYG0SK5l01Bp1zY2t7rn9oR2xmlfTmhFoJGQrJ9nlkMf2lR5FO+j/4P+Tt3H7KV7H8uNFf0qeFvhr+xt4E+HH/AAT0+IPwt8HeJvDXjX4ieJri/u/EFtrunTXKXdh4g/s3zWS40SWOYpPBFPaxyAwwxBoZI53dpz4t+2f+xF8Cdc+F/wC0b8Zfg7c+Kda+KHwd+M954Z8VRanqFlPBdaLqV5dW9pqiWtrptqyyz30Yt5I45GRHZSqgOFSo42LlZq2tvx5fzD2bsfgpRX9KPjj/AIJD/Ab4V/DW3+IEfgr4o/FXWG1NfBsXhfwPqFpcXN74h0m3tT4guxdxaPeG1sLO/uDYW8LWc008qFmkjUrn8u/+CiP7IHgH9k7xn4Pm+Gmq3zaX438PW+tt4e8QmKPxN4cuWZo5rDVYI1jKSKy+ZDKYYRNC6sEHNVSxtKpJRj1/QTg1qzzvwH/wTp/4KDfFTwhYfEH4YfAn4h+JNA1WIT2WpaX4Y1K8s7mJujxTRW7Rup7MrEV4V8YfgX8bv2efFo8A/H7wdrngbXWgS6Gm+INPuNMuzBISEk8m5SN9jFWCttwSDg8Gv3B+KnwW+Hvxf/4I+fseR+Ofix4T+GL2mpfEhbceJ4NalF752pWe4xNpGlakqCLaN5nMX3127gG2+Q6h+yV8BfjH+z5+0JY+F/HniD4k/FL9m+CzfQtSt9YguPD2s+DbW/8Astzc2VnLbNcxQ2UckcgRLxowsu8YHyHOGLe8trtbPpLlvfb+vIbh2PxIor+ifQv+CS/wQ0X9n63+Mvijw78R/GmveH7HRdL13wn4Qngm1G/8WeILY6olrAV0u6On2mnaY0DXkssV4zXVwIFEbRtu9N+Hf/BIX9ibWri+8V/GO6+IXw9sF+GfivxtfeENTurAeMvC954RkVZkvbKaytmvbO+Vi1nP5Wn7mikRsEZoeY0d9f6/4H9X0D2bP5i6K/pl/wCCeH7Bf/BPX9pb4lfBH9oHwronjG48Fat8VbX4deIvCniPVrC6f+0Li2k1Gxuhd2+nQrPZTQ20qXNm1tFID8q3BX5j5Z8PP+Cfv7Of7RC/G347/Cf4beP/AB/beDvHX9jL8OvBPiDTY9f0fR9jGbVZSdFuGu7aS5/c21vbafEIVVhJM2zcW8fTUnFpq3p3tb+tA9mz+e2vYtN/Z4/aA1n4R3vx/wBH8C+IbvwHpswt7vxJDplzJpEExYKEkvFjMCNuYDazg5IHerX7SHg34V/D347eKvBPwR1m/wBf8J6ZqEsGmX2qWbaffPCp+7cW7gMksZzG+QuWUkKoO0fqh8L/APlXq+K//Za/DX/pqvK2q13GMJR6tLXzJUdWj8Q6K/QD/gnB+yNpX7Y/xz1TwDr2k+JNetdG8PanrY0zwyqQXN9cWceYbaTUJ4bi10yGRyN17cwyRJgJtLyKR+tV9/wRQ+D1j8UdatfBcPiH4kvP8MPDnxD8O/Drwv4o0afxDff2tcS22oRQa3BZ3ljqMWmNazOZLLT2a5EsIRU+YmauMpU5cknr/X9X28xqDauj+ZWiv6PPBv7Lf/BN/wAD/s7/ALWfjHU/BPj3XL74feF/B9xFp+v30Gia34dvNb1ewgubBvP0eRTd2swKyXot1S4tZHhSGEsZq+gNN/YF/Z+/a++NX7Lnw9+Onifxp/YfjH9nm41qzntrjSjc6J/wjw1GaKCNY9Mt1u7YLA3yTFbhmf5rogADGWYwV207L/JS29GP2bP5Q6K/cr4Jf8E5v2X/APgoH4Qsde/Ye1bxL4NvtH8e+GvBfiK18c3VpqavZ+LZ5bew1S1ksrayEbJJA4nsXEpG5dly2Mt3P/DKn/BNyf4KftX+Kfhd4X8aXniD4CadHp1nL4v16AWN5cX+qQ6WupJDY6fZSW1xA5Z4rCea5SXfhnJQhtHjaafLZ36rtdpL77oXI9z8U/hD8Bvjl+0H4guPCfwE8Ga7441W0t2vJ7PQNOuNSuIrdCA0rx26SMsakgFiMAkc15lfWN9pd9Npmpwvb3Nu7RSxSqUeN0OGVlOCCCMEEZBr9sv+DfD/AJSKL/2Ivjf/ANMd5Xo1x+xR/wAEyfh/8If2XfGPxah+Jj6j+0Rpsj3kumazpf2bRJ4NQk057lIpNKMl1G0gRxal4WRNw+0OcClPGKFV05LorW+b/JAoXV0fz+0V+9nxU/4J0fsfaR4h/aB+B/w1uPGf/Cwf2XvM1XxA2rX9iLDxXomlX8Gn6nJYpBZFtJnD3Eclus82oBozhgGyF9X+L3/BNb/gnlB/wUs8R/8ABKH4YSePvD/jRp00zwx4v1zXdO1LSrrV7mziu7W2vNOg0iymhimeT7P9ojvJGV9r+SVYhD69T89r/LTX8UP2bP5vKK/pM+Ef/BEzwZ8Q/wBlc+Lte0/xX4e8Zz/DnXfG1trOuarpmj6dNqeimaRtKttBuYP7UvITBAS2pwXPkAsreXs6/Kvx8/Zd/wCCb37Hv7RM37En7RN949vfFugpBY+KvHOi31gNG0jV54hJIkGiNYS3N/bWbOkcsn9p20spWQxxjagkIY+lOTjC7avt5df618hOm1qz8XaK/Z79uX4Yfsb+A/8Agmx+y54/+CvgrWtK8W/EGz8Tajfazfataz/aP7O1WXTpRcQx6dE77zbq9qq3CpaRlo2Fw7NO34w10UavtI81ratfc7EyVmFFFFaiCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/1f4P6KKK/VDywooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooA/cz9mr/grt8J/2d9I/ZejX4Tavq+o/s0apr2rQTf8ACUw28OsT+IGSScPF/Y8jW6JJGhjAkkITKsWJDL86fs6ft4fBX4FaV+0F4f1P4b6zrdn8ctIm0GHZ4khtJtIsZryO9+Zv7KlW6mEkUY37IVKhvkG7I/L6iuX6nR103833v37u5fOz9wbj/grp8N5P+Cu+i/8ABVSD4Vakv9jpp0v/AAi7+JY28y903T49Ojk+2jSl2xGKJGaL7OWMmSJApCjyXxL+3z+yn8Z/+EJvf2n/AIJ6t4tvvhnp8Ph3w9JYeLhpcd34d05ydNsNZQ6Vcm7a0iPkGezfTnli4IBCsv5MUULB0lZpbK272Xz8w52fstYf8FrP2iL7wv8AtB2PxA0fTtZ1j45ywXVldxf6Lb+FrtLaXTJJdPgCuwzo88unxgyq0aeW7PIyEN6X8Ev+Cw3wa+HfxN+Dnx++IvwY1HxP47+D3gaL4f2U8HiwafpM2m29vc2sc6WQ0uaWK88q6fczXUsDMS5g3HI/B6ik8DQaa5d+110t08g9pLufrN4E/wCCivwd0jwP8DPCPxA+G2t6vL+zz4hu9U8Kz2PiaCxWXTrzVP7Wa0vkfSLnzpVnyouIWgXaxzCTjHX/AAV/4K63nwB/b++L/wC2h4D8Bi80L4vtrFxf+EdY1MXkEV3qVyNRt5WnW0iSYWeopHPGrWwLRKYSwLtJX41UVTwdFppre/V9Xfv31Fzs/S/4Yf8ABQiyvv2Zdb/Y9/bA8Pa18R/A2o+Jn8ZWMml+IjoerafrU67LmRJ5rPUraWG5XmSKWzYiQmSN0ZnLfKn7Svxe+HHxk8d2er/CPwFYfDnw5pOmWulWWl2czXc8iWwO65vbpkjNzdzOzNJMIowRtUIoUV890VcKEIy5or87fdsJyb0P1gv/ANuD9jr4h/sffCH9k/44fCTxlqQ+ER1yW11TQ/G9lpf2yfxBPFcXTSQXHhy+2IrwqIUWQlVJ3M5IIzfgN+358Cv2T/2w/DX7QP7N/wAIrmw8D2fh248N+JvCGu+Ijq7+JbW/gmt703d79hgjj+0JIh2RWaxo0QKrya/LGip+q07ONtHfq+u/UfO9z9Svh/8A8FOfFGo+HfjH8K/2qtCu/HngP4362nijXdM0rVW0K7tdchmaWK6srloL2KNQHMbQzW08bIsfAMaken/B7/gpb+y98DrrxLoXw++As+m+G9b+G2ufDqNbbxJEmtTp4iz9s1DUtRfSXW9uVARbdI7a2ghRdoQgmvxmopPB0nfT8X6dw52frp+x3/wVH0z9jf8AZz0H4VeDPAlzqHi7w58UdF+KFpr02solkbnR4pLX7HJYCxLtDPazzxuwu1cO4dcbdp4Kf9rv9jaL4g6p8TPCvwn8aeGfEF14iPiGx1/RfiALPXLEzq32i1S4GjNb+QZGMkDLaJcxZKvPMuAPzIop/VaXM5W1e+r/AMw53sfYX7YH7T3hr9r/AOLnjf8AaJ8SeGJ9F8ceNfE1xrE0lpfxnSodPljAW3+yG1Ez3XmDfJeG72yZOYAxL19D/AH9uj9nXwH+wZ4i/YT+OPwx8ReKNP8AEni608X3GraF4rttEnSewt5LaGFI7jRdSXy9krFySWZsYKgYP5bUVTw9NxULaK1tX02Dmd7n7L/Dz/goZ+xF8Ivgh4x/Zp+G3wH8U2PhH4l6Wun+Lr2Xx9HJ4hv3sr63vtPaC7XQksreK3Mc0csP9nSfaElUsymMFqXxz/4KJ/sjfHzTPBdl4k+BGsaTdeAPB2k+ENB1LSfG0lvfacmi3txdQ3EDvpskXmTLculz58UxLKjwNb4ZX/HWis/qdK/NZ39X/n/S0Hzs/ajxR/wV3sfin4r+JOi/G3wLqXiHwB8TPBXhnwVqVoviFYvE0kfhOW2nsb+fW5dPnS4vWlt83Ej2GyVX2hECrXrXwz/4LTfCT4c+Pfgz47T4O6veSfB/4Zar8Nooj4shRb+LU0mjN2x/sZjE0a3Vx+7G4MTH8w2MJP5/aKl4Cg1bl09X2t37B7SR+7X/AARy/an/AGavAvjR/wBkH4veH9Rs9M+LHxA8H6nJ4mfX7e1g0qLwzdvc2MLwSae6SedNM0dxO88SBGVgibGL/d/7VfiT4jftd/s//HeL9obwD8R/2dV0a2m8X3N3rD6PF4b17XrKYiDTrt4PD2jX2oXExdorGS41HUJ1bEjmXYzn+TaipqYGMqntU7PTz27a9Uktug1U0sff3/BNv9tLwr+wT+0PP8fPEvg+78asdB1fRILG11VNJCHWLWS0kleR7O837IpXKoEX59pLYBU+t/FX/goZ8I/iT4N/Zo8DQfDfVrKy/Z4ie2cv4jhmk1mCW+OoSAEaVGLVjMSqticLHgFSw3H8pqK2lhacp+0a19X2a7+bJU2lY/bmH/gpt8P/AIg/tTftMfF3Rfg5rV/q37U2jXfhi10iz8RLLNpc2t3dvdTmIrpTNePJdW8PkRiOIqu5CZCwZf0S/wCCtf7VXwy/YO/4LHfFH42+D/hLri/Gq1S3l0DxFruuKdBtZrnTYLdNTtNHXTIZpJoVDrE0uozQCcM/lkqqJ/JpRWLwFPnUlta1rvXbz8vn1H7R2sf0C+HP+C1Hwfi+LsX7Rvjz4L6rqvj28+GrfDPU7i18Xiy0tbE6Z/ZYudOsv7JlNlN5YDskk9zBuLlY1Zgw+dfiR/wUV/Zj+Pnxgt/2rv2jfgVP4t+LKwW/9oTnxN9n8L63fWUXkwXmp6R/Z0lzLIyrGbmO31K2gndMmNQ8iv8AkJRVxwNGLvFWdrbvbtuHPI/Qfxb+2P8ACz4s/ssfC39m/wCMXgXVLib4S3uopo+oaHrsenwvo+s6idRvbWW3udOvnM+55UtrkThYtwMkM+3B+EPEM+gXOv31z4Utriy0uS4lazt7udbq4ityxMaSzJFAsrquAzrFGGIJCKDtGPRXRCnGF+X+r6kt3CiiirEFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFDA//W/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/X/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/Q/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/R/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/S/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/T/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/U/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/V/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/W/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/X/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/Q/g/ooor9UPLCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiihgf/Z";
+
+// ─── DATA ────────────────────────────────────────────────────────────────────
+const USERS = {
+  ceo: { id: "ceo", name: "David Osei", role: "CEO", email: "david@stretchfield.com", avatar: "DO" },
+  admin: { id: "admin", name: "Ama Mensah", role: "Country Manager", email: "ama@stretchfield.com", avatar: "AM" },
+  vendorMgr: { id: "vendorMgr", name: "Kofi Asante", role: "Vendor Manager", email: "kofi@stretchfield.com", avatar: "KA" },
+  events: { id: "events", name: "Abena Boateng", role: "Strategy & Events Opportunity", email: "abena@stretchfield.com", avatar: "AB" },
+  marketing: { id: "marketing", name: "Kwame Darko", role: "Sales & Marketing", email: "kwame@stretchfield.com", avatar: "KD" },
+  vendor: { id: "vendor", name: "TechPro Solutions", role: "Vendor", email: "info@techpro.com", avatar: "TP" },
+  client: { id: "client", name: "Acme Corp", role: "Client", email: "events@acme.com", avatar: "AC" },
+};
+
+const PROJECTS = [
+  { id: "p1", name: "Acme Brand Refresh", client: "Acme Corp", completion: 65, status: "active", deadline: "2025-08-30", phase: "Execution", tasks: 12, completed: 8 },
+  { id: "p2", name: "TechPro Website Redesign", client: "TechPro Ltd", completion: 40, status: "active", deadline: "2025-09-15", phase: "Design", tasks: 18, completed: 7 },
+  { id: "p3", name: "Sunrise Event Campaign", client: "Sunrise Hotels", completion: 90, status: "active", deadline: "2025-07-20", phase: "Review", tasks: 10, completed: 9 },
+  { id: "p4", name: "MaxFin Digital Strategy", client: "MaxFin", completion: 20, status: "active", deadline: "2025-10-01", phase: "Planning", tasks: 15, completed: 3 },
+];
+
+const TASKS = [
+  { id: "t1", event: "p1", name: "Logo Design v3", assignee: "vendor", status: "in-progress", progress: 75, deadline: "2025-07-15", comments: 3 },
+  { id: "t2", event: "p1", name: "Brand Guidelines Document", assignee: "events", status: "completed", progress: 100, deadline: "2025-07-01", comments: 1 },
+  { id: "t3", event: "p1", name: "Social Media Templates", assignee: "marketing", status: "in-progress", progress: 50, deadline: "2025-07-22", comments: 5 },
+  { id: "t4", event: "p2", name: "UX Wireframes", assignee: "vendor", status: "pending", progress: 0, deadline: "2025-07-25", comments: 0 },
+  { id: "t5", event: "p2", name: "Homepage Design", assignee: "vendor", status: "in-progress", progress: 30, deadline: "2025-08-01", comments: 2 },
+  { id: "t6", event: "p3", name: "Event Concept Deck", assignee: "marketing", status: "completed", progress: 100, deadline: "2025-06-30", comments: 4 },
+];
+
+const RFFS = [
+  { id: "rff1", title: "Brand Identity Package — Acme", vendor: "TechPro Solutions", event: "p1", status: "quote-submitted", deadline: "2025-07-10", amount: null },
+  { id: "rff2", title: "Website Development — TechPro", vendor: "TechPro Solutions", event: "p2", status: "quote-approved", deadline: "2025-07-18", amount: 4500 },
+  { id: "rff3", title: "Event Materials — Sunrise", vendor: "PrintMaster GH", event: "p3", status: "invoice-submitted", deadline: "2025-07-05", amount: 1200 },
+  { id: "rff4", title: "Video Production — MaxFin", vendor: "VisualEdge Studios", event: "p4", status: "pending", deadline: "2025-08-01", amount: null },
+];
+
+const INVOICES = [
+  { id: "inv1", vendor: "TechPro Solutions", event: "p2", amount: 4500, status: "approved", date: "2025-07-01", rff: "rff2" },
+  { id: "inv2", vendor: "PrintMaster GH", event: "p3", amount: 1200, status: "pending", date: "2025-07-05", rff: "rff3" },
+  { id: "inv3", vendor: "CreativeHub", event: "p1", amount: 2800, status: "paid", date: "2025-06-20", rff: "rff1" },
+];
+
+const NOTIFICATIONS = {
+  ceo: [
+    { id: 1, text: "Invoice #INV-002 pending approval", time: "2h ago", unread: true, type: "invoice" },
+    { id: 2, text: "Event 'Sunrise Event Campaign' is 90% complete", time: "5h ago", unread: true, type: "event" },
+    { id: 3, text: "New vendor quote submitted for RFF-001", time: "1d ago", unread: false, type: "vendor" },
+  ],
+  vendor: [
+    { id: 1, text: "Your quote for RFF-002 has been approved", time: "3h ago", unread: true, type: "approval" },
+    { id: 2, text: "New RFF assigned: Brand Identity Package", time: "1d ago", unread: true, type: "rff" },
+    { id: 3, text: "Task 'Logo Design v3' comment from Kofi", time: "2d ago", unread: false, type: "task" },
+  ],
+  client: [
+    { id: 1, text: "Task 'Brand Guidelines' has been completed", time: "1h ago", unread: true, type: "task" },
+    { id: 2, text: "Event milestone reached: 65% completion", time: "6h ago", unread: true, type: "milestone" },
+    { id: 3, text: "New report uploaded for your review", time: "2d ago", unread: false, type: "report" },
+  ],
+};
+
+// ─── THEME — Deep Navy + Cyan/Blue/Magenta Luxury ───────────────────────────
+// ─── THEME SYSTEM ────────────────────────────────────────────────────────────
+const DARK_THEME = {
+  bg:           "#060B14",
+  bgDeep:       "#03070E",
+  surface:      "#0C1525",
+  surfaceRaise: "#0F1C30",
+  surfaceHigh:  "#152238",
+  border:       "#1A2E4A",
+  borderLight:  "#223B5E",
+  cyan:         "#00C8FF",
+  cyanDim:      "#00C8FF18",
+  cyanGlow:     "#00C8FF",
+  magenta:      "#E040FB",
+  magentaDim:   "#E040FB15",
+  teal:         "#00E5C8",
+  tealDim:      "#00E5C815",
+  blue:         "#3B7BFF",
+  blueDim:      "#3B7BFF15",
+  amber:        "#F59E0B",
+  amberDim:     "#F59E0B15",
+  red:          "#F43F5E",
+  redDim:       "#F43F5E15",
+  gold:         "#C9A84C",
+  goldDim:      "#C9A84C15",
+  textPrimary:  "#E8F0FF",
+  textSecondary:"#7A94BF",
+  textMuted:    "#3D5478",
+  textGhost:    "#243551",
+  isDark:       true,
+};
+
+const LIGHT_THEME = {
+  bg: "#E8EBF4",
+  bgDeep: "#DCE0ED",
+  surface: "#F0F2FA",
+  border: "#C2C9DC",
+  cyan: "#0077BB",
+  teal: "#008870",
+  amber: "#A86000",
+  gold: "#8A6010",
+  textPrimary: "#0A1628",
+  textSecondary: "#2A3F5F",
+  textMuted: "#5A6E8A",
+  textGhost: "#B0BCCC",
+  red: "#C0192A",
+  magenta: "#A020C0",
+  blue: "#2255CC",
+  accent: "#0077BB",
+  orange: "#A86000",
+};
+
+let T = DARK_THEME;
+
+const ThemeContext = React.createContext({ isDark: true, toggleTheme: () => {}, theme: DARK_THEME });
+
+const ThemeProvider = ({ children }) => {
+  const getInitial = () => { try { return localStorage.getItem("sf-theme") !== "light"; } catch { return true; } };
+  const [isDark, setIsDark] = React.useState(getInitial);
+
+  const toggleTheme = () => {
+    setIsDark(prev => {
+      const next = !prev;
+      try { localStorage.setItem("sf-theme", next ? "dark" : "light"); } catch {}
+      return next;
+    });
   };
+
+  const theme = isDark ? DARK_THEME : LIGHT_THEME;
+  // Keep global T in sync so inline styles using T still work
+  T = theme;
+
+  return (
+    <ThemeContext.Provider value={{ isDark, toggleTheme, theme }}>
+      <ThemeConsumer>{children}</ThemeConsumer>
+    </ThemeContext.Provider>
+  );
+};
+
+// Forces ALL children to re-render when theme changes by consuming context
+const ThemeConsumer = ({ children }) => {
+  const { theme } = React.useContext(ThemeContext);
+  // Update global T on every render of any child tree
+  T = theme;
+  return (
+    <div style={{ minHeight: "100vh", background: theme.bg, color: theme.textPrimary, transition: "background 0.3s, color 0.3s" }}>
+      {children}
+    </div>
+  );
+};
+
+const useTheme = () => React.useContext(ThemeContext);
+
+const AccountSettingsModal = ({ user, onClose, onUpdate }) => {
+  const [phone, setPhone] = React.useState(user.phone || "");
+  const [password, setPassword] = React.useState("");
+  const [confirmPassword, setConfirmPassword] = React.useState("");
+  const [avatarFile, setAvatarFile] = React.useState(null);
+  const [avatarPreview, setAvatarPreview] = React.useState(user.avatar_url || null);
+  const [saving, setSaving] = React.useState(false);
+  const [uploading, setUploading] = React.useState(false);
+  const [msg, setMsg] = React.useState("");
+  const [error, setError] = React.useState("");
+  const fileRef = React.useRef();
+
+  const handleAvatarChange = (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    setAvatarFile(f);
+    setAvatarPreview(URL.createObjectURL(f));
+  };
+
+  const handleSave = async () => {
+    setError(""); setMsg("");
+    if (password && password !== confirmPassword) { setError("Passwords do not match."); return; }
+    setSaving(true);
+    let avatar_url = user.avatar_url || null;
+
+    // Upload avatar if changed
+    if (avatarFile) {
+      setUploading(true);
+      const ext = avatarFile.name.split(".").pop();
+      const filename = `avatar_${user.id}_${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("avatars").upload(filename, avatarFile, { upsert: true });
+      if (upErr) { setError("Upload failed: " + upErr.message); setSaving(false); setUploading(false); return; }
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(filename);
+      avatar_url = urlData.publicUrl;
+      setUploading(false);
+    }
+
+    // Update profile
+    const updates = { phone, avatar_url };
+    await supabase.from("profiles").update(updates).eq("id", user.id);
+
+    // Update password if provided
+    if (password) {
+      const { error: pwErr } = await supabase.auth.updateUser({ password });
+      if (pwErr) { setError("Password update failed: " + pwErr.message); setSaving(false); return; }
+    }
+
+    setSaving(false);
+    setMsg("Profile updated successfully.");
+    onUpdate({ ...user, phone, avatar_url });
+  };
+
+  const initials = user.name ? user.name.split(" ").map(n => n[0]).join("").slice(0,2).toUpperCase() : "?";
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+      onClick={onClose}>
+      <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 480, boxShadow: `0 24px 80px rgba(0,0,0,0.5)`, animation: "fadeUp 0.25s ease" }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ padding: "20px 24px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>Account</div>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18 }}>Profile Settings</div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = T.red + "60"; e.currentTarget.style.color = T.red; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.textMuted; }}>×</button>
+        </div>
+
+        <div style={{ padding: "24px" }}>
+          {/* Avatar upload */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 28 }}>
+            <div onClick={() => fileRef.current.click()} style={{ width: 96, height: 96, borderRadius: "50%", overflow: "hidden", border: `3px solid ${T.cyan}40`, cursor: "pointer", position: "relative", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10 }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = T.cyan}
+              onMouseLeave={e => e.currentTarget.style.borderColor = T.cyan + "40"}>
+              {avatarPreview ? (
+                <img src={avatarPreview} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                <div style={{ width: "100%", height: "100%", background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ color: "#fff", fontWeight: 900, fontSize: 28 }}>{initials}</span>
+                </div>
+              )}
+              {/* Overlay */}
+              <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.2s", borderRadius: "50%" }}
+                onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                onMouseLeave={e => e.currentTarget.style.opacity = 0}>
+                <span style={{ color: "#fff", fontSize: 22 }}>📷</span>
+              </div>
+            </div>
+            <input ref={fileRef} type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: "none" }} />
+            <div style={{ color: T.textMuted, fontSize: 11 }}>Click to change photo</div>
+          </div>
+
+          {/* Name (read only) */}
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Name</label>
+            <div style={{ padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}44`, borderRadius: 8, color: T.textMuted, fontSize: 13 }}>{user.name}</div>
+          </div>
+
+          {/* Phone */}
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Phone Number</label>
+            <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+233 XX XXX XXXX"
+              style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+              onFocus={e => e.target.style.borderColor = T.cyan + "60"}
+              onBlur={e => e.target.style.borderColor = T.border} />
+          </div>
+
+          {/* New Password */}
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>New Password</label>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Leave blank to keep current"
+              style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+              onFocus={e => e.target.style.borderColor = T.cyan + "60"}
+              onBlur={e => e.target.style.borderColor = T.border} />
+          </div>
+
+          {/* Confirm Password */}
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Confirm Password</label>
+            <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Repeat new password"
+              style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+              onFocus={e => e.target.style.borderColor = T.cyan + "60"}
+              onBlur={e => e.target.style.borderColor = T.border} />
+          </div>
+
+          {error && <div style={{ color: T.red, fontSize: 12, marginBottom: 12, padding: "8px 12px", background: T.red + "12", borderRadius: 8 }}>{error}</div>}
+          {msg && <div style={{ color: T.teal, fontSize: 12, marginBottom: 12, padding: "8px 12px", background: T.teal + "12", borderRadius: 8 }}>✓ {msg}</div>}
+
+          <button onClick={handleSave} disabled={saving} style={{
+            width: "100%", padding: "11px", background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`,
+            border: "none", borderRadius: 8, color: "#fff", fontWeight: 800, fontSize: 13,
+            cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1, fontFamily: "inherit",
+          }}>{uploading ? "Uploading..." : saving ? "Saving..." : "Save Changes"}</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ThemeToggle = ({ compact }) => {
+  const { isDark, toggleTheme } = useTheme();
+  return (
+    <button onClick={toggleTheme} title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+      style={{
+        background: "none", border: `1px solid ${T.border}`, borderRadius: 20,
+        padding: compact ? "4px 10px" : "5px 14px", cursor: "pointer",
+        display: "flex", alignItems: "center", gap: 6,
+        color: T.textMuted, fontSize: 11, fontWeight: 600,
+        letterSpacing: "0.06em", transition: "all 0.2s", flexShrink: 0,
+      }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = T.cyan + "80"; e.currentTarget.style.color = T.cyan; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.textMuted; }}
+    >
+      <span style={{ fontSize: 13 }}>{isDark ? "☀️" : "🌙"}</span>
+      {!compact && <span>{isDark ? "Light" : "Dark"}</span>}
+    </button>
+  );
+};
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const statusMeta = (s) => ({
+  "active":           { color: T.teal,    label: "Active" },
+  "completed":        { color: T.cyan,    label: "Completed" },
+  "in-progress":      { color: T.amber,   label: "In Progress" },
+  "pending":          { color: T.textMuted, label: "Pending" },
+  "quote-submitted":  { color: T.amber,   label: "Quote Submitted" },
+  "quote-approved":   { color: T.teal,    label: "Quote Approved" },
+  "invoice-submitted":{ color: T.blue,    label: "Invoice Submitted" },
+  "approved":         { color: T.teal,    label: "Approved" },
+  "paid":             { color: T.cyan,    label: "Paid" },
+}[s] || { color: T.textMuted, label: s });
+
+const Badge = ({ status }) => {
+  const m = statusMeta(status);
+  return (
+    <span style={{
+      background: m.color + "18",
+      color: m.color,
+      border: `1px solid ${m.color}35`,
+      padding: "3px 10px",
+      borderRadius: 3,
+      fontSize: 10,
+      fontWeight: 700,
+      letterSpacing: "0.10em",
+      textTransform: "uppercase",
+      whiteSpace: "nowrap",
+      fontFamily: "'Cormorant Garamond', serif",
+    }}>{m.label}</span>
+  );
+};
+
+const ProgressBar = ({ value, color = T.cyan, height = 4 }) => (
+  <div style={{ background: T.bgDeep, borderRadius: 0, height, overflow: "hidden", width: "100%", border: `1px solid ${T.border}` }}>
+    <div style={{
+      width: `${value}%`, height: "100%",
+      background: `linear-gradient(90deg, ${color}88, ${color})`,
+      transition: "width 0.8s cubic-bezier(0.22,1,0.36,1)",
+    }} />
+  </div>
+);
+
+const Avatar = ({ initials, size = 36, color = T.cyan }) => (
+  <div style={{
+    width: size, height: size,
+    borderRadius: "50%",
+    background: `linear-gradient(135deg, ${color}22, ${color}08)`,
+    border: `1px solid ${color}44`,
+    color,
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontSize: size * 0.30, fontWeight: 700, flexShrink: 0,
+    letterSpacing: "0.06em",
+    fontFamily: "'Cormorant Garamond', serif",
+  }}>{initials}</div>
+);
+
+const Divider = () => (
+  <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${T.borderLight}60, transparent)`, margin: "0" }} />
+);
+
+const Card = ({ children, style = {}, onClick, accent }) => (
+  <div onClick={onClick} style={{
+    background: T.surface,
+    border: `1px solid ${accent ? accent + "30" : T.border}`,
+    borderTop: accent ? `1px solid ${accent}60` : `1px solid ${T.borderLight}`,
+    borderRadius: 2,
+    padding: 24,
+    cursor: onClick ? "pointer" : "default",
+    transition: "border-color 0.25s, box-shadow 0.25s, transform 0.2s",
+    position: "relative",
+    overflow: "hidden",
+    ...style,
+  }}
+    onMouseEnter={e => { if (onClick) { e.currentTarget.style.borderColor = T.cyan + "40"; e.currentTarget.style.boxShadow = `0 8px 40px ${T.cyan}10`; e.currentTarget.style.transform = "translateY(-2px)"; } }}
+    onMouseLeave={e => { if (onClick) { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.transform = "none"; } }}
+  >
+    {accent && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: `linear-gradient(90deg, transparent, ${accent}80, transparent)` }} />}
+    {children}
+  </div>
+);
+
+const Stat = ({ label, value, sub, color = T.cyan, icon }) => (
+  <Card accent={color} style={{ flex: 1, minWidth: 140 }}>
+    <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, marginBottom: 12, display: "flex", alignItems: "center", gap: 6, textTransform: "uppercase", letterSpacing: "0.14em" }}>
+      <span style={{ color }}>{icon}</span>{label}
+    </div>
+    <div style={{ fontSize: 32, fontWeight: 300, color, letterSpacing: "-0.03em", fontFamily: "'Cormorant Garamond', serif", lineHeight: 1 }}>{value}</div>
+    {sub && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 8, letterSpacing: "0.04em" }}>{sub}</div>}
+  </Card>
+);
+
+const SectionLabel = ({ children }) => (
+  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+    <div style={{ width: 3, height: 16, background: `linear-gradient(180deg, ${T.cyan}, ${T.magenta})`, borderRadius: 2 }} />
+    <span style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase" }}>{children}</span>
+  </div>
+);
+
+const SectionHeader = ({ title, action, actionLabel }) => (
+  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+    <SectionLabel>{title}</SectionLabel>
+    {action && <button onClick={action} style={{
+      background: "transparent", color: T.cyan, border: `1px solid ${T.cyan}35`,
+      borderRadius: 2, padding: "5px 14px", fontSize: 10, fontWeight: 700, cursor: "pointer",
+      letterSpacing: "0.10em", textTransform: "uppercase", transition: "all 0.2s",
+    }}
+      onMouseEnter={e => { e.currentTarget.style.background = T.cyanDim; }}
+      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+    >{actionLabel}</button>}
+  </div>
+);
+
+const Modal = ({ title, children, onClose }) => (
+  <div style={{
+    position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 1000,
+    display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+    backdropFilter: "blur(4px)",
+  }} onClick={onClose}>
+    <div onClick={e => e.stopPropagation()} style={{
+      background: T.surface,
+      border: `1px solid ${T.borderLight}`,
+      borderTop: `1px solid ${T.cyan}50`,
+      borderRadius: 2,
+      padding: 32,
+      width: "100%", maxWidth: 520,
+      maxHeight: "80vh", overflowY: "auto",
+      boxShadow: `0 40px 100px rgba(0,0,0,0.6), 0 0 60px ${T.cyan}08`,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
+        <div>
+          <div style={{ width: 24, height: 1, background: T.cyan, marginBottom: 10 }} />
+          <h3 style={{ margin: 0, color: T.textPrimary, fontSize: 18, fontWeight: 300, letterSpacing: "0.06em", fontFamily: "'Cormorant Garamond', serif" }}>{title}</h3>
+        </div>
+        <button onClick={onClose} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, width: 32, height: 32, borderRadius: 2, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+      </div>
+      {children}
+    </div>
+  </div>
+);
+
+const Input = ({ label, placeholder, value, onChange, type = "text" }) => (
+  <div style={{ marginBottom: 20 }}>
+    <label style={{ display: "block", color: T.textMuted, fontSize: 10, fontWeight: 700, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.14em" }}>{label}</label>
+    <input type={type} placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)}
+      style={{
+        width: "100%", boxSizing: "border-box",
+        background: T.bgDeep, border: `1px solid ${T.border}`,
+        borderRadius: 2, padding: "11px 14px", color: T.textPrimary,
+        fontSize: 14, outline: "none", transition: "border-color 0.2s",
+        fontFamily: "inherit",
+      }}
+      onFocus={e => { e.target.style.borderColor = T.cyan + "80"; e.target.style.background = T.surface; }}
+      onBlur={e => { e.target.style.borderColor = T.border; e.target.style.background = T.bgDeep; }}
+    />
+  </div>
+);
+
+const Select = ({ label, options, value, onChange }) => (
+  <div style={{ marginBottom: 20 }}>
+    <label style={{ display: "block", color: T.textMuted, fontSize: 10, fontWeight: 700, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.14em" }}>{label}</label>
+    <select value={value} onChange={e => onChange(e.target.value)}
+      style={{
+        width: "100%", background: T.bgDeep, border: `1px solid ${T.border}`,
+        borderRadius: 2, padding: "11px 14px", color: T.textPrimary,
+        fontSize: 14, outline: "none", cursor: "pointer", fontFamily: "inherit",
+      }}>
+      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  </div>
+);
+
+const Btn = ({ children, onClick, variant = "primary", small }) => {
+  const styles = {
+    primary:   { background: `linear-gradient(135deg, ${T.cyan}CC, ${T.blue}CC)`, color: T.bgDeep, border: "none" },
+    secondary: { background: "transparent", color: T.cyan, border: `1px solid ${T.cyan}40` },
+    danger:    { background: T.redDim, color: T.red, border: `1px solid ${T.red}40` },
+    ghost:     { background: "transparent", color: T.textSecondary, border: `1px solid ${T.border}` },
+  };
+  return (
+    <button onClick={onClick} style={{
+      ...styles[variant], borderRadius: 2,
+      padding: small ? "6px 14px" : "10px 22px",
+      fontSize: small ? 10 : 12,
+      fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase",
+      cursor: "pointer", transition: "all 0.2s", fontFamily: "inherit",
+    }}
+      onMouseEnter={e => { e.currentTarget.style.opacity = "0.80"; }}
+      onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
+    >{children}</button>
+  );
+};
+
+// ─── SIDEBAR ─────────────────────────────────────────────────────────────────
+const getNavItems = (role) => {
+  const base = [{ id: "dashboard", label: "Dashboard", icon: "▪" }];
+  if (["CEO","Country Manager","Vendor Manager","Strategy & Events Opportunity"].includes(role)) {
+    base.push({ id: "events", label: "Events", icon: "▪" }, { id: "tasks", label: "Event Tasks", icon: "▪" });
+  }
+  if (role === "Finance Manager") {
+    base.push({ id: "events", label: "Events", icon: "▪" });
+  }
+  if (role === "CEO") {
+    base.push({ id: "impact-intelligence", label: "Impact Intelligence", icon: "▪" });
+  }
+  if (["Strategy & Events Opportunity", "Vendor Manager"].includes(role)) {
+    base.push({ id: "strategy-map", label: "Strategy Map", icon: "▪" });
+  }
+  if (["Sales & Marketing"].includes(role)) {
+    base.push({ id: "events", label: "Events", icon: "▪" });
+  }
+  if (["CEO","Sales & Marketing"].includes(role)) {
+    base.push({ id: "opportunities", label: "Opportunities", icon: "▪" });
+  }
+  if (["CEO","Sales & Marketing"].includes(role)) {
+    base.push({ id: "crm", label: "CRM / Leads", icon: "▪" }, { id: "crm-insights", label: "CRM Insights", icon: "▪" }, { id: "sm-tasks", label: "S&M Tasks", icon: "▪" });
+  }
+  if (["Strategy & Events Opportunity"].includes(role)) {
+    base.push({ id: "strategy-overview", label: "Client Overview", icon: "▪" }, { id: "feedback-summary", label: "Feedback", icon: "▪" });
+  }
+  if (["CEO","Country Manager"].includes(role)) {
+    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "rff-approvals", label: "RFF Approvals", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" });
+  }
+  if (role === "CEO") {
+    base.push({ id: "vendor-onboarding", label: "Vendor Applications", icon: "▪" });
+    base.push({ id: "contract-awards", label: "Contract Awards", icon: "▪" });
+    base.push({ id: "event-analysis", label: "Event Analysis", icon: "▪" });
+  }
+  if (role === "CEO") {
+    // CEO gets grouped nav — return special structure
+    return [
+      { id: "dashboard", label: "Dashboard", group: true },
+      { id: "grp-events", label: "Events & Operations", group: true, children: [
+        { id: "events", label: "Events" },
+        { id: "tasks", label: "Event Tasks" },
+        { id: "impact-intelligence", label: "Impact Intelligence" },
+      ]},
+      { id: "grp-crm", label: "CRM & Sales", group: true, children: [
+        { id: "opportunities", label: "Opportunities" },
+        { id: "crm", label: "CRM / Leads" },
+        { id: "crm-insights", label: "CRM Insights" },
+        { id: "sm-tasks", label: "S&M Tasks" },
+      ]},
+      { id: "grp-vendors", label: "Vendors & Procurement", group: true, children: [
+        { id: "vendor-onboarding", label: "Vendor Applications" },
+        { id: "vendors", label: "Vendors & RFFs" },
+        { id: "rff-approvals", label: "RFF Approvals" },
+        { id: "vendor-assignment", label: "Vendor Assignment" },
+        { id: "quote-comparison", label: "Quote Comparison" },
+        { id: "contract-awards", label: "Contract Awards" },
+        { id: "scorecards", label: "Vendor Scorecards" },
+      ]},
+      { id: "grp-finance", label: "Finance", group: true, children: [
+        { id: "finance", label: "Finance Operations" },
+        { id: "client-financials", label: "Client Financials" },
+        { id: "purchase-orders", label: "Purchase Orders" },
+        { id: "vendor-invoices", label: "Vendor Invoices" },
+        { id: "zoho-books", label: "Zoho Books" },
+      ]},
+      { id: "grp-clients", label: "Clients", group: true, children: [
+        { id: "clients", label: "Client Database" },
+      ]},
+      { id: "grp-people", label: "People", group: true, children: [
+        { id: "users", label: "User Management" },
+        { id: "hr", label: "HR" },
+      ]},
+      { id: "grp-intelligence", label: "Intelligence", group: true, children: [
+        { id: "event-analysis", label: "Event Analysis" },
+        { id: "strategy-map", label: "Strategy Map" },
+        { id: "impact-intelligence", label: "Impact Intelligence" },
+      ]},
+      { id: "notifications", label: "Notifications", group: true },
+      { id: "calendar", label: "Calendar", group: true },
+    ];
+  }
+  if (role === "Vendor Manager") {
+    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quotes-received", label: "Quotes Received", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" });
+  }
+  if (["CEO","Country Manager","Vendor Manager","Finance Manager"].includes(role)) {
+    base.push({ id: "invoices", label: "Invoices", icon: "▪" });
+  }
+  if (["CEO","Finance Manager"].includes(role)) {
+    base.push({ id: "zoho-books", label: "Zoho Books", icon: "▪" });
+  }
+  if (["CEO","Country Manager","Finance Manager"].includes(role)) {
+    base.push({ id: "finance", label: "Finance", icon: "▪" });
+  }
+  if (["Finance Manager","CEO"].includes(role)) {
+    base.push({ id: "purchase-orders", label: "Purchase Orders", icon: "▪" });
+    base.push({ id: "vendor-invoices", label: "Vendor Invoices", icon: "▪" });
+  }
+  if (["CEO"].includes(role)) {
+    base.push({ id: "client-financials", label: "Client Financials", icon: "▪" });
+  }
+  if (["CEO"].includes(role)) {
+    base.push({ id: "clients", label: "Clients", icon: "▪" }, { id: "users", label: "User Management", icon: "▪" });
+  }
+  if (role === "Vendor") {
+    base.push({ id: "rffs", label: "My RFFs", icon: "▪" }, { id: "quotes", label: "Quotes", icon: "▪" }, { id: "vendor-invoices-submit", label: "Invoices", icon: "▪" }, { id: "vendor-tasks", label: "My Tasks", icon: "▪" });
+  }
+  if (role === "Client") {
+    base.push({ id: "client-events", label: "My Events", icon: "▪" }, { id: "client-finance", label: "Budget & Invoices", icon: "▪" }, { id: "client-docs", label: "Documents", icon: "▪" });
+  }
+  if (role === "Board of Directors") {
+    return [{ id: "dashboard", label: "Dashboard", icon: "▪" }, { id: "notifications", label: "Notifications", icon: "▪" }];
+  }
+  if (!["Vendor","Client","Strategy & Events Opportunity"].includes(role)) {
+    base.push({ id: "feedback", label: "Feedback", icon: "▪" });
+  }
+  if (role !== "Client") base.push({ id: "calendar", label: "Calendar", icon: "▪" });
+  base.push({ id: "notifications", label: "Notifications", icon: "▪" });
+  return base;
+};
+
+const Sidebar = ({ user, activeTab, onTab, collapsed, onToggle }) => {
+  const navItems = getNavItems(user.role);
+  return (
+    <div style={{
+      width: collapsed ? 64 : 240,
+      background: T.bgDeep,
+      borderRight: `1px solid ${T.border}`,
+      display: "flex", flexDirection: "column",
+      transition: "width 0.3s cubic-bezier(0.22,1,0.36,1)",
+      flexShrink: 0, overflow: "hidden",
+      position: "relative",
+    }}>
+      {/* Subtle vertical glow */}
+      <div style={{ position: "absolute", top: 0, left: 0, width: 1, height: "100%", background: `linear-gradient(180deg, transparent, ${T.cyan}30, ${T.magenta}20, transparent)`, pointerEvents: "none" }} />
+
+      {/* Logo */}
+      <div style={{ padding: "20px 16px 18px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 10 }}>
+        <img src={LOGO_SRC} alt="Stretchfield" style={{ width: 34, height: 34, objectFit: "contain", flexShrink: 0 }} />
+        {!collapsed && (
+          <div>
+            <div style={{ color: T.textPrimary, fontWeight: 300, fontSize: 15, letterSpacing: "0.12em", fontFamily: "'Cormorant Garamond', serif", textTransform: "uppercase" }}>Stretchfield</div>
+            <div style={{ color: T.textMuted, fontSize: 9, letterSpacing: "0.20em", textTransform: "uppercase", marginTop: 1 }}>WorkRoom</div>
+          </div>
+        )}
+      </div>
+
+      {/* Nav */}
+      <nav style={{ flex: 1, padding: "16px 10px", overflowY: "auto" }}>
+        {navItems.map(item => {
+          const active = activeTab === item.id;
+          return (
+            <button key={item.id} onClick={() => onTab(item.id)} style={{
+              width: "100%", display: "flex", alignItems: "center", gap: 10,
+              padding: "9px 10px", borderRadius: 2, border: "none", cursor: "pointer",
+              background: active ? `linear-gradient(90deg, ${T.cyan}14, transparent)` : "transparent",
+              color: active ? T.cyan : T.textMuted,
+              fontSize: 11, fontWeight: active ? 700 : 500,
+              marginBottom: 1, transition: "all 0.15s",
+              whiteSpace: "nowrap", overflow: "hidden",
+              letterSpacing: active ? "0.08em" : "0.04em",
+              textTransform: "uppercase",
+              borderLeft: active ? `2px solid ${T.cyan}` : "2px solid transparent",
+            }}
+              onMouseEnter={e => { if (!active) { e.currentTarget.style.background = T.surfaceRaise; e.currentTarget.style.color = T.textSecondary; } }}
+              onMouseLeave={e => { if (!active) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMuted; } }}
+            >
+              <span style={{ fontSize: 6, flexShrink: 0, color: active ? T.cyan : T.textGhost }}>■</span>
+              {!collapsed && item.label}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* User */}
+      <div style={{ padding: "12px 10px", borderTop: `1px solid ${T.border}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 8px", borderRadius: 2 }}>
+          <Avatar initials={user.avatar} size={32} color={T.cyan} />
+          {!collapsed && (
+            <div style={{ overflow: "hidden" }}>
+              <div style={{ color: T.textPrimary, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: "0.04em" }}>{user.name}</div>
+              <div style={{ color: T.textMuted, fontSize: 10, letterSpacing: "0.06em" }}>{user.role}</div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <button onClick={onToggle} style={{
+        background: "none", border: "none", color: T.textGhost,
+        padding: "10px", cursor: "pointer", fontSize: 12,
+        borderTop: `1px solid ${T.border}`, letterSpacing: "0.10em",
+        transition: "color 0.2s",
+      }}
+        onMouseEnter={e => e.currentTarget.style.color = T.cyan}
+        onMouseLeave={e => e.currentTarget.style.color = T.textGhost}
+      >{collapsed ? "›" : "‹"}</button>
+    </div>
+  );
+};
+
+// ─── PAGE HEADER ─────────────────────────────────────────────────────────────
+const PageHeader = ({ title, subtitle }) => (
+  <div style={{ marginBottom: 32 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 6 }}>
+      <div style={{ width: 1, height: 28, background: `linear-gradient(180deg, ${T.cyan}, ${T.magenta})` }} />
+      <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 300, letterSpacing: "0.10em", textTransform: "uppercase", fontFamily: "'Cormorant Garamond', serif" }}>{title}</h2>
+    </div>
+    {subtitle && <p style={{ margin: "0 0 0 17px", color: T.textMuted, fontSize: 11, letterSpacing: "0.08em" }}>{subtitle}</p>}
+  </div>
+);
+
+// ─── DASHBOARDS ──────────────────────────────────────────────────────────────
+const CEODashboard = ({ onTab, user }) => {
+  const [events, setEvents] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [vendorProfiles, setVendorProfiles] = useState([]);
+  const [scorecards, setScorecards] = useState([]);
+  const [opportunities, setOpportunitys] = useState([]);
+  const [targets, setTargets] = useState([]);
+  const [feedback, setFeedback] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [rffs, setRffs] = useState([]);
+  const [unreadNotifs, setUnreadNotifs] = useState([]);
+
+  const [loading, setLoading] = React.useState(true);
+
+  useEffect(() => {
+    const loadAll = async () => {
+      setLoading(true);
+      const [ev, inv, tk, cl, fb, op, tg, rf, vp, sc] = await Promise.all([
+        supabase.from('projects').select('*').order('created_at', { ascending: false }),
+        supabase.from('invoices').select('*').order('created_at', { ascending: false }),
+        supabase.from('tasks').select('*'),
+        supabase.from('clients').select('*'),
+        supabase.from('feedback').select('*').order('created_at', { ascending: false }),
+        supabase.from('opportunities').select('*'),
+        supabase.from('sales_targets').select('*'),
+        supabase.from('rffs').select('*'),
+        supabase.from('profiles').select('*').eq('role', 'Vendor'),
+        supabase.from('vendor_scorecards').select('*').order('created_at', { ascending: false }),
+      ]);
+      setEvents(ev.data || []);
+      setInvoices(inv.data || []);
+      setTasks(tk.data || []);
+      setClients(cl.data || []);
+      setFeedback(fb.data || []);
+      setOpportunitys(op.data || []);
+      setTargets(tg.data || []);
+      const rffData = rf.data || [];
+      setRffs(rffData);
+      setVendors([...new Set(rffData.map(r => r.vendor).filter(Boolean))]);
+      setVendorProfiles(vp.data || []);
+      setScorecards(sc.data || []);
+      setLoading(false);
+    };
+    loadAll();
+  }, []);
+
+  // Live unread notifications for CEO - polls every 5s + realtime
+  useEffect(() => {
+    if (!user?.id) return;
+    const fetch = () => supabase.from('notifications').select('*').eq('user_id', user.id).eq('read', false).order('created_at', { ascending: false }).then(({ data }) => setUnreadNotifs(data || []));
+    fetch();
+    const sub = supabase.channel('ceo-dash-notif-' + user.id)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications' }, fetch)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, fetch)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'notifications' }, fetch)
+      .subscribe();
+    const interval = setInterval(fetch, 5000);
+    return () => { supabase.removeChannel(sub); clearInterval(interval); };
+  }, [user?.id]);
+
+  if (loading) return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", flexDirection: "column", gap: 16 }}>
+      <div style={{ width: 40, height: 40, border: `3px solid ${T.border}`, borderTop: `3px solid ${T.cyan}`, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+      <div style={{ color: T.textMuted, fontSize: 13 }}>Loading dashboard...</div>
+    </div>
+  );
+
+  const pendingInvoices = invoices.filter(i => i.status === 'pending');
+  const openTasks = tasks.filter(t => t.status !== 'completed');
+  const wonOpportunitys = opportunities.filter(l => l.status === 'won');
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const mtdRevenue = wonOpportunitys.filter(l => l.closed_date && new Date(l.closed_date) >= startOfMonth).reduce((a, l) => a + (l.value || 0), 0);
+  const ytdRevenue = wonOpportunitys.filter(l => l.closed_date && new Date(l.closed_date) >= startOfYear).reduce((a, l) => a + (l.value || 0), 0);
+  const totalRevenue = wonOpportunitys.reduce((a, l) => a + (l.value || 0), 0);
+  const closingPct = opportunities.length ? Math.round((wonOpportunitys.length / opportunities.length) * 100) : 0;
+  const avgCycle = wonOpportunitys.filter(l => l.sales_cycle_days).length
+    ? Math.round(wonOpportunitys.filter(l => l.sales_cycle_days).reduce((a, l) => a + l.sales_cycle_days, 0) / wonOpportunitys.filter(l => l.sales_cycle_days).length) : 0;
+  const pendingRffs = rffs.filter(r => r.status === 'pending' && r.approved);
+  const wonOpportunitysAwaitingApproval = opportunities.filter(l => l.status === 'won' && !l.approved);
+  const avgRating = feedback.length ? (feedback.reduce((a, f) => a + f.rating, 0) / feedback.length).toFixed(1) : null;
+  const upcomingEvents = events
+    .filter(e => e.event_date && new Date(e.event_date) >= new Date())
+    .sort((a, b) => new Date(a.event_date) - new Date(b.event_date))
+    .slice(0, 5);
+
+  const now2 = new Date();
+  const greeting = now2.getHours() < 12 ? 'Good Morning' : now2.getHours() < 17 ? 'Good Afternoon' : 'Good Evening';
+  const dateStr = now2.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+  return (
+    <div style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <style>{`
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
+        .exec-card { animation: fadeUp 0.4s ease forwards; }
+        .exec-kpi:hover { transform: translateY(-2px); transition: transform 0.2s ease; }
+      `}</style>
+
+      {/* Executive Header */}
+      <div style={{ marginBottom: 32, paddingBottom: 24, borderBottom: '1px solid ' + T.border }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <div style={{ color: T.textMuted, fontSize: 12, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>{dateStr}</div>
+            <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: T.textPrimary, letterSpacing: '-0.02em' }}>{greeting}</h1>
+            <div style={{ color: T.textMuted, fontSize: 14, marginTop: 4 }}>Here's your company at a glance</div>
+          </div>
+          {(unreadNotifs.length > 0 || wonOpportunitysAwaitingApproval.length > 0 || pendingInvoices.length > 0) && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 260 }}>
+              {unreadNotifs.slice(0, 2).map(n => (
+                <div key={n.id} onClick={() => onTab('notifications')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', background: 'linear-gradient(135deg, ' + T.amber + '18, ' + T.amber + '08)', border: '1px solid ' + T.amber + '33', borderRadius: 8, cursor: 'pointer', backdropFilter: 'blur(8px)' }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: T.amber, flexShrink: 0, boxShadow: '0 0 6px ' + T.amber }} />
+                  <div style={{ color: T.amber, fontSize: 12, fontWeight: 600, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.title}</div>
+                  <span style={{ color: T.amber, fontSize: 11, opacity: 0.7 }}>→</span>
+                </div>
+              ))}
+              {wonOpportunitysAwaitingApproval.length > 0 && (
+                <div onClick={() => onTab('crm')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', background: 'linear-gradient(135deg, ' + T.teal + '18, ' + T.teal + '08)', border: '1px solid ' + T.teal + '33', borderRadius: 8, cursor: 'pointer' }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: T.teal, flexShrink: 0, boxShadow: '0 0 6px ' + T.teal }} />
+                  <div style={{ color: T.teal, fontSize: 12, fontWeight: 600 }}>{wonOpportunitysAwaitingApproval.length} Won Opportunity{wonOpportunitysAwaitingApproval.length > 1 ? 's' : ''} Awaiting Approval</div>
+                  <span style={{ color: T.teal, fontSize: 11, opacity: 0.7 }}>→</span>
+                </div>
+              )}
+              {pendingInvoices.length > 0 && (
+                <div onClick={() => onTab('invoices')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', background: 'linear-gradient(135deg, ' + T.magenta + '18, ' + T.magenta + '08)', border: '1px solid ' + T.magenta + '33', borderRadius: 8, cursor: 'pointer' }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: T.magenta, flexShrink: 0, boxShadow: '0 0 6px ' + T.magenta }} />
+                  <div style={{ color: T.magenta, fontSize: 12, fontWeight: 600 }}>{pendingInvoices.length} Invoice{pendingInvoices.length > 1 ? 's' : ''} Pending · GHS {pendingInvoices.reduce((a, i) => a + (i.amount || 0), 0).toLocaleString()}</div>
+                  <span style={{ color: T.magenta, fontSize: 11, opacity: 0.7 }}>→</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Revenue Command Centre */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 24 }}>
+        {[
+          { label: 'Total Revenue', value: 'GHS ' + totalRevenue.toLocaleString(), sub: wonOpportunitys.length + ' deals closed', color: '#C9A84C', gradient: 'linear-gradient(135deg, #C9A84C22, #C9A84C08)' },
+          { label: 'YTD Revenue', value: 'GHS ' + ytdRevenue.toLocaleString(), sub: 'Year to date', color: T.cyan, gradient: 'linear-gradient(135deg, ' + T.cyan + '22, ' + T.cyan + '08)' },
+          { label: 'MTD Revenue', value: 'GHS ' + mtdRevenue.toLocaleString(), sub: 'This month', color: T.teal, gradient: 'linear-gradient(135deg, ' + T.teal + '22, ' + T.teal + '08)' },
+        ].map((k, i) => (
+          <div key={i} className="exec-kpi" style={{ padding: '20px 22px', background: k.gradient, border: '1px solid ' + k.color + '33', borderRadius: 14, animationDelay: (i * 0.08) + 's' }}>
+            <div style={{ color: k.color, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, opacity: 0.8 }}>{k.label}</div>
+            <div style={{ color: k.color, fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em', marginBottom: 4 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 11 }}>{k.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* KPI Strip */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginBottom: 28 }}>
+        {[
+          { label: 'Active Events', value: events.filter(e => e.status === 'active').length, sub: events.length + ' total', color: T.cyan, tab: 'events' },
+          { label: 'Clients', value: clients.length, sub: 'active', color: T.blue, tab: 'clients' },
+          { label: 'Vendors', value: vendors.length, sub: 'registered', color: T.teal, tab: 'vendors' },
+          { label: 'Open Tasks', value: openTasks.length, sub: 'in progress', color: T.magenta, tab: 'tasks' },
+          { label: 'Closing Rate', value: closingPct + '%', sub: 'win rate', color: '#C9A84C', tab: 'crm' },
+          { label: 'Client Rating', value: avgRating ? avgRating + '/5' : '—', sub: 'avg score', color: T.amber, tab: 'feedback' },
+        ].map((k, i) => (
+          <div key={i} onClick={() => onTab(k.tab)} className="exec-kpi" style={{ padding: '14px 16px', background: T.surface, border: '1px solid ' + T.border, borderTop: '2px solid ' + k.color, borderRadius: 10, cursor: 'pointer', animationDelay: (0.24 + i * 0.06) + 's', textAlign: 'center' }}>
+            <div style={{ color: k.color, fontSize: 20, fontWeight: 900, letterSpacing: '-0.02em' }}>{k.value}</div>
+            <div style={{ color: T.textPrimary, fontSize: 11, fontWeight: 600, marginTop: 4 }}>{k.label}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{k.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Main 3-col executive grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 18, marginBottom: 18 }}>
+        {/* Event Progress */}
+        <div style={{ background: T.surface, border: '1px solid ' + T.border, borderRadius: 14, padding: '20px 22px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, letterSpacing: '-0.01em' }}>Active Events</div>
+            <button onClick={() => onTab('events')} style={{ background: 'none', border: 'none', color: T.cyan, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>View All →</button>
+          </div>
+          {events.filter(e => e.status === 'active').slice(0, 4).map((e, i) => (
+            <div key={e.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: i < 3 ? '1px solid ' + T.border + '55' : 'none' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div>
+                  <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 700 }}>{e.name}</div>
+                  <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{e.phase} · {e.client}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ color: e.completion >= 80 ? T.teal : e.completion >= 50 ? T.cyan : T.amber, fontWeight: 900, fontSize: 16 }}>{e.completion || 0}%</div>
+                </div>
+              </div>
+              <div style={{ height: 4, background: T.border + '44', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: (e.completion || 0) + '%', background: e.completion >= 80 ? T.teal : e.completion >= 50 ? T.cyan : T.amber, borderRadius: 2, transition: 'width 0.6s ease' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Opportunities Pipeline — elegant funnel */}
+        <div style={{ background: T.surface, border: '1px solid ' + T.border, borderRadius: 14, padding: '20px 22px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, letterSpacing: '-0.01em' }}>Pipeline</div>
+            <button onClick={() => onTab('crm')} style={{ background: 'none', border: 'none', color: T.cyan, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>View All →</button>
+          </div>
+          {['new','contacted','qualified','proposal','won','lost'].map(s => {
+            const count = opportunities.filter(l => l.status === s).length;
+            const val = opportunities.filter(l => l.status === s).reduce((a, l) => a + (l.value || 0), 0);
+            if (!count) return null;
+            const colors = { new: T.cyan, contacted: T.blue, qualified: T.amber, proposal: T.magenta, won: T.teal, lost: '#F43F5E' };
+            const maxVal = Math.max(...['new','contacted','qualified','proposal','won','lost'].map(st => opportunities.filter(l => l.status === st).reduce((a,l) => a + (l.value||0), 0)));
+            const barW = maxVal > 0 ? Math.round((val / maxVal) * 100) : 0;
+            return (
+              <div key={s} style={{ marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ color: colors[s], fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{s}</span>
+                  <span style={{ color: T.textMuted, fontSize: 11 }}>{count} · GHS {val.toLocaleString()}</span>
+                </div>
+                <div style={{ height: 3, background: T.border + '44', borderRadius: 2 }}>
+                  <div style={{ height: '100%', width: barW + '%', background: colors[s], borderRadius: 2, opacity: 0.8 }} />
+                </div>
+              </div>
+            );
+          })}
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid ' + T.border + '44', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ color: T.textMuted, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Pipeline Value</span>
+            <span style={{ color: '#C9A84C', fontWeight: 800, fontSize: 15 }}>GHS {opportunities.filter(l => !['won','lost'].includes(l.status)).reduce((a, l) => a + (l.value || 0), 0).toLocaleString()}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom row — Invoices + Feedback side by side */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 18 }}>
+        <div style={{ background: T.surface, border: '1px solid ' + T.border, borderRadius: 14, padding: '20px 22px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>Recent Invoices</div>
+            <button onClick={() => onTab('invoices')} style={{ background: 'none', border: 'none', color: T.cyan, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>View All →</button>
+          </div>
+          {invoices.slice(0, 4).map((inv, i) => (
+            <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i < 3 ? '1px solid ' + T.border + '44' : 'none' }}>
+              <div>
+                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{inv.vendor || 'Vendor'}</div>
+                <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{inv.event_name}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 700 }}>GHS {(inv.amount || 0).toLocaleString()}</div>
+                <Badge status={inv.status} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ background: T.surface, border: '1px solid ' + T.border, borderRadius: 14, padding: '20px 22px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>Client Feedback</div>
+            <button onClick={() => onTab('feedback')} style={{ background: 'none', border: 'none', color: T.cyan, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>View All →</button>
+          </div>
+          {feedback.length === 0 ? (
+            <div style={{ color: T.textMuted, fontSize: 13, padding: '20px 0', textAlign: 'center' }}>No feedback yet.</div>
+          ) : feedback.slice(0, 3).map((f, i) => (
+            <div key={f.id} style={{ padding: '10px 0', borderBottom: i < 2 ? '1px solid ' + T.border + '44' : 'none' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 700 }}>{f.client_name}</div>
+                <div style={{ color: '#C9A84C', fontSize: 12, letterSpacing: 2 }}>{'★'.repeat(f.rating)}{'☆'.repeat(5 - f.rating)}</div>
+              </div>
+              <div style={{ color: T.textMuted, fontSize: 10, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{f.event_name}</div>
+              <div style={{ color: T.textSecondary, fontSize: 12, fontStyle: 'italic', opacity: 0.8 }}>"{f.summary}"</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Sales Targets Progress */}
+      {targets.length > 0 && (
+        <div style={{ background: T.surface, border: '1px solid ' + T.border, borderRadius: 14, padding: '20px 22px', marginBottom: 18 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>Sales Team Performance</div>
+            <button onClick={() => onTab('crm-insights')} style={{ background: 'none', border: 'none', color: T.cyan, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Full Insights →</button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
+            {targets.map(t => {
+              const repWon = wonOpportunitys.filter(l => l.assigned_to === t.rep_id || l.created_by === t.rep_id);
+              const repRevenue = repWon.reduce((a, l) => a + (l.value || 0), 0);
+              const pct = Math.min(100, Math.round((repRevenue / t.target_amount) * 100));
+              const col = pct >= 100 ? T.teal : pct >= 60 ? T.cyan : T.amber;
+              return (
+                <div key={t.id} style={{ padding: '16px', background: T.bg, borderRadius: 10, border: '1px solid ' + T.border, borderTop: '2px solid ' + col }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{t.rep_name}</div>
+                    <span style={{ color: col, fontSize: 14, fontWeight: 900 }}>{pct}%</span>
+                  </div>
+                  <div style={{ height: 4, background: T.border + '44', borderRadius: 2, marginBottom: 10 }}>
+                    <div style={{ height: '100%', width: pct + '%', background: col, borderRadius: 2 }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <div style={{ color: col, fontSize: 12, fontWeight: 700 }}>GHS {repRevenue.toLocaleString()}</div>
+                    <div style={{ color: T.textMuted, fontSize: 11 }}>/ GHS {t.target_amount.toLocaleString()}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Vendor Ratings Summary — A/B/C/D grades only */}
+      {vendorProfiles.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Vendor Grades</div>
+            <button onClick={() => onTab('vendors')} style={{ background: 'none', border: 'none', color: T.cyan, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Full Ratings →</button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+            {vendorProfiles.sort((a,b) => (b.vendor_score||0) - (a.vendor_score||0)).map(v => {
+              const score = v.vendor_score || 0;
+              const count = v.vendor_scorecard_count || 0;
+              const isUnrated = count === 0;
+              // A/B/C/D grading
+              let grade, gradeColor, gradeBg;
+              if (isUnrated) { grade = '—'; gradeColor = T.textMuted; gradeBg = T.bg; }
+              else if (score >= 85) { grade = 'A'; gradeColor = '#10B981'; gradeBg = '#10B98115'; }
+              else if (score >= 70) { grade = 'B'; gradeColor = T.cyan; gradeBg = T.cyan + '15'; }
+              else if (score >= 50) { grade = 'C'; gradeColor = T.amber; gradeBg = T.amber + '15'; }
+              else { grade = 'D'; gradeColor = '#F43F5E'; gradeBg = '#F43F5E15'; }
+              return (
+                <div key={v.id} style={{ padding: '12px 14px', background: T.surface, border: '1px solid ' + gradeColor + '44', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: gradeBg, border: '2px solid ' + gradeColor + '66', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 900, color: gradeColor, flexShrink: 0 }}>{grade}</div>
+                  <div>
+                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{v.name}</div>
+                    <div style={{ color: gradeColor, fontSize: 11, fontWeight: 600, marginTop: 2 }}>{isUnrated ? 'Unrated' : grade === 'D' ? '⛔ Do Not Engage' : grade === 'A' ? 'Excellent' : grade === 'B' ? 'Good' : 'Fair'}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+const VendorManagerDashboard = ({ user }) => {
+  const [vendors, setVendors] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [notifs, setNotifs] = useState([]);
+  const [rffs, setRffs] = useState([]);
+  const [awards, setAwards] = useState([]);
+
+
+  const VENDOR_TYPES = ["Event Lighting","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
+
+  const loadVM = () => {
+    Promise.all([
+      supabase.from("profiles").select("*").eq("role", "Vendor").order("name"),
+      supabase.from("tasks").select("*").eq("assignee_id", user.id),
+      supabase.from("projects").select("*").eq("status", "active"),
+      supabase.from("notifications").select("*").eq("user_id", user.id).eq("read", false).limit(5),
+      supabase.from("rffs").select("*").order("created_at", { ascending: false }),
+      supabase.from("rff_awards").select("*").in("status", ["confirmed","po_created"]),
+    ]).then(([v, t, ev, n, r, aw]) => {
+      setVendors(v.data || []);
+      setTasks(t.data || []);
+      setEvents(ev.data || []);
+      setNotifs(n.data || []);
+      setRffs(r.data || []);
+      setAwards(aw.data || []);
+    });
+  };
+
+  useEffect(() => { loadVM(); }, [user.id]);
+
+
+
+  const now = new Date();
+  const greeting = now.getHours() < 12 ? "Good Morning" : now.getHours() < 17 ? "Good Afternoon" : "Good Evening";
+  const dateStr = now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+  const pending = tasks.filter(t => t.status !== "completed");
+  const pendingRffs = rffs.filter(r => !r.approved);
+  const upcomingEvents = events.filter(e => e.event_date && new Date(e.event_date) >= now).sort((a,b) => new Date(a.event_date) - new Date(b.event_date));
+
+  // Group vendors by service_category
+  const vendorsByCategory = VENDOR_TYPES.reduce((acc, type) => {
+    const list = vendors.filter(v => v.service_category === type);
+    if (list.length > 0) acc[type] = list;
+    return acc;
+  }, {});
+  // Uncategorised vendors
+  const uncategorised = vendors.filter(v => !v.service_category || !VENDOR_TYPES.includes(v.service_category));
+
+  const getTierColor = (score, count) => {
+    if (!count) return T.textMuted;
+    if (score >= 85) return "#10B981";
+    if (score >= 70) return T.teal;
+    if (score >= 50) return T.amber;
+    return T.red;
+  };
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>{dateStr}</div>
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: T.textPrimary, letterSpacing: "-0.02em" }}>{greeting}, {user.name.split(" ")[0]}</h1>
+        <div style={{ color: T.textMuted, fontSize: 13, marginTop: 4 }}>Vendor network overview and procurement status</div>
+      </div>
+
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Total Vendors", value: vendors.length, color: T.cyan },
+          { label: "Active Events", value: events.length, color: T.teal },
+          { label: "Pending RFFs", value: pendingRffs.length, color: T.amber },
+          { label: "Confirmed Gigs", value: awards.length, color: "#10B981" },
+        ].map((k,i) => (
+          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Alerts */}
+      {notifs.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          {notifs.slice(0,3).map(n => (
+            <div key={n.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: T.amber+"12", border: `1px solid ${T.amber}30`, borderRadius: 8, marginBottom: 6 }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.amber, flexShrink: 0 }} />
+              <div style={{ color: T.amber, fontSize: 12, fontWeight: 600, flex: 1 }}>{n.title}</div>
+              <div style={{ color: T.textMuted, fontSize: 11 }}>{n.message?.slice(0,60)}...</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Two column layout */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 16, marginBottom: 24 }}>
+
+        {/* Upcoming Events */}
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px" }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 14 }}>Upcoming Events</div>
+          {upcomingEvents.length > 0 ? upcomingEvents.slice(0,4).map((ev,i) => {
+            const days = Math.ceil((new Date(ev.event_date) - now)/(1000*60*60*24));
+            const color = days <= 7 ? T.red : days <= 30 ? T.amber : T.teal;
+            const archetype = EVENT_ARCHETYPES[ev.event_category];
+            return (
+              <div key={ev.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < 3 ? `1px solid ${T.border}33` : "none" }}>
+                <div>
+                  <div style={{ color: T.textPrimary, fontWeight: 600, fontSize: 12 }}>{ev.name}</div>
+                  {ev.event_category && <div style={{ color: archetype?.color||T.cyan, fontSize: 10, fontWeight: 700 }}>{ev.event_category}</div>}
+                </div>
+                <div style={{ color, fontWeight: 800, fontSize: 13 }}>{days}d</div>
+              </div>
+            );
+          }) : <div style={{ color: T.textMuted, fontSize: 12, textAlign: "center", padding: "16px 0" }}>No upcoming events</div>}
+        </div>
+
+        {/* My Tasks */}
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px" }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 14 }}>My Tasks</div>
+          {pending.length > 0 ? pending.slice(0,4).map((t,i) => (
+            <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < Math.min(pending.length,4)-1 ? `1px solid ${T.border}33` : "none" }}>
+              <div style={{ color: T.textPrimary, fontSize: 12, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</div>
+              <div style={{ color: t.deadline && new Date(t.deadline) < now ? T.red : T.textMuted, fontSize: 10, flexShrink: 0, marginLeft: 8 }}>{t.deadline || "No date"}</div>
+            </div>
+          )) : <div style={{ color: T.textMuted, fontSize: 12, textAlign: "center", padding: "16px 0" }}>No pending tasks</div>}
+        </div>
+      </div>
+
+      {/* Vendor Directory by Category */}
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ padding: "16px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Vendor Directory</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{vendors.length} vendors across {Object.keys(vendorsByCategory).length} categories</div>
+          </div>
+        </div>
+
+        <div style={{ padding: "16px 20px" }}>
+          {Object.entries(vendorsByCategory).map(([category, catVendors]) => (
+            <div key={category} style={{ marginBottom: 20 }}>
+              {/* Category Header */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, paddingBottom: 6, borderBottom: `1px solid ${T.border}` }}>
+                <div style={{ background: T.cyan+"18", border: `1px solid ${T.cyan}30`, borderRadius: 20, padding: "3px 12px", display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ color: T.cyan, fontWeight: 900, fontSize: 16 }}>{catVendors.length}</span>
+                  <span style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>vendor{catVendors.length !== 1 ? "s" : ""}</span>
+                </div>
+                <span style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{category}</span>
+              </div>
+
+              {/* Vendor List */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px,1fr))", gap: 8 }}>
+                {catVendors.map(v => {
+                  const tierColor = getTierColor(v.vendor_score, v.vendor_scorecard_count);
+                  const isPoor = v.vendor_scorecard_count > 0 && (v.vendor_score||0) < 50;
+                  return (
+                    <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: isPoor ? T.red+"08" : T.bg, border: `1px solid ${isPoor ? T.red+"30" : T.border}`, borderRadius: 8 }}>
+                      <div style={{ width: 30, height: 30, borderRadius: "50%", background: tierColor+"20", border: `1px solid ${tierColor}40`, display: "flex", alignItems: "center", justifyContent: "center", color: tierColor, fontWeight: 800, fontSize: 11, flexShrink: 0 }}>
+                        {(v.name||"?").slice(0,2).toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.name}</div>
+                        <div style={{ color: T.textMuted, fontSize: 10, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.company_name || v.email || ""}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+                          {v.vendor_scorecard_count > 0 ? (
+                            <span style={{ color: tierColor, fontSize: 10, fontWeight: 700 }}>{v.vendor_score}% · {getTier(v.vendor_score).label}</span>
+                          ) : (
+                            <span style={{ color: T.textMuted, fontSize: 10 }}>Unrated</span>
+                          )}
+                          {isPoor && <span style={{ color: T.red, fontSize: 9, fontWeight: 700 }}>⛔ Blocked</span>}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {/* Uncategorised */}
+          {uncategorised.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, paddingBottom: 6, borderBottom: `1px solid ${T.border}` }}>
+                <div style={{ background: T.textMuted+"18", border: `1px solid ${T.border}`, borderRadius: 20, padding: "3px 12px", display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ color: T.textMuted, fontWeight: 900, fontSize: 16 }}>{uncategorised.length}</span>
+                  <span style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>vendor{uncategorised.length !== 1 ? "s" : ""}</span>
+                </div>
+                <span style={{ color: T.textMuted, fontWeight: 700, fontSize: 13 }}>Uncategorised</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px,1fr))", gap: 8 }}>
+                {uncategorised.map(v => (
+                  <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8 }}>
+                    <div style={{ width: 30, height: 30, borderRadius: "50%", background: T.border, display: "flex", alignItems: "center", justifyContent: "center", color: T.textMuted, fontWeight: 800, fontSize: 11, flexShrink: 0 }}>{(v.name||"?").slice(0,2).toUpperCase()}</div>
+                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>{v.name}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {vendors.length === 0 && (
+            <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted, fontSize: 13 }}>No vendors onboarded yet. Use the Add New Vendor tab to get started.</div>
+          )}
+        </div>
+      </div>
+
+    </div>
+  );
+};
+
+const StaffDashboard = ({ user }) => {
+  const [tasks, setTasks] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [notifs, setNotifs] = useState([]);
+
+  useEffect(() => {
+    supabase.from("tasks").select("*").eq("assignee_id", user.id).order("created_at", { ascending: false }).then(({ data }) => setTasks(data || []));
+    supabase.from("projects").select("*").eq("status", "active").then(({ data }) => setEvents(data || []));
+    supabase.from("notifications").select("*").eq("user_id", user.id).eq("read", false).order("created_at", { ascending: false }).limit(5).then(({ data }) => setNotifs(data || []));
+  }, [user.id]);
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+  const greeting = now.getHours() < 12 ? "Good Morning" : now.getHours() < 17 ? "Good Afternoon" : "Good Evening";
+  const pending = tasks.filter(t => t.status !== "completed");
+  const dueSoon = tasks.filter(t => t.deadline && new Date(t.deadline) <= new Date(Date.now() + 3 * 86400000) && t.status !== "completed");
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>{dateStr}</div>
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: T.textPrimary, letterSpacing: "-0.02em" }}>{greeting}, {user.name.split(" ")[0]}</h1>
+        <div style={{ color: T.textMuted, fontSize: 13, marginTop: 4 }}>Here's your workload for today</div>
+      </div>
+
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Active Events", value: events.length, color: T.cyan },
+          { label: "Pending Tasks", value: pending.length, sub: dueSoon.length > 0 ? dueSoon.length + " due soon" : null, color: T.amber },
+          { label: "Unread Alerts", value: notifs.length, color: T.blue },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "16px 18px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textPrimary, fontSize: 11, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+            {k.sub && <div style={{ color: T.amber, fontSize: 10, marginTop: 2 }}>{k.sub}</div>}
+          </div>
+        ))}
+      </div>
+
+      {/* Alerts */}
+      {notifs.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          {notifs.slice(0, 3).map(n => (
+            <div key={n.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: T.amber + "12", border: `1px solid ${T.amber}30`, borderRadius: 8, marginBottom: 6 }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.amber, boxShadow: `0 0 6px ${T.amber}`, flexShrink: 0 }} />
+              <div style={{ color: T.amber, fontSize: 12, fontWeight: 600, flex: 1 }}>{n.title}</div>
+              <div style={{ color: T.textMuted, fontSize: 11 }}>{n.message}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Upcoming Events */}
+      {(() => {
+        const upcoming = events
+          .filter(e => e.event_date && new Date(e.event_date) >= new Date())
+          .sort((a, b) => new Date(a.event_date) - new Date(b.event_date))
+          .slice(0, 5);
+        if (upcoming.length === 0) return null;
+        return (
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 22px", marginBottom: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div>
+                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>Schedule</div>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Upcoming Events</div>
+              </div>
+              <span style={{ background: T.cyan + "18", border: `1px solid ${T.cyan}30`, color: T.cyan, borderRadius: 20, padding: "3px 12px", fontSize: 11, fontWeight: 700 }}>{upcoming.length} upcoming</span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {upcoming.map(e => {
+                const daysLeft = Math.ceil((new Date(e.event_date) - new Date()) / 86400000);
+                const isSoon = daysLeft <= 7;
+                const isNear = daysLeft <= 30;
+                const dotColor = isSoon ? T.red : isNear ? T.amber : T.teal;
+                const phaseBg = e.phase === "Execution" ? T.cyan : e.phase === "Review" ? T.teal : e.phase === "Design" ? T.magenta : T.amber;
+                return (
+                  <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 14px", background: T.bg, border: `1px solid ${T.border}44`, borderLeft: `3px solid ${dotColor}`, borderRadius: 8 }}>
+                    <div style={{ flexShrink: 0, width: 48, height: 48, borderRadius: "50%", background: dotColor + "18", border: `2px solid ${dotColor}40`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                      <div style={{ color: dotColor, fontSize: 14, fontWeight: 900, lineHeight: 1 }}>{daysLeft}</div>
+                      <div style={{ color: dotColor, fontSize: 8, fontWeight: 700, textTransform: "uppercase" }}>days</div>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.name}</div>
+                      <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center" }}>
+                        <span style={{ color: T.textMuted, fontSize: 11 }}>{e.client}</span>
+                        <span style={{ color: T.textMuted, fontSize: 10 }}>·</span>
+                        <span style={{ color: T.textMuted, fontSize: 11 }}>📅 {new Date(e.event_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
+                      </div>
+                    </div>
+                    <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
+                      <span style={{ background: phaseBg + "18", color: phaseBg, border: `1px solid ${phaseBg}30`, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{e.phase || "Planning"}</span>
+                      <span style={{ color: T.textMuted, fontSize: 11 }}>{e.completion || 0}% done</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Tasks */}
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 22px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>My Tasks</div>
+          <div style={{ color: T.textMuted, fontSize: 11 }}>{pending.length} open</div>
+        </div>
+        {tasks.length === 0 ? (
+          <div style={{ color: T.textMuted, fontSize: 13, padding: "24px 0", textAlign: "center" }}>No tasks assigned yet.</div>
+        ) : tasks.slice(0, 5).map((t, i) => (
+          <div key={t.id} style={{ padding: "12px 0", borderBottom: i < Math.min(tasks.length, 5) - 1 ? `1px solid ${T.border}44` : "none" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{t.name}</div>
+              <Badge status={t.status} />
+            </div>
+            <div style={{ height: 3, background: T.border + "44", borderRadius: 2, marginBottom: 4 }}>
+              <div style={{ height: "100%", width: (t.progress || 0) + "%", background: t.status === "completed" ? T.teal : T.cyan, borderRadius: 2 }} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <div style={{ color: T.textMuted, fontSize: 10 }}>Due {t.deadline}</div>
+              <div style={{ color: T.textMuted, fontSize: 10 }}>{t.progress || 0}%</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const VendorDashboard = ({ user }) => {
+  const [rffs, setRffs] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [scorecards, setScorecards] = useState([]);
+
+  useEffect(() => {
+    // Only show RFFs assigned to this vendor
+    supabase.from("rff_vendor_assignments").select("rff_id").eq("vendor_id", user.id).then(({ data: assignments }) => {
+      if (assignments && assignments.length > 0) {
+        const ids = assignments.map(a => a.rff_id);
+        supabase.from("rffs").select("*").in("id", ids).order("created_at", { ascending: false }).then(({ data }) => setRffs(data || []));
+      }
+    });
+    supabase.from("tasks").select("*").eq("assignee_id", user.id).order("created_at", { ascending: false }).then(({ data }) => setTasks(data || []));
+    supabase.from("vendor_scorecards").select("*").eq("vendor_id", user.id).order("created_at", { ascending: false }).then(({ data }) => setScorecards(data || []));
+  }, [user.id]);
+
+  const pendingRffs = rffs.filter(r => r.status === "vendor-assigned" || r.status === "pending");
+  const submittedRffs = rffs.filter(r => r.status === "quote-submitted");
+  const approvedRffs = rffs.filter(r => r.status === "quote-approved");
+  const latestScore = scorecards.length > 0 ? scorecards[0] : null;
+  const overallTier = latestScore ? getTier(latestScore.total_pct) : null;
+
+  const now2 = new Date();
+  const greeting2 = now2.getHours() < 12 ? "Good Morning" : now2.getHours() < 17 ? "Good Afternoon" : "Good Evening";
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>{now2.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}</div>
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: T.textPrimary, letterSpacing: "-0.02em" }}>{greeting2}, {user.name.split(" ")[0]}</h1>
+        <div style={{ color: T.textMuted, fontSize: 13, marginTop: 4 }}>Your performance, RFFs and tasks</div>
+      </div>
+
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Open RFFs", value: pendingRffs.length, color: T.cyan },
+          { label: "Quotes Submitted", value: submittedRffs.length, color: T.amber },
+          { label: "Approved", value: approvedRffs.length, color: T.teal },
+          { label: "My Tasks", value: tasks.length, color: T.magenta },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "16px 18px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textPrimary, fontSize: 11, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Performance Score Card */}
+      {scorecards.length > 0 && (
+        <Card style={{ marginBottom: 24, borderLeft: "3px solid " + (overallTier?.color || T.cyan) }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+            <div>
+              <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>My Performance Rating</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ fontSize: 36, fontWeight: 900, color: overallTier?.color }}>{latestScore.total_pct}%</div>
+                <div>
+                  <div style={{ color: overallTier?.color, fontWeight: 700, fontSize: 16 }}>{overallTier?.label}</div>
+                  <div style={{ color: T.textMuted, fontSize: 12 }}>Based on most recent event</div>
+                </div>
+              </div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ color: T.textMuted, fontSize: 12 }}>{scorecards.length} event{scorecards.length !== 1 ? "s" : ""} scored</div>
+              <div style={{ color: T.cyan, fontSize: 12, marginTop: 2 }}>📁 {latestScore.event_name}</div>
+            </div>
+          </div>
+
+          {/* Score History per Event */}
+          <div style={{ borderTop: "1px solid " + T.border, paddingTop: 12 }}>
+            <div style={{ color: T.textSecondary, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Score History by Event</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
+              {scorecards.map(sc => {
+                const t = getTier(sc.total_pct);
+                return (
+                  <div key={sc.id} style={{ padding: "10px 12px", background: T.bg, borderRadius: 8, border: "1px solid " + t.color + "33", borderLeft: "3px solid " + t.color }}>
+                    <div style={{ color: T.textPrimary, fontWeight: 600, fontSize: 13 }}>{sc.event_name || "General"}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
+                      <span style={{ color: t.color, fontWeight: 800, fontSize: 20 }}>{sc.total_pct}%</span>
+                      <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: t.bg, color: t.color, border: "1px solid " + t.color + "44" }}>{t.label}</span>
+                    </div>
+                    <div style={{ color: T.textMuted, fontSize: 10, marginTop: 4 }}>{new Date(sc.created_at).toLocaleDateString()}</div>
+                    {sc.notes && <div style={{ color: T.textSecondary, fontSize: 11, marginTop: 4, fontStyle: "italic" }}>{sc.notes}</div>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* RFFs + Tasks grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 16, marginBottom: 16 }}>
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.06em" }}>My RFFs</div>
+          {rffs.length === 0 ? (
+            <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No RFFs assigned yet.</div>
+          ) : rffs.slice(0, 4).map((r, i) => (
+            <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < Math.min(rffs.length, 4) - 1 ? `1px solid ${T.border}44` : "none" }}>
+              <div>
+                <div style={{ color: T.textPrimary, fontSize: 12, fontWeight: 600 }}>{r.title}</div>
+                <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{r.event_name} · {r.deadline}</div>
+              </div>
+              <Badge status={r.status} />
+            </div>
+          ))}
+        </div>
+
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.06em" }}>My Tasks</div>
+          {tasks.length === 0 ? (
+            <div style={{ color: T.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No tasks assigned yet.</div>
+          ) : tasks.slice(0, 4).map((t, i) => (
+            <div key={t.id} style={{ padding: "10px 0", borderBottom: i < Math.min(tasks.length, 4) - 1 ? `1px solid ${T.border}44` : "none" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <div style={{ color: T.textPrimary, fontSize: 12, fontWeight: 600 }}>{t.name}</div>
+                <Badge status={t.status} />
+              </div>
+              <div style={{ height: 3, background: T.border + "44", borderRadius: 2, marginBottom: 3 }}>
+                <div style={{ height: "100%", width: (t.progress || 0) + "%", background: t.status === "completed" ? T.teal : T.cyan, borderRadius: 2 }} />
+              </div>
+              <div style={{ color: T.textMuted, fontSize: 10 }}>{t.progress || 0}% · Due {t.deadline}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CEOClientFinanceView = ({ user }) => {
+  const [clients, setClients] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [budgets, setBudgets] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [tab, setTab] = useState("budget");
+  const [saving, setSaving] = useState(false);
+
+  // Budget form
+  const [budgetForm, setBudgetForm] = useState({ agreed_budget: "", management_fee_pct: "15" });
+  // Expense form
+  const [expenseForm, setExpenseForm] = useState({ category: "Venue", description: "", amount: "" });
+  // Invoice form
+  const [invoiceForm, setInvoiceForm] = useState({ title: "", file_url: "" });
+
+  const load = async () => {
+    const [cl, ev, bud, exp, inv] = await Promise.all([
+      supabase.from("clients").select("*").order("name"),
+      supabase.from("projects").select("*").order("name"),
+      supabase.from("client_budgets").select("*"),
+      supabase.from("client_expenses").select("*").order("created_at", { ascending: false }),
+      supabase.from("client_invoices").select("*").order("created_at", { ascending: false }),
+    ]);
+    setClients(cl.data || []);
+    setEvents(ev.data || []);
+    setBudgets(bud.data || []);
+    setExpenses(exp.data || []);
+    setInvoices(inv.data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const clientEvents = events.filter(e => e.client_id === selectedClient);
+  const currentBudget = budgets.find(b => b.project_id === selectedEvent && b.client_id === selectedClient);
+  const currentExpenses = expenses.filter(e => e.project_id === selectedEvent && e.client_id === selectedClient);
+  const currentInvoices = invoices.filter(i => i.project_id === selectedEvent && i.client_id === selectedClient);
+
+  const handleSaveBudget = async () => {
+    if (!selectedClient || !selectedEvent) return;
+    setSaving(true);
+    if (currentBudget) {
+      await supabase.from("client_budgets").update({
+        agreed_budget: parseFloat(budgetForm.agreed_budget),
+        management_fee_pct: parseFloat(budgetForm.management_fee_pct),
+        updated_at: new Date().toISOString(),
+      }).eq("id", currentBudget.id);
+    } else {
+      await supabase.from("client_budgets").insert({
+        project_id: selectedEvent, client_id: selectedClient,
+        agreed_budget: parseFloat(budgetForm.agreed_budget),
+        management_fee_pct: parseFloat(budgetForm.management_fee_pct),
+      });
+    }
+    setSaving(false);
+    load();
+  };
+
+  const handleAddExpense = async () => {
+    if (!selectedClient || !selectedEvent || !expenseForm.amount) return;
+    setSaving(true);
+    await supabase.from("client_expenses").insert({
+      project_id: selectedEvent, client_id: selectedClient,
+      category: expenseForm.category,
+      description: expenseForm.description,
+      amount: parseFloat(expenseForm.amount),
+    });
+    setExpenseForm({ category: "Venue", description: "", amount: "" });
+    setSaving(false);
+    load();
+  };
+
+  const handleDeleteExpense = async (id) => {
+    await supabase.from("client_expenses").delete().eq("id", id);
+    load();
+  };
+
+  const handleUploadInvoice = async () => {
+    if (!selectedClient || !selectedEvent || !invoiceForm.title || !invoiceForm.file_url) return;
+    setSaving(true);
+    await supabase.from("client_invoices").insert({
+      project_id: selectedEvent, client_id: selectedClient,
+      title: invoiceForm.title, file_url: invoiceForm.file_url,
+      uploaded_by: user.id,
+    });
+    setInvoiceForm({ title: "", file_url: "" });
+    setSaving(false);
+    load();
+  };
+
+  const handleDeleteInvoice = async (id) => {
+    await supabase.from("client_invoices").delete().eq("id", id);
+    load();
+  };
+
+  // Sync budget form when event selected
+  useEffect(() => {
+    if (currentBudget) {
+      setBudgetForm({ agreed_budget: currentBudget.agreed_budget, management_fee_pct: currentBudget.management_fee_pct });
+    } else {
+      setBudgetForm({ agreed_budget: "", management_fee_pct: "15" });
+    }
+  }, [selectedEvent, budgets]);
+
+  const totalSpent = currentExpenses.reduce((s, e) => s + (e.amount || 0), 0);
+  const agreedBudget = currentBudget?.agreed_budget || 0;
+  const spentPct = agreedBudget > 0 ? Math.min(100, Math.round((totalSpent / agreedBudget) * 100)) : 0;
+
+  const categoryColors = {
+    "Venue": "#00C8FF", "Catering": "#00E5C8", "Production": "#C9A84C",
+    "Logistics": "#3B7BFF", "Management Fee": "#E879F9", "Other": "#8BA3C7",
+  };
+
   const inputStyle = { width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
   const labelStyle = { color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5, display: "block" };
 
@@ -1900,7 +3634,7 @@ const EventsView = ({ user, userRole }) => {
 
 
 const OpportunitiesView = ({ user, onNavigate }) => {
-  const [opportunities, setOpportunities] = useState([]);
+  const [leads, setLeads] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [search, setSearch] = useState("");
   const [sectorFilter, setSectorFilter] = useState("all");
@@ -1918,8 +3652,8 @@ const OpportunitiesView = ({ user, onNavigate }) => {
   const canManage = ["CEO", "Sales & Marketing"].includes(user?.role);
 
   const load = async () => {
-    const { data } = await supabase.from("opportunities").select("*").order("company");
-    setOpportunities(data || []);
+    const { data } = await supabase.from("leads").select("*").order("company");
+    setLeads(data || []);
   };
 
   const loadActivities = async (oppId) => {
@@ -1968,15 +3702,15 @@ const OpportunitiesView = ({ user, onNavigate }) => {
   useEffect(() => { load(); }, []);
 
   useEffect(() => {
-    let f = [...opportunities];
+    let f = [...leads];
     if (search) f = f.filter(o => o.company.toLowerCase().includes(search.toLowerCase()) || o.sector?.toLowerCase().includes(search.toLowerCase()));
     if (sectorFilter !== "all") f = f.filter(o => o.sector === sectorFilter);
     if (presenceFilter !== "all") f = f.filter(o => o.presence === presenceFilter);
     if (statusFilter !== "all") f = f.filter(o => o.status === statusFilter);
     setFiltered(f);
-  }, [opportunities, search, sectorFilter, presenceFilter, statusFilter]);
+  }, [leads, search, sectorFilter, presenceFilter, statusFilter]);
 
-  const sectors = [...new Set(opportunities.map(o => o.sector).filter(Boolean))].sort();
+  const sectors = [...new Set(leads.map(o => o.sector).filter(Boolean))].sort();
   const statuses = ["New", "Contacted", "Qualified", "Converted"];
   const statusColors = { New: T.cyan, Contacted: T.amber, Qualified: T.teal, Converted: "#10B981" };
   const presenceColors = { GH: T.cyan, NG: T.amber, KE: T.teal };
@@ -1984,7 +3718,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
   const handleAdd = async () => {
     if (!form.company) return;
     setSaving(true);
-    await supabase.from("opportunities").insert({ ...form });
+    await supabase.from("leads").insert({ ...form });
     // form already includes contact_name, contact_email, contact_phone
     setSaving(false);
     setModal(false);
@@ -1994,7 +3728,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
 
   const handleUpdate = async () => {
     setSaving(true);
-    await supabase.from("opportunities").update({
+    await supabase.from("leads").update({
       company: editModal.company, sector: editModal.sector,
       presence: editModal.presence, event_fit: editModal.event_fit,
       notes: editModal.notes, status: editModal.status,
@@ -2010,38 +3744,33 @@ const OpportunitiesView = ({ user, onNavigate }) => {
 
   const handleDelete = async (id) => {
     if (!window.confirm("Remove this opportunity?")) return;
-    await supabase.from("opportunities").delete().eq("id", id);
+    await supabase.from("leads").delete().eq("id", id);
     load();
   };
 
   const handleConvert = async (opp) => {
-    if (!window.confirm(`Convert ${opp.company} to a Lead? It will appear in the Leads Pipeline.`)) return;
+    if (!window.confirm('Convert ' + opp.company + ' to a Lead?')) return;
     setSaving(true);
-    const { data: opportunity, error } = await supabase.from("opportunities").insert({
+    const res = await supabase.from('leads').insert({
       company: opp.company,
-      contact_name: opp.contact_name || "",
-      email: opp.contact_email || "",
-      phone: opp.contact_phone || "",
-      status: "new",
+      contact_name: opp.contact_name || '',
+      email: opp.contact_email || opp.email || '',
+      phone: opp.contact_phone || opp.phone || '',
+      status: 'new',
       value: 0,
-      notes: `Converted from Leads Portal.\n\nEvent Fit: ${opp.event_fit || ""}\n\nOpportunity Notes: ${opp.notes || ""}`,
-      source: "Leads Portal",
-      created_by: user?.id,
-      assigned_to: user?.id,
-      assigned_name: user?.name || "",
+      notes: 'Converted from Opportunities.',
+      source: 'Opportunities',
+      created_by: user && user.id,
+      assigned_to: user && user.id,
+      assigned_name: (user && user.name) || '',
     }).select().single();
-    console.log("Opportunity insert result:", opportunity, error);
-    if (!error && opportunity) {
-      await supabase.from("opportunities").update({
-        status: "Converted",
-        converted_opportunity_id: opportunity.id,
-        updated_at: new Date().toISOString(),
-      }).eq("id", opp.id);
+    if (!res.error && res.data) {
+      await supabase.from('opportunities').update({ status: 'Converted' }).eq('id', opp.id);
       setSaving(false);
       load();
-      // Navigate to CRM tab
-      if (onNavigate) onNavigate("crm");
+      if (onNavigate) onNavigate('crm');
     } else {
+      alert('Failed: ' + (res.error && res.error.message));
       setSaving(false);
     }
   };
@@ -2057,10 +3786,10 @@ const OpportunitiesView = ({ user, onNavigate }) => {
     </div>
   );
 
-  const converted = opportunities.filter(o => o.status === "Converted").length;
-  const qualified = opportunities.filter(o => o.status === "Qualified").length;
-  const contacted = opportunities.filter(o => o.status === "Contacted").length;
-  const panAfrica = opportunities.filter(o => o.presence === "GH+NG+KE").length;
+  const converted = leads.filter(o => o.status === "Converted").length;
+  const qualified = leads.filter(o => o.status === "Qualified").length;
+  const contacted = leads.filter(o => o.status === "Contacted").length;
+  const panAfrica = leads.filter(o => o.presence === "GH+NG+KE").length;
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
@@ -2069,7 +3798,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
         <div>
           <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>CRM</div>
           <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Opportunities</h2>
-          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{opportunities.length} target companies · {converted} converted to leads</div>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{leads.length} target companies · {converted} converted to leads</div>
         </div>
         {canManage && (
           <button onClick={() => setModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, letterSpacing: "0.06em" }}>+ Add Opportunity</button>
@@ -2079,7 +3808,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
       {/* KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginBottom: 24 }}>
         {[
-          { label: "Total", value: opportunities.length, color: T.blue },
+          { label: "Total", value: leads.length, color: T.blue },
           { label: "Contacted", value: contacted, color: T.amber },
           { label: "Qualified", value: qualified, color: T.teal },
           { label: "Converted", value: converted, color: "#10B981" },
@@ -2223,7 +3952,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
             </tbody>
           </table>
           {filtered.length === 0 && (
-            <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted, fontSize: 13 }}>No opportunities match your filters.</div>
+            <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted, fontSize: 13 }}>No leads match your filters.</div>
           )}
         </div>
       </div>
@@ -5739,763 +7468,6 @@ const NotificationsView = ({ user, onNavigate }) => {
     </div>
   );
 };
-
-const ZohoBooksView = ({ user }) => {
-  const [connected, setConnected] = useState(false);
-  const [checking, setChecking] = useState(true);
-  const [tab, setTab] = useState("invoices");
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [syncMsg, setSyncMsg] = useState("");
-  const [clients, setClients] = useState([]);
-  const [vendors, setVendors] = useState([]);
-
-  const tabs = [
-    { id: "invoices", label: "Invoices" },
-    { id: "estimates", label: "Quotes / Estimates" },
-    { id: "payments", label: "Payments Received" },
-    { id: "expenses", label: "Expenses" },
-    { id: "bills", label: "Bills" },
-    { id: "purchaseorders", label: "Purchase Orders" },
-    { id: "contacts", label: "Contacts" },
-    { id: "sync", label: "⟳ Sync" },
-  ];
-
-  const checkConnection = async () => {
-    setChecking(true);
-    try {
-      const res = await fetch("/api/zoho-sync?action=status");
-      const json = await res.json();
-      setConnected(!!json.connected);
-    } catch {
-      setConnected(false);
-    }
-    setChecking(false);
-  };
-
-  const fetchTab = async (t) => {
-    setLoading(true);
-    setData([]);
-    try {
-      const res = await fetch(`/api/zoho-sync?action=${t}`);
-      const json = await res.json();
-      const key = Object.keys(json).find(k => Array.isArray(json[k]));
-      setData(key ? json[key] : []);
-    } catch {
-      setData([]);
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    checkConnection();
-    // Check if just connected via OAuth callback
-    if (window.location.search.includes("zoho=connected")) {
-      setSyncMsg("✅ Zoho Books connected successfully!");
-      window.history.replaceState({}, "", window.location.pathname);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (connected && tab !== "sync") fetchTab(tab);
-  }, [connected, tab]);
-
-  const loadLocalData = async () => {
-    const [{ data: cl }, { data: vn }] = await Promise.all([
-      supabase.from("clients").select("*").order("name"),
-      supabase.from("profiles").select("*").eq("role", "Vendor"),
-    ]);
-    setClients(cl || []);
-    setVendors(vn || []);
-  };
-
-  useEffect(() => { loadLocalData(); }, []);
-
-  const syncClient = async (client) => {
-    setSyncing(true);
-    setSyncMsg("");
-    try {
-      const res = await fetch("/api/zoho-sync?action=sync-client", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client }),
-      });
-      const json = await res.json();
-      if (json.contact) setSyncMsg(`✅ ${client.name} synced to Zoho Books`);
-      else setSyncMsg(`⚠ ${json.message || "Sync failed"}`);
-    } catch (e) {
-      setSyncMsg("❌ Error: " + e.message);
-    }
-    setSyncing(false);
-  };
-
-  const syncVendor = async (vendor) => {
-    setSyncing(true);
-    setSyncMsg("");
-    try {
-      const res = await fetch("/api/zoho-sync?action=sync-vendor", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vendor }),
-      });
-      const json = await res.json();
-      if (json.contact) setSyncMsg(`✅ ${vendor.name} synced to Zoho Books`);
-      else setSyncMsg(`⚠ ${json.message || "Sync failed"}`);
-    } catch (e) {
-      setSyncMsg("❌ Error: " + e.message);
-    }
-    setSyncing(false);
-  };
-
-  // Column definitions per tab
-  const columns = {
-    invoices: ["Invoice #", "Customer", "Date", "Due Date", "Amount", "Status"],
-    estimates: ["Estimate #", "Customer", "Date", "Expiry", "Amount", "Status"],
-    payments: ["Payment #", "Customer", "Date", "Amount", "Mode"],
-    expenses: ["Date", "Category", "Description", "Amount", "Status"],
-    bills: ["Bill #", "Vendor", "Date", "Due Date", "Amount", "Status"],
-    purchaseorders: ["PO #", "Vendor", "Date", "Expected", "Amount", "Status"],
-    contacts: ["Name", "Type", "Email", "Phone", "Balance"],
-  };
-
-  const getRow = (item, t) => {
-    if (t === "invoices") return [item.invoice_number, item.customer_name, item.date, item.due_date, `${item.currency_code} ${(item.total || 0).toLocaleString()}`, item.status];
-    if (t === "estimates") return [item.estimate_number, item.customer_name, item.date, item.expiry_date, `${item.currency_code} ${(item.total || 0).toLocaleString()}`, item.status];
-    if (t === "payments") return [item.payment_number, item.customer_name, item.date, `${item.currency_code} ${(item.amount || 0).toLocaleString()}`, item.payment_mode];
-    if (t === "expenses") return [item.date, item.account_name, item.description || item.reference_number, `${item.currency_code} ${(item.total || 0).toLocaleString()}`, item.status];
-    if (t === "bills") return [item.bill_number, item.vendor_name, item.date, item.due_date, `${item.currency_code} ${(item.total || 0).toLocaleString()}`, item.status];
-    if (t === "purchaseorders") return [item.purchaseorder_number, item.vendor_name, item.date, item.delivery_date, `${item.currency_code} ${(item.total || 0).toLocaleString()}`, item.status];
-    if (t === "contacts") return [item.contact_name, item.contact_type, item.email, item.phone, `${item.currency_code || ""} ${(item.outstanding_receivable_amount || 0).toLocaleString()}`];
-    return [];
-  };
-
-  const statusColor = (s) => {
-    if (!s) return T.textMuted;
-    const sl = s.toLowerCase();
-    if (["paid","accepted","received","open"].includes(sl)) return T.teal;
-    if (["overdue","expired"].includes(sl)) return T.red;
-    if (["draft","pending","sent"].includes(sl)) return T.amber;
-    return T.textMuted;
-  };
-
-  return (
-    <div style={{ animation: "fadeUp 0.35s ease" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-        <div>
-          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
-          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Zoho Books</h2>
-          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Live sync with your Zoho Books Professional account</div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {checking ? (
-            <span style={{ color: T.textMuted, fontSize: 12 }}>Checking connection...</span>
-          ) : connected ? (
-            <span style={{ background: T.teal + "18", color: T.teal, border: `1px solid ${T.teal}30`, borderRadius: 20, padding: "4px 14px", fontSize: 11, fontWeight: 700 }}>● Connected</span>
-          ) : (
-            <a href="/api/zoho-auth" style={{ background: `linear-gradient(135deg, #E67E22, #F39C12)`, border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, textDecoration: "none" }}>Connect Zoho Books</a>
-          )}
-          {connected && <button onClick={() => { if (tab !== "sync") fetchTab(tab); }} style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.textMuted, padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>↻ Refresh</button>}
-          {connected && <a href="https://books.zoho.com" target="_blank" rel="noopener noreferrer" style={{ background: `linear-gradient(135deg, #E67E22, #F39C12)`, color: "#fff", padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>Open Zoho Books ↗</a>}
-        </div>
-      </div>
-
-      {!connected && !checking && (
-        <div style={{ textAlign: "center", padding: "60px 0", background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>📚</div>
-          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 18, marginBottom: 8 }}>Connect Zoho Books</div>
-          <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 24 }}>Click "Connect Zoho Books" above to authorise access to your account.</div>
-          <a href="/api/zoho-auth" style={{ background: `linear-gradient(135deg, #E67E22, #F39C12)`, color: "#fff", padding: "12px 28px", borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: "none" }}>Connect Now</a>
-        </div>
-      )}
-
-      {connected && (
-        <>
-          {/* Tabs */}
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
-            {tabs.map(t => (
-              <button key={t.id} onClick={() => setTab(t.id)} style={{
-                padding: "6px 16px", borderRadius: 20, cursor: "pointer", fontSize: 11, fontWeight: 700,
-                border: `1px solid ${tab === t.id ? "#E67E22" : T.border}`,
-                background: tab === t.id ? "#E67E2220" : "none",
-                color: tab === t.id ? "#E67E22" : T.textMuted,
-                letterSpacing: "0.04em", textTransform: "uppercase", transition: "all 0.15s",
-              }}>{t.label}</button>
-            ))}
-          </div>
-
-          {/* Sync tab */}
-          {tab === "sync" && (
-            <div>
-              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 16, marginBottom: 16 }}>Sync WorkRoom Data to Zoho Books</div>
-              {syncMsg && <div style={{ padding: "10px 14px", background: T.teal + "12", border: `1px solid ${T.teal}30`, borderRadius: 8, color: T.teal, fontSize: 13, marginBottom: 16 }}>{syncMsg}</div>}
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-                {/* Clients */}
-                <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 20 }}>
-                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Clients → Zoho Customers</div>
-                  <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 14 }}>Push WorkRoom clients to Zoho Books as customer contacts</div>
-                  {clients.map(c => (
-                    <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: `1px solid ${T.border}44` }}>
-                      <div>
-                        <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{c.name}</div>
-                        <div style={{ color: T.textMuted, fontSize: 11 }}>{c.email}</div>
-                      </div>
-                      <button onClick={() => syncClient(c)} disabled={syncing} style={{ background: "#E67E2218", border: "1px solid #E67E2230", color: "#E67E22", padding: "4px 12px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
-                        {c.zoho_contact_id ? "Re-sync" : "→ Zoho"}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Vendors */}
-                <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 20 }}>
-                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Vendors → Zoho Vendors</div>
-                  <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 14 }}>Push WorkRoom vendors to Zoho Books as vendor contacts</div>
-                  {vendors.map(v => (
-                    <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: `1px solid ${T.border}44` }}>
-                      <div>
-                        <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{v.name}</div>
-                        <div style={{ color: T.textMuted, fontSize: 11 }}>{v.email}</div>
-                      </div>
-                      <button onClick={() => syncVendor(v)} disabled={syncing} style={{ background: "#E67E2218", border: "1px solid #E67E2230", color: "#E67E22", padding: "4px 12px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>→ Zoho</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Data table */}
-          {tab !== "sync" && (
-            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-              {loading ? (
-                <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted }}>Loading from Zoho Books...</div>
-              ) : data.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted, fontSize: 13 }}>No {tab} found in Zoho Books. <a href="https://books.zoho.com" target="_blank" rel="noopener noreferrer" style={{ color: "#E67E22", fontWeight: 700 }}>Create one in Zoho Books ↗</a></div>
-              ) : (
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
-                    <thead>
-                      <tr style={{ borderBottom: `1px solid ${T.border}`, background: T.bg }}>
-                        {(columns[tab] || []).map((h, i) => (
-                          <th key={i} style={{ padding: "12px 16px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.map((item, idx) => {
-                        const row = getRow(item, tab);
-                        return (
-                          <tr key={idx} style={{ borderBottom: idx < data.length - 1 ? `1px solid ${T.border}44` : "none" }}
-                            onMouseEnter={e => e.currentTarget.style.background = T.bg}
-                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                            {row.map((cell, ci) => (
-                              <td key={ci} style={{ padding: "11px 16px", fontSize: 12 }}>
-                                {ci === row.length - 1 && tab !== "contacts" && tab !== "payments" ? (
-                                  <span style={{ background: statusColor(cell) + "18", color: statusColor(cell), border: `1px solid ${statusColor(cell)}30`, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{cell}</span>
-                                ) : (
-                                  <span style={{ color: ci === 0 ? T.textPrimary : T.textSecondary, fontWeight: ci === 0 ? 700 : 400 }}>{cell}</span>
-                                )}
-                              </td>
-                            ))}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-};
-
-
-const HRView = ({ user }) => {
-  const [hrTab, setHrTab] = useState("staff");
-  const [staff, setStaff] = useState([]);
-  const [leaveRequests, setLeaveRequests] = useState([]);
-  const [reviews, setReviews] = useState([]);
-  const [training, setTraining] = useState([]);
-  const [trainingNeeds, setTrainingNeeds] = useState([]);
-  const [saving, setSaving] = useState(false);
-
-  // Modals
-  const [leaveModal, setLeaveModal] = useState(false);
-  const [reviewModal, setReviewModal] = useState(null);
-  const [trainingModal, setTrainingModal] = useState(null);
-  const [needModal, setNeedModal] = useState(false);
-
-  // Forms
-  const [leaveForm, setLeaveForm] = useState({ staff_id: "", staff_name: "", leave_type: "Annual", start_date: "", end_date: "", reason: "" });
-  const [reviewForm, setReviewForm] = useState({ staff_id: "", staff_name: "", review_period: "", score: 7, strengths: "", improvements: "", goals: "", events_delivered: 0 });
-  const [trainingForm, setTrainingForm] = useState({ staff_id: "", staff_name: "", training_name: "", training_type: "Internal", provider: "", date_completed: "", expiry_date: "", notes: "" });
-  const [needForm, setNeedForm] = useState({ staff_id: "", staff_name: "", training_required: "", priority: "medium", reason: "" });
-
-  const load = async () => {
-    const [s, l, r, t, n] = await Promise.all([
-      supabase.from("profiles").select("*").not("role", "in", '("Client","Vendor","Board of Directors")').order("name"),
-      supabase.from("leave_requests").select("*").order("created_at", { ascending: false }),
-      supabase.from("performance_reviews").select("*").order("created_at", { ascending: false }),
-      supabase.from("training_records").select("*").order("created_at", { ascending: false }),
-      supabase.from("training_needs").select("*").order("created_at", { ascending: false }),
-    ]);
-    setStaff(s.data || []);
-    setLeaveRequests(l.data || []);
-    setReviews(r.data || []);
-    setTraining(t.data || []);
-    setTrainingNeeds(n.data || []);
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const calcDays = (start, end) => {
-    if (!start || !end) return 0;
-    return Math.ceil((new Date(end) - new Date(start)) / (1000*60*60*24)) + 1;
-  };
-
-  const saveLeave = async () => {
-    if (!leaveForm.staff_id || !leaveForm.start_date || !leaveForm.end_date) { alert("Please fill all required fields."); return; }
-    setSaving(true);
-    const days = calcDays(leaveForm.start_date, leaveForm.end_date);
-    await supabase.from("leave_requests").insert({ ...leaveForm, days_requested: days, status: "pending" });
-    // Notify staff member
-    await supabase.from("notifications").insert({ user_id: leaveForm.staff_id, title: "Leave Request Submitted", message: `Your ${leaveForm.leave_type} leave request for ${days} day(s) has been submitted for approval.`, type: "task" });
-    setSaving(false);
-    setLeaveModal(false);
-    setLeaveForm({ staff_id: "", staff_name: "", leave_type: "Annual", start_date: "", end_date: "", reason: "" });
-    load();
-  };
-
-  const approveLeave = async (id, staffId, approved) => {
-    await supabase.from("leave_requests").update({ status: approved ? "approved" : "declined", approved_by: user.id, approved_at: new Date().toISOString() }).eq("id", id);
-    await supabase.from("notifications").insert({ user_id: staffId, title: approved ? "Leave Approved" : "Leave Declined", message: `Your leave request has been ${approved ? "approved" : "declined"} by CEO.`, type: "task" });
-    load();
-  };
-
-  const saveReview = async () => {
-    if (!reviewForm.staff_id || !reviewForm.review_period) { alert("Please fill all required fields."); return; }
-    setSaving(true);
-    await supabase.from("performance_reviews").insert({ ...reviewForm, reviewed_by: user.id, review_date: new Date().toISOString().slice(0,10) });
-    await supabase.from("notifications").insert({ user_id: reviewForm.staff_id, title: "Performance Review Added", message: `Your performance review for ${reviewForm.review_period} has been completed.`, type: "task" });
-    setSaving(false);
-    setReviewModal(null);
-    setReviewForm({ staff_id: "", staff_name: "", review_period: "", score: 7, strengths: "", improvements: "", goals: "", events_delivered: 0 });
-    load();
-  };
-
-  const saveTraining = async () => {
-    if (!trainingForm.staff_id || !trainingForm.training_name) { alert("Please fill all required fields."); return; }
-    setSaving(true);
-    await supabase.from("training_records").insert({ ...trainingForm, status: trainingForm.date_completed ? "completed" : "pending", created_by: user.id });
-    setSaving(false);
-    setTrainingModal(null);
-    setTrainingForm({ staff_id: "", staff_name: "", training_name: "", training_type: "Internal", provider: "", date_completed: "", expiry_date: "", notes: "" });
-    load();
-  };
-
-  const saveNeed = async () => {
-    if (!needForm.staff_id || !needForm.training_required) { alert("Please fill all required fields."); return; }
-    setSaving(true);
-    await supabase.from("training_needs").insert({ ...needForm, status: "open", created_by: user.id });
-    setSaving(false);
-    setNeedModal(false);
-    setNeedForm({ staff_id: "", staff_name: "", training_required: "", priority: "medium", reason: "" });
-    load();
-  };
-
-  const inputStyle = { width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
-  const labelStyle = { color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 };
-  const sectionHead = { color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 16 };
-
-  const pendingLeave = leaveRequests.filter(l => l.status === "pending");
-  const expiringCerts = training.filter(t => t.expiry_date && new Date(t.expiry_date) <= new Date(Date.now() + 30*24*60*60*1000) && t.status === "completed");
-  const openNeeds = trainingNeeds.filter(n => n.status === "open");
-
-  const staffSelect = [{ value: "", label: "Select staff member..." }, ...staff.map(s => ({ value: s.id, label: `${s.name} — ${s.role}` }))];
-
-  const StatusPill = ({ status }) => {
-    const map = { pending: [T.amber, "Pending"], approved: ["#10B981", "Approved"], declined: [T.red, "Declined"], completed: ["#10B981", "Completed"], open: [T.amber, "Open"], in_progress: [T.cyan, "In Progress"] };
-    const [color, label] = map[status] || [T.textMuted, status];
-    return <span style={{ background: color+"18", color, border: `1px solid ${color}30`, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 800 }}>{label}</span>;
-  };
-
-  const PriorityPill = ({ priority }) => {
-    const map = { high: [T.red, "High"], medium: [T.amber, "Medium"], low: [T.teal, "Low"] };
-    const [color, label] = map[priority] || [T.textMuted, priority];
-    return <span style={{ background: color+"18", color, border: `1px solid ${color}30`, borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>{label}</span>;
-  };
-
-  const Modal = ({ title, onClose, children, maxWidth = 580 }) => (
-    <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
-      <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth, maxHeight: "90vh", overflow: "auto", padding: 28 }} onClick={e => e.stopPropagation()}>
-        <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 20 }}>{title}</div>
-        {children}
-      </div>
-    </div>
-  );
-
-  const Field = ({ label, children }) => (
-    <div style={{ marginBottom: 14 }}><label style={labelStyle}>{label}</label>{children}</div>
-  );
-
-  const StaffSelect = ({ value, onChange }) => (
-    <select value={value} onChange={e => { const s = staff.find(x => x.id === e.target.value); onChange(e.target.value, s?.name || ""); }} style={inputStyle}>
-      {staffSelect.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
-  );
-
-  const hrTabs = [
-    { id: "staff", label: "Staff Records", badge: 0 },
-    { id: "leave", label: "Leave", badge: pendingLeave.length },
-    { id: "performance", label: "Performance", badge: 0 },
-    { id: "training", label: "Training", badge: expiringCerts.length + openNeeds.length },
-  ];
-
-  return (
-    <div style={{ animation: "fadeUp 0.35s ease" }}>
-      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>People</div>
-        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800 }}>Human Resources</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{staff.length} staff members · {pendingLeave.length} leave pending · {openNeeds.length} training needs open</div>
-      </div>
-
-      {/* KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
-        {[
-          { label: "Total Staff", value: staff.length, color: T.cyan },
-          { label: "Leave Pending", value: pendingLeave.length, color: T.amber },
-          { label: "Training Needs", value: openNeeds.length, color: T.red },
-          { label: "Expiring Certs", value: expiringCerts.length, color: expiringCerts.length > 0 ? T.red : T.teal },
-        ].map((k,i) => (
-          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
-            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
-            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginTop: 4 }}>{k.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* HR Tabs */}
-      <div style={{ display: "flex", gap: 0, marginBottom: 24, borderBottom: `1px solid ${T.border}` }}>
-        {hrTabs.map(t => (
-          <button key={t.id} onClick={() => setHrTab(t.id)} style={{ padding: "10px 18px", border: "none", cursor: "pointer", background: "none", color: hrTab === t.id ? T.textPrimary : T.textMuted, fontWeight: hrTab === t.id ? 700 : 400, fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: hrTab === t.id ? `2px solid ${T.cyan}` : "2px solid transparent", marginBottom: -1, position: "relative" }}>
-            {t.label}
-            {t.badge > 0 && <span style={{ marginLeft: 5, background: T.amber, color: "#000", fontSize: 9, fontWeight: 900, borderRadius: 20, padding: "1px 5px" }}>{t.badge}</span>}
-          </button>
-        ))}
-      </div>
-
-      {/* ── STAFF RECORDS ── */}
-      {hrTab === "staff" && (
-        <div>
-          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
-                  {["Name","Role","Email","Country","Leave Taken","Reviews","Training"].map(h => (
-                    <th key={h} style={{ padding: "10px 14px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {staff.map((s, i) => {
-                  const staffLeave = leaveRequests.filter(l => l.staff_id === s.id && l.status === "approved").reduce((sum, l) => sum + (l.days_requested || 0), 0);
-                  const staffReviews = reviews.filter(r => r.staff_id === s.id).length;
-                  const staffTraining = training.filter(t => t.staff_id === s.id && t.status === "completed").length;
-                  const latestReview = reviews.filter(r => r.staff_id === s.id).sort((a,b) => new Date(b.created_at) - new Date(a.created_at))[0];
-                  const roleColor = { CEO: T.cyan, "Country Manager": T.teal, "Vendor Manager": T.amber, "Strategy & Events Lead": "#E879F9", "Finance Manager": "#F59E0B", "Sales & Marketing": T.blue }[s.role] || T.textMuted;
-                  return (
-                    <tr key={s.id} style={{ borderBottom: i < staff.length-1 ? `1px solid ${T.border}44` : "none" }}
-                      onMouseEnter={e => e.currentTarget.style.background = T.bg}
-                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                      <td style={{ padding: "10px 14px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ width: 28, height: 28, borderRadius: "50%", background: roleColor+"20", border: `1px solid ${roleColor}40`, display: "flex", alignItems: "center", justifyContent: "center", color: roleColor, fontWeight: 800, fontSize: 10 }}>{(s.name||"?").slice(0,2).toUpperCase()}</div>
-                          <span style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{s.name}</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: "10px 14px" }}><span style={{ background: roleColor+"15", color: roleColor, borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>{s.role}</span></td>
-                      <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 11 }}>{s.email}</td>
-                      <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 12 }}>{s.country || "Ghana"}</td>
-                      <td style={{ padding: "10px 14px", color: T.textPrimary, fontSize: 12, fontWeight: 600 }}>{staffLeave} days</td>
-                      <td style={{ padding: "10px 14px" }}>
-                        <div style={{ color: staffReviews > 0 ? T.teal : T.textMuted, fontSize: 12 }}>
-                          {staffReviews > 0 ? `${staffReviews} reviews` : "—"}
-                          {latestReview && <div style={{ color: T.textMuted, fontSize: 10 }}>Last: {latestReview.score}/10</div>}
-                        </div>
-                      </td>
-                      <td style={{ padding: "10px 14px", color: staffTraining > 0 ? T.cyan : T.textMuted, fontSize: 12 }}>{staffTraining > 0 ? `${staffTraining} completed` : "—"}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ── LEAVE MANAGEMENT ── */}
-      {hrTab === "leave" && (
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <div style={sectionHead}>Leave Requests</div>
-            <button onClick={() => setLeaveModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "9px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>+ Add Leave Request</button>
-          </div>
-          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
-                  {["Staff","Type","From","To","Days","Reason","Status","Actions"].map(h => (
-                    <th key={h} style={{ padding: "10px 14px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {leaveRequests.map((l, i) => (
-                  <tr key={l.id} style={{ borderBottom: i < leaveRequests.length-1 ? `1px solid ${T.border}44` : "none" }}
-                    onMouseEnter={e => e.currentTarget.style.background = T.bg}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                    <td style={{ padding: "10px 14px", color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{l.staff_name}</td>
-                    <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 12 }}>{l.leave_type}</td>
-                    <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 12 }}>{l.start_date}</td>
-                    <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 12 }}>{l.end_date}</td>
-                    <td style={{ padding: "10px 14px", color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{l.days_requested}</td>
-                    <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 11, maxWidth: 160 }}>{l.reason}</td>
-                    <td style={{ padding: "10px 14px" }}><StatusPill status={l.status} /></td>
-                    <td style={{ padding: "10px 14px" }}>
-                      {l.status === "pending" && (
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button onClick={() => approveLeave(l.id, l.staff_id, true)} style={{ background: "#10B98118", border: "1px solid #10B98130", color: "#10B981", padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>✓ Approve</button>
-                          <button onClick={() => approveLeave(l.id, l.staff_id, false)} style={{ background: T.red+"18", border: `1px solid ${T.red}30`, color: T.red, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>✗ Decline</button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {leaveRequests.length === 0 && <tr><td colSpan={8} style={{ padding: "30px 0", textAlign: "center", color: T.textMuted }}>No leave requests yet</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ── PERFORMANCE REVIEWS ── */}
-      {hrTab === "performance" && (
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <div style={sectionHead}>Performance Reviews</div>
-            <button onClick={() => setReviewModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "9px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>+ Add Review</button>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14 }}>
-            {staff.map(s => {
-              const staffReviews = reviews.filter(r => r.staff_id === s.id).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
-              const latest = staffReviews[0];
-              const avgScore = staffReviews.length > 0 ? (staffReviews.reduce((sum,r) => sum + (r.score||0), 0) / staffReviews.length).toFixed(1) : null;
-              const scoreColor = avgScore >= 8 ? "#10B981" : avgScore >= 6 ? T.teal : avgScore >= 4 ? T.amber : T.red;
-              return (
-                <div key={s.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 18px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-                    <div>
-                      <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{s.name}</div>
-                      <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{s.role}</div>
-                    </div>
-                    {avgScore && <div style={{ textAlign: "right" }}><div style={{ color: scoreColor, fontWeight: 900, fontSize: 22 }}>{avgScore}</div><div style={{ color: T.textMuted, fontSize: 9 }}>avg /10</div></div>}
-                  </div>
-                  {latest ? (
-                    <div>
-                      <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 4 }}>Latest: {latest.review_period} · Score: {latest.score}/10</div>
-                      {latest.strengths && <div style={{ color: T.textSecondary, fontSize: 11, marginBottom: 2 }}>✓ {latest.strengths?.slice(0,60)}...</div>}
-                      {latest.improvements && <div style={{ color: T.amber, fontSize: 11 }}>↑ {latest.improvements?.slice(0,60)}...</div>}
-                      <div style={{ color: T.textMuted, fontSize: 10, marginTop: 6 }}>{staffReviews.length} review{staffReviews.length !== 1 ? "s" : ""} total</div>
-                    </div>
-                  ) : (
-                    <div style={{ color: T.textMuted, fontSize: 12, fontStyle: "italic" }}>No reviews yet</div>
-                  )}
-                  <button onClick={() => setReviewModal({ staff_id: s.id, staff_name: s.name })} style={{ marginTop: 12, width: "100%", background: T.cyan+"12", border: `1px solid ${T.cyan}25`, color: T.cyan, padding: "6px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>+ Add Review</button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ── TRAINING ── */}
-      {hrTab === "training" && (
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <div style={sectionHead}>Training & Development</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => setNeedModal(true)} style={{ background: T.amber+"15", border: `1px solid ${T.amber}30`, color: T.amber, padding: "9px 16px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 12 }}>+ Training Need</button>
-              <button onClick={() => setTrainingModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "9px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>+ Log Training</button>
-            </div>
-          </div>
-
-          {/* Training Needs */}
-          {trainingNeeds.length > 0 && (
-            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 20 }}>
-              <div style={{ padding: "12px 16px", borderBottom: `1px solid ${T.border}`, color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>Training Needs — {openNeeds.length} open</div>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead><tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
-                  {["Staff","Training Required","Priority","Reason","Status"].map(h => <th key={h} style={{ padding: "8px 14px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>)}
-                </tr></thead>
-                <tbody>
-                  {trainingNeeds.map((n, i) => (
-                    <tr key={n.id} style={{ borderBottom: i < trainingNeeds.length-1 ? `1px solid ${T.border}44` : "none" }}
-                      onMouseEnter={e => e.currentTarget.style.background = T.bg}
-                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                      <td style={{ padding: "10px 14px", color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{n.staff_name}</td>
-                      <td style={{ padding: "10px 14px", color: T.textSecondary, fontSize: 12 }}>{n.training_required}</td>
-                      <td style={{ padding: "10px 14px" }}><PriorityPill priority={n.priority} /></td>
-                      <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 11 }}>{n.reason}</td>
-                      <td style={{ padding: "10px 14px" }}>
-                        <select value={n.status} onChange={async e => { await supabase.from("training_needs").update({ status: e.target.value }).eq("id", n.id); load(); }} style={{ padding: "4px 8px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 11, fontFamily: "inherit", outline: "none" }}>
-                          <option value="open">Open</option>
-                          <option value="in_progress">In Progress</option>
-                          <option value="completed">Completed</option>
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Training Records */}
-          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-            <div style={{ padding: "12px 16px", borderBottom: `1px solid ${T.border}`, color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>Training Records</div>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
-                {["Staff","Training","Type","Provider","Date","Expiry","Status"].map(h => <th key={h} style={{ padding: "8px 14px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>)}
-              </tr></thead>
-              <tbody>
-                {training.map((t, i) => {
-                  const isExpiring = t.expiry_date && new Date(t.expiry_date) <= new Date(Date.now() + 30*24*60*60*1000);
-                  return (
-                    <tr key={t.id} style={{ borderBottom: i < training.length-1 ? `1px solid ${T.border}44` : "none", background: isExpiring ? T.red+"05" : "transparent" }}
-                      onMouseEnter={e => e.currentTarget.style.background = T.bg}
-                      onMouseLeave={e => e.currentTarget.style.background = isExpiring ? T.red+"05" : "transparent"}>
-                      <td style={{ padding: "10px 14px", color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{t.staff_name}</td>
-                      <td style={{ padding: "10px 14px", color: T.textSecondary, fontSize: 12 }}>{t.training_name}</td>
-                      <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 11 }}>{t.training_type}</td>
-                      <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 11 }}>{t.provider || "—"}</td>
-                      <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 11 }}>{t.date_completed || "—"}</td>
-                      <td style={{ padding: "10px 14px", color: isExpiring ? T.red : T.textMuted, fontSize: 11, fontWeight: isExpiring ? 700 : 400 }}>{t.expiry_date || "—"}{isExpiring && " ⚠"}</td>
-                      <td style={{ padding: "10px 14px" }}><StatusPill status={t.status} /></td>
-                    </tr>
-                  );
-                })}
-                {training.length === 0 && <tr><td colSpan={7} style={{ padding: "30px 0", textAlign: "center", color: T.textMuted }}>No training records yet</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ════ MODALS ════ */}
-
-      {/* Leave Request Modal */}
-      {leaveModal && (
-        <Modal title="Add Leave Request" onClose={() => setLeaveModal(false)}>
-          <Field label="Staff Member *"><StaffSelect value={leaveForm.staff_id} onChange={(id, name) => setLeaveForm({...leaveForm, staff_id: id, staff_name: name})} /></Field>
-          <Field label="Leave Type">
-            <select value={leaveForm.leave_type} onChange={e => setLeaveForm({...leaveForm, leave_type: e.target.value})} style={inputStyle}>
-              {["Annual","Sick","Emergency","Maternity/Paternity","Study","Other"].map(t => <option key={t}>{t}</option>)}
-            </select>
-          </Field>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="Start Date *"><input type="date" value={leaveForm.start_date} onChange={e => setLeaveForm({...leaveForm, start_date: e.target.value})} style={inputStyle} /></Field>
-            <Field label="End Date *"><input type="date" value={leaveForm.end_date} onChange={e => setLeaveForm({...leaveForm, end_date: e.target.value})} style={inputStyle} /></Field>
-          </div>
-          {leaveForm.start_date && leaveForm.end_date && <div style={{ color: T.cyan, fontSize: 12, marginBottom: 14, fontWeight: 700 }}>📅 {calcDays(leaveForm.start_date, leaveForm.end_date)} days requested</div>}
-          <Field label="Reason"><textarea value={leaveForm.reason} onChange={e => setLeaveForm({...leaveForm, reason: e.target.value})} rows={3} style={{...inputStyle, resize: "vertical"}} placeholder="Reason for leave..." /></Field>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={saveLeave} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Submit Leave Request"}</button>
-            <button onClick={() => setLeaveModal(false)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
-          </div>
-        </Modal>
-      )}
-
-      {/* Performance Review Modal */}
-      {reviewModal && (
-        <Modal title="Add Performance Review" onClose={() => setReviewModal(null)}>
-          {!reviewModal.staff_id ? (
-            <Field label="Staff Member *"><StaffSelect value={reviewForm.staff_id} onChange={(id, name) => setReviewForm({...reviewForm, staff_id: id, staff_name: name})} /></Field>
-          ) : (
-            <div style={{ background: T.cyan+"12", border: `1px solid ${T.cyan}30`, borderRadius: 8, padding: "10px 14px", marginBottom: 16, color: T.cyan, fontSize: 13, fontWeight: 700 }}>{reviewModal.staff_name}</div>
-          )}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="Review Period *"><input value={reviewForm.review_period} onChange={e => setReviewForm({...reviewForm, review_period: e.target.value})} style={inputStyle} placeholder="e.g. Q1 2026" /></Field>
-            <Field label="Events Delivered"><input type="number" value={reviewForm.events_delivered} onChange={e => setReviewForm({...reviewForm, events_delivered: parseInt(e.target.value)||0})} style={inputStyle} /></Field>
-          </div>
-          <Field label={`Performance Score: ${reviewForm.score}/10`}>
-            <input type="range" min="1" max="10" step="0.5" value={reviewForm.score} onChange={e => setReviewForm({...reviewForm, score: parseFloat(e.target.value)})}
-              style={{ width: "100%", accentColor: T.cyan }} />
-            <div style={{ display: "flex", justifyContent: "space-between", color: T.textMuted, fontSize: 10, marginTop: 2 }}><span>1 — Poor</span><span style={{ color: T.cyan, fontWeight: 700 }}>{reviewForm.score}/10</span><span>10 — Exceptional</span></div>
-          </Field>
-          <Field label="Strengths"><textarea value={reviewForm.strengths} onChange={e => setReviewForm({...reviewForm, strengths: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} placeholder="Key strengths observed..." /></Field>
-          <Field label="Areas for Improvement"><textarea value={reviewForm.improvements} onChange={e => setReviewForm({...reviewForm, improvements: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} placeholder="Areas to develop..." /></Field>
-          <Field label="Goals for Next Period"><textarea value={reviewForm.goals} onChange={e => setReviewForm({...reviewForm, goals: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} placeholder="Goals and objectives..." /></Field>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={() => { if(reviewModal.staff_id) setReviewForm(f => ({...f, staff_id: reviewModal.staff_id, staff_name: reviewModal.staff_name})); saveReview(); }} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Save Review"}</button>
-            <button onClick={() => setReviewModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
-          </div>
-        </Modal>
-      )}
-
-      {/* Training Log Modal */}
-      {trainingModal && (
-        <Modal title="Log Training" onClose={() => setTrainingModal(null)}>
-          <Field label="Staff Member *"><StaffSelect value={trainingForm.staff_id} onChange={(id, name) => setTrainingForm({...trainingForm, staff_id: id, staff_name: name})} /></Field>
-          <Field label="Training Name *"><input value={trainingForm.training_name} onChange={e => setTrainingForm({...trainingForm, training_name: e.target.value})} style={inputStyle} placeholder="e.g. Event Safety Certification" /></Field>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="Training Type">
-              <select value={trainingForm.training_type} onChange={e => setTrainingForm({...trainingForm, training_type: e.target.value})} style={inputStyle}>
-                {["Internal","External","Certification","Workshop","Online","Conference"].map(t => <option key={t}>{t}</option>)}
-              </select>
-            </Field>
-            <Field label="Provider / Institution"><input value={trainingForm.provider} onChange={e => setTrainingForm({...trainingForm, provider: e.target.value})} style={inputStyle} placeholder="Who delivered it?" /></Field>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="Date Completed"><input type="date" value={trainingForm.date_completed} onChange={e => setTrainingForm({...trainingForm, date_completed: e.target.value})} style={inputStyle} /></Field>
-            <Field label="Expiry Date (if applicable)"><input type="date" value={trainingForm.expiry_date} onChange={e => setTrainingForm({...trainingForm, expiry_date: e.target.value})} style={inputStyle} /></Field>
-          </div>
-          <Field label="Notes"><textarea value={trainingForm.notes} onChange={e => setTrainingForm({...trainingForm, notes: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} /></Field>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={saveTraining} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Save Training Record"}</button>
-            <button onClick={() => setTrainingModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
-          </div>
-        </Modal>
-      )}
-
-      {/* Training Need Modal */}
-      {needModal && (
-        <Modal title="Flag Training Need" onClose={() => setNeedModal(false)}>
-          <Field label="Staff Member *"><StaffSelect value={needForm.staff_id} onChange={(id, name) => setNeedForm({...needForm, staff_id: id, staff_name: name})} /></Field>
-          <Field label="Training Required *"><input value={needForm.training_required} onChange={e => setNeedForm({...needForm, training_required: e.target.value})} style={inputStyle} placeholder="e.g. Client Management, Protocol Training" /></Field>
-          <Field label="Priority">
-            <select value={needForm.priority} onChange={e => setNeedForm({...needForm, priority: e.target.value})} style={inputStyle}>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
-          </Field>
-          <Field label="Reason / Context"><textarea value={needForm.reason} onChange={e => setNeedForm({...needForm, reason: e.target.value})} rows={3} style={{...inputStyle, resize: "vertical"}} placeholder="Why is this training needed?" /></Field>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={saveNeed} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.amber}, ${T.amber}99)`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Flag Training Need"}</button>
-            <button onClick={() => setNeedModal(false)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
-          </div>
-        </Modal>
-      )}
-    </div>
-  );
-};
-
 
 export default function StretchfieldWorkRoom({ user: propUser, profile: propProfile, onLogout }) {
   const [activeTab, setActiveTab] = useState("dashboard");

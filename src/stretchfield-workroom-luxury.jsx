@@ -3674,9 +3674,9 @@ const OpportunitiesView = ({ user, onNavigate }) => {
       created_by_name: user.name,
     });
     // If scheduled — add to itineraries for calendar
-    if (actForm.scheduled_date && ["call","meeting","demo","follow-up"].includes(actForm.type)) {
+    if (af.scheduled_date && ["call","meeting","demo","follow-up"].includes(af.type)) {
       await supabase.from("itineraries").insert({
-        title: `${actForm.type.charAt(0).toUpperCase()+actForm.type.slice(1)} — ${company}`,
+        title: `${af.type.charAt(0).toUpperCase()+actForm.type.slice(1)} — ${company}`,
         week_start: actForm.scheduled_date,
         items: JSON.stringify([{
           date: actForm.scheduled_date,
@@ -3703,6 +3703,8 @@ const OpportunitiesView = ({ user, onNavigate }) => {
 
   useEffect(() => {
     let f = [...opportunities];
+    // Hide converted by default unless specifically filtered
+    if (statusFilter === "all") f = f.filter(o => o.status !== "Converted");
     if (search) f = f.filter(o => o.company.toLowerCase().includes(search.toLowerCase()) || o.sector?.toLowerCase().includes(search.toLowerCase()));
     if (sectorFilter !== "all") f = f.filter(o => o.sector === sectorFilter);
     if (presenceFilter !== "all") f = f.filter(o => o.presence === presenceFilter);
@@ -5974,15 +5976,15 @@ const CRMView = ({ user }) => {
     load();
   };
 
-  const addActivity = async (leadId, company) => {
-    if (!actForm.notes) return;
+  const addActivity = async (leadId, company, form) => {
+    const af = form || actForm;
+    if (!af.notes) return;
     setAddingAct(true);
     await supabase.from("crm_activities").insert({
-      lead_id: leadId, type: actForm.type, notes: actForm.notes,
-      date: new Date().toISOString().slice(0,10),
-      scheduled_date: actForm.scheduled_date || null,
-      scheduled_time: actForm.scheduled_time || null,
-      activity_type: actForm.type,
+      lead_id: leadId, type: af.type, notes: af.notes,
+      scheduled_date: af.scheduled_date || null,
+      scheduled_time: af.scheduled_time || null,
+      activity_type: af.type,
       created_by: user.id, created_by_name: user.name,
     });
     if (actForm.scheduled_date && ["call","meeting","demo","follow-up"].includes(actForm.type)) {

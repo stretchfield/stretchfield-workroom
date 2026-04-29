@@ -6036,7 +6036,7 @@ const CRMView = ({ user }) => {
       {/* ── KPI Strip ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 10, marginBottom: 20 }}>
         {[
-          { label: "Total Leads", value: opportunities.length, color: T.cyan },
+          { label: "Total Leads", value: leads.length, color: T.cyan },
           { label: "Pipeline Value", value: "GHS "+totalPipeline.toLocaleString(), color: T.amber },
           { label: "Won", value: wonCount, sub: "GHS "+totalWon.toLocaleString(), color: T.teal },
           { label: "Pending Approval", value: pendingApproval, color: pendingApproval > 0 ? T.red : T.textMuted },

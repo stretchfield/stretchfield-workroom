@@ -5805,11 +5805,42 @@ const LeadCard = ({ lead, selectedLead, setSelectedLead, activities, onReactivat
   );
 };
 
-const LeadPanel = ({ lead, activities, canEdit, canApprove, actForm, setActForm, addingAct, addActivity, updateStatus, handleDelete, setApprovalModal, existingClients, setMatchedClient }) => {
+const LeadPanel = ({ lead, activities, canEdit, canApprove, addActivity, updateStatus, handleDelete, setApprovalModal, existingClients, setMatchedClient, onEditLead }) => {
   const stage = STAGES.find(s => s.id === lead.status) || STAGES[0];
   const leadActivities = (activities || []).filter(a => a.lead_id === lead.id).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
   const tColors = { note: T.textMuted, call: T.teal, meeting: T.cyan, email: T.blue, demo: T.amber, "follow-up": "#8B5CF6" };
   const tIcons = { note: "📝", call: "📞", meeting: "🤝", email: "✉️", demo: "🎯", "follow-up": "🔄" };
+  const [actForm, setActForm] = React.useState({ type: "call", notes: "", scheduled_date: "", scheduled_time: "" });
+  const [addingActLocal, setAddingActLocal] = React.useState(false);
+  const [editMode, setEditMode] = React.useState(false);
+  const [editVals, setEditVals] = React.useState({ value: lead.value || 0, contact_name: lead.contact_name || "", phone: lead.phone || "", email: lead.email || "", notes: lead.notes || "", event_name: lead.event_name || "", event_type: lead.event_type || "", event_date: lead.event_date || "" });
+  const [savingEdit, setSavingEdit] = React.useState(false);
+
+  const handleLog = async () => {
+    if (!actForm.notes) return;
+    setAddingActLocal(true);
+    await addActivity(lead.id, lead.company, actForm);
+    setActForm({ type: "call", notes: "", scheduled_date: "", scheduled_time: "" });
+    setAddingActLocal(false);
+  };
+
+  const saveEdit = async () => {
+    setSavingEdit(true);
+    await supabase.from("leads").update({
+      value: parseFloat(editVals.value) || 0,
+      contact_name: editVals.contact_name,
+      phone: editVals.phone,
+      email: editVals.email,
+      notes: editVals.notes,
+      event_name: editVals.event_name,
+      event_type: editVals.event_type,
+      event_date: editVals.event_date || null,
+    }).eq("id", lead.id);
+    setSavingEdit(false);
+    setEditMode(false);
+    if (onEditLead) onEditLead();
+  };
+
   return (
     <div style={{ width: 380, flexShrink: 0, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 200px)", overflow: "hidden" }}>
       <div style={{ padding: "18px 20px", borderBottom: `1px solid ${T.border}`, background: stage.color+"08" }}>

@@ -6238,7 +6238,7 @@ const CRMView = ({ user }) => {
         </div>
 
         {/* ── Right Panel ── */}
-        {selectedLead && <LeadPanel lead={selectedLead} activities={activities} canEdit={canEdit} canApprove={canApprove} actForm={actForm} setActForm={setActForm} addingAct={addingAct} addActivity={addActivity} updateStatus={updateStatus} handleDelete={handleDelete} setApprovalModal={setApprovalModal} existingClients={existingClients} setMatchedClient={setMatchedClient} />}
+        {selectedLead && <LeadPanel key={selectedLead.id} lead={selectedLead} activities={activities} canEdit={canEdit} canApprove={canApprove} addActivity={addActivity} updateStatus={updateStatus} handleDelete={handleDelete} setApprovalModal={setApprovalModal} existingClients={existingClients} setMatchedClient={setMatchedClient} onEditLead={() => load()} />}
       </div>
 
       {/* ── New Lead Modal ── */}

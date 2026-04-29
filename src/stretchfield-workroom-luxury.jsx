@@ -5766,22 +5766,24 @@ const STAGES = [
   { id: "lost", label: "Lost", color: "#F43F5E" },
 ];
 
-const LeadCard = ({ lead, selectedLead, setSelectedLead, activities }) => {
+const LeadCard = ({ lead, selectedLead, setSelectedLead, activities, onReactivate }) => {
   const stage = STAGES.find(s => s.id === lead.status) || STAGES[0];
   const leadActivities = (activities || []).filter(a => a.lead_id === lead.id);
   const lastAct = leadActivities[0];
   const daysSince = lead.created_at ? Math.floor((new Date() - new Date(lead.created_at)) / (1000*60*60*24)) : 0;
   const isSelected = selectedLead?.id === lead.id;
+  const isLost = lead.status === "lost";
   const tIcons = { note: "📝", call: "📞", meeting: "🤝", email: "✉️", demo: "🎯", "follow-up": "🔄" };
   return (
     <div onClick={() => setSelectedLead(isSelected ? null : lead)}
-      style={{ background: isSelected ? T.surface : T.bg, border: `1px solid ${isSelected ? stage.color+"80" : T.border}`, borderLeft: `3px solid ${stage.color}`, borderRadius: 10, padding: "14px 16px", cursor: "pointer", transition: "all 0.2s", marginBottom: 8 }}
+      style={{ background: isSelected ? T.surface : T.bg, border: `1px solid ${isSelected ? stage.color+"80" : T.border}`, borderLeft: `3px solid ${stage.color}`, borderRadius: 10, padding: "14px 16px", cursor: "pointer", transition: "all 0.2s", marginBottom: 8, opacity: isLost ? 0.7 : 1 }}
       onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.borderColor = stage.color+"50"; e.currentTarget.style.background = T.surface; }}}
       onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.background = T.bg; }}}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lead.company}</div>
-          {lead.contact_name && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{lead.contact_name}</div>}
+          {lead.event_name && <div style={{ color: T.cyan, fontSize: 11, fontWeight: 600, marginTop: 1 }}>📅 {lead.event_name}</div>}
+          {lead.contact_name && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 1 }}>{lead.contact_name}</div>}
         </div>
         {lead.status === "won" && !lead.approved && <span style={{ background: T.amber+"20", color: T.amber, fontSize: 9, fontWeight: 800, borderRadius: 20, padding: "2px 7px", flexShrink: 0, marginLeft: 6 }}>CEO</span>}
         {lead.status === "won" && lead.approved && <span style={{ background: "#10B98120", color: "#10B981", fontSize: 9, fontWeight: 800, borderRadius: 20, padding: "2px 7px", flexShrink: 0, marginLeft: 6 }}>✓</span>}
@@ -5792,9 +5794,13 @@ const LeadCard = ({ lead, selectedLead, setSelectedLead, activities }) => {
           <span style={{ color: T.textMuted, fontSize: 10 }}>{daysSince}d</span>
           {lastAct && <span style={{ fontSize: 10 }}>{tIcons[lastAct.type]}</span>}
           <span style={{ color: T.textMuted, fontSize: 10 }}>{leadActivities.length} act.</span>
+          {lead.event_type && <span style={{ color: T.textMuted, fontSize: 9, background: T.border+"50", borderRadius: 4, padding: "1px 5px" }}>{lead.event_type}</span>}
         </div>
         {lead.assigned_name && <span style={{ color: T.cyan, fontSize: 10, fontWeight: 600 }}>{lead.assigned_name.split(" ")[0]}</span>}
       </div>
+      {isLost && onReactivate && (
+        <button onClick={e => { e.stopPropagation(); onReactivate(lead); }} style={{ marginTop: 8, width: "100%", padding: "5px", background: T.teal+"15", border: `1px solid ${T.teal}30`, borderRadius: 6, cursor: "pointer", color: T.teal, fontSize: 10, fontWeight: 700 }}>🔄 Reactivate Lead</button>
+      )}
     </div>
   );
 };
@@ -5808,12 +5814,63 @@ const LeadPanel = ({ lead, activities, canEdit, canApprove, actForm, setActForm,
     <div style={{ width: 380, flexShrink: 0, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 200px)", overflow: "hidden" }}>
       <div style={{ padding: "18px 20px", borderBottom: `1px solid ${T.border}`, background: stage.color+"08" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 16 }}>{lead.company}</div>
+            {lead.event_name && <div style={{ color: T.cyan, fontSize: 12, fontWeight: 700, marginTop: 2 }}>📅 {lead.event_name}</div>}
+            {lead.event_type && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 1 }}>{lead.event_type}{lead.event_date ? " · " + lead.event_date : ""}</div>}
             <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{lead.contact_name} {lead.phone ? "· "+lead.phone : ""}</div>
             {lead.email && <div style={{ color: T.cyan, fontSize: 11, marginTop: 2 }}>{lead.email}</div>}
           </div>
+          {canEdit && <button onClick={() => setEditMode(!editMode)} style={{ background: editMode ? T.cyan+"20" : "none", border: `1px solid ${editMode ? T.cyan : T.border}`, color: editMode ? T.cyan : T.textMuted, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>✎ Edit</button>}
         </div>
+
+        {/* Edit Form */}
+        {editMode && (
+          <div style={{ marginTop: 12, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+              <div>
+                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>Event Name</div>
+                <input value={editVals.event_name} onChange={e => setEditVals(v => ({...v, event_name: e.target.value}))} style={{ width: "100%", padding: "6px 10px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} placeholder="Event name" />
+              </div>
+              <div>
+                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>Event Type</div>
+                <select value={editVals.event_type} onChange={e => setEditVals(v => ({...v, event_type: e.target.value}))} style={{ width: "100%", padding: "6px 10px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }}>
+                  <option value="">Select...</option>
+                  {["Conference/Seminar","Product Launch","Awards Ceremony","Corporate Party","Other"].map(t => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+              <div>
+                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>Value (GHS)</div>
+                <input type="number" value={editVals.value} onChange={e => setEditVals(v => ({...v, value: e.target.value}))} style={{ width: "100%", padding: "6px 10px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>Event Date</div>
+                <input type="date" value={editVals.event_date} onChange={e => setEditVals(v => ({...v, event_date: e.target.value}))} style={{ width: "100%", padding: "6px 10px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+              <div>
+                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>Contact Name</div>
+                <input value={editVals.contact_name} onChange={e => setEditVals(v => ({...v, contact_name: e.target.value}))} style={{ width: "100%", padding: "6px 10px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>Phone</div>
+                <input value={editVals.phone} onChange={e => setEditVals(v => ({...v, phone: e.target.value}))} style={{ width: "100%", padding: "6px 10px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+              </div>
+            </div>
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>Notes</div>
+              <textarea value={editVals.notes} onChange={e => setEditVals(v => ({...v, notes: e.target.value}))} rows={2} style={{ width: "100%", padding: "6px 10px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none", resize: "none", boxSizing: "border-box" }} />
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={saveEdit} disabled={savingEdit} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "6px 16px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>{savingEdit ? "Saving..." : "Save"}</button>
+              <button onClick={() => setEditMode(false)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontSize: 11 }}>Cancel</button>
+            </div>
+          </div>
+        )}
+
         <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
           <span style={{ color: T.gold, fontWeight: 900, fontSize: 18 }}>GHS {(lead.value||0).toLocaleString()}</span>
           <span style={{ background: stage.color+"20", color: stage.color, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{lead.status}</span>
@@ -5910,7 +5967,7 @@ const CRMView = ({ user }) => {
   const [loginPassword, setLoginPassword] = useState("");
   const [actForm, setActForm] = useState({ type: "call", notes: "", scheduled_date: "", scheduled_time: "" });
   const [addingAct, setAddingAct] = useState(false);
-  const [form, setForm] = useState({ company: "", contact_name: "", email: "", phone: "", source: "", value: "", notes: "", status: "new", assigned_to: "", assigned_name: "" });
+  const [form, setForm] = useState({ company: "", contact_name: "", email: "", phone: "", source: "", value: "", notes: "", status: "new", assigned_to: "", assigned_name: "", event_name: "", event_type: "", event_date: "" });
 
   const canEdit = ["CEO", "Country Manager", "Sales & Marketing"].includes(user?.role);
   const canApprove = ["CEO", "Country Manager"].includes(user?.role);
@@ -5955,9 +6012,11 @@ const CRMView = ({ user }) => {
       phone: form.phone, source: form.source, value: parseFloat(form.value) || 0,
       notes: form.notes, status: form.status || "new", created_by: user.id,
       assigned_to: form.assigned_to || null, assigned_name: form.assigned_name || "",
+      event_name: form.event_name || null, event_type: form.event_type || null,
+      event_date: form.event_date || null,
     });
     setModal(false);
-    setForm({ company: "", contact_name: "", email: "", phone: "", source: "", value: "", notes: "", status: "new", assigned_to: "", assigned_name: "" });
+    setForm({ company: "", contact_name: "", email: "", phone: "", source: "", value: "", notes: "", status: "new", assigned_to: "", assigned_name: "", event_name: "", event_type: "", event_date: "" });
     setSaving(false);
     load();
   };
@@ -6085,7 +6144,7 @@ const CRMView = ({ user }) => {
                     {/* Cards */}
                     <div style={{ minHeight: 80 }}>
                       {stageLeads.length === 0 && <div style={{ color: T.textMuted, fontSize: 11, textAlign: "center", padding: "20px 0", fontStyle: "italic" }}>Empty</div>}
-                      {stageLeads.map(lead => <LeadCard key={lead.id} lead={lead} selectedLead={selectedLead} setSelectedLead={setSelectedLead} activities={activities} />)}
+                      {stageLeads.map(lead => <LeadCard key={lead.id} lead={lead} selectedLead={selectedLead} setSelectedLead={setSelectedLead} activities={activities} onReactivate={handleReactivate} />)}
                     </div>
                   </div>
                 );
@@ -6159,6 +6218,26 @@ const CRMView = ({ user }) => {
                 <input type={type} value={form[key]} onChange={e => setForm({...form, [key]: e.target.value})} placeholder={placeholder} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
               </div>
             ))}
+            <div style={{ background: T.cyan+"08", border: `1px solid ${T.cyan}20`, borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
+              <div style={{ color: T.cyan, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Event Details</div>
+              <div style={{ marginBottom: 10 }}>
+                <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 4 }}>Event Name</label>
+                <input value={form.event_name} onChange={e => setForm({...form, event_name: e.target.value})} placeholder="e.g. MTN Annual Conference 2026" style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div>
+                  <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 4 }}>Event Type</label>
+                  <select value={form.event_type} onChange={e => setForm({...form, event_type: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                    <option value="">Select type...</option>
+                    {["Conference/Seminar","Product Launch","Awards Ceremony","Corporate Party","Other"].map(t => <option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 4 }}>Approx. Date</label>
+                  <input type="date" value={form.event_date} onChange={e => setForm({...form, event_date: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                </div>
+              </div>
+            </div>
             <div style={{ marginBottom: 12 }}>
               <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 4 }}>Stage</label>
               <select value={form.status} onChange={e => setForm({...form, status: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>

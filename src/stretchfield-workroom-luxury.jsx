@@ -5942,7 +5942,7 @@ const LeadPanel = ({ lead, activities, canEdit, canApprove, addActivity, updateS
               </div>
             )}
             {actForm.scheduled_date && <div style={{ color: "#8B5CF6", fontSize: 10, fontWeight: 700, marginBottom: 6 }}>📅 {actForm.scheduled_date}{actForm.scheduled_time ? " at "+actForm.scheduled_time : ""} → calendar</div>}
-            <button onClick={() => addActivity(lead.id, lead.company)} disabled={addingAct || !actForm.notes} style={{ background: T.cyan, border: "none", color: "#000", padding: "5px 14px", borderRadius: 5, cursor: "pointer", fontSize: 11, fontWeight: 800, opacity: !actForm.notes ? 0.5 : 1 }}>{addingAct ? "..." : "Log"}</button>
+            <button onClick={handleLog} disabled={addingActLocal || !actForm.notes} style={{ background: T.cyan, border: "none", color: "#000", padding: "5px 14px", borderRadius: 5, cursor: "pointer", fontSize: 11, fontWeight: 800, opacity: !actForm.notes ? 0.5 : 1 }}>{addingActLocal ? "..." : "Log"}</button>
           </div>
         )}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

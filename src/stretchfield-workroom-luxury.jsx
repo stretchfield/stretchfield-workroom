@@ -12346,7 +12346,12 @@ const ApprovedVendorsTab = ({ apps, user, load }) => {
 };
 
 const VendorOnboardingView = ({ user }) => {
-  const [tab, setTab] = useState(user?.role === "CEO" ? "applications" : "form");
+  const getDefaultTab = () => {
+    if (user?.role === "CEO") return "applications";
+    if (user?.role === "Vendor Manager") return "approved";
+    return "form";
+  };
+  const [tab, setTab] = useState(getDefaultTab());
   const [apps, setApps] = useState([]);
   const [submitted, setSubmitted] = useState(false);
   const [editApp, setEditApp] = useState(null);

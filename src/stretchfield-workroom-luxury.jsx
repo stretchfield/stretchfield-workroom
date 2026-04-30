@@ -7743,8 +7743,10 @@ const NotificationsView = ({ user, onNavigate }) => {
         </div>
       )}
 
+
+
       {/* ── CEO Approval Modal ── */}
-      {false && (
+      {approvalModal && (
         <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setApprovalModal(null)}>
           <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 560, maxHeight: "90vh", overflow: "auto", padding: 28 }} onClick={e => e.stopPropagation()}>
             <div style={{ marginBottom: 20 }}>

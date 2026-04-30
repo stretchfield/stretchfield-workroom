@@ -12264,6 +12264,87 @@ const EditVendorAppModal = ({ app, user, onClose, onResubmitted }) => {
   );
 };
 
+const ApprovedVendorsTab = ({ apps, user, load }) => {
+  const [loginModal, setLoginModal] = React.useState(null);
+  const [loginPwd, setLoginPwd] = React.useState("");
+  const [loginSaving, setLoginSaving] = React.useState(false);
+  const [loginSuccess, setLoginSuccess] = React.useState("");
+  const approvedApps = apps.filter(a => ["approved","login-created"].includes(a.status));
+
+  return (
+    <div>
+      <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 16 }}>
+        {approvedApps.length === 0 ? "No approved vendors yet. CEO will approve your submissions." : `${approvedApps.length} approved vendor${approvedApps.length !== 1 ? "s" : ""}`}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {approvedApps.map(app => (
+          <div key={app.id} style={{ background: T.surface, border: `1px solid ${app.status === "login-created" ? T.teal+"50" : T.amber+"50"}`, borderLeft: `3px solid ${app.status === "login-created" ? T.teal : T.amber}`, borderRadius: 10, padding: "16px 18px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{app.vendor_name}</div>
+                <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{app.vendor_type} · {app.contact_email}</div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 1 }}>{app.contact_person} · {app.phone}</div>
+              </div>
+              <div>
+                {app.status === "login-created" ? (
+                  <span style={{ background: T.teal+"18", color: T.teal, borderRadius: 20, padding: "3px 12px", fontSize: 11, fontWeight: 700 }}>✓ Portal Active</span>
+                ) : (
+                  <button onClick={() => { setLoginModal(app); setLoginPwd(generatePassword(app.contact_email || "")); setLoginSuccess(""); }} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "7px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>🔑 Create Login</button>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {loginModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 700, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setLoginModal(null)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 480, padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Create Vendor Portal Login</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 16 }}>{loginModal.vendor_name} · {loginModal.contact_email}</div>
+            <div style={{ background: T.cyan+"12", border: `1px solid ${T.cyan}30`, borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: T.cyan }}>
+              Login details will be sent to <strong>{loginModal.contact_email}</strong>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Password</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input type="text" value={loginPwd} onChange={e => setLoginPwd(e.target.value)} style={{ flex: 1, padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                <button onClick={() => setLoginPwd(generatePassword(loginModal.contact_email || ""))} style={{ background: T.cyan+"15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "9px 14px", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>⚡ Generate</button>
+              </div>
+              {loginPwd && <div style={{ color: T.teal, fontSize: 11, marginTop: 5 }}>✓ Will be emailed to vendor</div>}
+            </div>
+            {loginSuccess && <div style={{ color: T.teal, fontSize: 12, marginBottom: 12, padding: "8px 12px", background: T.teal+"12", borderRadius: 6 }}>{loginSuccess}</div>}
+            {!loginSuccess ? (
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={async () => {
+                  setLoginSaving(true);
+                  const { data: { session } } = await supabase.auth.getSession();
+                  const res = await fetch("https://okbduzenceoknkjqnrha.supabase.co/functions/v1/create-vendor-login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
+                    body: JSON.stringify({ email: loginModal.contact_email, password: loginPwd, name: loginModal.vendor_name, role: "Vendor", company_name: loginModal.vendor_name, service_category: loginModal.vendor_type, application_id: loginModal.id }),
+                  });
+                  const result = await res.json();
+                  if (result.error) { alert("Failed: " + result.error); setLoginSaving(false); return; }
+                  await sendEmail(loginModal.contact_email, "Welcome to Stretchfield WorkRoom", welcomeEmailHtml({ name: loginModal.vendor_name, email: loginModal.contact_email, password: loginPwd, role: "Vendor" }));
+                  setLoginSuccess("Portal login created. Login details sent to " + loginModal.contact_email);
+                  setLoginSaving(false);
+                  if (load) load();
+                }} disabled={loginSaving || !loginPwd} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13, opacity: !loginPwd ? 0.6 : 1 }}>
+                  {loginSaving ? "Creating..." : "🔑 Create Login & Send Email"}
+                </button>
+                <button onClick={() => setLoginModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+              </div>
+            ) : (
+              <button onClick={() => setLoginModal(null)} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>Done ✓</button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const VendorOnboardingView = ({ user }) => {
   const [tab, setTab] = useState(user?.role === "CEO" ? "applications" : "form");
   const [apps, setApps] = useState([]);
@@ -12506,83 +12587,11 @@ const VendorOnboardingView = ({ user }) => {
         </div>
       )}
 
-      {/* Vendor Manager — Approved vendors, create logins */}
-      {tab === "approved" && user?.role === "Vendor Manager" && (() => {
-        const [loginModal, setLoginModal] = React.useState(null);
-        const [loginPwd, setLoginPwd] = React.useState("");
-        const [loginSaving, setLoginSaving] = React.useState(false);
-        const [loginSuccess, setLoginSuccess] = React.useState("");
-        const approvedApps = apps.filter(a => ["approved","login-created"].includes(a.status));
-        return (
-          <div>
-            <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 16 }}>
-              {approvedApps.length === 0 ? "No approved vendors yet. CEO will approve your submissions." : `${approvedApps.length} approved vendor${approvedApps.length !== 1 ? "s" : ""}`}
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {approvedApps.map(app => (
-                <div key={app.id} style={{ background: T.surface, border: `1px solid ${app.status === "login-created" ? T.teal+"50" : T.amber+"50"}`, borderLeft: `3px solid ${app.status === "login-created" ? T.teal : T.amber}`, borderRadius: 10, padding: "16px 18px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div>
-                      <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{app.vendor_name}</div>
-                      <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{app.vendor_type} · {app.contact_email}</div>
-                      <div style={{ color: T.textMuted, fontSize: 11, marginTop: 1 }}>{app.contact_person} · {app.phone}</div>
-                    </div>
-                    <div>
-                      {app.status === "login-created" ? (
-                        <span style={{ background: T.teal+"18", color: T.teal, borderRadius: 20, padding: "3px 12px", fontSize: 11, fontWeight: 700 }}>✓ Portal Active</span>
-                      ) : (
-                        <button onClick={() => { setLoginModal(app); setLoginPwd(generatePassword(app.contact_email || "")); setLoginSuccess(""); }} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "7px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>🔑 Create Login</button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {loginModal && (
-              <div style={{ position: "fixed", inset: 0, zIndex: 700, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setLoginModal(null)}>
-                <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 480, padding: 28 }} onClick={e => e.stopPropagation()}>
-                  <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Create Vendor Portal Login</div>
-                  <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 16 }}>{loginModal.vendor_name} · {loginModal.contact_email}</div>
-                  <div style={{ background: T.cyan+"12", border: `1px solid ${T.cyan}30`, borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: T.cyan }}>Login details will be sent to <strong>{loginModal.contact_email}</strong></div>
-                  <div style={{ marginBottom: 16 }}>
-                    <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Password</label>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <input type="text" value={loginPwd} onChange={e => setLoginPwd(e.target.value)} style={{ flex: 1, padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
-                      <button onClick={() => setLoginPwd(generatePassword(loginModal.contact_email || ""))} style={{ background: T.cyan+"15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "9px 14px", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>⚡ Generate</button>
-                    </div>
-                    {loginPwd && <div style={{ color: T.teal, fontSize: 11, marginTop: 5 }}>✓ Will be emailed to vendor</div>}
-                  </div>
-                  {loginSuccess && <div style={{ color: T.teal, fontSize: 12, marginBottom: 12, padding: "8px 12px", background: T.teal+"12", borderRadius: 6 }}>{loginSuccess}</div>}
-                  {!loginSuccess ? (
-                    <div style={{ display: "flex", gap: 10 }}>
-                      <button onClick={async () => {
-                        setLoginSaving(true);
-                        const { data: { session } } = await supabase.auth.getSession();
-                        const res = await fetch("https://okbduzenceoknkjqnrha.supabase.co/functions/v1/create-vendor-login", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
-                          body: JSON.stringify({ email: loginModal.contact_email, password: loginPwd, name: loginModal.vendor_name, role: "Vendor", company_name: loginModal.vendor_name, service_category: loginModal.vendor_type, application_id: loginModal.id }),
-                        });
-                        const result = await res.json();
-                        if (result.error) { alert("Failed: " + result.error); setLoginSaving(false); return; }
-                        await sendEmail(loginModal.contact_email, "Welcome to Stretchfield WorkRoom", welcomeEmailHtml({ name: loginModal.vendor_name, email: loginModal.contact_email, password: loginPwd, role: "Vendor" }));
-                        setLoginSuccess("Portal login created. Login details sent to " + loginModal.contact_email);
-                        setLoginSaving(false);
-                        load();
-                      }} disabled={loginSaving || !loginPwd} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13, opacity: !loginPwd ? 0.6 : 1 }}>{loginSaving ? "Creating..." : "🔑 Create Login & Send Email"}</button>
-                      <button onClick={() => setLoginModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
-                    </div>
-                  ) : (
-                    <button onClick={() => { setLoginModal(null); }} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>Done ✓</button>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })()}
+      {tab === "approved" && user?.role === "Vendor Manager" && (
+        <ApprovedVendorsTab apps={apps} user={user} load={load} />
+      )}
 
-      {/* CEO — All Applications */}
+            {/* CEO — All Applications */}
       {tab === "applications" && (
         <VendorApprovalsPanel user={user} onLoginCreated={load} />
       )}

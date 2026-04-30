@@ -4957,7 +4957,7 @@ const VendorsView = ({ user }) => {
           <Input label="Description" placeholder="Brief description of what's needed" value={form.description} onChange={v => setForm({ ...form, description: v })} />
           <Select label="Client" options={[{ value: '', label: 'Select client...' }, ...clients.map(c => ({ value: c.id, label: c.company || c.name }))]}
             value={form.client_id}
-            onChange={v => { const c = clients.find(x => x.id === v); setForm({ ...form, client_id: v, client_name: c ? c.name : '', project_id: '', event_name: '' }); }} />
+            onChange={v => { const c = clients.find(x => x.id === v); setForm({ ...form, client_id: v, client_name: c ? (c.company || c.name) : '', project_id: '', event_name: '' }); }} />
           <Select label="Event" options={[{ value: '', label: form.client_id ? 'Select event...' : 'Select client first...' }, ...events.filter(e => e.client_id === form.client_id).map(e => ({ value: e.id, label: e.name }))]}
             value={form.project_id}
             onChange={v => { const e = events.find(x => x.id === v); setForm({ ...form, project_id: v, event_name: e ? e.name : '' }); }} />

@@ -2304,6 +2304,161 @@ const ClientDashboard = ({ user }) => {
 };
 
 
+const ClientFeedbackForm = ({ event, user }) => {
+  const [rating, setRating] = useState(0);
+  const [summary, setSummary] = useState("");
+  const [detailed, setDetailed] = useState("");
+  const [recommend, setRecommend] = useState(null);
+  const [categoryRatings, setCategoryRatings] = useState({ communication: 0, quality: 0, timeliness: 0, value: 0 });
+  const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState(false);
+  const [existing, setExisting] = useState(null);
+  const [clientId, setClientId] = useState(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    supabase.from("clients").select("id").eq("profile_id", user.id).single().then(({ data }) => {
+      if (data) {
+        setClientId(data.id);
+        supabase.from("feedback").select("*").eq("project_id", event.id).eq("client_id", data.id).single()
+          .then(({ data: fb }) => { if (fb) { setExisting(fb); setDone(true); } });
+      }
+    });
+  }, [user.id, event.id]);
+
+  const handleSubmit = async () => {
+    if (!rating || !summary) return;
+    setSaving(true);
+    const { error } = await supabase.from("feedback").insert({
+      client_id: clientId, project_id: event.id,
+      client_name: user.name, event_name: event.name,
+      rating, summary, detailed_feedback: detailed,
+      recommend,
+      communication_rating: categoryRatings.communication || null,
+      quality_rating: categoryRatings.quality || null,
+      timeliness_rating: categoryRatings.timeliness || null,
+      value_rating: categoryRatings.value || null,
+    });
+    setSaving(false);
+    if (error) { alert("Error: " + error.message); return; }
+    setDone(true);
+    setExisting({ rating, summary });
+    setOpen(false);
+  };
+
+  const StarRow = ({ label, field }) => (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid " + T.border }}>
+      <div style={{ color: T.textSecondary, fontSize: 13 }}>{label}</div>
+      <div style={{ display: "flex", gap: 4 }}>
+        {[1,2,3,4,5].map(s => (
+          <button key={s} onClick={() => setCategoryRatings(prev => ({ ...prev, [field]: s }))}
+            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: s <= categoryRatings[field] ? "#F59E0B" : T.border, padding: "2px" }}>★</button>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (done && existing) return (
+    <div style={{ marginTop: 20, padding: 16, background: T.teal + "15", borderRadius: 10, border: "1px solid " + T.teal + "33" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <div style={{ color: T.teal, fontWeight: 700, fontSize: 14, marginBottom: 4 }}>✓ Feedback Submitted</div>
+          <div style={{ color: "#F59E0B", fontSize: 18 }}>{"★".repeat(existing.rating)}{"☆".repeat(5 - existing.rating)}</div>
+          <div style={{ color: T.textSecondary, fontSize: 13, marginTop: 6, fontStyle: "italic" }}>"{existing.summary}"</div>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (done) return (
+    <div style={{ marginTop: 20, padding: 16, background: T.teal + "15", borderRadius: 10, border: "1px solid " + T.teal + "33" }}>
+      <div style={{ color: T.teal, fontWeight: 700, fontSize: 14 }}>✓ Thank you for your feedback!</div>
+    </div>
+  );
+
+  return (
+    <div style={{ marginTop: 20 }}>
+      {!open ? (
+        <button onClick={() => setOpen(true)} style={{ width: "100%", padding: "12px", background: T.cyan + "15", border: "1px solid " + T.cyan + "33", borderRadius: 10, cursor: "pointer", color: T.cyan, fontWeight: 700, fontSize: 13 }}>
+          📝 Leave Feedback for this Event
+        </button>
+      ) : (
+        <div style={{ padding: 20, background: T.surface, borderRadius: 12, border: "1px solid " + T.border }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 16 }}>📝 Event Feedback</div>
+            <button onClick={() => setOpen(false)} style={{ background: "none", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 18 }}>×</button>
+          </div>
+
+          {/* Overall Rating */}
+          <div style={{ marginBottom: 20, padding: 16, background: T.bg, borderRadius: 10 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.06em" }}>Overall Rating *</div>
+            <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
+              {[1,2,3,4,5].map(s => (
+                <button key={s} onClick={() => setRating(s)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 40, color: s <= rating ? "#F59E0B" : T.border, transition: "color 0.15s" }}>★</button>
+              ))}
+            </div>
+            {rating > 0 && (
+              <div style={{ textAlign: "center", marginTop: 8, color: T.textMuted, fontSize: 13 }}>
+                {["", "Poor", "Fair", "Good", "Very Good", "Excellent"][rating]}
+              </div>
+            )}
+          </div>
+
+          {/* Category Ratings */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.06em" }}>Rate Specific Areas</div>
+            <div style={{ background: T.bg, borderRadius: 10, padding: "0 16px" }}>
+              <StarRow label="Communication" field="communication" />
+              <StarRow label="Quality of Work" field="quality" />
+              <StarRow label="Timeliness" field="timeliness" />
+              <StarRow label="Value for Money" field="value" />
+            </div>
+          </div>
+
+          {/* Summary */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Summary *</div>
+            <input value={summary} onChange={e => setSummary(e.target.value)} placeholder="Brief summary of your experience..."
+              style={{ width: "100%", padding: "10px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }} />
+          </div>
+
+          {/* Detailed */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Detailed Feedback <span style={{ color: T.textMuted, fontWeight: 400 }}>(optional)</span></div>
+            <textarea value={detailed} onChange={e => setDetailed(e.target.value)} placeholder="What went well? What could be improved? Any other comments..."
+              style={{ width: "100%", minHeight: 100, padding: "10px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }} />
+          </div>
+
+          {/* Recommend */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>Would you recommend us?</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              {["Yes, definitely!", "Maybe", "No"].map(opt => (
+                <button key={opt} onClick={() => setRecommend(opt)} style={{
+                  flex: 1, padding: "10px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600,
+                  border: "1px solid " + (recommend === opt ? T.cyan : T.border),
+                  background: recommend === opt ? T.cyan + "20" : T.bg,
+                  color: recommend === opt ? T.cyan : T.textMuted,
+                }}>{opt}</button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <Btn onClick={handleSubmit} disabled={saving || !rating || !summary}>{saving ? "Submitting..." : "Submit Feedback"}</Btn>
+            <Btn variant="ghost" onClick={() => setOpen(false)}>Cancel</Btn>
+          </div>
+          {(!rating || !summary) && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 8 }}>* Overall rating and summary are required</div>}
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+
+
+
 const ClientEventsView = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -7589,13 +7744,13 @@ const NotificationsView = ({ user, onNavigate }) => {
       )}
 
       {/* ── CEO Approval Modal ── */}
-      {approvalModal && (
+      {false && (
         <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setApprovalModal(null)}>
           <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 560, maxHeight: "90vh", overflow: "auto", padding: 28 }} onClick={e => e.stopPropagation()}>
             <div style={{ marginBottom: 20 }}>
               <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>CRM — Won Lead Approval</div>
               <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 20 }}>Approve & Create Client</div>
-              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{approvalModal.company} · {approvalModal.event_name || "No event name set"}</div>
+              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{null.company} · {null.event_name || "No event name set"}</div>
             </div>
 
             {matchedClient ? (
@@ -7610,19 +7765,19 @@ const NotificationsView = ({ user, onNavigate }) => {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
                   <div>
                     <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Client Name</label>
-                    <input value={clientForm.name} onChange={e => setClientForm(f => ({...f, name: e.target.value}))} placeholder={approvalModal.contact_name || ""} style={{ width: "100%", padding: "8px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                    <input value={clientForm.name} onChange={e => setClientForm(f => ({...f, name: e.target.value}))} placeholder={null.contact_name || ""} style={{ width: "100%", padding: "8px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                   </div>
                   <div>
                     <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Company</label>
-                    <input value={clientForm.company} onChange={e => setClientForm(f => ({...f, company: e.target.value}))} placeholder={approvalModal.company || ""} style={{ width: "100%", padding: "8px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                    <input value={clientForm.company} onChange={e => setClientForm(f => ({...f, company: e.target.value}))} placeholder={null.company || ""} style={{ width: "100%", padding: "8px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                   </div>
                   <div>
                     <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Email</label>
-                    <input type="email" value={clientForm.email} onChange={e => setClientForm(f => ({...f, email: e.target.value}))} placeholder={approvalModal.email || ""} style={{ width: "100%", padding: "8px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                    <input type="email" value={clientForm.email} onChange={e => setClientForm(f => ({...f, email: e.target.value}))} placeholder={null.email || ""} style={{ width: "100%", padding: "8px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                   </div>
                   <div>
                     <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Phone</label>
-                    <input value={clientForm.phone} onChange={e => setClientForm(f => ({...f, phone: e.target.value}))} placeholder={approvalModal.phone || ""} style={{ width: "100%", padding: "8px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                    <input value={clientForm.phone} onChange={e => setClientForm(f => ({...f, phone: e.target.value}))} placeholder={null.phone || ""} style={{ width: "100%", padding: "8px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                   </div>
                 </div>
               </div>
@@ -7633,11 +7788,11 @@ const NotificationsView = ({ user, onNavigate }) => {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <div style={{ gridColumn: "1/-1" }}>
                   <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Event Name</label>
-                  <input value={eventForm.name} onChange={e => setEventForm(f => ({...f, name: e.target.value}))} placeholder={approvalModal.event_name || approvalModal.company + " Event"} style={{ width: "100%", padding: "8px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                  <input value={eventForm.name} onChange={e => setEventForm(f => ({...f, name: e.target.value}))} placeholder={null.event_name || null.company + " Event"} style={{ width: "100%", padding: "8px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                 </div>
                 <div>
                   <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Event Date</label>
-                  <input type="date" value={eventForm.deadline} onChange={e => setEventForm(f => ({...f, deadline: e.target.value}))} defaultValue={approvalModal.event_date || ""} style={{ width: "100%", padding: "8px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                  <input type="date" value={eventForm.deadline} onChange={e => setEventForm(f => ({...f, deadline: e.target.value}))} defaultValue={null.event_date || ""} style={{ width: "100%", padding: "8px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                 </div>
                 <div>
                   <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Phase</label>
@@ -7651,7 +7806,7 @@ const NotificationsView = ({ user, onNavigate }) => {
             {!createLogin ? (
               <div style={{ display: "flex", gap: 10 }}>
                 <button onClick={async () => {
-                  const lead = approvalModal;
+                  const lead = null;
                   const clientName = clientForm.name || lead.contact_name || lead.company;
                   const clientEmail = clientForm.email || lead.email || "";
                   const clientCompany = clientForm.company || lead.company;
@@ -7713,17 +7868,17 @@ const NotificationsView = ({ user, onNavigate }) => {
                   <div style={{ color: T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", marginBottom: 8 }}>Create Client Portal Login (Optional)</div>
                   <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                     <input type="text" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="Password" style={{ flex: 1, padding: "8px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
-                    <button onClick={() => setLoginPassword(generatePassword(clientForm.email || approvalModal.email || ""))} style={{ background: T.cyan+"15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>⚡</button>
+                    <button onClick={() => setLoginPassword(generatePassword(clientForm.email || null.email || ""))} style={{ background: T.cyan+"15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>⚡</button>
                   </div>
                   <div style={{ display: "flex", gap: 10 }}>
                     <button onClick={async () => {
-                      const email = clientForm.email || approvalModal.email || "";
-                      const name = clientForm.name || approvalModal.contact_name || approvalModal.company;
+                      const email = clientForm.email || null.email || "";
+                      const name = clientForm.name || null.contact_name || null.company;
                       const { data: { session } } = await supabase.auth.getSession();
                       const res = await fetch("https://okbduzenceoknkjqnrha.supabase.co/functions/v1/create-vendor-login", {
                         method: "POST",
                         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
-                        body: JSON.stringify({ email, password: loginPassword, name, role: "Client", company_name: approvalModal.company, application_id: null }),
+                        body: JSON.stringify({ email, password: loginPassword, name, role: "Client", company_name: null.company, application_id: null }),
                       });
                       const result = await res.json();
                       if (result.error) { alert("Login creation failed: " + result.error); return; }

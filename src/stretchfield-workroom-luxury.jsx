@@ -4590,7 +4590,12 @@ const TasksView = ({ userRole, openTaskId, onOpenHandled }) => {
             );
           })()}
           <Select label="Assigned By" options={[{ value: '', label: 'Select assignor...' }, ...members.map(m => ({ value: m.id, label: m.name + ' — ' + m.role }))]} value={form.assigned_by} onChange={v => setForm({ ...form, assigned_by: v })} />
-          <Input label="Deadline" type="date" value={form.deadline} onChange={v => setForm({ ...form, deadline: v })} />
+          <Input label="Event Deadline" type="date" value={form.deadline} onChange={v => setForm({ ...form, deadline: v })} />
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Quote Submission Deadline</label>
+            <input type="datetime-local" value={form.quote_deadline} onChange={e => setForm({ ...form, quote_deadline: e.target.value })} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+            {form.quote_deadline && <div style={{ color: T.amber, fontSize: 11, marginTop: 4 }}>⏰ Vendor quote form will auto-close at this date & time</div>}
+          </div>
           <Select label="Status" options={[
             { value: 'pending', label: 'Pending' },
             { value: 'in-progress', label: 'In Progress' },
@@ -4674,7 +4679,7 @@ const VendorsView = ({ user }) => {
     }
     const rffCode = await generateRffCode(form.event_type);
     const { error } = await supabase.from('rffs').insert({
-      title: rffCode, description: form.description,
+      title: rffCode, description: form.description, quote_deadline: form.quote_deadline || null,
       client_id: form.client_id, client_name: form.client_name,
       project_id: form.project_id, event_name: form.event_name,
       deadline: form.deadline || null, document_url, document_name,
@@ -5061,6 +5066,9 @@ const InvoicesView = () => {
 const VendorRFFsView = ({ user }) => {
   const [rffs, setRffs] = useState([]);
   const [quoteModal, setQuoteModal] = useState(null);
+  const [now, setNow] = React.useState(new Date());
+  React.useEffect(() => { const t = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(t); }, []);
+  const isQuoteDeadlinePassed = (rff) => rff.quote_deadline && new Date(rff.quote_deadline) < now;
   const [quoteAmount, setQuoteAmount] = useState('');
   const [quoteFile, setQuoteFile] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -5161,7 +5169,13 @@ const VendorRFFsView = ({ user }) => {
                 {r.document_url && (
                   <a href={r.document_url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.cyan, fontSize: 11, fontWeight: 700, textDecoration: "none", background: T.cyan + "12", padding: "6px 12px", borderRadius: 8, border: `1px solid ${T.cyan}30` }}>📄 Download</a>
                 )}
-                <Btn small onClick={() => { setQuoteModal(r); setQuoteAmount(""); }}>Submit Quote</Btn>
+                {isQuoteDeadlinePassed(r) ? (
+                  <div style={{ color: T.red, fontSize: 11, fontWeight: 700, padding: "5px 12px", background: T.red+"12", border: `1px solid ${T.red}30`, borderRadius: 6 }}>⏰ Submission Closed</div>
+                ) : r.status === 'quote-submitted' ? (
+                  <div style={{ color: T.teal, fontSize: 11, fontWeight: 700, padding: "5px 12px", background: T.teal+"12", border: `1px solid ${T.teal}30`, borderRadius: 6 }}>✓ Quote Submitted</div>
+                ) : (
+                  <Btn small onClick={() => { setQuoteModal(r); setQuoteAmount(""); }}>Submit Quote</Btn>
+                )}
               </div>
             </div>
           ))}

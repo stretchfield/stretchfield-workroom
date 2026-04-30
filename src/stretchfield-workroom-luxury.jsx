@@ -7618,146 +7618,6 @@ const ImpactIntelligenceSummary = ({ user }) => {
           <EventImpactView user={user} project={selectedEvent} />
         </div>
       )}
-    </div>
-  );
-};
-
-
-
-const NotificationsView = ({ user, onNavigate }) => {
-  const [notes, setNotes] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-    setNotes(data || []);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    load();
-    const sub = supabase.channel('notif-view-' + user.id)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: 'user_id=eq.' + user.id }, () => load())
-      .subscribe();
-    return () => supabase.removeChannel(sub);
-  }, [user.id]);
-
-  const getNavTarget = (note) => {
-    const typeMap = {
-      invoice: 'invoices', task: 'tasks', quote: 'vendors', rff: 'vendors',
-      crm: 'crm', approval: 'vendors', event: 'events', finance: 'finance',
-      budget: 'budgets', expense: 'expenses', scorecard: 'scorecards',
-    };
-    return typeMap[note.type] || null;
-  };
-
-  const handleNoteClick = async (note) => {
-    // Mark as read
-    await supabase.from('notifications').update({ read: true }).eq('id', note.id);
-    load();
-    // Navigate to source
-    const target = getNavTarget(note);
-    if (target && onNavigate) {
-      // Deep-link routing by notification title keywords
-      let resolvedTarget = "notifications";
-      const t = note.title?.toLowerCase() || "";
-      const m = note.message?.toLowerCase() || "";
-      if (t.includes("task") || t.includes("comment") || t.includes("replied")) resolvedTarget = "tasks";
-      else if (t.includes("rff approved") || t.includes("rff declined") || t.includes("rff resubmitted")) resolvedTarget = "vendors";
-      else if (t.includes("vendor application") || t.includes("vendor onboarding")) resolvedTarget = "vendor-onboarding";
-      else if (t.includes("quote submitted")) resolvedTarget = "quotes-received";
-      else if (t.includes("contract award") && t.includes("pending")) resolvedTarget = "contract-awards";
-      else if (t.includes("contract award confirmed") || t.includes("gig confirmed")) resolvedTarget = "purchase-orders";
-      else if (t.includes("purchase order")) resolvedTarget = "vendor-invoices-submit";
-      else if (t.includes("invoice received")) resolvedTarget = "vendor-invoices";
-      else if (t.includes("opportunity") || t.includes("crm")) resolvedTarget = "crm";
-      else if (t.includes("opportunity") || t.includes("converted")) resolvedTarget = "leads";
-      else if (t.includes("vendor assigned") || t.includes("new rff assignment")) resolvedTarget = "rffs";
-      else if (note.type === "rff") resolvedTarget = "vendors";
-      else if (note.type === "task") resolvedTarget = "tasks";
-      onNavigate(resolvedTarget, note.resource_id || null);
-    }
-  };
-
-  const markRead = async (id) => {
-    await supabase.from('notifications').update({ read: true }).eq('id', id);
-    load();
-  };
-
-  const markAllRead = async () => {
-    await supabase.from('notifications').update({ read: true }).eq('user_id', user.id);
-    load();
-  };
-
-  const deleteNote = async (id) => {
-    await supabase.from('notifications').delete().eq('id', id);
-    load();
-  };
-
-  const typeIcon = (type) => {
-    const icons = { invoice: '🧾', task: '✅', quote: '💬', info: 'ℹ️', event: '📁' };
-    return icons[type] || '🔔';
-  };
-
-  const unread = notes.filter(n => !n.read).length;
-
-  return (
-    <div style={{ animation: "fadeUp 0.35s ease" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
-        <div>
-          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>System</div>
-          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Notifications</h2>
-          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{unread > 0 ? <span style={{ color: T.cyan, fontWeight: 700 }}>{unread} unread</span> : "All caught up"}</div>
-        </div>
-        {unread > 0 && <Btn small onClick={markAllRead}>✓ Mark All Read</Btn>}
-      </div>
-      {loading ? (
-        <div style={{ color: T.textMuted, textAlign: "center", padding: 60 }}>Loading...</div>
-      ) : notes.length === 0 ? (
-        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
-          <div style={{ fontSize: 40, marginBottom: 16 }}>🔔</div>
-          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No notifications</div>
-          <div style={{ color: T.textMuted, fontSize: 13 }}>You're all caught up.</div>
-        </div>
-      ) : (
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-          {notes.map((n, i) => (
-            <div key={n.id} onClick={() => { if (!n.read) markRead(n.id); handleNoteClick(n); }} style={{
-              display: "flex", alignItems: "flex-start", gap: 14,
-              padding: "16px 20px",
-              borderBottom: i < notes.length - 1 ? `1px solid ${T.border}44` : "none",
-              background: !n.read ? T.cyan + "08" : "transparent",
-              cursor: "pointer", transition: "background 0.15s",
-            }}
-              onMouseEnter={e => e.currentTarget.style.background = !n.read ? T.cyan + "12" : T.bg + "80"}
-              onMouseLeave={e => e.currentTarget.style.background = !n.read ? T.cyan + "08" : "transparent"}
-            >
-              <div style={{ fontSize: 18, flexShrink: 0, marginTop: 2 }}>{typeIcon(n.type)}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: !n.read ? T.textPrimary : T.textMuted, fontSize: 13, fontWeight: !n.read ? 700 : 500 }}>{n.title}</div>
-                {n.message && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>{n.message}</div>}
-                <div style={{ color: T.textMuted, fontSize: 10, marginTop: 5 }}>
-                  {new Date(n.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
-                {!n.read && <div style={{ width: 7, height: 7, borderRadius: "50%", background: T.cyan, boxShadow: `0 0 6px ${T.cyan}` }} />}
-                <button onClick={(e) => { e.stopPropagation(); deleteNote(n.id); }} style={{ background: "none", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 16, padding: "2px 6px", borderRadius: 4, transition: "color 0.15s" }}
-                  onMouseEnter={e => e.currentTarget.style.color = T.red}
-                  onMouseLeave={e => e.currentTarget.style.color = T.textMuted}
-                >×</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-
 
       {/* ── CEO Approval Modal ── */}
       {approvalModal && (
@@ -8621,6 +8481,144 @@ const CRMDashboardCEO = ({ user }) => {
             <Btn variant="ghost" onClick={() => setModal(false)}>Cancel</Btn>
           </div>
         </Modal>
+      )}
+    </div>
+  );
+};
+
+
+
+const NotificationsView = ({ user, onNavigate }) => {
+  const [notes, setNotes] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    setNotes(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    load();
+    const sub = supabase.channel('notif-view-' + user.id)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: 'user_id=eq.' + user.id }, () => load())
+      .subscribe();
+    return () => supabase.removeChannel(sub);
+  }, [user.id]);
+
+  const getNavTarget = (note) => {
+    const typeMap = {
+      invoice: 'invoices', task: 'tasks', quote: 'vendors', rff: 'vendors',
+      crm: 'crm', approval: 'vendors', event: 'events', finance: 'finance',
+      budget: 'budgets', expense: 'expenses', scorecard: 'scorecards',
+    };
+    return typeMap[note.type] || null;
+  };
+
+  const handleNoteClick = async (note) => {
+    // Mark as read
+    await supabase.from('notifications').update({ read: true }).eq('id', note.id);
+    load();
+    // Navigate to source
+    const target = getNavTarget(note);
+    if (target && onNavigate) {
+      // Deep-link routing by notification title keywords
+      let resolvedTarget = "notifications";
+      const t = note.title?.toLowerCase() || "";
+      const m = note.message?.toLowerCase() || "";
+      if (t.includes("task") || t.includes("comment") || t.includes("replied")) resolvedTarget = "tasks";
+      else if (t.includes("rff approved") || t.includes("rff declined") || t.includes("rff resubmitted")) resolvedTarget = "vendors";
+      else if (t.includes("vendor application") || t.includes("vendor onboarding")) resolvedTarget = "vendor-onboarding";
+      else if (t.includes("quote submitted")) resolvedTarget = "quotes-received";
+      else if (t.includes("contract award") && t.includes("pending")) resolvedTarget = "contract-awards";
+      else if (t.includes("contract award confirmed") || t.includes("gig confirmed")) resolvedTarget = "purchase-orders";
+      else if (t.includes("purchase order")) resolvedTarget = "vendor-invoices-submit";
+      else if (t.includes("invoice received")) resolvedTarget = "vendor-invoices";
+      else if (t.includes("opportunity") || t.includes("crm")) resolvedTarget = "crm";
+      else if (t.includes("opportunity") || t.includes("converted")) resolvedTarget = "leads";
+      else if (t.includes("vendor assigned") || t.includes("new rff assignment")) resolvedTarget = "rffs";
+      else if (note.type === "rff") resolvedTarget = "vendors";
+      else if (note.type === "task") resolvedTarget = "tasks";
+      onNavigate(resolvedTarget, note.resource_id || null);
+    }
+  };
+
+  const markRead = async (id) => {
+    await supabase.from('notifications').update({ read: true }).eq('id', id);
+    load();
+  };
+
+  const markAllRead = async () => {
+    await supabase.from('notifications').update({ read: true }).eq('user_id', user.id);
+    load();
+  };
+
+  const deleteNote = async (id) => {
+    await supabase.from('notifications').delete().eq('id', id);
+    load();
+  };
+
+  const typeIcon = (type) => {
+    const icons = { invoice: '🧾', task: '✅', quote: '💬', info: 'ℹ️', event: '📁' };
+    return icons[type] || '🔔';
+  };
+
+  const unread = notes.filter(n => !n.read).length;
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>System</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Notifications</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{unread > 0 ? <span style={{ color: T.cyan, fontWeight: 700 }}>{unread} unread</span> : "All caught up"}</div>
+        </div>
+        {unread > 0 && <Btn small onClick={markAllRead}>✓ Mark All Read</Btn>}
+      </div>
+      {loading ? (
+        <div style={{ color: T.textMuted, textAlign: "center", padding: 60 }}>Loading...</div>
+      ) : notes.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>🔔</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No notifications</div>
+          <div style={{ color: T.textMuted, fontSize: 13 }}>You're all caught up.</div>
+        </div>
+      ) : (
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+          {notes.map((n, i) => (
+            <div key={n.id} onClick={() => { if (!n.read) markRead(n.id); handleNoteClick(n); }} style={{
+              display: "flex", alignItems: "flex-start", gap: 14,
+              padding: "16px 20px",
+              borderBottom: i < notes.length - 1 ? `1px solid ${T.border}44` : "none",
+              background: !n.read ? T.cyan + "08" : "transparent",
+              cursor: "pointer", transition: "background 0.15s",
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = !n.read ? T.cyan + "12" : T.bg + "80"}
+              onMouseLeave={e => e.currentTarget.style.background = !n.read ? T.cyan + "08" : "transparent"}
+            >
+              <div style={{ fontSize: 18, flexShrink: 0, marginTop: 2 }}>{typeIcon(n.type)}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: !n.read ? T.textPrimary : T.textMuted, fontSize: 13, fontWeight: !n.read ? 700 : 500 }}>{n.title}</div>
+                {n.message && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>{n.message}</div>}
+                <div style={{ color: T.textMuted, fontSize: 10, marginTop: 5 }}>
+                  {new Date(n.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+                {!n.read && <div style={{ width: 7, height: 7, borderRadius: "50%", background: T.cyan, boxShadow: `0 0 6px ${T.cyan}` }} />}
+                <button onClick={(e) => { e.stopPropagation(); deleteNote(n.id); }} style={{ background: "none", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 16, padding: "2px 6px", borderRadius: 4, transition: "color 0.15s" }}
+                  onMouseEnter={e => e.currentTarget.style.color = T.red}
+                  onMouseLeave={e => e.currentTarget.style.color = T.textMuted}
+                >×</button>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

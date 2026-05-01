@@ -4933,6 +4933,8 @@ const VendorsView = ({ user }) => {
                             </div>
                           )}
                           {r.status === 'quote-approved' && <div style={{ color: T.teal, fontSize: 12, fontWeight: 600, marginTop: 12 }}>✓ Quote Approved — Awaiting Invoice</div>}
+                          {/* Vendors assigned + deadline */}
+                          <VendorAssignmentPanel rffId={r.id} quoteDeadline={r.quote_deadline} />
                         </Card>
                       )}
                     </div>
@@ -5185,7 +5187,7 @@ const VendorRFFsView = ({ user }) => {
                   <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{r.event_name} · Due {r.deadline}</div>
                   {r.description && <div style={{ color: T.textMuted, fontSize: 12, marginTop: 8, fontStyle: "italic" }}>{r.description}</div>}
                 </div>
-                <Badge status={r.status} />
+                <Badge status={getMyStatus(r) === 'pending' ? 'vendor-assigned' : getMyStatus(r)} />
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${T.border}44` }}>
                 {r.document_url && (
@@ -11448,7 +11450,13 @@ const QuotesReceivedView = ({ user }) => {
                   <div>
                     <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{rff.title}</div>
                     <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{event?.name || rff.event_name}</div>
-                    <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Deadline: {rff.deadline ? new Date(rff.deadline).toLocaleDateString("en-GB") : "—"}</div>
+                    <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Event Deadline: {rff.deadline ? new Date(rff.deadline).toLocaleDateString("en-GB") : "—"}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                      <div style={{ color: rff.quote_deadline ? T.amber : T.textMuted, fontSize: 11, fontWeight: rff.quote_deadline ? 700 : 400 }}>
+                        {rff.quote_deadline ? "⏰ Quote Due: " + new Date(rff.quote_deadline).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "No quote deadline set"}
+                      </div>
+                      <button onClick={e => { e.stopPropagation(); const dl = window.prompt("Set quote submission deadline (YYYY-MM-DDTHH:MM):", rff.quote_deadline ? rff.quote_deadline.slice(0,16) : new Date(Date.now()+7*24*60*60*1000).toISOString().slice(0,16)); if (dl) { supabase.from("rffs").update({ quote_deadline: dl }).eq("id", rff.id).then(() => load()); } }} style={{ background: T.amber+"15", border: `1px solid ${T.amber}30`, color: T.amber, padding: "2px 8px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>✎ Set Deadline</button>
+                    </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <div style={{ textAlign: "right" }}>
@@ -12747,6 +12755,38 @@ const ApprovedVendorsTab = ({ apps, user, load }) => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+const VendorAssignmentPanel = ({ rffId, quoteDeadline }) => {
+  const [vendors, setVendors] = React.useState([]);
+  React.useEffect(() => {
+    supabase.from("rff_vendor_assignments").select("*, profiles(name, email, service_category)").eq("rff_id", rffId).then(({ data }) => setVendors(data || []));
+  }, [rffId]);
+  if (vendors.length === 0) return null;
+  return (
+    <div style={{ marginTop: 12, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "10px 14px" }}>
+      <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+        Assigned Vendors ({vendors.length})
+        {quoteDeadline && <span style={{ color: T.amber, marginLeft: 10, fontWeight: 700 }}>⏰ Quote Due: {new Date(quoteDeadline).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>}
+      </div>
+      {vendors.map(v => {
+        const statusColors = { pending: T.textMuted, "quote-submitted": T.amber, "quote-approved": T.teal, "invoice-submitted": "#10B981" };
+        const statusLabels = { pending: "Awaiting Quote", "quote-submitted": "Quote Submitted", "quote-approved": "Quote Approved", "invoice-submitted": "Invoice Submitted" };
+        return (
+          <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${T.border}33` }}>
+            <div>
+              <div style={{ color: T.textPrimary, fontSize: 12, fontWeight: 700 }}>{v.profiles?.name || "Unknown"}</div>
+              <div style={{ color: T.textMuted, fontSize: 10 }}>{v.profiles?.service_category || v.profiles?.email}</div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {v.quote_amount && <span style={{ color: T.gold, fontSize: 12, fontWeight: 700 }}>GHS {parseFloat(v.quote_amount).toLocaleString()}</span>}
+              <span style={{ color: statusColors[v.status] || T.textMuted, fontSize: 10, fontWeight: 700, background: (statusColors[v.status] || T.textMuted)+"15", padding: "2px 8px", borderRadius: 20 }}>{statusLabels[v.status] || v.status}</span>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 };

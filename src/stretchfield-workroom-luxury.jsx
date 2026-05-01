@@ -13097,6 +13097,43 @@ const VendorAssignmentView = ({ user }) => {
   const [saving, setSaving] = useState(false);
   const [expandedEvent, setExpandedEvent] = useState(null);
   const [basketModal, setBasketModal] = useState(null);
+  const [selectedRff, setSelectedRff] = useState(null);
+  const [rffActivities, setRffActivities] = useState({});
+  const [actModal, setActModal] = useState(null);
+  const [actForm, setActForm] = useState({ type: "call", notes: "", scheduled_date: "", scheduled_time: "" });
+  const [addingAct, setAddingAct] = useState(false);
+
+  const loadActivities = async (assignmentId) => {
+    const { data } = await supabase.from("crm_activities").select("*").eq("vendor_assignment_id", assignmentId).order("created_at", { ascending: false });
+    setRffActivities(prev => ({ ...prev, [assignmentId]: data || [] }));
+  };
+
+  const handleLogActivity = async (assignment, vendorName) => {
+    if (!actForm.notes) return;
+    setAddingAct(true);
+    await supabase.from("crm_activities").insert({
+      vendor_assignment_id: assignment.id,
+      type: actForm.type,
+      notes: actForm.notes,
+      activity_type: actForm.type,
+      scheduled_date: actForm.scheduled_date || null,
+      scheduled_time: actForm.scheduled_time || null,
+      created_by: user.id,
+      created_by_name: user.name,
+    });
+    if (actForm.scheduled_date && ["call","meeting","follow-up"].includes(actForm.type)) {
+      await supabase.from("itineraries").insert({
+        title: actForm.type + " — " + vendorName,
+        week_start: actForm.scheduled_date,
+        items: JSON.stringify([{ date: actForm.scheduled_date, time: actForm.scheduled_time || "09:00", company: vendorName, action: actForm.type, notes: actForm.notes }]),
+        created_by: user.id,
+      });
+    }
+    setActForm({ type: "call", notes: "", scheduled_date: "", scheduled_time: "" });
+    setAddingAct(false);
+    loadActivities(assignment.id);
+    setActModal(null);
+  };
 
   const load = async () => {
     const [r, e, v, a] = await Promise.all([
@@ -13218,38 +13255,72 @@ const VendorAssignmentView = ({ user }) => {
                 const assigned = assignments.filter(a => a.rff_id === rff.id);
                 const assignedIds = assigned.map(a => a.vendor_id);
                 return (
-                  <Card key={rff.id} style={{ borderLeft: "3px solid " + T.teal, marginBottom: 0 }}>
+                  <Card key={rff.id} style={{ borderLeft: "3px solid " + T.teal, marginBottom: 0, cursor: "pointer" }} onClick={() => setSelectedRff(selectedRff?.id === rff.id ? null : rff)}>
                     <div style={{ marginBottom: 12 }}>
-                      <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{rff.title}</div>
-                      <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>Due {rff.deadline}</div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                        <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{rff.title}</div>
+                        <span style={{ color: T.textMuted, fontSize: 12 }}>{selectedRff?.id === rff.id ? "▲" : "▼"}</span>
+                      </div>
+                      <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>📅 Due {rff.deadline}</div>
+                      {rff.quote_deadline && <div style={{ color: T.amber, fontSize: 11, fontWeight: 700, marginTop: 3 }}>⏰ Quote Deadline: {new Date(rff.quote_deadline).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</div>}
                       {rff.description && <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 4 }}>{rff.description}</div>}
                     </div>
 
-                    {/* Assigned Vendors Basket */}
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ color: T.textSecondary, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Assigned Vendors ({assigned.length})</div>
-                      {assigned.length === 0 ? (
-                        <div style={{ color: T.textMuted, fontSize: 12, padding: "8px 12px", background: T.bg, borderRadius: 6, border: "1px dashed " + T.border }}>No vendors assigned yet</div>
-                      ) : (
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                          {assigned.map(a => {
-                            const vp = vendors.find(v => v.id === a.vendor_id);
-                            return (
-                              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", background: T.teal + "15", border: "1px solid " + T.teal + "33", borderRadius: 20 }}>
-                                <span style={{ color: T.teal, fontSize: 12, fontWeight: 600 }}>{a.vendor_name}</span>
-                                {vp && <TierBadge vendor={vp} />}
-                                <button onClick={() => removeVendor(rff.id, a.vendor_id)} style={{ background: "none", border: "none", color: "#F43F5E", cursor: "pointer", fontSize: 14, padding: 0, lineHeight: 1 }}>✕</button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
+                    {/* Summary badges */}
+                    <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                      <span style={{ color: T.cyan, fontSize: 11, fontWeight: 700, background: T.cyan+"12", padding: "2px 8px", borderRadius: 20 }}>{assigned.length} vendor{assigned.length !== 1 ? "s" : ""}</span>
+                      {assigned.filter(a => a.status === "quote-submitted").length > 0 && <span style={{ color: T.amber, fontSize: 11, fontWeight: 700, background: T.amber+"12", padding: "2px 8px", borderRadius: 20 }}>{assigned.filter(a => a.status === "quote-submitted").length} quote{assigned.filter(a => a.status === "quote-submitted").length !== 1 ? "s" : ""} in</span>}
                     </div>
 
-                    {/* Add Vendor Button */}
-                    <button onClick={() => setBasketModal({ rff, assignedIds })} style={{ width: "100%", padding: "8px", background: T.cyan + "15", border: "1px solid " + T.cyan + "33", borderRadius: 8, cursor: "pointer", color: T.cyan, fontSize: 12, fontWeight: 700 }}>
-                      + Add Vendor
-                    </button>
+                    {/* Expanded vendor list with activity */}
+                    {selectedRff?.id === rff.id && (
+                      <div onClick={e => e.stopPropagation()} style={{ borderTop: "1px solid " + T.border, paddingTop: 12, marginTop: 4 }}>
+                        {assigned.length === 0 ? (
+                          <div style={{ color: T.textMuted, fontSize: 12, padding: "8px 0" }}>No vendors assigned yet</div>
+                        ) : assigned.map(a => {
+                          const vp = vendors.find(v => v.id === a.vendor_id);
+                          const statusColors = { pending: T.textMuted, "quote-submitted": T.amber, "quote-approved": T.teal, "invoice-submitted": "#10B981" };
+                          const statusLabels = { pending: "Awaiting Quote", "quote-submitted": "Quote Submitted", "quote-approved": "Quote Approved", "invoice-submitted": "Invoice Submitted" };
+                          const acts = rffActivities[a.id] || [];
+                          const tIcons = { note: "📝", call: "📞", meeting: "🤝", email: "✉️", "follow-up": "🔄" };
+                          return (
+                            <div key={a.id} style={{ background: T.bg, border: "1px solid " + T.border, borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                                <div>
+                                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{a.vendor_name}</div>
+                                  {vp && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 1 }}>{vp.service_category || vp.email}</div>}
+                                  {a.quote_amount && <div style={{ color: T.gold, fontWeight: 700, fontSize: 13, marginTop: 4 }}>GHS {parseFloat(a.quote_amount).toLocaleString()}</div>}
+                                </div>
+                                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                                  <span style={{ color: statusColors[a.status] || T.textMuted, fontSize: 10, fontWeight: 700, background: (statusColors[a.status] || T.textMuted)+"15", padding: "2px 8px", borderRadius: 20 }}>{statusLabels[a.status] || a.status}</span>
+                                  <button onClick={() => { if (!rffActivities[a.id]) loadActivities(a.id); setActModal(a); setActForm({ type: "call", notes: "", scheduled_date: "", scheduled_time: "" }); }} style={{ background: T.cyan+"15", border: "1px solid " + T.cyan+"30", color: T.cyan, padding: "3px 8px", borderRadius: 5, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>📝 Log</button>
+                                  <button onClick={() => removeVendor(rff.id, a.vendor_id)} style={{ background: "none", border: "none", color: "#F43F5E", cursor: "pointer", fontSize: 14, padding: 0, lineHeight: 1 }}>✕</button>
+                                </div>
+                              </div>
+                              {/* Activity timeline */}
+                              {rffActivities[a.id] && rffActivities[a.id].length > 0 && (
+                                <div style={{ borderTop: "1px solid " + T.border+"44", paddingTop: 8, marginTop: 4 }}>
+                                  {rffActivities[a.id].slice(0,3).map((act, i) => (
+                                    <div key={act.id} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                                      <span style={{ fontSize: 12 }}>{tIcons[act.type] || "📝"}</span>
+                                      <div style={{ flex: 1 }}>
+                                        <div style={{ color: T.textSecondary, fontSize: 11 }}>{act.notes}</div>
+                                        <div style={{ color: T.textMuted, fontSize: 10, marginTop: 1 }}>{act.created_by_name} · {new Date(act.created_at).toLocaleDateString("en-GB")}{act.scheduled_date ? " · 📅 " + act.scheduled_date : ""}</div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {!rffActivities[a.id] && <button onClick={() => loadActivities(a.id)} style={{ background: "none", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 11, padding: 0 }}>Load activity history</button>}
+                            </div>
+                          );
+                        })}
+                        <button onClick={() => setBasketModal({ rff, assignedIds })} style={{ width: "100%", padding: "8px", background: T.cyan+"15", border: "1px solid " + T.cyan+"33", borderRadius: 8, cursor: "pointer", color: T.cyan, fontSize: 12, fontWeight: 700, marginTop: 4 }}>+ Add Vendor</button>
+                      </div>
+                    )}
+                    {selectedRff?.id !== rff.id && (
+                      <button onClick={e => { e.stopPropagation(); setBasketModal({ rff, assignedIds }); }} style={{ width: "100%", padding: "8px", background: T.cyan+"15", border: "1px solid " + T.cyan+"33", borderRadius: 8, cursor: "pointer", color: T.cyan, fontSize: 12, fontWeight: 700 }}>+ Add Vendor</button>
+                    )}
                   </Card>
                 );
               })}
@@ -13257,6 +13328,32 @@ const VendorAssignmentView = ({ user }) => {
           )}
         </div>
       ))}
+
+      {/* Activity Log Modal */}
+      {actModal && (
+        <Modal title={"Log Activity — " + actModal.vendor_name} onClose={() => setActModal(null)}>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: "flex", gap: 4, marginBottom: 10, flexWrap: "wrap" }}>
+              {["call","meeting","email","note","follow-up"].map(t => {
+                const tIcons = { note: "📝", call: "📞", meeting: "🤝", email: "✉️", "follow-up": "🔄" };
+                return <button key={t} onClick={() => setActForm(f => ({...f, type: t}))} style={{ padding: "4px 10px", borderRadius: 20, border: "1px solid " + (actForm.type === t ? T.cyan : T.border), background: actForm.type === t ? T.cyan+"20" : "none", color: actForm.type === t ? T.cyan : T.textMuted, fontSize: 10, fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>{tIcons[t]} {t}</button>;
+              })}
+            </div>
+            <textarea value={actForm.notes} onChange={e => setActForm(f => ({...f, notes: e.target.value}))} placeholder={"Log " + actForm.type + "..."} rows={3} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", resize: "none", boxSizing: "border-box", marginBottom: 8 }} />
+            {["call","meeting","follow-up"].includes(actForm.type) && (
+              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                <input type="date" value={actForm.scheduled_date} onChange={e => setActForm(f => ({...f, scheduled_date: e.target.value}))} style={{ flex: 1, padding: "8px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                <input type="time" value={actForm.scheduled_time} onChange={e => setActForm(f => ({...f, scheduled_time: e.target.value}))} style={{ flex: 1, padding: "8px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+              </div>
+            )}
+            {actForm.scheduled_date && <div style={{ color: "#8B5CF6", fontSize: 11, fontWeight: 700, marginBottom: 8 }}>📅 {actForm.scheduled_date}{actForm.scheduled_time ? " at " + actForm.scheduled_time : ""} → calendar</div>}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <Btn onClick={() => handleLogActivity(actModal, actModal.vendor_name)} disabled={addingAct || !actForm.notes}>{addingAct ? "Logging..." : "Log Activity"}</Btn>
+            <Btn variant="ghost" onClick={() => setActModal(null)}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
 
       {/* Vendor Picker Modal */}
       {basketModal && (

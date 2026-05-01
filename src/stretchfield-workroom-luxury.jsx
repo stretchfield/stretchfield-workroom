@@ -4836,6 +4836,12 @@ const VendorsView = ({ user }) => {
                       <div>
                         <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{r.title}</div>
                         <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>📅 Due {r.deadline}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+                          <div style={{ color: r.quote_deadline ? T.amber : T.textMuted, fontSize: 11, fontWeight: r.quote_deadline ? 700 : 400 }}>
+                            {r.quote_deadline ? "⏰ Quote Due: " + new Date(r.quote_deadline).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "No quote deadline set"}
+                          </div>
+                          {isVendorManager && <button onClick={e => { e.stopPropagation(); const dl = window.prompt("Set quote deadline (YYYY-MM-DDTHH:MM):", r.quote_deadline ? r.quote_deadline.slice(0,16) : new Date(Date.now()+7*24*60*60*1000).toISOString().slice(0,16)); if (dl) { supabase.from("rffs").update({ quote_deadline: dl }).eq("id", r.id).then(() => load()); } }} style={{ background: T.amber+"15", border: "1px solid " + T.amber + "30", color: T.amber, padding: "2px 8px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>✎ Set Deadline</button>}
+                        </div>
                         {/* Status indicators for Vendor Manager */}
                         {isVendorManager && r.status === 'pending' && r.submitted_for_approval && (
                           <div style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", background: T.amber + "15", border: "1px solid " + T.amber + "33", borderRadius: 20 }}>
@@ -5185,6 +5191,14 @@ const VendorRFFsView = ({ user }) => {
                   <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{r.title}</div>
                   <div style={{ color: T.cyan, fontSize: 11, marginTop: 4, fontWeight: 700 }}>{r.client_name}</div>
                   <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{r.event_name} · Due {r.deadline}</div>
+                {r.quote_deadline && (
+                  <div style={{ marginTop: 8, padding: "8px 12px", background: isQuoteDeadlinePassed(r) ? "#F43F5E15" : T.amber+"15", border: "1px solid " + (isQuoteDeadlinePassed(r) ? "#F43F5E" : T.amber) + "40", borderRadius: 8 }}>
+                    <div style={{ color: isQuoteDeadlinePassed(r) ? "#F43F5E" : T.amber, fontSize: 13, fontWeight: 800 }}>
+                      {isQuoteDeadlinePassed(r) ? "⏰ Quote Submission CLOSED" : "⏰ Quote Deadline: " + new Date(r.quote_deadline).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                    {!isQuoteDeadlinePassed(r) && <div style={{ color: T.amber, fontSize: 11, marginTop: 2 }}>{Math.ceil((new Date(r.quote_deadline) - now) / (1000*60*60*24))} days remaining</div>}
+                  </div>
+                )}
                   {r.description && <div style={{ color: T.textMuted, fontSize: 12, marginTop: 8, fontStyle: "italic" }}>{r.description}</div>}
                 </div>
                 <Badge status={getMyStatus(r) === 'pending' ? 'vendor-assigned' : getMyStatus(r)} />
@@ -12701,7 +12715,7 @@ const ApprovedVendorsTab = ({ apps, user, load }) => {
               </div>
               <div>
                 {app.status === "login-created" ? (
-                  <span style={{ background: T.teal+"18", color: T.teal, borderRadius: 20, padding: "3px 12px", fontSize: 11, fontWeight: 700 }}>✓ Portal Active</span>
+                  <button onClick={() => { setLoginModal(app); setLoginPwd(generatePassword(app.contact_email || "")); setLoginSuccess("view"); }} style={{ background: T.teal+"18", border: `1px solid ${T.teal}40`, color: T.teal, borderRadius: 20, padding: "3px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>✓ Portal Active — View Login</button>
                 ) : (
                   <button onClick={() => { setLoginModal(app); setLoginPwd(generatePassword(app.contact_email || "")); setLoginSuccess(""); }} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "7px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>🔑 Create Login</button>
                 )}
@@ -12728,7 +12742,22 @@ const ApprovedVendorsTab = ({ apps, user, load }) => {
               {loginPwd && <div style={{ color: T.teal, fontSize: 11, marginTop: 5 }}>✓ Will be emailed to vendor</div>}
             </div>
             {loginSuccess && <div style={{ color: T.teal, fontSize: 12, marginBottom: 12, padding: "8px 12px", background: T.teal+"12", borderRadius: 6 }}>{loginSuccess}</div>}
-            {!loginSuccess ? (
+            {loginSuccess === "view" ? (
+              <div>
+                <div style={{ background: T.teal+"12", border: `1px solid ${T.teal}30`, borderRadius: 8, padding: "14px 16px", marginBottom: 14 }}>
+                  <div style={{ color: T.teal, fontSize: 11, fontWeight: 800, textTransform: "uppercase", marginBottom: 10 }}>Login Details</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div><span style={{ color: T.textMuted, fontSize: 11 }}>Email: </span><span style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{loginModal.contact_email}</span></div>
+                    <div><span style={{ color: T.textMuted, fontSize: 11 }}>Password: </span><span style={{ color: T.cyan, fontWeight: 700, fontSize: 13, fontFamily: "monospace" }}>{loginPwd}</span></div>
+                    <div style={{ color: T.textMuted, fontSize: 10, marginTop: 4 }}>Password shown is the auto-generated one. If vendor changed it, this may differ.</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => { navigator.clipboard.writeText("Email: " + loginModal.contact_email + "\nPassword: " + loginPwd); alert("Copied!"); }} style={{ background: T.cyan+"15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>📋 Copy Details</button>
+                  <button onClick={() => setLoginModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>Close</button>
+                </div>
+              </div>
+            ) : !loginSuccess ? (
               <div style={{ display: "flex", gap: 10 }}>
                 <button onClick={async () => {
                   setLoginSaving(true);

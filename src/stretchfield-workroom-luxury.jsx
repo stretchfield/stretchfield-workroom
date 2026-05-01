@@ -4814,7 +4814,7 @@ const VendorsView = ({ user }) => {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div style={{ display: "flex", gap: 5 }}>
-                {["pending","quote-submitted","approved","declined"].map(s => {
+                {["pending","quote-received","quote-submitted","quote-approved","approved","declined"].map(s => {
                   const count = eventRffs.filter(r => r.status === s).length;
                   if (!count) return null;
                   return <Badge key={s} status={s} />;
@@ -4911,19 +4911,28 @@ const VendorsView = ({ user }) => {
                               border: `1px solid ${T.teal}33`,
                             }}>📎 {r.quote_filename || 'View Quote'}</a>
                           )}
-                          {r.status === 'quote-submitted' && (
+                          {(r.status === 'quote-submitted' || r.status === 'quote-received') && (
                             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                               <Btn small onClick={async () => {
+                                // Update RFF status
                                 await supabase.from('rffs').update({ status: 'quote-approved' }).eq('id', r.id);
+                                // Update vendor assignment status
+                                await supabase.from('rff_vendor_assignments').update({ status: 'quote-approved' }).eq('rff_id', r.id);
+                                // Notify vendor
+                                const { data: assigns } = await supabase.from('rff_vendor_assignments').select('vendor_id, profiles(name, email)').eq('rff_id', r.id);
+                                for (const a of assigns || []) {
+                                  await supabase.from('notifications').insert({ user_id: a.vendor_id, title: 'Quote Approved — ' + r.title, message: 'Your quote for "' + r.title + '" has been approved. You may now submit your invoice.', type: 'rff' });
+                                }
                                 load();
                               }}>✓ Approve Quote</Btn>
                               <Btn small variant="ghost" onClick={async () => {
-                                await supabase.from('rffs').update({ status: 'pending', amount: null, vendor: null, quote_url: null, quote_filename: null }).eq('id', r.id);
+                                await supabase.from('rffs').update({ status: 'pending', quote_url: null, quote_filename: null }).eq('id', r.id);
+                                await supabase.from('rff_vendor_assignments').update({ status: 'pending' }).eq('rff_id', r.id);
                                 load();
                               }}>✕ Reject</Btn>
                             </div>
                           )}
-                          {r.status === 'quote-approved' && <div style={{ color: T.teal, fontSize: 12, fontWeight: 600, marginTop: 12 }}>✓ Quote Approved</div>}
+                          {r.status === 'quote-approved' && <div style={{ color: T.teal, fontSize: 12, fontWeight: 600, marginTop: 12 }}>✓ Quote Approved — Awaiting Invoice</div>}
                         </Card>
                       )}
                     </div>
@@ -5065,27 +5074,40 @@ const InvoicesView = () => {
 
 const VendorRFFsView = ({ user }) => {
   const [rffs, setRffs] = useState([]);
+  const [assignments, setAssignments] = useState({});
   const [quoteModal, setQuoteModal] = useState(null);
+  const [invoiceModal, setInvoiceModal] = useState(null);
   const [now, setNow] = React.useState(new Date());
   React.useEffect(() => { const t = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(t); }, []);
   const isQuoteDeadlinePassed = (rff) => rff.quote_deadline && new Date(rff.quote_deadline) < now;
   const [quoteAmount, setQuoteAmount] = useState('');
   const [quoteFile, setQuoteFile] = useState(null);
+  const [invoiceAmount, setInvoiceAmount] = useState('');
+  const [invoiceFile, setInvoiceFile] = useState(null);
+  const [invoiceNotes, setInvoiceNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const loadRffs = async () => {
-    console.log("VendorRFFsView - user.id:", user?.id, "user:", user);
-    const { data: myAssignments, error: aErr } = await supabase.from("rff_vendor_assignments").select("rff_id").eq("vendor_id", user.id);
-    console.log("Assignments:", myAssignments, "Error:", aErr);
+    if (!user?.id) return;
+    // Load vendor assignments with their own status
+    const { data: myAssignments } = await supabase.from("rff_vendor_assignments").select("*").eq("vendor_id", user.id);
     if (!myAssignments || myAssignments.length === 0) { setRffs([]); return; }
+    
+    // Build assignment map by rff_id
+    const assignMap = {};
+    myAssignments.forEach(a => { assignMap[a.rff_id] = a; });
+    setAssignments(assignMap);
+    
     const rffIds = myAssignments.map(a => a.rff_id);
-    const { data, error: rErr } = await supabase.from("rffs").select("*").in("id", rffIds).order("created_at", { ascending: false });
-    console.log("RFFs:", data, "Error:", rErr);
+    const { data } = await supabase.from("rffs").select("*").in("id", rffIds).order("created_at", { ascending: false });
     setRffs(data || []);
   };
 
-  useEffect(() => { loadRffs(); }, []);
+  useEffect(() => { loadRffs(); }, [user?.id]);
+
+  // Get vendor-specific status for an RFF
+  const getMyStatus = (rff) => assignments[rff.id]?.status || rff.status || 'pending';
 
   const handleSubmitQuote = async () => {
     if (!quoteAmount) { setError('Please enter your quote amount.'); return; }
@@ -5104,7 +5126,7 @@ const VendorRFFsView = ({ user }) => {
       quote_filename = quoteFile.name;
     }
 
-    // Save quote to rff_vendor_assignments
+    // Save quote to vendor assignment only (not global RFF status)
     await supabase.from('rff_vendor_assignments').update({
       quote_amount: parseFloat(quoteAmount),
       quote_document_url: quote_url,
@@ -5113,9 +5135,9 @@ const VendorRFFsView = ({ user }) => {
       status: 'quote-submitted',
     }).eq('rff_id', quoteModal.id).eq('vendor_id', user.id);
 
-    // Also update RFF status
+    // Update RFF to quote-received (not submitted — that is vendor-specific)
     await supabase.from('rffs').update({
-      status: 'quote-submitted',
+      status: 'quote-received',
       quote_url,
       quote_filename,
     }).eq('id', quoteModal.id);
@@ -5171,8 +5193,12 @@ const VendorRFFsView = ({ user }) => {
                 )}
                 {isQuoteDeadlinePassed(r) ? (
                   <div style={{ color: T.red, fontSize: 11, fontWeight: 700, padding: "5px 12px", background: T.red+"12", border: `1px solid ${T.red}30`, borderRadius: 6 }}>⏰ Submission Closed</div>
-                ) : r.status === 'quote-submitted' ? (
-                  <div style={{ color: T.teal, fontSize: 11, fontWeight: 700, padding: "5px 12px", background: T.teal+"12", border: `1px solid ${T.teal}30`, borderRadius: 6 }}>✓ Quote Submitted</div>
+                ) : getMyStatus(r) === 'quote-submitted' ? (
+                  <div style={{ color: T.amber, fontSize: 11, fontWeight: 700, padding: "5px 12px", background: T.amber+"12", border: `1px solid ${T.amber}30`, borderRadius: 6 }}>⏳ Quote Pending Review</div>
+                ) : getMyStatus(r) === 'quote-approved' ? (
+                  <button onClick={() => { setInvoiceModal(r); setInvoiceAmount(""); setInvoiceNotes(""); }} style={{ background: `linear-gradient(135deg, ${T.teal}, #10B981)`, border: "none", color: "#fff", padding: "5px 14px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>🧾 Submit Invoice</button>
+                ) : getMyStatus(r) === 'invoice-submitted' ? (
+                  <div style={{ color: T.teal, fontSize: 11, fontWeight: 700, padding: "5px 12px", background: T.teal+"12", border: `1px solid ${T.teal}30`, borderRadius: 6 }}>✓ Invoice Submitted</div>
                 ) : (
                   <Btn small onClick={() => { setQuoteModal(r); setQuoteAmount(""); }}>Submit Quote</Btn>
                 )}
@@ -5204,6 +5230,60 @@ const VendorRFFsView = ({ user }) => {
           </div>
         </Modal>
       )}
+      {invoiceModal && (
+        <Modal title={"Submit Invoice — " + invoiceModal.title} onClose={() => setInvoiceModal(null)}>
+          <div style={{ background: T.teal+"10", border: `1px solid ${T.teal}30`, borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 12, color: T.teal }}>
+            ✓ Your quote was approved. Please submit your invoice below.
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 5 }}>Invoice Amount (GHS)</label>
+            <input type="number" value={invoiceAmount} onChange={e => setInvoiceAmount(e.target.value)} placeholder="Enter invoice amount" style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 5 }}>Notes</label>
+            <textarea value={invoiceNotes} onChange={e => setInvoiceNotes(e.target.value)} rows={3} placeholder="Any notes for this invoice..." style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", resize: "none", boxSizing: "border-box" }} />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 5 }}>Upload Invoice (PDF)</label>
+            <input type="file" accept=".pdf" onChange={e => setInvoiceFile(e.target.files[0])} style={{ width: "100%", padding: "10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textSecondary, fontSize: 13 }} />
+            {invoiceFile && <div style={{ color: T.cyan, fontSize: 12, marginTop: 6 }}>✓ {invoiceFile.name}</div>}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <Btn onClick={async () => {
+              if (!invoiceAmount) { alert("Please enter invoice amount"); return; }
+              setSaving(true);
+              let invoice_url = "";
+              if (invoiceFile) {
+                const ext = invoiceFile.name.split(".").pop();
+                const fname = "invoice_" + Date.now() + "." + ext;
+                const { error: upErr } = await supabase.storage.from("rffs").upload(fname, invoiceFile);
+                if (!upErr) {
+                  const { data: urlData } = supabase.storage.from("rffs").getPublicUrl(fname);
+                  invoice_url = urlData.publicUrl;
+                }
+              }
+              await supabase.from("rff_vendor_assignments").update({
+                status: "invoice-submitted",
+                invoice_amount: parseFloat(invoiceAmount),
+                invoice_url,
+                invoice_notes: invoiceNotes,
+                invoice_submitted_at: new Date().toISOString(),
+              }).eq("rff_id", invoiceModal.id).eq("vendor_id", user.id);
+              // Notify Finance & CEO
+              const { data: toNotify } = await supabase.from("profiles").select("id,name").in("role", ["CEO","Finance Manager","Vendor Manager"]);
+              for (const p of toNotify || []) {
+                await supabase.from("notifications").insert({ user_id: p.id, title: "Invoice Submitted — " + invoiceModal.title, message: user.name + " submitted an invoice of GHS " + parseFloat(invoiceAmount).toLocaleString() + " for " + invoiceModal.title, type: "rff" });
+              }
+              setSaving(false);
+              setInvoiceModal(null);
+              loadRffs();
+            }} disabled={saving}>{saving ? "Submitting..." : "Submit Invoice"}</Btn>
+            <Btn variant="ghost" onClick={() => setInvoiceModal(null)}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+
+
     </div>
   );
 };

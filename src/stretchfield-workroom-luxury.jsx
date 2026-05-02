@@ -11717,6 +11717,87 @@ const QuoteComparisonView = ({ user }) => {
   const selectedRffData = rffs.find(r => r.id === selectedRff);
   const compareData = compareVendors.map(id => assignments.find(a => a.id === id)).filter(Boolean);
 
+  // ── Weighted Scoring Engine ──
+  const scoreVendor = (a) => {
+    const vp = vendorProfiles.find(v => v.id === a.vendor_id);
+    const allQuotes = filteredAssignments.filter(x => x.quote_amount).map(x => x.quote_amount);
+    const minQuote = Math.min(...allQuotes);
+    const maxQuote = Math.max(...allQuotes);
+
+    // 1. Price Competitiveness (35%) — lower is better
+    const priceScore = allQuotes.length > 1
+      ? ((maxQuote - a.quote_amount) / (maxQuote - minQuote || 1)) * 100
+      : 75;
+
+    // 2. Vendor Rating (25%) — from scorecard or AI default
+    const rawRating = vp?.vendor_score || 0;
+    const completedGigs = pastEvents.filter(e => e.vendor_id === a.vendor_id && e.status === "quote-submitted").length;
+    const ratingScore = rawRating > 0 ? rawRating
+      : completedGigs > 5 ? 70
+      : completedGigs > 2 ? 55
+      : completedGigs > 0 ? 45
+      : 35; // new vendor default
+
+    // 3. Experience (20%) — gigs with Stretchfield
+    const expScore = Math.min(100, completedGigs * 15 + 25);
+
+    // 4. Reliability (15%) — invoice completion ratio
+    const totalAssigned = pastEvents.filter(e => e.vendor_id === a.vendor_id).length;
+    const reliabilityScore = totalAssigned > 0
+      ? Math.min(100, (completedGigs / totalAssigned) * 100)
+      : rawRating > 0 ? 60 : 40;
+
+    // 5. Response Speed (5%) — days from assignment to quote
+    let speedScore = 60;
+    if (a.quote_submitted_at && a.created_at) {
+      const days = Math.ceil((new Date(a.quote_submitted_at) - new Date(a.created_at)) / (1000*60*60*24));
+      speedScore = days <= 1 ? 100 : days <= 3 ? 85 : days <= 7 ? 70 : days <= 14 ? 50 : 30;
+    }
+
+    const total = (priceScore * 0.35) + (ratingScore * 0.25) + (expScore * 0.20) + (reliabilityScore * 0.15) + (speedScore * 0.05);
+
+    return {
+      total: Math.round(total),
+      breakdown: { price: Math.round(priceScore), rating: Math.round(ratingScore), experience: Math.round(expScore), reliability: Math.round(reliabilityScore), speed: Math.round(speedScore) },
+      isNewVendor: completedGigs === 0 && rawRating === 0,
+      completedGigs,
+    };
+  };
+
+  const generateRecommendation = (scored) => {
+    if (scored.length === 0) return null;
+    const sorted = [...scored].sort((a, b) => b.score.total - a.score.total);
+    const winner = sorted[0];
+    const runnerUp = sorted[1];
+    const diff = runnerUp ? winner.score.total - runnerUp.score.total : 100;
+    const vp = vendorProfiles.find(v => v.id === winner.assignment.vendor_id);
+    const category = vp?.service_category || "this category";
+
+    let confidence = diff >= 15 ? "High" : diff >= 8 ? "Moderate" : "Marginal";
+    let reasoning = "";
+    let risk = "";
+
+    if (winner.score.breakdown.price >= 80) reasoning += "Offers the most competitive pricing. ";
+    else if (winner.score.breakdown.price >= 60) reasoning += "Pricing is competitive relative to peers. ";
+    else reasoning += "Pricing is higher but offset by other strengths. ";
+
+    if (winner.score.completedGigs > 3) reasoning += `Has ${winner.score.completedGigs} completed engagements with Stretchfield. `;
+    else if (winner.score.completedGigs > 0) reasoning += "Has prior experience with Stretchfield. ";
+    else reasoning += "No prior Stretchfield history — first engagement. ";
+
+    if (winner.score.breakdown.rating >= 70) reasoning += "Strong vendor rating supports selection.";
+    else if (winner.score.breakdown.rating >= 50) reasoning += "Adequate vendor standing.";
+
+    if (winner.score.isNewVendor) risk = "New vendor with no track record. Consider requesting references or a smaller initial engagement.";
+    else if (winner.score.breakdown.price < 40) risk = "Selected primarily on non-price factors. Verify quality can match the premium.";
+    else if (diff < 8) risk = "Scores are very close — any of the top vendors would be a reasonable choice.";
+
+    return { winner, runnerUp, confidence, reasoning, risk, sorted };
+  };
+
+  const scoredData = compareData.map(a => ({ assignment: a, score: scoreVendor(a) }));
+  const recommendation = compareData.length >= 2 ? generateRecommendation(scoredData) : null;
+
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
       {/* Header */}
@@ -11855,36 +11936,135 @@ const QuoteComparisonView = ({ user }) => {
             </div>
           )}
 
-          {/* Side by Side Comparison */}
-          {compareData.length === 2 && (
-            <div style={{ background: T.surface, border: `1px solid ${T.amber}30`, borderRadius: 12, padding: "20px", marginBottom: 20 }}>
-              <div style={{ color: T.amber, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Side-by-Side Comparison</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0 }}>
-                <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}></div>
-                {compareData.map(a => (
-                  <div key={a.id} style={{ padding: "10px 14px", background: T.amber + "10", borderRadius: 8, textAlign: "center", margin: "0 6px" }}>
-                    <div style={{ color: T.amber, fontWeight: 900, fontSize: 14 }}>{a.vendor_name}</div>
+          {/* ── Weighted Scoring Matrix ── */}
+          {compareData.length >= 2 && (
+            <div style={{ marginBottom: 20 }}>
+
+              {/* AI Recommendation Banner */}
+              {recommendation && (
+                <div style={{ background: `linear-gradient(135deg, ${T.teal}18, ${T.cyan}12)`, border: `1px solid ${T.teal}40`, borderRadius: 14, padding: "20px 24px", marginBottom: 20 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                    <div>
+                      <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>Stretchfield Intelligence — Recommendation</div>
+                      <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18 }}>Award to {recommendation.winner.assignment.vendor_name}</div>
+                      <div style={{ color: T.teal, fontSize: 13, fontWeight: 700, marginTop: 2 }}>Score: {recommendation.winner.score.total}/100 · {recommendation.confidence} Confidence</div>
+                    </div>
+                    <div style={{ background: T.teal+"20", border: `1px solid ${T.teal}40`, borderRadius: 10, padding: "8px 16px", textAlign: "center" }}>
+                      <div style={{ color: T.teal, fontSize: 24, fontWeight: 900 }}>{recommendation.winner.score.total}</div>
+                      <div style={{ color: T.textMuted, fontSize: 9, textTransform: "uppercase", letterSpacing: "0.08em" }}>Score</div>
+                    </div>
                   </div>
-                ))}
-                {[
-                  ["Total Quote", (a) => `GHS ${(a.quote_amount || 0).toLocaleString()}`],
-                  ["vs Budget", (a) => { if (!activeBudget) return "No budget set"; const v = (((a.quote_amount - activeBudget) / activeBudget) * 100).toFixed(1); return parseFloat(v) <= 0 ? `✓ ${Math.abs(v)}% under budget` : `⚠ ${v}% over budget`; }],
-                  ["Vendor Rating", (a) => { const vp = vendorProfiles.find(v => v.id === a.vendor_id); if (!vp || !vp.vendor_scorecard_count) return "Unrated"; const t = getTier(vp.vendor_score || 0); return `${t.label} (${vp.vendor_score}%)`; }],
-                  ["Experience", (a) => { const c = pastEvents.filter(e => e.vendor_id === a.vendor_id && e.quote_submitted_at).length; return c > 0 ? `${c} event${c>1?"s":""} with Stretchfield` : "New vendor"; }],
-                  ["Response Speed", (a) => { if (!a.quote_submitted_at || !a.created_at) return "—"; const d = Math.ceil((new Date(a.quote_submitted_at) - new Date(a.created_at))/(1000*60*60*24)); return `${d} day${d!==1?"s":""}`; }],
-                  ["Document", (a) => a.quote_document_url ? "✓ Submitted" : "✗ Not submitted"],
-                  ["Payment Terms", (a) => { const va = vendorApps.find(v => v.vendor_name === a.vendor_name); return va?.payment_terms || "Not specified"; }],
-                  ["Submitted", (a) => a.quote_submitted_at ? new Date(a.quote_submitted_at).toLocaleDateString("en-GB") : "—"],
-                ].map(([label, fn]) => (
-                  <React.Fragment key={label}>
-                    <div style={{ padding: "10px 0", color: T.textMuted, fontSize: 12, display: "flex", alignItems: "center" }}>{label}</div>
-                    {compareData.map(a => (
-                      <div key={a.id} style={{ padding: "10px 14px", textAlign: "center", borderBottom: `1px solid ${T.border}44` }}>
-                        <span style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{fn(a)}</span>
+                  <div style={{ color: T.textSecondary, fontSize: 13, lineHeight: 1.6, marginBottom: recommendation.risk ? 10 : 0 }}>{recommendation.reasoning}</div>
+                  {recommendation.risk && (
+                    <div style={{ background: T.amber+"15", border: `1px solid ${T.amber}30`, borderRadius: 8, padding: "8px 12px", marginTop: 8 }}>
+                      <span style={{ color: T.amber, fontSize: 11, fontWeight: 800 }}>Risk Note: </span>
+                      <span style={{ color: T.textSecondary, fontSize: 12 }}>{recommendation.risk}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Score Cards */}
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${compareData.length}, 1fr)`, gap: 12, marginBottom: 20 }}>
+                {scoredData.sort((a,b) => b.score.total - a.score.total).map((item, idx) => {
+                  const a = item.assignment;
+                  const s = item.score;
+                  const isWinner = idx === 0;
+                  const vp = vendorProfiles.find(v => v.id === a.vendor_id);
+                  return (
+                    <div key={a.id} style={{ background: isWinner ? `linear-gradient(160deg, ${T.teal}18, ${T.surface})` : T.surface, border: `2px solid ${isWinner ? T.teal : T.border}`, borderRadius: 12, padding: "18px 16px", position: "relative" }}>
+                      {isWinner && <div style={{ position: "absolute", top: -10, left: "50%", transform: "translateX(-50%)", background: T.teal, color: "#fff", fontSize: 9, fontWeight: 900, padding: "2px 12px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>Recommended</div>}
+                      <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 15, marginBottom: 4, marginTop: isWinner ? 4 : 0 }}>{a.vendor_name}</div>
+                      {vp?.service_category && <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 12 }}>{vp.service_category}</div>}
+
+                      {/* Total Score */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                        <div style={{ flex: 1, height: 8, background: T.border+"44", borderRadius: 4, overflow: "hidden" }}>
+                          <div style={{ width: s.total+"%", height: "100%", background: isWinner ? `linear-gradient(90deg, ${T.teal}, ${T.cyan})` : T.amber, borderRadius: 4, transition: "width 0.8s ease" }} />
+                        </div>
+                        <span style={{ color: isWinner ? T.teal : T.amber, fontWeight: 900, fontSize: 16, minWidth: 36 }}>{s.total}</span>
                       </div>
-                    ))}
-                  </React.Fragment>
-                ))}
+
+                      {/* Quote Amount */}
+                      <div style={{ marginBottom: 14, padding: "10px 12px", background: T.bg, borderRadius: 8 }}>
+                        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>Quote Amount</div>
+                        <div style={{ color: T.gold, fontWeight: 900, fontSize: 17 }}>GHS {(a.quote_amount||0).toLocaleString()}</div>
+                        {activeBudget > 0 && (
+                          <div style={{ color: a.quote_amount <= activeBudget ? T.teal : "#F43F5E", fontSize: 11, fontWeight: 700, marginTop: 3 }}>
+                            {a.quote_amount <= activeBudget ? `✓ ${((1 - a.quote_amount/activeBudget)*100).toFixed(1)}% under budget` : `⚠ ${(((a.quote_amount-activeBudget)/activeBudget)*100).toFixed(1)}% over budget`}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Score Breakdown */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {[
+                          ["Price", s.breakdown.price, "35%"],
+                          ["Rating", s.breakdown.rating, "25%"],
+                          ["Experience", s.breakdown.experience, "20%"],
+                          ["Reliability", s.breakdown.reliability, "15%"],
+                          ["Speed", s.breakdown.speed, "5%"],
+                        ].map(([label, val, weight]) => (
+                          <div key={label}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                              <span style={{ color: T.textMuted, fontSize: 10 }}>{label} <span style={{ color: T.textGhost, fontSize: 9 }}>({weight})</span></span>
+                              <span style={{ color: val >= 70 ? T.teal : val >= 50 ? T.amber : "#F43F5E", fontSize: 10, fontWeight: 700 }}>{val}</span>
+                            </div>
+                            <div style={{ height: 4, background: T.border+"33", borderRadius: 2, overflow: "hidden" }}>
+                              <div style={{ width: val+"%", height: "100%", background: val >= 70 ? T.teal : val >= 50 ? T.amber : "#F43F5E", borderRadius: 2 }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Details */}
+                      <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${T.border}44` }}>
+                        <div style={{ color: T.textMuted, fontSize: 11 }}>Gigs with Stretchfield: <strong style={{ color: T.textPrimary }}>{s.completedGigs || "None"}</strong></div>
+                        {s.isNewVendor && <div style={{ color: T.amber, fontSize: 10, fontWeight: 700, marginTop: 4 }}>New vendor — no prior history</div>}
+                        {a.quote_document_url && <div style={{ marginTop: 6 }}><a href={a.quote_document_url} target="_blank" rel="noreferrer" style={{ color: T.cyan, fontSize: 11, fontWeight: 700 }}>View Quote Document</a></div>}
+                      </div>
+
+                      <button onClick={() => { setAwardModal(a); setAwardNotes(""); setAgreedAmount(a.quote_amount || ""); }} style={{ width: "100%", marginTop: 14, padding: "9px", background: isWinner ? `linear-gradient(135deg, ${T.teal}, #10B981)` : T.surface, border: isWinner ? "none" : `1px solid ${T.border}`, color: isWinner ? "#fff" : T.textMuted, borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 800 }}>
+                        {isWinner ? "Award Gig" : "Award Anyway"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Comparison Table */}
+              <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ padding: "14px 20px", borderBottom: `1px solid ${T.border}`, color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em" }}>Detailed Comparison</div>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr>
+                        <th style={{ padding: "10px 16px", color: T.textMuted, fontSize: 11, fontWeight: 700, textAlign: "left", borderBottom: `1px solid ${T.border}` }}>Criteria</th>
+                        {scoredData.sort((a,b) => b.score.total - a.score.total).map(item => (
+                          <th key={item.assignment.id} style={{ padding: "10px 16px", color: T.textPrimary, fontSize: 12, fontWeight: 800, textAlign: "center", borderBottom: `1px solid ${T.border}`, background: item === scoredData.sort((a,b)=>b.score.total-a.score.total)[0] ? T.teal+"10" : "none" }}>{item.assignment.vendor_name}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        ["Quote Amount", a => "GHS " + (a.quote_amount||0).toLocaleString()],
+                        ["vs Budget", a => { if (!activeBudget) return "—"; const v = (((a.quote_amount - activeBudget)/activeBudget)*100).toFixed(1); return parseFloat(v) <= 0 ? "✓ "+Math.abs(v)+"% under" : "⚠ "+v+"% over"; }],
+                        ["Payment Terms", a => { const va = vendorApps.find(v => v.vendor_name === a.vendor_name); return va?.payment_terms || "Not specified"; }],
+                        ["Response Time", a => { if (!a.quote_submitted_at || !a.created_at) return "—"; const d = Math.ceil((new Date(a.quote_submitted_at)-new Date(a.created_at))/(1000*60*60*24)); return d+" day"+(d!==1?"s":""); }],
+                        ["Quote Document", a => a.quote_document_url ? "✓ Submitted" : "✗ Not submitted"],
+                        ["Submitted On", a => a.quote_submitted_at ? new Date(a.quote_submitted_at).toLocaleDateString("en-GB") : "—"],
+                        ["Overall Score", a => { const s = scoredData.find(x => x.assignment.id === a.id); return s ? s.score.total + "/100" : "—"; }],
+                      ].map(([label, fn]) => (
+                        <tr key={label}>
+                          <td style={{ padding: "10px 16px", color: T.textMuted, fontSize: 12, borderBottom: `1px solid ${T.border}22` }}>{label}</td>
+                          {scoredData.sort((a,b)=>b.score.total-a.score.total).map(item => (
+                            <td key={item.assignment.id} style={{ padding: "10px 16px", color: T.textPrimary, fontSize: 13, fontWeight: 600, textAlign: "center", borderBottom: `1px solid ${T.border}22`, background: item === scoredData.sort((a,b)=>b.score.total-a.score.total)[0] ? T.teal+"06" : "none" }}>{fn(item.assignment)}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}

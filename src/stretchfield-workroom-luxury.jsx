@@ -2462,149 +2462,328 @@ const ClientFeedbackForm = ({ event, user }) => {
 const ClientEventsView = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [milestones, setMilestones] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [messages, setMessages] = useState([]);
   const [clientInfo, setClientInfo] = useState(null);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [activeSection, setActiveSection] = useState("overview");
+  const [newMessage, setNewMessage] = useState("");
+  const [sendingMsg, setSendingMsg] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const load = async () => {
     if (!user?.id) return;
+    setLoading(true);
     let clientData = null;
     const { data: byProfile } = await supabase.from('clients').select('*').eq('profile_id', user.id).single();
-    if (byProfile) {
-      clientData = byProfile;
-    } else {
+    if (byProfile) { clientData = byProfile; }
+    else {
       const { data: byEmail } = await supabase.from('clients').select('*').eq('email', user.email).single();
-      if (byEmail) {
-        clientData = byEmail;
-        await supabase.from('clients').update({ profile_id: user.id }).eq('id', byEmail.id);
-      }
+      if (byEmail) { clientData = byEmail; await supabase.from('clients').update({ profile_id: user.id }).eq('id', byEmail.id); }
     }
     if (clientData) {
       setClientInfo(clientData);
-      const [ev, tk] = await Promise.all([
-        supabase.from('projects').select('*').eq('client_id', clientData.id).eq('active_for_client', true),
+      const [ev, tk, ms, dc, mg] = await Promise.all([
+        supabase.from('projects').select('*').eq('client_id', clientData.id).eq('active_for_client', true).order('event_date'),
         supabase.from('tasks').select('*').eq('client_id', clientData.id).eq('visible_to_client', true),
+        supabase.from('client_milestones').select('*').eq('project_id', clientData.id).order('due_date'),
+        supabase.from('event_documents').select('*').eq('client_id', clientData.id).order('created_at', { ascending: false }),
+        supabase.from('client_messages').select('*').eq('client_id', clientData.id).order('created_at', { ascending: true }),
       ]);
-      setEvents(ev.data || []);
+      const evData = ev.data || [];
+      setEvents(evData);
       setTasks(tk.data || []);
+      // Load milestones per project
+      if (evData.length > 0) {
+        const { data: ms2 } = await supabase.from('client_milestones').select('*').in('project_id', evData.map(e => e.id)).order('due_date');
+        setMilestones(ms2 || []);
+        const { data: dc2 } = await supabase.from('event_documents').select('*').in('project_id', evData.map(e => e.id)).order('created_at', { ascending: false });
+        setDocuments(dc2 || []);
+        const { data: mg2 } = await supabase.from('client_messages').select('*').in('project_id', evData.map(e => e.id)).order('created_at', { ascending: true });
+        setMessages(mg2 || []);
+        if (!selectedEvent && evData.length > 0) setSelectedEvent(evData[0]);
+      }
     }
+    setLoading(false);
   };
 
   useEffect(() => { load(); }, [user?.id]);
 
-  // Real-time updates
-  useEffect(() => {
-    const projectSub = supabase.channel('client-projects')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => load())
-      .subscribe();
-    const taskSub = supabase.channel('client-tasks')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => load())
-      .subscribe();
-    return () => { supabase.removeChannel(projectSub); supabase.removeChannel(taskSub); };
-  }, []);
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !selectedEvent) return;
+    setSendingMsg(true);
+    await supabase.from('client_messages').insert({
+      project_id: selectedEvent.id,
+      client_id: clientInfo.id,
+      sender_id: user.id,
+      sender_name: user.name,
+      sender_role: 'Client',
+      message: newMessage.trim(),
+      read_by_team: false,
+      read_by_client: true,
+    });
+    // Notify Stretchfield team
+    const { data: team } = await supabase.from('profiles').select('id').in('role', ['CEO', 'Strategy & Events Lead']);
+    for (const t of team || []) {
+      await supabase.from('notifications').insert({ user_id: t.id, title: 'Client Message — ' + selectedEvent.name, message: user.name + ': ' + newMessage.trim().slice(0,80), type: 'task' });
+    }
+    setNewMessage('');
+    setSendingMsg(false);
+    load();
+  };
+
+  const approveItem = async (table, id, field) => {
+    await supabase.from(table).update({ [field]: true, approved_at: new Date().toISOString() }).eq('id', id);
+    load();
+  };
+
+  const PHASES = ['Brief', 'Planning', 'Pre-Production', 'Production', 'Live', 'Post-Production', 'Completed'];
+
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: T.textMuted }}>Loading your events...</div>;
+
+  if (events.length === 0) return (
+    <div style={{ textAlign: 'center', padding: 80, background: T.surface, borderRadius: 16, border: `1px solid ${T.border}` }}>
+      <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 18, marginBottom: 8 }}>No active events</div>
+      <div style={{ color: T.textMuted, fontSize: 13 }}>Your events will appear here once your Stretchfield team activates them.</div>
+    </div>
+  );
+
+  const ev = selectedEvent;
+  const evTasks = tasks.filter(t => t.project_id === ev?.id);
+  const evMilestones = milestones.filter(m => m.project_id === ev?.id);
+  const evDocs = documents.filter(d => d.project_id === ev?.id);
+  const evMessages = messages.filter(m => m.project_id === ev?.id);
+  const completedMilestones = evMilestones.filter(m => m.status === 'completed').length;
+  const daysToEvent = ev?.event_date ? Math.ceil((new Date(ev.event_date) - new Date()) / (1000*60*60*24)) : null;
+  const phaseIdx = PHASES.indexOf(ev?.phase || 'Planning');
+  const completedTasks = evTasks.filter(t => t.status === 'completed').length;
+  const pendingApprovals = [...evMilestones.filter(m => m.requires_approval && !m.approved_by_client), ...evDocs.filter(d => d.requires_approval && !d.approved_by_client)];
+  const unreadMessages = evMessages.filter(m => m.sender_role !== 'Client' && !m.read_by_client).length;
 
   return (
-    <div>
-      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, animation: "fadeUp 0.35s ease" }}>
-        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Client Portal</div>
-        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>My Events</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Your active engagements and task progress</div>
-      </div>
-      {events.length === 0 ? (
-        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
-          <div style={{ fontSize: 40, marginBottom: 16 }}>📁</div>
-          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No events assigned</div>
-          <div style={{ color: T.textMuted, fontSize: 13 }}>Events assigned to you will appear here.</div>
+    <div style={{ animation: 'fadeUp 0.35s ease', maxWidth: 900 }}>
+
+      {/* Event Selector if multiple events */}
+      {events.length > 1 && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 24, overflowX: 'auto', paddingBottom: 4 }}>
+          {events.map(e => (
+            <button key={e.id} onClick={() => { setSelectedEvent(e); setActiveSection('overview'); }} style={{ padding: '8px 18px', borderRadius: 20, border: `1px solid ${selectedEvent?.id === e.id ? T.cyan : T.border}`, background: selectedEvent?.id === e.id ? T.cyan+'18' : 'none', color: selectedEvent?.id === e.id ? T.cyan : T.textMuted, fontWeight: selectedEvent?.id === e.id ? 700 : 400, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}>{e.name}</button>
+          ))}
         </div>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 20 }}>
-          {events.map(p => {
-            const eventTasks = tasks.filter(t => t.project_id === p.id);
-            const completedTasks = eventTasks.filter(t => t.status === 'completed').length;
-            const inProgressTasks = eventTasks.filter(t => t.status === 'in-progress').length;
-            return (
-              <div key={p.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 22px", transition: "box-shadow 0.2s" }}
-                onMouseEnter={e => e.currentTarget.style.boxShadow = `0 4px 24px ${T.cyan}10`}
-                onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
-              >
-                {/* Event Header */}
-                {(() => {
-                  const daysLeft = p.deadline ? Math.ceil((new Date(p.deadline) - new Date()) / 86400000) : null;
-                  const isOver = daysLeft !== null && daysLeft < 0;
-                  const isToday = daysLeft === 0;
-                  const isSoon = daysLeft !== null && daysLeft > 0 && daysLeft <= 7;
-                  const countdownColor = isOver ? T.red : isToday ? T.red : isSoon ? T.amber : T.teal;
-                  const countdownBg = isOver ? T.red : isToday ? T.red : isSoon ? T.amber : T.teal;
-                  const countdownLabel = isOver ? `${Math.abs(daysLeft)}d overdue` : isToday ? "Today!" : `${daysLeft} day${daysLeft !== 1 ? "s" : ""} to go`;
-                  return (
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ color: T.textPrimary, fontSize: 18, fontWeight: 800, marginBottom: 6 }}>{p.name}</div>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                          <span style={{ background: T.cyan + "20", color: T.cyan, padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>{p.phase || "Planning"}</span>
-                          {p.deadline && (
-                            <span style={{ color: T.textMuted, fontSize: 11 }}>📅 {p.deadline}</span>
-                          )}
+      )}
+
+      {ev && (
+        <>
+          {/* Event Hero */}
+          <div style={{ background: `linear-gradient(135deg, ${T.bgDeep}, ${T.surface})`, border: `1px solid ${T.border}`, borderRadius: 16, padding: '28px 28px 20px', marginBottom: 20, position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: 0, right: 0, width: 200, height: 200, background: `radial-gradient(circle, ${T.cyan}08, transparent 70%)`, pointerEvents: 'none' }} />
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 6 }}>{ev.event_category || ev.event_type || 'Event'}</div>
+            <h1 style={{ margin: '0 0 6px', color: T.textPrimary, fontSize: 24, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.2 }}>{ev.name}</h1>
+            <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 20 }}>
+              {ev.event_date ? new Date(ev.event_date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'Date TBC'}
+              {ev.client && ' · ' + ev.client}
+            </div>
+
+            {/* Countdown */}
+            {daysToEvent !== null && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, background: daysToEvent <= 7 ? T.red+'15' : daysToEvent <= 30 ? T.amber+'15' : T.cyan+'12', border: `1px solid ${daysToEvent <= 7 ? T.red : daysToEvent <= 30 ? T.amber : T.cyan}30`, borderRadius: 10, padding: '10px 18px', marginBottom: 20 }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ color: daysToEvent <= 7 ? T.red : daysToEvent <= 30 ? T.amber : T.cyan, fontSize: 28, fontWeight: 900, lineHeight: 1 }}>{daysToEvent > 0 ? daysToEvent : daysToEvent === 0 ? 'Today' : Math.abs(daysToEvent)}</div>
+                  <div style={{ color: T.textMuted, fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{daysToEvent > 0 ? 'Days to go' : daysToEvent === 0 ? '' : 'Days ago'}</div>
+                </div>
+                <div style={{ width: 1, height: 32, background: T.border }} />
+                <div>
+                  <div style={{ color: T.textPrimary, fontSize: 12, fontWeight: 700 }}>{ev.event_date ? new Date(ev.event_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11 }}>Event Date</div>
+                </div>
+              </div>
+            )}
+
+            {/* Phase Progress */}
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Event Journey</span>
+                <span style={{ color: T.cyan, fontSize: 10, fontWeight: 700 }}>{ev.phase || 'Planning'}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 3 }}>
+                {PHASES.map((phase, i) => (
+                  <div key={phase} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= phaseIdx ? (i === phaseIdx ? T.cyan : T.teal) : T.border+'44', transition: 'background 0.3s' }} title={phase} />
+                ))}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                <span style={{ color: T.textMuted, fontSize: 9 }}>Brief</span>
+                <span style={{ color: T.textMuted, fontSize: 9 }}>Completed</span>
+              </div>
+            </div>
+
+            {/* KPI Strip */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px,1fr))', gap: 10, marginTop: 16 }}>
+              {[
+                { label: 'Milestones', value: completedMilestones + '/' + evMilestones.length, color: T.teal },
+                { label: 'Tasks Done', value: completedTasks + '/' + evTasks.length, color: T.cyan },
+                { label: 'Documents', value: evDocs.length, color: T.amber },
+                { label: 'Approvals Needed', value: pendingApprovals.length, color: pendingApprovals.length > 0 ? T.red : T.textMuted },
+              ].map(k => (
+                <div key={k.label} style={{ background: T.bg, borderRadius: 8, padding: '10px 12px', border: `1px solid ${T.border}` }}>
+                  <div style={{ color: k.color, fontWeight: 900, fontSize: 18 }}>{k.value}</div>
+                  <div style={{ color: T.textMuted, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 2 }}>{k.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Section Tabs */}
+          <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: `1px solid ${T.border}`, paddingBottom: 0 }}>
+            {[
+              { id: 'overview', label: 'Overview' },
+              { id: 'milestones', label: 'Milestones' + (evMilestones.length > 0 ? ' ('+evMilestones.length+')' : '') },
+              { id: 'documents', label: 'Documents' + (evDocs.length > 0 ? ' ('+evDocs.length+')' : '') },
+              { id: 'messages', label: 'Messages' + (unreadMessages > 0 ? ' ●' : '') },
+            ].map(tab => (
+              <button key={tab.id} onClick={() => setActiveSection(tab.id)} style={{ padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', color: activeSection === tab.id ? T.cyan : T.textMuted, fontWeight: activeSection === tab.id ? 800 : 400, fontSize: 13, borderBottom: activeSection === tab.id ? `2px solid ${T.cyan}` : '2px solid transparent', marginBottom: -1, transition: 'all 0.15s' }}>{tab.label}</button>
+            ))}
+          </div>
+
+          {/* Overview Tab */}
+          {activeSection === 'overview' && (
+            <div>
+              {/* Pending Approvals Alert */}
+              {pendingApprovals.length > 0 && (
+                <div style={{ background: T.amber+'12', border: `1px solid ${T.amber}30`, borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
+                  <div style={{ color: T.amber, fontWeight: 800, fontSize: 13, marginBottom: 4 }}>Action Required — {pendingApprovals.length} item{pendingApprovals.length !== 1 ? 's' : ''} awaiting your approval</div>
+                  <div style={{ color: T.textMuted, fontSize: 12 }}>Please review and approve the items in Milestones or Documents.</div>
+                </div>
+              )}
+
+              {/* Recent Milestones */}
+              {evMilestones.length > 0 && (
+                <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: '20px', marginBottom: 16 }}>
+                  <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 14 }}>Latest Milestones</div>
+                  {evMilestones.slice(0,4).map(m => {
+                    const statusColor = m.status === 'completed' ? T.teal : m.status === 'in-progress' ? T.cyan : T.textMuted;
+                    return (
+                      <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: `1px solid ${T.border}22` }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: statusColor, flexShrink: 0 }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{m.title}</div>
+                          {m.due_date && <div style={{ color: T.textMuted, fontSize: 11 }}>{new Date(m.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</div>}
+                        </div>
+                        <span style={{ color: statusColor, fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>{m.status}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Recent Messages */}
+              {evMessages.length > 0 && (
+                <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: '20px' }}>
+                  <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 14 }}>Recent Messages</div>
+                  {evMessages.slice(-2).map(m => (
+                    <div key={m.id} style={{ padding: '10px 0', borderBottom: `1px solid ${T.border}22` }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ color: m.sender_role === 'Client' ? T.cyan : T.teal, fontSize: 11, fontWeight: 700 }}>{m.sender_name}</span>
+                        <span style={{ color: T.textMuted, fontSize: 10 }}>{new Date(m.created_at).toLocaleDateString('en-GB')}</span>
+                      </div>
+                      <div style={{ color: T.textSecondary, fontSize: 13 }}>{m.message}</div>
+                    </div>
+                  ))}
+                  <button onClick={() => setActiveSection('messages')} style={{ marginTop: 10, background: 'none', border: 'none', color: T.cyan, fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: 0 }}>View all messages →</button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Milestones Tab */}
+          {activeSection === 'milestones' && (
+            <div>
+              {evMilestones.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}`, color: T.textMuted, fontSize: 13 }}>No milestones have been added yet.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {evMilestones.map(m => {
+                    const statusColors = { pending: T.textMuted, 'in-progress': T.cyan, completed: T.teal };
+                    const color = statusColors[m.status] || T.textMuted;
+                    return (
+                      <div key={m.id} style={{ background: T.surface, border: `1px solid ${m.status === 'completed' ? T.teal+'40' : T.border}`, borderLeft: `3px solid ${color}`, borderRadius: 12, padding: '16px 20px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{m.title}</div>
+                            {m.description && <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>{m.description}</div>}
+                            {m.due_date && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 6 }}>Due: {new Date(m.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</div>}
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                            <span style={{ color, fontSize: 10, fontWeight: 800, textTransform: 'uppercase', background: color+'18', padding: '3px 10px', borderRadius: 20 }}>{m.status}</span>
+                            {m.requires_approval && !m.approved_by_client && m.status === 'completed' && (
+                              <button onClick={() => approveItem('client_milestones', m.id, 'approved_by_client')} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 800 }}>Approve ✓</button>
+                            )}
+                            {m.approved_by_client && <span style={{ color: T.teal, fontSize: 10, fontWeight: 700 }}>✓ Approved by you</span>}
+                          </div>
                         </div>
                       </div>
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0, marginLeft: 12 }}>
-                        {/* Completion */}
-                        <div style={{ textAlign: "center" }}>
-                          <div style={{ fontSize: 30, fontWeight: 900, color: p.completion >= 80 ? T.teal : p.completion >= 50 ? T.cyan : T.amber, lineHeight: 1 }}>{p.completion || 0}%</div>
-                          <div style={{ color: T.textMuted, fontSize: 10 }}>Complete</div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Documents Tab */}
+          {activeSection === 'documents' && (
+            <div>
+              {evDocs.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}`, color: T.textMuted, fontSize: 13 }}>No documents have been shared yet.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {evDocs.map(d => (
+                    <div key={d.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: '16px 20px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{d.title}</div>
+                          <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>{d.document_type || 'Document'} · Shared by {d.shared_by_name} · {new Date(d.created_at).toLocaleDateString('en-GB')}</div>
                         </div>
-                        {/* Countdown pill */}
-                        {daysLeft !== null && (
-                          <div style={{ background: countdownBg + "18", border: `1px solid ${countdownBg}40`, borderRadius: 20, padding: "4px 12px", display: "flex", alignItems: "center", gap: 5 }}>
-                            <div style={{ width: 5, height: 5, borderRadius: "50%", background: countdownColor, boxShadow: `0 0 5px ${countdownColor}`, flexShrink: 0 }} />
-                            <span style={{ color: countdownColor, fontSize: 11, fontWeight: 800 }}>{countdownLabel}</span>
-                          </div>
-                        )}
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          {d.document_url && (
+                            <a href={d.document_url} target="_blank" rel="noreferrer" style={{ background: T.cyan+'15', border: `1px solid ${T.cyan}30`, color: T.cyan, padding: '7px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>Download</a>
+                          )}
+                          {d.requires_approval && !d.approved_by_client && (
+                            <button onClick={() => approveItem('event_documents', d.id, 'approved_by_client')} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: 'none', color: '#fff', padding: '7px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 800 }}>Approve ✓</button>
+                          )}
+                          {d.approved_by_client && <span style={{ color: T.teal, fontSize: 11, fontWeight: 700 }}>✓ Approved</span>}
+                        </div>
                       </div>
                     </div>
-                  );
-                })()}
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
-                {/* Event Progress Bar */}
-                <ProgressBar value={p.completion || 0} height={10} color={p.completion >= 80 ? T.teal : p.completion >= 50 ? T.cyan : T.amber} />
-
-                {/* Task Summary */}
-                {eventTasks.length > 0 && (
-                  <div style={{ display: "flex", gap: 12, marginTop: 12, marginBottom: 16 }}>
-                    <div style={{ color: T.textMuted, fontSize: 12 }}>📋 {eventTasks.length} task{eventTasks.length > 1 ? "s" : ""}</div>
-                    <div style={{ color: T.teal, fontSize: 12 }}>✅ {completedTasks} done</div>
-                    <div style={{ color: T.cyan, fontSize: 12 }}>⚙️ {inProgressTasks} in progress</div>
-                  </div>
-                )}
-
-                {/* Tasks Breakdown */}
-                {eventTasks.length > 0 && (
-                  <div style={{ borderTop: "1px solid " + T.border, paddingTop: 14 }}>
-                    <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>Task Breakdown</div>
-                    {eventTasks.map(t => (
-                      <div key={t.id} style={{ marginBottom: 14 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                          <div>
-                            <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{t.name}</div>
-                            {t.deadline && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Due {t.deadline}</div>}
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <span style={{ color: T.cyan, fontWeight: 700, fontSize: 13 }}>{t.progress || 0}%</span>
-                            <Badge status={t.status} />
-                          </div>
-                        </div>
-                        <ProgressBar value={t.progress || 0} height={6} color={t.status === "completed" ? T.teal : t.status === "in-progress" ? T.cyan : T.amber} />
+          {/* Messages Tab */}
+          {activeSection === 'messages' && (
+            <div>
+              <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: '20px', marginBottom: 16, maxHeight: 400, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {evMessages.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No messages yet. Start a conversation with your Stretchfield team.</div>}
+                {evMessages.map(m => {
+                  const isClient = m.sender_role === 'Client';
+                  return (
+                    <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isClient ? 'flex-end' : 'flex-start' }}>
+                      <div style={{ maxWidth: '80%', background: isClient ? T.cyan+'18' : T.bg, border: `1px solid ${isClient ? T.cyan+'30' : T.border}`, borderRadius: isClient ? '12px 12px 2px 12px' : '12px 12px 12px 2px', padding: '10px 14px' }}>
+                        <div style={{ color: T.textPrimary, fontSize: 13, lineHeight: 1.5 }}>{m.message}</div>
                       </div>
-                    ))}
-                  </div>
-                )}
-
-                {eventTasks.length === 0 && (
-                  <div style={{ marginTop: 12, color: T.textMuted, fontSize: 13, fontStyle: "italic" }}>No tasks assigned yet.</div>
-                )}
-                <ClientFeedbackForm event={p} user={user} />
+                      <div style={{ color: T.textMuted, fontSize: 10, marginTop: 3 }}>{m.sender_name} · {new Date(m.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <textarea value={newMessage} onChange={e => setNewMessage(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }}} placeholder="Type a message to your Stretchfield team..." rows={2} style={{ flex: 1, padding: '10px 14px', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10, color: T.textPrimary, fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'none' }} />
+                <button onClick={sendMessage} disabled={sendingMsg || !newMessage.trim()} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: 'none', color: '#fff', padding: '10px 20px', borderRadius: 10, cursor: 'pointer', fontWeight: 800, fontSize: 13, opacity: !newMessage.trim() ? 0.6 : 1 }}>{sendingMsg ? '...' : 'Send'}</button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

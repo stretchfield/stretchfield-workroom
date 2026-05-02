@@ -2244,61 +2244,6 @@ const ClientDashboard = ({ user }) => {
         </div>
       )}
 
-      {/* ── Budget & Invoices Summary ── */}
-      {(budgets.length > 0 || invoices.length > 0) && (
-        <div style={{ marginTop: 28 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>💰 Budget & Invoices</div>
-            <span style={{ color: T.cyan, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>See full details in Budget & Invoices tab →</span>
-          </div>
-
-          {/* Budget summary per event */}
-          {budgets.length > 0 && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12, marginBottom: 16 }}>
-              {budgets.map(b => {
-                const ev = events.find(e => e.id === b.project_id);
-                if (!ev) return null;
-                const agreedBudget = b.agreed_budget || 0;
-                const mgmtFee = agreedBudget * ((b.management_fee_pct || 15) / 100);
-                return (
-                  <div key={b.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${T.cyan}`, borderRadius: 10, padding: "16px 18px" }}>
-                    <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 10 }}>{ev.name}</div>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                      <span style={{ color: T.textMuted, fontSize: 11 }}>Agreed Budget</span>
-                      <span style={{ color: T.cyan, fontWeight: 700, fontSize: 12 }}>GHS {agreedBudget.toLocaleString()}</span>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ color: T.textMuted, fontSize: 11 }}>Mgmt Fee ({b.management_fee_pct || 15}%)</span>
-                      <span style={{ color: T.magenta, fontWeight: 700, fontSize: 12 }}>GHS {mgmtFee.toLocaleString()}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Recent invoices */}
-          {invoices.length > 0 && (
-            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px" }}>
-              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 12 }}>📄 Recent Invoices</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {invoices.map(inv => (
-                  <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", background: T.bg, border: `1px solid ${T.border}44`, borderRadius: 8 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <span style={{ fontSize: 18 }}>📑</span>
-                      <div>
-                        <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>{inv.title}</div>
-                        <div style={{ color: T.textMuted, fontSize: 10 }}>{new Date(inv.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>
-                      </div>
-                    </div>
-                    <a href={inv.file_url} target="_blank" rel="noopener noreferrer" style={{ background: T.cyan + "18", border: `1px solid ${T.cyan}40`, color: T.cyan, padding: "5px 12px", borderRadius: 8, fontSize: 10, fontWeight: 700, textDecoration: "none" }}>Download</a>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 };

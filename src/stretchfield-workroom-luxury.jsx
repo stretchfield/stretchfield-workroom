@@ -13169,22 +13169,20 @@ const QuoteComparisonView = ({ user }) => {
     ? totalBudget
     : (budgets.find(b => b.category === selectedCategory)?.proposed_amount || 0);
   
-  // Filter assignments by selected category
-  const categoryFilteredAssignments = selectedCategory === "all" 
+  const quotedAssignments = assignments.filter(a => a.quote_amount);
+
+  // Filter by category — match vendor service_category or type
+  const categoryFilteredAssignments = selectedCategory === "all"
     ? quotedAssignments
     : quotedAssignments.filter(a => {
         const vp = vendorProfiles.find(v => v.id === a.vendor_id);
         const va = vendorApps.find(v => v.vendor_name === a.vendor_name);
-        const vendorCat = vp?.service_category || va?.vendor_type || "";
-        return vendorCat.toLowerCase().includes(selectedCategory.toLowerCase()) || 
-               selectedCategory.toLowerCase().includes(vendorCat.toLowerCase());
+        const vendorCat = (vp?.service_category || va?.vendor_type || "").toLowerCase();
+        const selCat = selectedCategory.toLowerCase();
+        return vendorCat.includes(selCat) || selCat.includes(vendorCat);
       });
-  const quotedAssignments = assignments.filter(a => a.quote_amount);
-  // Filter assignments by selected budget category — match vendor service_category
-  const filteredAssignments = selectedCategory === "all" ? quotedAssignments : quotedAssignments.filter(a => {
-    const vProfile = vendorProfiles.find(v => v.id === a.vendor_id);
-    return vProfile?.service_category === selectedCategory;
-  });
+
+  const filteredAssignments = categoryFilteredAssignments;
 
   const toggleCompare = (id) => {
     setCompareVendors(prev => prev.includes(id) ? prev.filter(v => v !== id) : prev.length < 5 ? [...prev, id] : [...prev.slice(1), id]);

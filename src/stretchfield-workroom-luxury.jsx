@@ -4353,11 +4353,11 @@ const EventsView = ({ user, userRole }) => {
           ))}
         </div>
       )}
-      {/* ── Assign Strategy Opportunity Modal ── */}
+      {/* ── Assign Strategy Lead Modal ── */}
       {assignModal && (
         <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setAssignModal(null)}>
           <div style={{ background: T.surface, border: `1px solid ${T.amber}30`, borderRadius: 16, width: "100%", maxWidth: 480, padding: 28 }} onClick={e => e.stopPropagation()}>
-            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Assign Strategy Opportunity</div>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Assign Strategy Lead</div>
             <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>Event: <strong style={{ color: T.textPrimary }}>{assignModal.name}</strong></div>
             {assignModal.assigned_to_name && (
               <div style={{ background: T.amber+"12", border: `1px solid ${T.amber}30`, borderRadius: 8, padding: "10px 14px", marginBottom: 16, color: T.amber, fontSize: 12 }}>
@@ -4367,20 +4367,27 @@ const EventsView = ({ user, userRole }) => {
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
               {strategyLeads.map(sl => (
                 <div key={sl.id} onClick={async () => {
-                  await supabase.from("projects").update({ assigned_to: sl.id, assigned_to_name: sl.name }).eq("id", assignModal.id);
-                  await supabase.from("notifications").insert({ user_id: sl.id, title: "Event Assigned to You", message: `CEO assigned you to opportunity "${assignModal.name}". Check your Events tab.`, type: "task" });
-                  if (sl.email) await sendEmail(sl.email, `Event Assigned — ${assignModal.name}`, notifEmailHtml({ name: sl.name, title: "Event Assigned to You", message: `CEO has assigned you as Strategy Opportunity for <strong>${assignModal.name}</strong>. Please log in to view the event details.`, actionUrl: "https://workroom.stretchfield.com", actionLabel: "View Event" }));
-                  setAssignModal(null);
+                  // Toggle assignment - if already assigned, keep + add; support multiple
+                  const currentIds = (assignModal.assigned_to_ids || (assignModal.assigned_to ? [assignModal.assigned_to] : []));
+                  const isAssigned = currentIds.includes(sl.id);
+                  const newIds = isAssigned ? currentIds.filter(id => id !== sl.id) : [...currentIds, sl.id];
+                  const newNames = strategyLeads.filter(l => newIds.includes(l.id)).map(l => l.name).join(", ");
+                  await supabase.from("projects").update({ assigned_to: newIds[0] || null, assigned_to_name: newNames || null, assigned_to_ids: newIds }).eq("id", assignModal.id);
+                  if (!isAssigned) {
+                    await supabase.from("notifications").insert({ user_id: sl.id, title: "Event Assigned to You", message: `CEO assigned you to "${assignModal.name}". Check your Events tab.`, type: "task" });
+                    if (sl.email) await sendEmail(sl.email, `Event Assigned — ${assignModal.name}`, notifEmailHtml({ name: sl.name, title: "Event Assigned to You", message: `CEO has assigned you as Strategy Lead for <strong>${assignModal.name}</strong>. Please log in to view the event details.`, actionUrl: "https://workroom.stretchfield.com", actionLabel: "View Event" }));
+                  }
+                  setAssignModal(prev => ({...prev, assigned_to: newIds[0] || null, assigned_to_ids: newIds, assigned_to_name: newNames}));
                   load();
-                }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: assignModal.assigned_to === sl.id ? T.amber+"15" : T.bg, border: `1px solid ${assignModal.assigned_to === sl.id ? T.amber : T.border}`, borderRadius: 10, cursor: "pointer" }}
+                }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: (assignModal.assigned_to_ids || [assignModal.assigned_to]).includes(sl.id) ? T.amber+"15" : T.bg, border: `1px solid ${(assignModal.assigned_to_ids || [assignModal.assigned_to]).includes(sl.id) ? T.amber : T.border}`, borderRadius: 10, cursor: "pointer" }}
                   onMouseEnter={e => e.currentTarget.style.borderColor = T.amber}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = assignModal.assigned_to === sl.id ? T.amber : T.border}>
+                  onMouseLeave={e => { const assigned = (assignModal.assigned_to_ids || [assignModal.assigned_to]).includes(sl.id); e.currentTarget.style.borderColor = assigned ? T.amber : T.border; }}>
                   <div style={{ width: 36, height: 36, borderRadius: "50%", background: T.amber+"20", border: `1px solid ${T.amber}40`, display: "flex", alignItems: "center", justifyContent: "center", color: T.amber, fontWeight: 800, fontSize: 13 }}>{(sl.name||"?").slice(0,2).toUpperCase()}</div>
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{sl.name}</div>
                     <div style={{ color: T.textMuted, fontSize: 11 }}>{sl.email}</div>
                   </div>
-                  {assignModal.assigned_to === sl.id && <div style={{ marginLeft: "auto", color: T.amber, fontWeight: 800 }}>✓</div>}
+                  {(assignModal.assigned_to_ids || [assignModal.assigned_to]).includes(sl.id) && <div style={{ color: T.amber, fontWeight: 900, fontSize: 16 }}>✓</div>}
                 </div>
               ))}
               {strategyLeads.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: 20 }}>No Strategy & Events Lead users found.</div>}
@@ -5406,11 +5413,7 @@ const TasksView = ({ userRole, openTaskId, onOpenHandled }) => {
           })()}
           <Select label="Assigned By" options={[{ value: '', label: 'Select assignor...' }, ...members.map(m => ({ value: m.id, label: m.name + ' — ' + m.role }))]} value={form.assigned_by} onChange={v => setForm({ ...form, assigned_by: v })} />
           <Input label="Event Deadline" type="date" value={form.deadline} onChange={v => setForm({ ...form, deadline: v })} />
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Quote Submission Deadline</label>
-            <input type="datetime-local" value={form.quote_deadline} onChange={e => setForm({ ...form, quote_deadline: e.target.value })} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
-            {form.quote_deadline && <div style={{ color: T.amber, fontSize: 11, marginTop: 4 }}>⏰ Vendor quote form will auto-close at this date & time</div>}
-          </div>
+
           <Select label="Status" options={[
             { value: 'pending', label: 'Pending' },
             { value: 'in-progress', label: 'In Progress' },
@@ -13165,6 +13168,17 @@ const QuoteComparisonView = ({ user }) => {
   const activeBudget = selectedCategory === "all"
     ? totalBudget
     : (budgets.find(b => b.category === selectedCategory)?.proposed_amount || 0);
+  
+  // Filter assignments by selected category
+  const categoryFilteredAssignments = selectedCategory === "all" 
+    ? quotedAssignments
+    : quotedAssignments.filter(a => {
+        const vp = vendorProfiles.find(v => v.id === a.vendor_id);
+        const va = vendorApps.find(v => v.vendor_name === a.vendor_name);
+        const vendorCat = vp?.service_category || va?.vendor_type || "";
+        return vendorCat.toLowerCase().includes(selectedCategory.toLowerCase()) || 
+               selectedCategory.toLowerCase().includes(vendorCat.toLowerCase());
+      });
   const quotedAssignments = assignments.filter(a => a.quote_amount);
   // Filter assignments by selected budget category — match vendor service_category
   const filteredAssignments = selectedCategory === "all" ? quotedAssignments : quotedAssignments.filter(a => {
@@ -13173,7 +13187,7 @@ const QuoteComparisonView = ({ user }) => {
   });
 
   const toggleCompare = (id) => {
-    setCompareVendors(prev => prev.includes(id) ? prev.filter(v => v !== id) : prev.length < 2 ? [...prev, id] : [prev[1], id]);
+    setCompareVendors(prev => prev.includes(id) ? prev.filter(v => v !== id) : prev.length < 5 ? [...prev, id] : [...prev.slice(1), id]);
   };
 
   const handleAward = async () => {

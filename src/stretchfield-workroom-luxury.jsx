@@ -8212,119 +8212,136 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       </div>
 
       {/* Mobile Header */}
-      <div className="sf-mobile-header" style={{ display: isMobile ? "flex" : "none", position: "fixed", top: 0, left: 0, right: 0, height: 56, background: T.surface, borderBottom: `1px solid ${T.border}`, alignItems: "center", justifyContent: "space-between", padding: "0 16px", zIndex: 200 }}>
+      {/* ── LUXURY MOBILE HEADER ── */}
+      <div className="sf-mobile-header" style={{ display: isMobile ? "flex" : "none", position: "fixed", top: 0, left: 0, right: 0, height: 60, background: T.bgDeep+"f0", borderBottom: `1px solid ${T.border}`, alignItems: "center", justifyContent: "space-between", padding: "0 20px", zIndex: 400, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: `linear-gradient(135deg, ${T.cyan}, #3B7BFF)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 900, color: "#000" }}>S</div>
-          <span style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>WorkRoom</span>
+          <img src={LOGO_SRC} alt="S" style={{ width: 26, height: 26, objectFit: "contain", borderRadius: 6 }} />
+          <div>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 13, letterSpacing: "0.04em" }}>Stretchfield</div>
+            <div style={{ color: T.textMuted, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase" }}>WorkRoom</div>
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <button onClick={() => setActiveTab('notifications')} style={{ position: "relative", background: "none", border: "1px solid " + T.border, color: T.textMuted, width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            🔔
-            {unreadCount > 0 && (
-              <span style={{ position: "absolute", top: -4, right: -4, background: "#F43F5E", color: "#fff", fontSize: 9, fontWeight: 800, borderRadius: "50%", width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid " + T.bg }}>
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
-            )}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ color: T.textPrimary, fontSize: 11, fontWeight: 700 }}>{currentUser.name?.split(" ")[0]}</div>
+            <div style={{ color: T.cyan, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>{currentUser.role}</div>
+          </div>
+          {unreadCount > 0 && (
+            <button onClick={() => setActiveTab("notifications")} style={{ position: "relative", background: "none", border: `1px solid ${T.red}40`, color: T.red, width: 34, height: 34, borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {unreadCount > 9 ? "9+" : unreadCount}
+              <div style={{ position: "absolute", top: -3, right: -3, width: 8, height: 8, borderRadius: "50%", background: T.red }} />
+            </button>
+          )}
+          <button onClick={() => setMobileMenuOpen(true)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textPrimary, width: 34, height: 34, borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 4 }}>
+            <div style={{ width: 14, height: 1.5, background: T.textPrimary, borderRadius: 1 }} />
+            <div style={{ width: 10, height: 1.5, background: T.textMuted, borderRadius: 1 }} />
+            <div style={{ width: 14, height: 1.5, background: T.textPrimary, borderRadius: 1 }} />
           </button>
-          <div style={{ background: T.cyan + "22", border: `1px solid ${T.cyan}44`, color: T.cyan, padding: "3px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>{currentUser.role}</div>
-          <button onClick={onLogout} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>Sign Out</button>
-          <button onClick={() => setMobileMenuOpen(true)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textPrimary, padding: "6px 10px", borderRadius: 4, cursor: "pointer", fontSize: 18, lineHeight: 1 }}>☰</button>
         </div>
       </div>
 
-      {/* Mobile Drawer */}
-      {/* ── Mobile Bottom Navigation ── */}
+      {/* ── LUXURY MOBILE BOTTOM NAV ── */}
       {isMobile && (() => {
         const role = currentUser.role;
         const bottomTabs = {
           "CEO": [
-            { id: "dashboard", icon: "⊞", label: "Home" },
-            { id: "events", icon: "📅", label: "Events" },
-            { id: "crm", icon: "📈", label: "Leads" },
-            { id: "vendors", icon: "🏭", label: "Vendors" },
-            { id: "finance", icon: "💼", label: "Finance" },
+            { id: "dashboard", label: "Home" },
+            { id: "events", label: "Events" },
+            { id: "crm", label: "Leads" },
+            { id: "vendors", label: "Vendors" },
+            { id: "finance", label: "Finance" },
           ],
           "Country Manager": [
-            { id: "dashboard", icon: "⊞", label: "Home" },
-            { id: "events", icon: "📅", label: "Events" },
-            { id: "vendors", icon: "🏭", label: "Vendors" },
-            { id: "finance", icon: "💼", label: "Finance" },
-            { id: "tasks", icon: "✅", label: "Tasks" },
+            { id: "dashboard", label: "Home" },
+            { id: "events", label: "Events" },
+            { id: "vendors", label: "Vendors" },
+            { id: "finance", label: "Finance" },
+            { id: "calendar", label: "Calendar" },
           ],
           "Strategy & Events Lead": [
-            { id: "dashboard", icon: "⊞", label: "Home" },
-            { id: "events", icon: "📅", label: "Events" },
-            { id: "tasks", icon: "✅", label: "Tasks" },
-            { id: "calendar", icon: "📆", label: "Calendar" },
-            { id: "notifications", icon: "🔔", label: "Alerts" },
+            { id: "dashboard", label: "Home" },
+            { id: "events", label: "Events" },
+            { id: "tasks", label: "Tasks" },
+            { id: "calendar", label: "Calendar" },
+            { id: "notifications", label: "Alerts" },
           ],
           "Vendor Manager": [
-            { id: "dashboard", icon: "⊞", label: "Home" },
-            { id: "vendors", icon: "🏭", label: "Vendors" },
-            { id: "vendor-assignment", icon: "📋", label: "Assign" },
-            { id: "quote-comparison", icon: "⚖️", label: "Quotes" },
-            { id: "calendar", icon: "📆", label: "Calendar" },
+            { id: "dashboard", label: "Home" },
+            { id: "vendors", label: "Vendors" },
+            { id: "vendor-assignment", label: "Assign" },
+            { id: "vendor-onboarding", label: "Onboard" },
+            { id: "calendar", label: "Calendar" },
           ],
           "Finance Manager": [
-            { id: "dashboard", icon: "⊞", label: "Home" },
-            { id: "finance", icon: "💼", label: "Finance" },
-            { id: "purchase-orders", icon: "📄", label: "POs" },
-            { id: "vendor-invoices", icon: "🧾", label: "Invoices" },
-            { id: "calendar", icon: "📆", label: "Calendar" },
+            { id: "dashboard", label: "Home" },
+            { id: "finance", label: "Finance" },
+            { id: "purchase-orders", label: "Orders" },
+            { id: "vendor-invoices", label: "Invoices" },
+            { id: "calendar", label: "Calendar" },
           ],
           "Sales & Marketing": [
-            { id: "dashboard", icon: "⊞", label: "Home" },
-            { id: "opportunities", icon: "🎯", label: "Leads" },
-            { id: "crm", icon: "📈", label: "Pipeline" },
-            { id: "sm-tasks", icon: "✅", label: "Tasks" },
-            { id: "calendar", icon: "📆", label: "Calendar" },
+            { id: "dashboard", label: "Home" },
+            { id: "opportunities", label: "Targets" },
+            { id: "crm", label: "Pipeline" },
+            { id: "sm-tasks", label: "Tasks" },
+            { id: "calendar", label: "Calendar" },
           ],
           "Vendor": [
-            { id: "dashboard", icon: "⊞", label: "Home" },
-            { id: "rffs", icon: "📋", label: "RFFs" },
-            { id: "quotes", icon: "💬", label: "Quotes" },
-            { id: "vendor-invoices-submit", icon: "🧾", label: "Invoices" },
-            { id: "vendor-tasks", icon: "✅", label: "Tasks" },
+            { id: "dashboard", label: "Home" },
+            { id: "rffs", label: "RFFs" },
+            { id: "quotes", label: "Quotes" },
+            { id: "vendor-invoices-submit", label: "Invoices" },
+            { id: "vendor-tasks", label: "Tasks" },
           ],
           "Client": [
-            { id: "dashboard", icon: "⊞", label: "Home" },
-            { id: "client-events", icon: "📅", label: "Events" },
-            { id: "client-finance", icon: "💼", label: "Finance" },
-            { id: "notifications", icon: "🔔", label: "Alerts" },
-            { id: "calendar", icon: "📆", label: "Calendar" },
+            { id: "dashboard", label: "Home" },
+            { id: "client-events", label: "Events" },
+            { id: "client-finance", label: "Finance" },
+            { id: "notifications", label: "Alerts" },
+            { id: "calendar", label: "Calendar" },
+          ],
+          "Board of Directors": [
+            { id: "dashboard", label: "Home" },
+            { id: "events", label: "Events" },
+            { id: "finance", label: "Finance" },
+            { id: "impact-intelligence", label: "Impact" },
+            { id: "notifications", label: "Alerts" },
           ],
         };
         const tabs = bottomTabs[role] || [
-          { id: "dashboard", icon: "⊞", label: "Home" },
-          { id: "notifications", icon: "🔔", label: "Alerts" },
-          { id: "calendar", icon: "📆", label: "Calendar" },
+          { id: "dashboard", label: "Home" },
+          { id: "notifications", label: "Alerts" },
+          { id: "calendar", label: "Calendar" },
         ];
         return (
           <div className="sf-bottom-nav" style={{
-            position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 500,
-            background: T.bgDeep, borderTop: `1px solid ${T.border}`,
-            display: "none", alignItems: "center", justifyContent: "space-around",
-            padding: "6px 0 max(6px, env(safe-area-inset-bottom))",
+            position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 400,
+            background: T.bgDeep+"f0", borderTop: `1px solid ${T.border}`,
+            display: "none", alignItems: "stretch",
+            paddingBottom: "max(8px, env(safe-area-inset-bottom))",
             backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
           }}>
             {tabs.map(tab => {
               const active = activeTab === tab.id;
               return (
                 <button key={tab.id} onClick={() => { setActiveTab(tab.id); setMobileMenuOpen(false); }} style={{
-                  display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-                  background: "none", border: "none", cursor: "pointer", padding: "6px 12px",
-                  flex: 1, minWidth: 0,
+                  flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                  gap: 3, background: "none", border: "none", cursor: "pointer",
+                  padding: "10px 4px 6px", minWidth: 0, position: "relative",
                 }}>
-                  <div style={{
-                    width: 32, height: 32, borderRadius: 10,
-                    background: active ? T.cyan+"20" : "none",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 16, transition: "all 0.15s",
-                    transform: active ? "scale(1.1)" : "scale(1)",
-                  }}>{tab.icon}</div>
-                  <span style={{ color: active ? T.cyan : T.textMuted, fontSize: 9, fontWeight: active ? 700 : 400, letterSpacing: "0.04em" }}>{tab.label}</span>
+                  {active && <div style={{ position: "absolute", top: 0, left: "20%", right: "20%", height: 2, background: T.cyan, borderRadius: "0 0 2px 2px" }} />}
+                  <span style={{
+                    color: active ? T.cyan : T.textMuted,
+                    fontSize: active ? 10 : 9,
+                    fontWeight: active ? 800 : 500,
+                    letterSpacing: active ? "0.06em" : "0.04em",
+                    textTransform: "uppercase",
+                    transition: "all 0.15s",
+                    lineHeight: 1.2,
+                    textAlign: "center",
+                  }}>{tab.label}</span>
                   {tab.id === "notifications" && unreadCount > 0 && (
-                    <div style={{ position: "absolute", top: 4, width: 6, height: 6, borderRadius: "50%", background: T.red }} />
+                    <div style={{ position: "absolute", top: 6, right: "18%", width: 6, height: 6, borderRadius: "50%", background: T.red }} />
                   )}
                 </button>
               );
@@ -8333,63 +8350,114 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
         );
       })()}
 
-      {/* ── Mobile Drawer (full nav) ── */}
+      {/* ── LUXURY MOBILE DRAWER ── */}
       {mobileMenuOpen && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }} onClick={() => setMobileMenuOpen(false)}>
-          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: T.bgDeep, borderRadius: "24px 24px 0 0", borderTop: `1px solid ${T.border}`, boxShadow: `0 -8px 48px rgba(0,0,0,0.4)`, overflow: "hidden" }} onClick={e => e.stopPropagation()}>
+        <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(12px)" }} onClick={() => setMobileMenuOpen(false)}>
+          <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "82vw", maxWidth: 340, background: T.bgDeep, borderRight: `1px solid ${T.border}`, display: "flex", flexDirection: "column", animation: "slideIn 0.28s cubic-bezier(0.22,1,0.36,1)" }} onClick={e => e.stopPropagation()}>
 
-            {/* Pull handle */}
-            <div style={{ width: 36, height: 3, borderRadius: 2, background: T.border, margin: "14px auto 0" }} />
-
-            {/* User identity */}
-            <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "18px 24px 14px", borderBottom: `1px solid ${T.border}` }}>
-              <Avatar initials={currentUser.avatar} size={40} color={T.cyan} />
-              <div>
-                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{currentUser.name}</div>
-                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2, textTransform: "uppercase", letterSpacing: "0.08em" }}>{currentUser.role}</div>
+            {/* Drawer Header */}
+            <div style={{ padding: "24px 20px 18px", borderBottom: `1px solid ${T.border}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                <img src={LOGO_SRC} alt="S" style={{ width: 36, height: 36, objectFit: "contain", borderRadius: 8 }} />
+                <div>
+                  <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 15, letterSpacing: "0.04em" }}>Stretchfield</div>
+                  <div style={{ color: T.textMuted, fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase" }}>WorkRoom</div>
+                </div>
+              </div>
+              <div style={{ padding: "12px 14px", background: T.surface, borderRadius: 10, border: `1px solid ${T.border}` }}>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{currentUser.name}</div>
+                <div style={{ color: T.cyan, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 2 }}>{currentUser.role}</div>
+                {currentUser.country && <div style={{ color: T.textMuted, fontSize: 10, marginTop: 1 }}>{currentUser.country}</div>}
               </div>
             </div>
 
-            {/* Tagline */}
-            <div style={{ textAlign: "center", padding: "12px 24px 10px", borderBottom: `1px solid ${T.border}44` }}>
-              <span style={{
-                fontFamily: "'Cormorant Garamond', Georgia, serif",
-                fontStyle: "italic",
-                fontWeight: 500,
-                fontSize: 13,
-                letterSpacing: "0.06em",
-                color: T.textMuted,
-              }}>We don't plan events. We engineer impact.</span>
-            </div>
+            {/* Nav Items */}
+            <nav style={{ flex: 1, overflowY: "auto", padding: "12px 12px" }}>
+              {(() => {
+                const navItems = getNavItems(currentUser.role);
+                const isCEONav = currentUser.role === "CEO";
+                if (!isCEONav) {
+                  return navItems.map(item => {
+                    const active = activeTab === item.id;
+                    return (
+                      <button key={item.id} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }} style={{
+                        width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "12px 14px", borderRadius: 8, border: "none", cursor: "pointer",
+                        background: active ? T.cyan+"14" : "none",
+                        marginBottom: 2, textAlign: "left",
+                        borderLeft: active ? `2px solid ${T.cyan}` : "2px solid transparent",
+                      }}>
+                        <span style={{ color: active ? T.cyan : T.textSecondary, fontWeight: active ? 700 : 400, fontSize: 13, letterSpacing: "0.03em" }}>{item.label}</span>
+                        {active && <div style={{ width: 4, height: 4, borderRadius: "50%", background: T.cyan }} />}
+                      </button>
+                    );
+                  });
+                }
+                return navItems.map(item => {
+                  if (!item.children) {
+                    const active = activeTab === item.id;
+                    return (
+                      <button key={item.id} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }} style={{
+                        width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "10px 14px", borderRadius: 8, border: "none", cursor: "pointer",
+                        background: active ? T.cyan+"14" : "none",
+                        marginBottom: 2, textAlign: "left",
+                        color: active ? T.cyan : T.textMuted,
+                        fontWeight: active ? 700 : 400, fontSize: 11,
+                        letterSpacing: "0.1em", textTransform: "uppercase",
+                      }}>{item.label}</button>
+                    );
+                  }
+                  const isGroupActive = item.children.some(c => c.id === activeTab);
+                  const [groupOpen, setGroupOpen] = React.useState(isGroupActive);
+                  return (
+                    <div key={item.id} style={{ marginBottom: 2 }}>
+                      <button onClick={() => setGroupOpen(o => !o)} style={{
+                        width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "10px 14px", borderRadius: 8, border: "none", cursor: "pointer",
+                        background: isGroupActive ? T.cyan+"10" : "none",
+                        color: isGroupActive ? T.cyan : T.textMuted,
+                        fontWeight: 800, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase",
+                        textAlign: "left",
+                      }}>
+                        <span>{item.label}</span>
+                        <span style={{ fontSize: 9, opacity: 0.5, transform: groupOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▾</span>
+                      </button>
+                      {groupOpen && (
+                        <div style={{ paddingLeft: 12, paddingBottom: 4 }}>
+                          {item.children.map(child => {
+                            const active = activeTab === child.id;
+                            return (
+                              <button key={child.id} onClick={() => { setActiveTab(child.id); setMobileMenuOpen(false); }} style={{
+                                width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                                padding: "10px 14px", borderRadius: 6, border: "none", cursor: "pointer",
+                                background: active ? T.cyan+"18" : "none",
+                                marginBottom: 1, textAlign: "left",
+                                borderLeft: active ? `2px solid ${T.cyan}` : "2px solid transparent",
+                              }}>
+                                <span style={{ color: active ? T.cyan : T.textMuted, fontWeight: active ? 700 : 400, fontSize: 13 }}>{child.label}</span>
+                                {active && <div style={{ width: 4, height: 4, borderRadius: "50%", background: T.cyan }} />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
+            </nav>
 
-            {/* Nav items */}
-            <div style={{ padding: "8px 0 16px", overflowY: "auto", maxHeight: "55vh" }}>
-              {getNavItems(currentUser.role).map(item => {
-                const active = activeTab === item.id;
-                return (
-                  <button key={item.id} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }} style={{
-                    width: "100%", display: "flex", alignItems: "center", gap: 16,
-                    padding: "13px 24px", background: active ? T.cyan + "14" : "none",
-                    border: "none", cursor: "pointer", textAlign: "left",
-                    borderLeft: active ? `3px solid ${T.cyan}` : "3px solid transparent",
-                    transition: "all 0.15s",
-                  }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: active ? T.cyan : T.border, boxShadow: active ? `0 0 8px ${T.cyan}` : "none", flexShrink: 0, transition: "all 0.15s" }} />
-                    <span style={{ color: active ? T.cyan : T.textPrimary, fontWeight: active ? 700 : 500, fontSize: 14, letterSpacing: "0.04em", textTransform: "uppercase" }}>{item.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Bottom — theme toggle + sign out */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px 36px", borderTop: `1px solid ${T.border}` }}>
-              <ThemeToggle compact />
-              <button onClick={onLogout} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "6px 16px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600, letterSpacing: "0.06em" }}>Sign Out</button>
+            {/* Drawer Footer */}
+            <div style={{ padding: "14px 16px", borderTop: `1px solid ${T.border}`, display: "flex", gap: 8 }}>
+              <button onClick={() => { setShowAccountSettings(true); setMobileMenuOpen(false); }} style={{ flex: 1, padding: "10px", background: T.surface, border: `1px solid ${T.border}`, color: T.textMuted, borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>Settings</button>
+              <button onClick={onLogout} style={{ flex: 1, padding: "10px", background: T.red+"12", border: `1px solid ${T.red}25`, color: T.red, borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>Sign Out</button>
             </div>
           </div>
         </div>
       )}
-    </div>
+
+
       {showAccountSettings && (
         <AccountSettingsModal
           user={currentUser}
@@ -8400,6 +8468,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
           }}
         />
       )}
+    </div>
     </ThemeProvider>
   );
 }

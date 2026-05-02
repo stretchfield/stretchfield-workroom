@@ -728,7 +728,7 @@ const getNavItems = (role) => {
     base.push({ id: "rffs", label: "My RFFs", icon: "▪" }, { id: "quotes", label: "Quotes", icon: "▪" }, { id: "vendor-invoices-submit", label: "Invoices", icon: "▪" }, { id: "vendor-tasks", label: "My Tasks", icon: "▪" });
   }
   if (role === "Client") {
-    base.push({ id: "client-events", label: "My Events", icon: "▪" }, { id: "client-finance", label: "Budget & Invoices", icon: "▪" }, { id: "client-docs", label: "Documents", icon: "▪" });
+    base.push({ id: "client-events", label: "My Events", icon: "▪" }, { id: "notifications", label: "Notifications", icon: "▪" }, { id: "calendar", label: "Calendar", icon: "▪" });
   }
   if (role === "Board of Directors") {
     return [{ id: "dashboard", label: "Dashboard", icon: "▪" }, { id: "notifications", label: "Notifications", icon: "▪" }];
@@ -2781,6 +2781,10 @@ const ClientEventsView = ({ user }) => {
   const [newMessage, setNewMessage] = useState("");
   const [sendingMsg, setSendingMsg] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [feedbackForm, setFeedbackForm] = useState({ rating: 0, feedback: "" });
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [feedback, setFeedback] = useState([]);
 
   const load = async () => {
     if (!user?.id) return;
@@ -2812,6 +2816,8 @@ const ClientEventsView = ({ user }) => {
         setDocuments(dc2 || []);
         const { data: mg2 } = await supabase.from('client_messages').select('*').in('project_id', evData.map(e => e.id)).order('created_at', { ascending: true });
         setMessages(mg2 || []);
+        const { data: fb2 } = await supabase.from('client_feedback').select('*').in('project_id', evData.map(e => e.id)).order('created_at', { ascending: false });
+        setFeedback(fb2 || []);
         if (!selectedEvent && evData.length > 0) setSelectedEvent(evData[0]);
       }
     }
@@ -2950,6 +2956,7 @@ const ClientEventsView = ({ user }) => {
               { id: 'milestones', label: 'Milestones' + (evMilestones.length > 0 ? ' ('+evMilestones.length+')' : '') },
               { id: 'documents', label: 'Documents' + (evDocs.length > 0 ? ' ('+evDocs.length+')' : '') },
               { id: 'messages', label: 'Messages' + (unreadMessages > 0 ? ' ●' : '') },
+              { id: 'feedback', label: 'Feedback' },
             ].map(tab => (
               <button key={tab.id} onClick={() => setActiveSection(tab.id)} style={{ padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', color: activeSection === tab.id ? T.cyan : T.textMuted, fontWeight: activeSection === tab.id ? 800 : 400, fontSize: 13, borderBottom: activeSection === tab.id ? `2px solid ${T.cyan}` : '2px solid transparent', marginBottom: -1, transition: 'all 0.15s' }}>{tab.label}</button>
             ))}
@@ -3069,6 +3076,66 @@ const ClientEventsView = ({ user }) => {
               )}
             </div>
           )}
+
+          {/* Feedback Tab */}
+          {activeSection === 'feedback' && (() => {
+            const evFeedback = feedback.filter(f => f.project_id === ev.id);
+            const alreadySubmitted = evFeedback.some(f => f.submitted_by === user.id);
+            const submitFeedback = async () => {
+              if (!feedbackForm.rating) { alert("Please select a rating"); return; }
+              setSubmittingFeedback(true);
+              await supabase.from("client_feedback").insert({
+                project_id: ev.id, client_id: clientInfo.id,
+                submitted_by: user.id, submitted_by_name: user.name,
+                rating: feedbackForm.rating, feedback: feedbackForm.feedback,
+              });
+              const { data: team } = await supabase.from("profiles").select("id").in("role", ["CEO", "Strategy & Events Lead"]);
+              for (const t of team || []) {
+                await supabase.from("notifications").insert({ user_id: t.id, title: "Client Feedback — " + ev.name, message: user.name + " rated the event " + feedbackForm.rating + "/5. " + feedbackForm.feedback.slice(0,60), type: "task" });
+              }
+              setFeedbackForm({ rating: 0, feedback: "" });
+              setSubmittingFeedback(false);
+              setFeedbackSubmitted(true);
+              load();
+            };
+            return (
+              <div>
+                {!alreadySubmitted && !feedbackSubmitted ? (
+                  <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "24px" }}>
+                    <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 16, marginBottom: 4 }}>Share Your Experience</div>
+                    <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 20 }}>Your feedback helps us deliver even better events.</div>
+                    <div style={{ marginBottom: 20 }}>
+                      <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", marginBottom: 10 }}>Overall Rating</div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        {[1,2,3,4,5].map(n => (
+                          <button key={n} onClick={() => setFeedbackForm(f => ({...f, rating: n}))} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 32, color: n <= feedbackForm.rating ? T.amber : T.border, transition: "color 0.15s" }}>★</button>
+                        ))}
+                      </div>
+                      {feedbackForm.rating > 0 && <div style={{ color: T.amber, fontSize: 12, fontWeight: 700, marginTop: 6 }}>{["","Poor","Fair","Good","Very Good","Excellent"][feedbackForm.rating]}</div>}
+                    </div>
+                    <div style={{ marginBottom: 20 }}>
+                      <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>Comments (optional)</div>
+                      <textarea value={feedbackForm.feedback} onChange={e => setFeedbackForm(f => ({...f, feedback: e.target.value}))} rows={4} placeholder="Tell us about your experience — what went well, what could be improved..." style={{ width: "100%", padding: "12px 14px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", resize: "none", boxSizing: "border-box" }} />
+                    </div>
+                    <button onClick={submitFeedback} disabled={submittingFeedback || !feedbackForm.rating} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "12px 28px", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: 14, opacity: !feedbackForm.rating ? 0.6 : 1 }}>{submittingFeedback ? "Submitting..." : "Submit Feedback"}</button>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: "center", padding: "60px 0", background: T.surface, borderRadius: 14, border: `1px solid ${T.teal}40` }}>
+                    <div style={{ color: T.teal, fontWeight: 900, fontSize: 18, marginBottom: 8 }}>Thank you for your feedback!</div>
+                    <div style={{ color: T.textMuted, fontSize: 13 }}>Your response has been shared with the Stretchfield team.</div>
+                    {evFeedback[0] && (
+                      <div style={{ marginTop: 20 }}>
+                        <div style={{ display: "flex", justifyContent: "center", gap: 4, marginBottom: 8 }}>
+                          {[1,2,3,4,5].map(n => <span key={n} style={{ color: n <= evFeedback[0].rating ? T.amber : T.border, fontSize: 24 }}>★</span>)}
+                        </div>
+                        {evFeedback[0].feedback && <div style={{ color: T.textSecondary, fontSize: 13, maxWidth: 400, margin: "0 auto", lineHeight: 1.6 }}>{evFeedback[0].feedback}</div>}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Messages Tab */}
           {activeSection === 'messages' && (
@@ -3759,6 +3826,291 @@ const EventImpactView = ({ user, project }) => {
   );
 };
 
+const EventClientPortalPanel = ({ event, client, user, onClose }) => {
+  const [milestones, setMilestones] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [feedback, setFeedback] = useState([]);
+  const [activeSection, setActiveSection] = useState("milestones");
+  const [milestoneForm, setMilestoneForm] = useState({ title: "", description: "", due_date: "", requires_approval: false });
+  const [showMilestoneForm, setShowMilestoneForm] = useState(false);
+  const [docForm, setDocForm] = useState({ title: "", document_type: "Event Brief", requires_approval: false });
+  const [docFile, setDocFile] = useState(null);
+  const [showDocForm, setShowDocForm] = useState(false);
+  const [reply, setReply] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  const load = async () => {
+    const [ms, dc, mg, fb] = await Promise.all([
+      supabase.from("client_milestones").select("*").eq("project_id", event.id).order("due_date"),
+      supabase.from("event_documents").select("*").eq("project_id", event.id).order("created_at", { ascending: false }),
+      supabase.from("client_messages").select("*").eq("project_id", event.id).order("created_at", { ascending: true }),
+      supabase.from("client_feedback").select("*").eq("project_id", event.id).order("created_at", { ascending: false }),
+    ]);
+    setMilestones(ms.data || []);
+    setDocuments(dc.data || []);
+    setMessages(mg.data || []);
+    setFeedback(fb.data || []);
+  };
+
+  useEffect(() => { load(); }, [event.id]);
+
+  const notifyClient = async (title, message) => {
+    const { data: cp } = await supabase.from("profiles").select("id").eq("email", client.email).single();
+    if (cp) await supabase.from("notifications").insert({ user_id: cp.id, title, message, type: "task" });
+  };
+
+  const addMilestone = async () => {
+    if (!milestoneForm.title) return;
+    setSaving(true);
+    await supabase.from("client_milestones").insert({
+      project_id: event.id, title: milestoneForm.title,
+      description: milestoneForm.description || null,
+      due_date: milestoneForm.due_date || null,
+      status: "pending", requires_approval: milestoneForm.requires_approval,
+      created_by: user.id,
+    });
+    await notifyClient("New Milestone — " + event.name, milestoneForm.title + " has been added to your event timeline.");
+    setMilestoneForm({ title: "", description: "", due_date: "", requires_approval: false });
+    setShowMilestoneForm(false);
+    setSaving(false);
+    load();
+  };
+
+  const updateMilestoneStatus = async (id, status) => {
+    await supabase.from("client_milestones").update({ status, completed_at: status === "completed" ? new Date().toISOString() : null }).eq("id", id);
+    if (status === "completed") {
+      const ms = milestones.find(m => m.id === id);
+      if (ms) await notifyClient("Milestone Completed — " + ms.title, ms.title + " has been completed for " + event.name + ".");
+    }
+    load();
+  };
+
+  const shareDocument = async () => {
+    if (!docForm.title) return;
+    setSaving(true);
+    let document_url = null;
+    if (docFile) {
+      const ext = docFile.name.split(".").pop();
+      const fname = "client_doc_" + Date.now() + "." + ext;
+      const { error: upErr } = await supabase.storage.from("vendor-docs").upload(fname, docFile);
+      if (!upErr) {
+        const { data: urlData } = supabase.storage.from("vendor-docs").getPublicUrl(fname);
+        document_url = urlData.publicUrl;
+      }
+    }
+    await supabase.from("event_documents").insert({
+      project_id: event.id, client_id: client.id,
+      title: docForm.title, document_type: docForm.document_type,
+      document_url, shared_by: user.id, shared_by_name: user.name,
+      requires_approval: docForm.requires_approval,
+    });
+    await notifyClient("Document Shared — " + docForm.title, docForm.title + " has been shared with you." + (docForm.requires_approval ? " Your approval is required." : ""));
+    setDocForm({ title: "", document_type: "Event Brief", requires_approval: false });
+    setDocFile(null);
+    setShowDocForm(false);
+    setSaving(false);
+    load();
+  };
+
+  const sendReply = async () => {
+    if (!reply.trim()) return;
+    setSending(true);
+    await supabase.from("client_messages").insert({
+      project_id: event.id, client_id: client.id,
+      sender_id: user.id, sender_name: user.name, sender_role: user.role,
+      message: reply.trim(), read_by_client: false, read_by_team: true,
+    });
+    await notifyClient("New Message from Stretchfield", user.name + ": " + reply.trim().slice(0, 80));
+    setReply("");
+    setSending(false);
+    load();
+  };
+
+  const unreadCount = messages.filter(m => m.sender_role === "Client" && !m.read_by_team).length;
+  const inputStyle = { width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>Client Portal</div>
+          <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18 }}>{event.name}</div>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{client.company || client.name} · {event.phase}</div>
+        </div>
+        <button onClick={onClose} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 18 }}>×</button>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        {[
+          { id: "milestones", label: "Milestones (" + milestones.length + ")" },
+          { id: "documents", label: "Documents (" + documents.length + ")" },
+          { id: "messages", label: "Messages" + (unreadCount > 0 ? " (" + unreadCount + " new)" : "") },
+          { id: "feedback", label: "Feedback (" + feedback.length + ")" },
+        ].map(tab => (
+          <button key={tab.id} onClick={() => setActiveSection(tab.id)} style={{ padding: "9px 16px", border: "none", background: "none", cursor: "pointer", color: activeSection === tab.id ? T.cyan : T.textMuted, fontWeight: activeSection === tab.id ? 800 : 400, fontSize: 12, borderBottom: activeSection === tab.id ? `2px solid ${T.cyan}` : "2px solid transparent", marginBottom: -1 }}>{tab.label}</button>
+        ))}
+      </div>
+
+      {/* Milestones */}
+      {activeSection === "milestones" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
+            <div style={{ color: T.textMuted, fontSize: 12 }}>Visible to {client.company || client.name}</div>
+            <button onClick={() => setShowMilestoneForm(!showMilestoneForm)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>+ Add Milestone</button>
+          </div>
+          {showMilestoneForm && (
+            <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 10, padding: "16px", marginBottom: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                <div style={{ gridColumn: "1/-1" }}>
+                  <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Title</label>
+                  <input value={milestoneForm.title} onChange={e => setMilestoneForm(f => ({...f, title: e.target.value}))} placeholder="e.g. Venue Confirmed" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Due Date</label>
+                  <input type="date" value={milestoneForm.due_date} onChange={e => setMilestoneForm(f => ({...f, due_date: e.target.value}))} style={inputStyle} />
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 18 }}>
+                  <input type="checkbox" checked={milestoneForm.requires_approval} onChange={e => setMilestoneForm(f => ({...f, requires_approval: e.target.checked}))} id="ms_appr" />
+                  <label htmlFor="ms_appr" style={{ color: T.textMuted, fontSize: 12 }}>Requires client approval</label>
+                </div>
+              </div>
+              <textarea value={milestoneForm.description} onChange={e => setMilestoneForm(f => ({...f, description: e.target.value}))} placeholder="Description (optional)" rows={2} style={{ ...inputStyle, resize: "none", marginBottom: 10 }} />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={addMilestone} disabled={saving || !milestoneForm.title} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "7px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>{saving ? "Saving..." : "Add"}</button>
+                <button onClick={() => setShowMilestoneForm(false)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>Cancel</button>
+              </div>
+            </div>
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {milestones.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "30px 0" }}>No milestones yet.</div>}
+            {milestones.map(m => {
+              const sc = { pending: T.textMuted, "in-progress": T.cyan, completed: T.teal };
+              const c = sc[m.status] || T.textMuted;
+              return (
+                <div key={m.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderLeft: `3px solid ${c}`, borderRadius: 10, padding: "12px 16px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{m.title}</div>
+                      {m.description && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{m.description}</div>}
+                      {m.due_date && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>Due: {new Date(m.due_date).toLocaleDateString("en-GB")}</div>}
+                      {m.requires_approval && <div style={{ color: m.approved_by_client ? T.teal : T.amber, fontSize: 10, fontWeight: 700, marginTop: 3 }}>{m.approved_by_client ? "✓ Approved by client" : "Awaiting client approval"}</div>}
+                    </div>
+                    <div style={{ display: "flex", gap: 4 }}>
+                      {["pending","in-progress","completed"].map(s => (
+                        <button key={s} onClick={() => updateMilestoneStatus(m.id, s)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${m.status === s ? c : T.border}`, background: m.status === s ? c+"20" : "none", color: m.status === s ? c : T.textMuted, fontSize: 9, fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>{s}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Documents */}
+      {activeSection === "documents" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
+            <div style={{ color: T.textMuted, fontSize: 12 }}>Share files with client</div>
+            <button onClick={() => setShowDocForm(!showDocForm)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>+ Share Document</button>
+          </div>
+          {showDocForm && (
+            <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 10, padding: "16px", marginBottom: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                <div style={{ gridColumn: "1/-1" }}>
+                  <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Title</label>
+                  <input value={docForm.title} onChange={e => setDocForm(f => ({...f, title: e.target.value}))} placeholder="e.g. Event Brief v1" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Type</label>
+                  <select value={docForm.document_type} onChange={e => setDocForm(f => ({...f, document_type: e.target.value}))} style={{ ...inputStyle, appearance: "none" }}>
+                    {["Event Brief","Run of Show","Proposal","Contract","Programme","Other"].map(t => <option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 18 }}>
+                  <input type="checkbox" checked={docForm.requires_approval} onChange={e => setDocForm(f => ({...f, requires_approval: e.target.checked}))} id="doc_appr2" />
+                  <label htmlFor="doc_appr2" style={{ color: T.textMuted, fontSize: 12 }}>Requires client approval</label>
+                </div>
+              </div>
+              <input type="file" onChange={e => setDocFile(e.target.files[0])} style={{ ...inputStyle, marginBottom: 10, cursor: "pointer" }} />
+              {docFile && <div style={{ color: T.cyan, fontSize: 11, marginBottom: 10 }}>✓ {docFile.name}</div>}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={shareDocument} disabled={saving || !docForm.title} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "7px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>{saving ? "Sharing..." : "Share"}</button>
+                <button onClick={() => setShowDocForm(false)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>Cancel</button>
+              </div>
+            </div>
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {documents.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "30px 0" }}>No documents shared yet.</div>}
+            {documents.map(d => (
+              <div key={d.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{d.title}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{d.document_type} · {new Date(d.created_at).toLocaleDateString("en-GB")}</div>
+                  {d.requires_approval && <div style={{ color: d.approved_by_client ? T.teal : T.amber, fontSize: 10, fontWeight: 700, marginTop: 2 }}>{d.approved_by_client ? "✓ Client approved" : "Awaiting approval"}</div>}
+                </div>
+                {d.document_url && <a href={d.document_url} target="_blank" rel="noreferrer" style={{ color: T.cyan, fontSize: 11, fontWeight: 700, textDecoration: "none", padding: "5px 10px", border: `1px solid ${T.cyan}30`, borderRadius: 6 }}>View</a>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Messages */}
+      {activeSection === "messages" && (
+        <div>
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px", marginBottom: 14, maxHeight: 360, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+            {messages.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "20px 0" }}>No messages yet. Start the conversation.</div>}
+            {messages.map(m => {
+              const isTeam = m.sender_role !== "Client";
+              return (
+                <div key={m.id} style={{ display: "flex", flexDirection: "column", alignItems: isTeam ? "flex-end" : "flex-start" }}>
+                  <div style={{ maxWidth: "80%", background: isTeam ? T.teal+"18" : T.bg, border: `1px solid ${isTeam ? T.teal+"30" : T.border}`, borderRadius: isTeam ? "12px 12px 2px 12px" : "12px 12px 12px 2px", padding: "10px 14px" }}>
+                    <div style={{ color: T.textPrimary, fontSize: 13, lineHeight: 1.5 }}>{m.message}</div>
+                  </div>
+                  <div style={{ color: T.textMuted, fontSize: 10, marginTop: 3 }}>{m.sender_name} · {new Date(m.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <textarea value={reply} onChange={e => setReply(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(); }}} placeholder="Message to client..." rows={2} style={{ flex: 1, padding: "10px 14px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", resize: "none" }} />
+            <button onClick={sendReply} disabled={sending || !reply.trim()} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: "none", color: "#fff", padding: "10px 18px", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: 13, opacity: !reply.trim() ? 0.6 : 1 }}>{sending ? "..." : "Send"}</button>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback */}
+      {activeSection === "feedback" && (
+        <div>
+          {feedback.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted, fontSize: 13 }}>No feedback submitted yet. Feedback appears here after the event.</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {feedback.map(f => (
+                <div key={f.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                    <div style={{ color: T.textPrimary, fontWeight: 700 }}>{f.submitted_by_name || client.name}</div>
+                    <div style={{ display: "flex", gap: 2 }}>
+                      {[1,2,3,4,5].map(n => <span key={n} style={{ color: n <= (f.rating||0) ? T.amber : T.border, fontSize: 14 }}>★</span>)}
+                    </div>
+                  </div>
+                  {f.feedback && <div style={{ color: T.textSecondary, fontSize: 13, lineHeight: 1.6 }}>{f.feedback}</div>}
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 8 }}>{new Date(f.created_at).toLocaleDateString("en-GB")}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const EventsView = ({ user, userRole }) => {
   const [events, setEvents] = useState([]);
   const [clients, setClients] = useState([]);
@@ -3772,6 +4124,7 @@ const EventsView = ({ user, userRole }) => {
   const [strategyOpportunitys, setStrategyOpportunitys] = useState([]);
   const [editEvent, setEditEvent] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const [portalEvent, setPortalEvent] = useState(null);
 
   const canManage = ['CEO','Country Manager'].includes(user?.role);
   const canSeeTasks = ['CEO','Country Manager','Strategy & Events Opportunity','Vendor Manager'].includes(user?.role);
@@ -4019,7 +4372,10 @@ const EventsView = ({ user, userRole }) => {
                       👤 {p.assigned_to_name ? p.assigned_to_name.split(" ")[0] : "Assign Opportunity"}
                     </button>
                     {p.event_category && (
-                      <button onClick={e => { e.stopPropagation(); setImpactEvent(impactEvent?.id === p.id ? null : p); }} style={{ flex: 1, padding: "6px 10px", background: (EVENT_ARCHETYPES[p.event_category]?.color||T.teal)+"15", border: `1px solid ${(EVENT_ARCHETYPES[p.event_category]?.color||T.teal)}30`, borderRadius: 6, cursor: "pointer", color: EVENT_ARCHETYPES[p.event_category]?.color||T.teal, fontSize: 11, fontWeight: 700 }}>🎯 Impact</button>
+                      <button onClick={e => { e.stopPropagation(); setImpactEvent(impactEvent?.id === p.id ? null : p); }} style={{ flex: 1, padding: "6px 10px", background: (EVENT_ARCHETYPES[p.event_category]?.color||T.teal)+"15", border: `1px solid ${(EVENT_ARCHETYPES[p.event_category]?.color||T.teal)}30`, borderRadius: 6, cursor: "pointer", color: EVENT_ARCHETYPES[p.event_category]?.color||T.teal, fontSize: 11, fontWeight: 700 }}>Impact</button>
+                    )}
+                    {p.client_id && canManage && (
+                      <button onClick={e => { e.stopPropagation(); setPortalEvent(p); }} style={{ flex: 1, padding: "6px 10px", background: T.cyan+"15", border: `1px solid ${T.cyan}30`, borderRadius: 6, cursor: "pointer", color: T.cyan, fontSize: 11, fontWeight: 700 }}>Client Portal</button>
                     )}
                   </div>
                 )}
@@ -4094,6 +4450,21 @@ const EventsView = ({ user, userRole }) => {
       )}
 
       {/* ── Event Tasks Modal ── */}
+      {/* Client Portal Manager */}
+      {portalEvent && (() => {
+        const portalClient = clients.find(c => c.id === portalEvent.client_id);
+        if (!portalClient) return null;
+        return (
+          <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", overflowY: "auto" }} onClick={() => setPortalEvent(null)}>
+            <div style={{ minHeight: "100vh", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 20px" }}>
+              <div style={{ background: T.bg, borderRadius: 16, width: "100%", maxWidth: 720, padding: 28 }} onClick={e => e.stopPropagation()}>
+                <EventClientPortalPanel event={portalEvent} client={portalClient} user={user} onClose={() => setPortalEvent(null)} />
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {taskModalEvent && canSeeTasks && (() => {
         const eventTasks = tasks.filter(t => t.project_id === taskModalEvent.id);
         const completed = eventTasks.filter(t => t.status === "completed").length;

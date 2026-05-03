@@ -13179,25 +13179,9 @@ const QuoteComparisonView = ({ user }) => {
     setBudgets([]);
   };
 
-  // Derive categories from vendor service_category when no budget lines exist
-  const budgetCategories = [...new Set(budgets.map(b => b.category).filter(Boolean))];
-  const vendorCategories = [...new Set(
-    quotedAssignments.map(a => {
-      const vp = vendorProfiles.find(v => v.id === a.vendor_id);
-      const va = vendorApps.find(v => v.vendor_name === a.vendor_name);
-      return vp?.service_category || va?.vendor_type || null;
-    }).filter(Boolean)
-  )];
-  const categories = budgetCategories.length > 0 ? budgetCategories : vendorCategories;
-  const totalBudget = budgets.reduce((sum, b) => sum + (b.proposed_amount || 0), 0);
-  // When category selected, use only that category budget for comparison
-  const activeBudget = selectedCategory === "all"
-    ? totalBudget
-    : (budgets.find(b => b.category === selectedCategory)?.proposed_amount || 0);
-  
+  // Define all derived values in correct dependency order
   const quotedAssignments = assignments.filter(a => a.quote_amount);
 
-  // Filter by category — match vendor service_category or type
   const categoryFilteredAssignments = selectedCategory === "all"
     ? quotedAssignments
     : quotedAssignments.filter(a => {
@@ -13209,6 +13193,22 @@ const QuoteComparisonView = ({ user }) => {
       });
 
   const filteredAssignments = categoryFilteredAssignments;
+
+  const totalBudget = budgets.reduce((sum, b) => sum + (b.proposed_amount || 0), 0);
+  const activeBudget = selectedCategory === "all"
+    ? totalBudget
+    : (budgets.find(b => b.category === selectedCategory)?.proposed_amount || 0);
+
+  // Derive categories from budget lines or vendor service categories
+  const budgetCategories = [...new Set(budgets.map(b => b.category).filter(Boolean))];
+  const vendorCategories = [...new Set(
+    quotedAssignments.map(a => {
+      const vp = vendorProfiles.find(v => v.id === a.vendor_id);
+      const va = vendorApps.find(v => v.vendor_name === a.vendor_name);
+      return vp?.service_category || va?.vendor_type || null;
+    }).filter(Boolean)
+  )];
+  const categories = budgetCategories.length > 0 ? budgetCategories : vendorCategories;
 
   const toggleCompare = (id) => {
     setCompareVendors(prev => prev.includes(id) ? prev.filter(v => v !== id) : prev.length < 5 ? [...prev, id] : [...prev.slice(1), id]);

@@ -2725,6 +2725,131 @@ const ClientPortalManager = ({ client, user, onBack }) => {
   );
 };
 
+const ClientDocumentsTab = ({ evDocs, user, ev, clientInfo, approveItem, load }) => {
+  const [docComments, setDocComments] = React.useState({});
+  const [expandedDoc, setExpandedDoc] = React.useState(null);
+  const [docComment, setDocComment] = React.useState('');
+  const [uploadingDoc, setUploadingDoc] = React.useState(false);
+  const [docUploadForm, setDocUploadForm] = React.useState({ title: '', file: null });
+  const [showUpload, setShowUpload] = React.useState(false);
+
+  const loadDocComments = async (docId) => {
+    const { data } = await supabase.from('document_comments').select('*').eq('document_id', docId).order('created_at', { ascending: true });
+    setDocComments(prev => ({ ...prev, [docId]: data || [] }));
+  };
+
+  const sendDocComment = async (docId, docTitle) => {
+    if (!docComment.trim()) return;
+    await supabase.from('document_comments').insert({ document_id: docId, sender_id: user.id, sender_name: user.name, sender_role: user.role, message: docComment.trim() });
+    const { data: team } = await supabase.from('profiles').select('id').in('role', ['CEO', 'Strategy & Events Lead']);
+    for (const t of team || []) {
+      await supabase.from('notifications').insert({ user_id: t.id, title: 'Document Comment — ' + docTitle, message: user.name + ': ' + docComment.trim().slice(0, 60), type: 'task' });
+    }
+    setDocComment('');
+    loadDocComments(docId);
+  };
+
+  const uploadClientDoc = async () => {
+    if (!docUploadForm.title || !docUploadForm.file || !ev) return;
+    setUploadingDoc(true);
+    const ext = docUploadForm.file.name.split('.').pop();
+    const fname = 'client_upload_' + Date.now() + '.' + ext;
+    const { error: upErr } = await supabase.storage.from('vendor-docs').upload(fname, docUploadForm.file);
+    let document_url = null;
+    if (!upErr) {
+      const { data: urlData } = supabase.storage.from('vendor-docs').getPublicUrl(fname);
+      document_url = urlData.publicUrl;
+    }
+    await supabase.from('event_documents').insert({
+      project_id: ev.id, client_id: clientInfo.id,
+      title: docUploadForm.title, document_type: 'Client Upload',
+      document_url, shared_by: user.id, shared_by_name: user.name,
+      uploaded_by_client: true, requires_approval: false,
+    });
+    const { data: team } = await supabase.from('profiles').select('id').in('role', ['CEO', 'Strategy & Events Lead']);
+    for (const t of team || []) {
+      await supabase.from('notifications').insert({ user_id: t.id, title: 'Client Document Uploaded', message: user.name + ' uploaded: ' + docUploadForm.title, type: 'task' });
+    }
+    setDocUploadForm({ title: '', file: null });
+    setShowUpload(false);
+    setUploadingDoc(false);
+    load();
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div style={{ color: T.textMuted, fontSize: 12 }}>Documents shared with you and your uploads</div>
+        <button onClick={() => setShowUpload(!showUpload)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: 'none', color: '#fff', padding: '7px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>+ Upload Document</button>
+      </div>
+      {showUpload && (
+        <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 12, padding: '16px 18px', marginBottom: 16 }}>
+          <div style={{ marginBottom: 10 }}>
+            <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>Document Title</label>
+            <input value={docUploadForm.title} onChange={e => setDocUploadForm(f => ({...f, title: e.target.value}))} placeholder="e.g. Guest List, Special Requirements" style={{ width: '100%', padding: '9px 12px', background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>File</label>
+            <input type="file" onChange={e => setDocUploadForm(f => ({...f, file: e.target.files[0]}))} style={{ width: '100%', padding: '8px', background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textSecondary, fontSize: 13, cursor: 'pointer' }} />
+            {docUploadForm.file && <div style={{ color: T.cyan, fontSize: 11, marginTop: 4 }}>✓ {docUploadForm.file.name}</div>}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={uploadClientDoc} disabled={uploadingDoc || !docUploadForm.title || !docUploadForm.file} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: 'none', color: '#fff', padding: '8px 18px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, opacity: (!docUploadForm.title || !docUploadForm.file) ? 0.6 : 1 }}>{uploadingDoc ? 'Uploading...' : 'Upload'}</button>
+            <button onClick={() => setShowUpload(false)} style={{ background: 'none', border: `1px solid ${T.border}`, color: T.textMuted, padding: '8px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {evDocs.length === 0 && <div style={{ textAlign: 'center', padding: 40, color: T.textMuted, fontSize: 13 }}>No documents yet.</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {evDocs.map(d => (
+          <div key={d.id} style={{ background: T.surface, border: `1px solid ${expandedDoc === d.id ? T.cyan : T.border}`, borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{d.title}</div>
+                  {d.uploaded_by_client && <span style={{ color: T.amber, fontSize: 9, fontWeight: 800, background: T.amber+'15', padding: '2px 6px', borderRadius: 10, textTransform: 'uppercase' }}>Your Upload</span>}
+                </div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>{d.document_type} · {d.shared_by_name} · {new Date(d.created_at).toLocaleDateString('en-GB')}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {d.document_url && <a href={d.document_url} target="_blank" rel="noreferrer" style={{ color: T.cyan, fontSize: 11, fontWeight: 700, textDecoration: 'none', padding: '5px 10px', border: `1px solid ${T.cyan}30`, borderRadius: 6 }}>Download</a>}
+                {d.requires_approval && !d.approved_by_client && <button onClick={() => approveItem('event_documents', d.id, 'approved_by_client')} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: 'none', color: '#fff', padding: '5px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 800 }}>Approve ✓</button>}
+                {d.approved_by_client && <span style={{ color: T.teal, fontSize: 11, fontWeight: 700 }}>✓ Approved</span>}
+                <button onClick={() => { const newExp = expandedDoc === d.id ? null : d.id; setExpandedDoc(newExp); if (newExp) loadDocComments(d.id); }} style={{ background: expandedDoc === d.id ? T.cyan+'15' : 'none', border: `1px solid ${expandedDoc === d.id ? T.cyan : T.border}`, color: expandedDoc === d.id ? T.cyan : T.textMuted, padding: '5px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                  {expandedDoc === d.id ? 'Close' : 'Comment'}
+                </button>
+              </div>
+            </div>
+            {expandedDoc === d.id && (
+              <div style={{ borderTop: `1px solid ${T.border}`, padding: '14px 18px', background: T.bg }}>
+                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Comments & Discussion</div>
+                <div style={{ maxHeight: 200, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                  {(docComments[d.id] || []).length === 0 && <div style={{ color: T.textMuted, fontSize: 12 }}>No comments yet. Start the discussion.</div>}
+                  {(docComments[d.id] || []).map(c => {
+                    const isMe = c.sender_id === user.id;
+                    return (
+                      <div key={c.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+                        <div style={{ maxWidth: '80%', background: isMe ? T.cyan+'18' : T.surface, border: `1px solid ${isMe ? T.cyan+'30' : T.border}`, borderRadius: isMe ? '12px 12px 2px 12px' : '12px 12px 12px 2px', padding: '8px 12px' }}>
+                          <div style={{ color: T.textPrimary, fontSize: 12 }}>{c.message}</div>
+                        </div>
+                        <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{c.sender_name} · {new Date(c.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input value={docComment} onChange={e => setDocComment(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') sendDocComment(d.id, d.title); }} placeholder="Add a comment..." style={{ flex: 1, padding: '8px 12px', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 12, fontFamily: 'inherit', outline: 'none' }} />
+                  <button onClick={() => sendDocComment(d.id, d.title)} disabled={!docComment.trim()} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: 'none', color: '#fff', padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, opacity: !docComment.trim() ? 0.6 : 1 }}>Send</button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const ClientEventsView = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -3003,131 +3128,9 @@ const ClientEventsView = ({ user }) => {
           )}
 
           {/* Documents Tab */}
-          {activeSection === 'documents' && (() => {
-            const [docComments, setDocComments] = React.useState({});
-            const [expandedDoc, setExpandedDoc] = React.useState(null);
-            const [docComment, setDocComment] = React.useState('');
-            const [uploadingDoc, setUploadingDoc] = React.useState(false);
-            const [docUploadForm, setDocUploadForm] = React.useState({ title: '', file: null });
-            const [showUpload, setShowUpload] = React.useState(false);
-
-            const loadDocComments = async (docId) => {
-              const { data } = await supabase.from('document_comments').select('*').eq('document_id', docId).order('created_at', { ascending: true });
-              setDocComments(prev => ({ ...prev, [docId]: data || [] }));
-            };
-
-            const sendDocComment = async (docId, docTitle) => {
-              if (!docComment.trim()) return;
-              await supabase.from('document_comments').insert({ document_id: docId, sender_id: user.id, sender_name: user.name, sender_role: user.role, message: docComment.trim() });
-              const { data: team } = await supabase.from('profiles').select('id').in('role', ['CEO', 'Strategy & Events Lead']);
-              for (const t of team || []) {
-                await supabase.from('notifications').insert({ user_id: t.id, title: 'Document Comment — ' + docTitle, message: user.name + ': ' + docComment.trim().slice(0, 60), type: 'task' });
-              }
-              setDocComment('');
-              loadDocComments(docId);
-            };
-
-            const uploadClientDoc = async () => {
-              if (!docUploadForm.title || !docUploadForm.file || !ev) return;
-              setUploadingDoc(true);
-              const ext = docUploadForm.file.name.split('.').pop();
-              const fname = 'client_upload_' + Date.now() + '.' + ext;
-              const { error: upErr } = await supabase.storage.from('vendor-docs').upload(fname, docUploadForm.file);
-              let document_url = null;
-              if (!upErr) {
-                const { data: urlData } = supabase.storage.from('vendor-docs').getPublicUrl(fname);
-                document_url = urlData.publicUrl;
-              }
-              await supabase.from('event_documents').insert({
-                project_id: ev.id, client_id: clientInfo.id,
-                title: docUploadForm.title, document_type: 'Client Upload',
-                document_url, shared_by: user.id, shared_by_name: user.name,
-                uploaded_by_client: true, requires_approval: false,
-              });
-              const { data: team } = await supabase.from('profiles').select('id').in('role', ['CEO', 'Strategy & Events Lead']);
-              for (const t of team || []) {
-                await supabase.from('notifications').insert({ user_id: t.id, title: 'Client Document Uploaded', message: user.name + ' uploaded: ' + docUploadForm.title, type: 'task' });
-              }
-              setDocUploadForm({ title: '', file: null });
-              setShowUpload(false);
-              setUploadingDoc(false);
-              load();
-            };
-
-            return (
-              <div>
-                {/* Upload section */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                  <div style={{ color: T.textMuted, fontSize: 12 }}>Documents shared with you and your uploads</div>
-                  <button onClick={() => setShowUpload(!showUpload)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: 'none', color: '#fff', padding: '7px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>+ Upload Document</button>
-                </div>
-                {showUpload && (
-                  <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 12, padding: '16px 18px', marginBottom: 16 }}>
-                    <div style={{ marginBottom: 10 }}>
-                      <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>Document Title</label>
-                      <input value={docUploadForm.title} onChange={e => setDocUploadForm(f => ({...f, title: e.target.value}))} placeholder="e.g. Guest List, Special Requirements" style={{ width: '100%', padding: '9px 12px', background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
-                    </div>
-                    <div style={{ marginBottom: 12 }}>
-                      <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>File</label>
-                      <input type="file" onChange={e => setDocUploadForm(f => ({...f, file: e.target.files[0]}))} style={{ width: '100%', padding: '8px', background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textSecondary, fontSize: 13, cursor: 'pointer' }} />
-                      {docUploadForm.file && <div style={{ color: T.cyan, fontSize: 11, marginTop: 4 }}>✓ {docUploadForm.file.name}</div>}
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button onClick={uploadClientDoc} disabled={uploadingDoc || !docUploadForm.title || !docUploadForm.file} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: 'none', color: '#fff', padding: '8px 18px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, opacity: (!docUploadForm.title || !docUploadForm.file) ? 0.6 : 1 }}>{uploadingDoc ? 'Uploading...' : 'Upload'}</button>
-                      <button onClick={() => setShowUpload(false)} style={{ background: 'none', border: `1px solid ${T.border}`, color: T.textMuted, padding: '8px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>Cancel</button>
-                    </div>
-                  </div>
-                )}
-                {evDocs.length === 0 && <div style={{ textAlign: 'center', padding: 40, color: T.textMuted, fontSize: 13 }}>No documents yet.</div>}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {evDocs.map(d => (
-                    <div key={d.id} style={{ background: T.surface, border: `1px solid ${expandedDoc === d.id ? T.cyan : T.border}`, borderRadius: 12, overflow: 'hidden' }}>
-                      <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{d.title}</div>
-                            {d.uploaded_by_client && <span style={{ color: T.amber, fontSize: 9, fontWeight: 800, background: T.amber+'15', padding: '2px 6px', borderRadius: 10, textTransform: 'uppercase' }}>Your Upload</span>}
-                          </div>
-                          <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>{d.document_type} · {d.shared_by_name} · {new Date(d.created_at).toLocaleDateString('en-GB')}</div>
-                        </div>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                          {d.document_url && <a href={d.document_url} target="_blank" rel="noreferrer" style={{ color: T.cyan, fontSize: 11, fontWeight: 700, textDecoration: 'none', padding: '5px 10px', border: `1px solid ${T.cyan}30`, borderRadius: 6 }}>Download</a>}
-                          {d.requires_approval && !d.approved_by_client && <button onClick={() => approveItem('event_documents', d.id, 'approved_by_client')} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: 'none', color: '#fff', padding: '5px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 800 }}>Approve ✓</button>}
-                          {d.approved_by_client && <span style={{ color: T.teal, fontSize: 11, fontWeight: 700 }}>✓ Approved</span>}
-                          <button onClick={() => { const newExp = expandedDoc === d.id ? null : d.id; setExpandedDoc(newExp); if (newExp) loadDocComments(d.id); }} style={{ background: expandedDoc === d.id ? T.cyan+'15' : 'none', border: `1px solid ${expandedDoc === d.id ? T.cyan : T.border}`, color: expandedDoc === d.id ? T.cyan : T.textMuted, padding: '5px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
-                            {expandedDoc === d.id ? 'Close' : 'Comment'}
-                          </button>
-                        </div>
-                      </div>
-                      {expandedDoc === d.id && (
-                        <div style={{ borderTop: `1px solid ${T.border}`, padding: '14px 18px', background: T.bg }}>
-                          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Comments & Discussion</div>
-                          <div style={{ maxHeight: 200, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-                            {(docComments[d.id] || []).length === 0 && <div style={{ color: T.textMuted, fontSize: 12 }}>No comments yet. Start the discussion.</div>}
-                            {(docComments[d.id] || []).map(c => {
-                              const isMe = c.sender_id === user.id;
-                              return (
-                                <div key={c.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
-                                  <div style={{ maxWidth: '80%', background: isMe ? T.cyan+'18' : T.surface, border: `1px solid ${isMe ? T.cyan+'30' : T.border}`, borderRadius: isMe ? '12px 12px 2px 12px' : '12px 12px 12px 2px', padding: '8px 12px' }}>
-                                    <div style={{ color: T.textPrimary, fontSize: 12 }}>{c.message}</div>
-                                  </div>
-                                  <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{c.sender_name} · {new Date(c.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            <input value={docComment} onChange={e => setDocComment(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') sendDocComment(d.id, d.title); }} placeholder="Add a comment..." style={{ flex: 1, padding: '8px 12px', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 12, fontFamily: 'inherit', outline: 'none' }} />
-                            <button onClick={() => sendDocComment(d.id, d.title)} disabled={!docComment.trim()} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: 'none', color: '#fff', padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, opacity: !docComment.trim() ? 0.6 : 1 }}>Send</button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
+          {activeSection === 'documents' && (
+            <ClientDocumentsTab evDocs={evDocs} user={user} ev={ev} clientInfo={clientInfo} approveItem={approveItem} load={load} />
+          )}
 
           {/* Feedback Tab */}
           {activeSection === 'feedback' && (() => {

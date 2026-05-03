@@ -13419,16 +13419,16 @@ const QuoteComparisonView = ({ user }) => {
               <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 16 }}>Quote Comparison Chart</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {/* Budget line */}
-                {totalBudget > 0 && (
+                {activeBudget > 0 && (
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 120, color: T.cyan, fontSize: 11, fontWeight: 700, textAlign: "right", flexShrink: 0 }}>Proposed Budget</div>
+                    <div style={{ width: 120, color: T.cyan, fontSize: 11, fontWeight: 700, textAlign: "right", flexShrink: 0 }}>{selectedCategory === "all" ? "Total Budget" : selectedCategory + " Budget"}</div>
                     <div style={{ flex: 1, height: 28, background: T.border + "44", borderRadius: 4, overflow: "hidden", position: "relative" }}>
                       <div style={{ height: "100%", width: "100%", background: `linear-gradient(90deg, ${T.cyan}40, ${T.cyan}20)`, borderRadius: 4, border: `2px dashed ${T.cyan}`, boxSizing: "border-box" }} />
                     </div>
-                    <div style={{ width: 120, color: T.cyan, fontSize: 12, fontWeight: 700, flexShrink: 0 }}>GHS {totalBudget.toLocaleString()}</div>
+                    <div style={{ width: 120, color: T.cyan, fontSize: 12, fontWeight: 700, flexShrink: 0 }}>GHS {activeBudget.toLocaleString()}</div>
                   </div>
                 )}
-                {quotedAssignments.map((a, idx) => {
+                {filteredAssignments.map((a, idx) => {
                   const pct = activeBudget > 0 ? Math.min((a.quote_amount / activeBudget) * 100, 150) : 50;
                   const barColor = a.quote_amount <= activeBudget ? T.teal : T.red;
                   const isSelected = compareVendors.includes(a.id);
@@ -13485,6 +13485,65 @@ const QuoteComparisonView = ({ user }) => {
           )}
 
           {/* ── Weighted Scoring Matrix ── */}
+          {/* Single vendor vs budget analysis */}
+          {compareData.length === 1 && activeBudget > 0 && (() => {
+            const a = compareData[0];
+            const s = scoredData[0]?.score;
+            const diff = a.quote_amount - activeBudget;
+            const pct = ((diff / activeBudget) * 100).toFixed(1);
+            const isOver = diff > 0;
+            return (
+              <div style={{ background: T.surface, border: `1px solid ${isOver ? T.red : T.teal}30`, borderRadius: 14, padding: "20px 24px", marginBottom: 20 }}>
+                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>Single Vendor Analysis vs Budget</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 20, flexWrap: "wrap" }}>
+                  <div>
+                    <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18 }}>{a.vendor_name}</div>
+                    <div style={{ color: T.gold, fontWeight: 900, fontSize: 22, marginTop: 4 }}>GHS {a.quote_amount.toLocaleString()}</div>
+                    <div style={{ color: isOver ? T.red : T.teal, fontWeight: 700, fontSize: 13, marginTop: 4 }}>
+                      {isOver ? `⚠ GHS ${Math.abs(diff).toLocaleString()} over budget (${pct}%)` : `✓ GHS ${Math.abs(diff).toLocaleString()} under budget (${Math.abs(pct)}%)`}
+                    </div>
+                  </div>
+                  <div style={{ background: T.bg, borderRadius: 10, padding: "14px 18px", minWidth: 160 }}>
+                    <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>Proposed Budget</div>
+                    <div style={{ color: T.cyan, fontWeight: 900, fontSize: 20 }}>GHS {activeBudget.toLocaleString()}</div>
+                  </div>
+                </div>
+                {s && (
+                  <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", marginBottom: 4 }}>Vendor Score</div>
+                    {[["Price vs Budget", isOver ? Math.max(0, 100 - parseFloat(pct)) : 100, "35%"],
+                      ["Rating", s.breakdown.rating, "25%"],
+                      ["Experience", s.breakdown.experience, "20%"],
+                      ["Reliability", s.breakdown.reliability, "15%"],
+                      ["Response Speed", s.breakdown.speed, "5%"],
+                    ].map(([label, val, weight]) => (
+                      <div key={label}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                          <span style={{ color: T.textMuted, fontSize: 11 }}>{label} <span style={{ color: T.textGhost, fontSize: 9 }}>({weight})</span></span>
+                          <span style={{ color: val >= 70 ? T.teal : val >= 50 ? T.amber : T.red, fontSize: 11, fontWeight: 700 }}>{Math.round(val)}</span>
+                        </div>
+                        <div style={{ height: 4, background: T.border+"33", borderRadius: 2, overflow: "hidden" }}>
+                          <div style={{ width: Math.round(val)+"%", height: "100%", background: val >= 70 ? T.teal : val >= 50 ? T.amber : T.red, borderRadius: 2 }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{ marginTop: 16, padding: "12px 16px", background: isOver ? T.red+"10" : T.teal+"10", borderRadius: 8, border: `1px solid ${isOver ? T.red : T.teal}20` }}>
+                  <div style={{ color: isOver ? T.red : T.teal, fontWeight: 700, fontSize: 13, marginBottom: 4 }}>
+                    {isOver ? "Recommendation: Negotiate" : "Recommendation: Proceed"}
+                  </div>
+                  <div style={{ color: T.textSecondary, fontSize: 12, lineHeight: 1.6 }}>
+                    {isOver
+                      ? `${a.vendor_name} has quoted GHS ${Math.abs(diff).toLocaleString()} above the proposed budget. Consider negotiating the price down or reviewing the budget allocation before proceeding.`
+                      : `${a.vendor_name}'s quote is within budget with GHS ${Math.abs(diff).toLocaleString()} to spare. ${s?.isNewVendor ? "Note: This is a new vendor with no prior Stretchfield history." : "Vendor has prior engagement history."} You may proceed or invite more quotes for comparison.`}
+                  </div>
+                </div>
+                <button onClick={() => { setAwardModal(a); setAwardNotes(""); setAgreedAmount(a.quote_amount || ""); }} style={{ marginTop: 14, background: `linear-gradient(135deg, ${T.teal}, #10B981)`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>Award Gig</button>
+              </div>
+            );
+          })()}
+
           {compareData.length >= 2 && (
             <div style={{ marginBottom: 20 }}>
 

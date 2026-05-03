@@ -13117,23 +13117,21 @@ const QuoteComparisonView = ({ user }) => {
   };
 
   // Define all derived values in correct dependency order
-  const quotedAssignments = assignments.filter(a => a.quote_amount);
+  const quotedAssignments = assignments.filter(a => a.quote_amount && parseFloat(a.quote_amount) > 0);
 
   const categoryFilteredAssignments = selectedCategory === "all"
     ? quotedAssignments
     : quotedAssignments.filter(a => {
         const vp = vendorProfiles.find(v => v.id === a.vendor_id);
         const va = vendorApps.find(v => v.vendor_name === a.vendor_name);
-        const vendorCat = (vp?.service_category || va?.vendor_type || "").toLowerCase();
-        const selCat = selectedCategory.toLowerCase();
-        // Direct match or "Other" catches vendors not matching specific categories
-        const budgetCats = budgets.map(b => b.category.toLowerCase()).filter(c => c !== "other");
+        const vendorCat = (vp?.service_category || va?.vendor_type || "").toLowerCase().trim();
+        const selCat = selectedCategory.toLowerCase().trim();
+        const budgetCats = budgets.map(b => b.category.toLowerCase().trim()).filter(c => c !== "other");
         const isOtherCategory = selCat === "other";
         if (isOtherCategory) {
-          // "Other" shows vendors whose category doesn't match any specific budget category
-          return !budgetCats.some(bc => vendorCat.includes(bc) || bc.includes(vendorCat));
+          return !budgetCats.some(bc => vendorCat === bc || vendorCat.includes(bc) || bc.includes(vendorCat));
         }
-        return vendorCat.includes(selCat) || selCat.includes(vendorCat);
+        return vendorCat === selCat || vendorCat.includes(selCat) || selCat.includes(vendorCat);
       });
 
   const filteredAssignments = categoryFilteredAssignments;
@@ -13363,9 +13361,9 @@ const QuoteComparisonView = ({ user }) => {
               <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 16 }}>Quote Comparison Chart</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {/* Budget line */}
-                {activeBudget > 0 && (
+                {(activeBudget > 0 || totalBudget > 0) && (
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 120, color: T.cyan, fontSize: 11, fontWeight: 700, textAlign: "right", flexShrink: 0 }}>{selectedCategory === "all" ? "Total Budget" : selectedCategory + " Budget"}</div>
+                    <div style={{ width: 120, color: T.cyan, fontSize: 11, fontWeight: 700, textAlign: "right", flexShrink: 0 }}>{selectedCategory === "all" ? "Total Budget" : selectedCategory}</div>
                     <div style={{ flex: 1, height: 28, background: T.border + "44", borderRadius: 4, overflow: "hidden", position: "relative" }}>
                       <div style={{ height: "100%", width: "100%", background: `linear-gradient(90deg, ${T.cyan}40, ${T.cyan}20)`, borderRadius: 4, border: `2px dashed ${T.cyan}`, boxSizing: "border-box" }} />
                     </div>

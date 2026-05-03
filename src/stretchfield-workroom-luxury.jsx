@@ -13131,7 +13131,11 @@ const QuoteComparisonView = ({ user }) => {
         if (isOtherCategory) {
           return !budgetCats.some(bc => vendorCat === bc || vendorCat.includes(bc) || bc.includes(vendorCat));
         }
-        return vendorCat === selCat || vendorCat.includes(selCat) || selCat.includes(vendorCat);
+        // Exact match first, then partial
+        if (vendorCat === selCat) return true;
+        // Handle trailing spaces in DB values
+        if (vendorCat.replace(/\s+/g, " ") === selCat.replace(/\s+/g, " ")) return true;
+        return vendorCat.includes(selCat) || selCat.includes(vendorCat);
       });
 
   const filteredAssignments = categoryFilteredAssignments;
@@ -13139,15 +13143,17 @@ const QuoteComparisonView = ({ user }) => {
   const totalBudget = budgets.reduce((sum, b) => sum + (b.proposed_amount || 0), 0);
   const activeBudget = selectedCategory === "all"
     ? totalBudget
-    : (budgets.find(b => b.category === selectedCategory)?.proposed_amount || 0);
+    : (budgets.find(b => b.category.trim() === selectedCategory.trim())?.proposed_amount || 0);
 
   // Derive categories from budget lines or vendor service categories
-  const budgetCategories = [...new Set(budgets.map(b => b.category).filter(Boolean))];
+  // Always use budget categories as primary source - shows all categories CEO defined
+  const budgetCategories = [...new Set(budgets.map(b => b.category.trim()).filter(Boolean))];
+  // Fall back to vendor categories if no budget lines
   const vendorCategories = [...new Set(
-    quotedAssignments.map(a => {
+    assignments.filter(a => a.quote_amount).map(a => {
       const vp = vendorProfiles.find(v => v.id === a.vendor_id);
       const va = vendorApps.find(v => v.vendor_name === a.vendor_name);
-      return vp?.service_category || va?.vendor_type || null;
+      return (vp?.service_category || va?.vendor_type || "").trim() || null;
     }).filter(Boolean)
   )];
   const categories = budgetCategories.length > 0 ? budgetCategories : vendorCategories;
@@ -13327,7 +13333,7 @@ const QuoteComparisonView = ({ user }) => {
           {/* Budget vs Quotes KPI */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 12, marginBottom: 24 }}>
             {[
-              { label: selectedCategory === "all" ? "Total Budget" : selectedCategory + " Budget", value: `GHS ${activeBudget.toLocaleString()}`, color: T.cyan },
+              { label: selectedCategory === "all" ? "Total Budget" : selectedCategory.split(" ").slice(0,2).join(" ") + " Budget", value: activeBudget > 0 ? `GHS ${activeBudget.toLocaleString()}` : "Not set", color: activeBudget > 0 ? T.cyan : T.textMuted },
               { label: "Quotes Received", value: quotedAssignments.length, color: T.teal },
               { label: "Lowest Quote", value: quotedAssignments.length > 0 ? `GHS ${Math.min(...quotedAssignments.map(a => a.quote_amount)).toLocaleString()}` : "—", color: "#10B981" },
               { label: "Highest Quote", value: quotedAssignments.length > 0 ? `GHS ${Math.max(...quotedAssignments.map(a => a.quote_amount)).toLocaleString()}` : "—", color: T.amber },
@@ -13428,9 +13434,14 @@ const QuoteComparisonView = ({ user }) => {
 
           {/* ── Weighted Scoring Matrix ── */}
           {/* Single vendor vs budget analysis */}
-          {compareData.length === 1 && activeBudget > 0 && (() => {
-            const a = compareData[0];
-            const s = scoredData[0]?.score;
+          {(() => {
+            // Auto-show single vendor analysis when only 1 vendor in filtered list
+            const autoSingle = filteredAssignments.length === 1 && compareData.length === 0 
+              ? filteredAssignments 
+              : compareData.length === 1 ? compareData : [];
+            if (autoSingle.length !== 1 || activeBudget <= 0) return null;
+            const a = autoSingle[0];
+            const s = scoredData.find(x => x.assignment.id === a.id)?.score || scoredData[0]?.score;
             const diff = a.quote_amount - activeBudget;
             const pct = ((diff / activeBudget) * 100).toFixed(1);
             const isOver = diff > 0;

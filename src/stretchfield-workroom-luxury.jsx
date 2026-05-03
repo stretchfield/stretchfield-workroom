@@ -13129,13 +13129,11 @@ const QuoteComparisonView = ({ user }) => {
         const budgetCats = budgets.map(b => b.category.toLowerCase().trim()).filter(c => c !== "other");
         const isOtherCategory = selCat === "other";
         if (isOtherCategory) {
-          return !budgetCats.some(bc => vendorCat === bc || vendorCat.includes(bc) || bc.includes(vendorCat));
+          // Other = vendors whose exact category is not in any specific budget category
+          return !budgetCats.some(bc => vendorCat === bc);
         }
-        // Exact match first, then partial
-        if (vendorCat === selCat) return true;
-        // Handle trailing spaces in DB values
-        if (vendorCat.replace(/\s+/g, " ") === selCat.replace(/\s+/g, " ")) return true;
-        return vendorCat.includes(selCat) || selCat.includes(vendorCat);
+        // Exact match only (with whitespace normalization)
+        return vendorCat.replace(/\s+/g, " ") === selCat.replace(/\s+/g, " ");
       });
 
   const filteredAssignments = categoryFilteredAssignments;
@@ -13311,16 +13309,19 @@ const QuoteComparisonView = ({ user }) => {
           <select value={selectedCategory} onChange={e => { setSelectedCategory(e.target.value); setCompareVendors([]); }} style={{ width: "100%", padding: "9px 12px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} disabled={!selectedRff}>
             <option value="all">All Categories</option>
             {categories.map(cat => {
-              const budgetLine = budgets.find(b => b.category === cat);
+              const budgetLine = budgets.find(b => b.category.trim() === cat.trim());
               const catVendors = quotedAssignments.filter(a => {
                 const vp = vendorProfiles.find(v => v.id === a.vendor_id);
                 const va = vendorApps.find(v => v.vendor_name === a.vendor_name);
-                const vendorCat = vp?.service_category || va?.vendor_type || "";
-                return vendorCat.toLowerCase().includes(cat.toLowerCase()) || cat.toLowerCase().includes(vendorCat.toLowerCase());
+                const vendorCat = (vp?.service_category || va?.vendor_type || "").toLowerCase().trim();
+                const selCat = cat.toLowerCase().trim();
+                const allBudgetCats = budgets.map(b => b.category.toLowerCase().trim()).filter(c => c !== "other");
+                if (selCat === "other") return !allBudgetCats.some(bc => vendorCat === bc);
+                return vendorCat === selCat;
               });
               return (
                 <option key={cat} value={cat}>
-                  {cat} — {catVendors.length} vendor{catVendors.length !== 1 ? "s" : ""}{budgetLine ? " — GHS " + (budgetLine.proposed_amount||0).toLocaleString() + " budget" : ""}
+                  {cat}{catVendors.length > 0 ? " — " + catVendors.length + " vendor" + (catVendors.length !== 1 ? "s" : "") : " — no quotes yet"}{budgetLine ? " (GHS " + (budgetLine.proposed_amount||0).toLocaleString() + ")" : ""}
                 </option>
               );
             })}

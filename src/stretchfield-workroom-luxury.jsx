@@ -1388,10 +1388,18 @@ const StaffDashboard = ({ user }) => {
 
   useEffect(() => {
     supabase.from("tasks").select("*").eq("assignee_id", user.id).order("created_at", { ascending: false }).then(({ data }) => setTasks(data || []));
-    const evQuery = user.role === "Strategy & Events Lead"
-      ? supabase.from("projects").select("*").eq("status", "active").eq("assigned_to", user.id)
-      : supabase.from("projects").select("*").eq("status", "active");
-    evQuery.then(({ data }) => setEvents(data || []));
+    // For Strategy Lead: load all active events then filter client-side for multi-assign support
+    supabase.from("projects").select("*").eq("status", "active").then(({ data }) => {
+      if (user.role === "Strategy & Events Lead") {
+        const myEvents = (data || []).filter(e => 
+          e.assigned_to === user.id || 
+          (Array.isArray(e.assigned_to_ids) && e.assigned_to_ids.includes(user.id))
+        );
+        setEvents(myEvents);
+      } else {
+        setEvents(data || []);
+      }
+    });
     supabase.from("notifications").select("*").eq("user_id", user.id).eq("read", false).order("created_at", { ascending: false }).limit(5).then(({ data }) => setNotifs(data || []));
   }, [user.id]);
 
@@ -4253,7 +4261,11 @@ const EventsView = ({ user, userRole }) => {
         </Card>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
-          {(userRole === "Strategy & Events Lead" ? events.filter(e => e.assigned_to === user?.id) : userRole === "Country Manager" ? events.filter(e => (e.country || 'Ghana') === (user?.country || 'Ghana')) : events).map((p, idx) => (
+          {(userRole === "Strategy & Events Lead" 
+            ? events.filter(e => e.assigned_to === user?.id || (Array.isArray(e.assigned_to_ids) && e.assigned_to_ids.includes(user?.id)))
+            : userRole === "Country Manager" 
+            ? events.filter(e => (e.country || 'Ghana') === (user?.country || 'Ghana')) 
+            : events).map((p, idx) => (
             <div key={p.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", transition: "box-shadow 0.2s, border-color 0.2s", animationDelay: idx * 0.04 + "s" }}>
               {/* Card header — always visible */}
               <div style={{ padding: "20px 22px" }}
@@ -13164,6 +13176,7 @@ const QuoteComparisonView = ({ user }) => {
     setBudgets(bud || []);
     setSelectedCategory("all");
     setCompareVendors([]);
+    setBudgets([]);
   };
 
   const categories = [...new Set(budgets.map(b => b.category))];
@@ -13338,7 +13351,7 @@ const QuoteComparisonView = ({ user }) => {
         </div>
         <div>
           <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Filter by Category</label>
-          <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} style={{ width: "100%", padding: "9px 12px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} disabled={!selectedRff}>
+          <select value={selectedCategory} onChange={e => { setSelectedCategory(e.target.value); setCompareVendors([]); }} style={{ width: "100%", padding: "9px 12px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} disabled={!selectedRff}>
             <option value="all">All Categories</option>
             {budgets.map(b => <option key={b.id} value={b.category}>{b.category} — GHS {(b.proposed_amount||0).toLocaleString()} budget</option>)}
           </select>

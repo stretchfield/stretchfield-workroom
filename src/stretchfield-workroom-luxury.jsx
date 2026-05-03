@@ -12626,37 +12626,7 @@ const PurchaseOrderView = ({ user }) => {
 
       {zohoStatus && <div style={{ padding: "10px 14px", background: T.teal + "12", border: `1px solid ${T.teal}30`, borderRadius: 8, color: T.teal, fontSize: 13, marginBottom: 16 }}>{zohoStatus}</div>}
 
-      {/* Confirmed gigs needing PO */}
-      {awards.length > 0 && (
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ color: T.amber, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>⚠ Confirmed Gigs — Create PO</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {awards.map(award => {
-              const rff = rffs.find(r => r.id === award.rff_id);
-              return (
-                <div key={award.id} style={{ background: T.surface, border: `1px solid ${T.amber}30`, borderLeft: `3px solid ${T.amber}`, borderRadius: 12, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{award.vendor_name}</div>
-                    <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{rff?.title} · {rff?.event_name}</div>
-                    <div style={{ color: T.amber, fontWeight: 700, fontSize: 13, marginTop: 4 }}>GHS {(award.quoted_amount || 0).toLocaleString()}</div>
-                    {vendorProfiles.find(v => v.id === award.vendor_id)?.email && (
-                      <div style={{ color: T.cyan, fontSize: 11, marginTop: 3 }}>✉ {vendorProfiles.find(v => v.id === award.vendor_id)?.email}</div>
-                    )}
-                    {vendorProfiles.find(v => v.id === award.vendor_id)?.phone && (
-                      <div style={{ color: T.textMuted, fontSize: 11 }}>📞 {vendorProfiles.find(v => v.id === award.vendor_id)?.phone}</div>
-                    )}
-                  </div>
-                  <button onClick={() => {
-                    const vp = vendorProfiles.find(v => v.id === award.vendor_id);
-                    setPoModal(award);
-                    setPoForm({ currency: "GHS", notes: "", vendor_email: vp?.email || "" });
-                  }} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>Create PO</button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+
 
       {/* Existing POs */}
       {pos.length > 0 && (
@@ -12693,40 +12663,7 @@ const PurchaseOrderView = ({ user }) => {
         </div>
       )}
 
-      {/* Create PO Modal */}
-      {poModal && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setPoModal(null)}>
-          <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 480, padding: 28 }} onClick={e => e.stopPropagation()}>
-            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Create Purchase Order</div>
-            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>{poModal.vendor_name}</div>
-            <div style={{ background: T.bg, borderRadius: 10, padding: "12px 16px", marginBottom: 16 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 10 }}>
-                {[["Vendor", poModal.vendor_name], ["Amount", `GHS ${(poModal.quoted_amount||0).toLocaleString()}`]].map(([l,v]) => (
-                  <div key={l}><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{l}</div><div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600, marginTop: 3 }}>{v}</div></div>
-                ))}
-              </div>
-            </div>
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Vendor Email (for PO delivery)</label>
-              <input type="email" value={poForm.vendor_email} onChange={e => setPoForm({...poForm, vendor_email: e.target.value})} placeholder="vendor@company.com" style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
-            </div>
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Currency</label>
-              <select value={poForm.currency} onChange={e => setPoForm({...poForm, currency: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
-                {["GHS","USD","EUR","GBP","NGN","KES"].map(c => <option key={c}>{c}</option>)}
-              </select>
-            </div>
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Notes</label>
-              <textarea value={poForm.notes} onChange={e => setPoForm({...poForm, notes: e.target.value})} rows={3} placeholder="PO notes, delivery terms..." style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", resize: "vertical" }} />
-            </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={handleCreatePO} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Creating..." : "Create PO + Sync to Zoho"}</button>
-              <button onClick={() => setPoModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 };
@@ -13189,6 +13126,13 @@ const QuoteComparisonView = ({ user }) => {
         const va = vendorApps.find(v => v.vendor_name === a.vendor_name);
         const vendorCat = (vp?.service_category || va?.vendor_type || "").toLowerCase();
         const selCat = selectedCategory.toLowerCase();
+        // Direct match or "Other" catches vendors not matching specific categories
+        const budgetCats = budgets.map(b => b.category.toLowerCase()).filter(c => c !== "other");
+        const isOtherCategory = selCat === "other";
+        if (isOtherCategory) {
+          // "Other" shows vendors whose category doesn't match any specific budget category
+          return !budgetCats.some(bc => vendorCat.includes(bc) || bc.includes(vendorCat));
+        }
         return vendorCat.includes(selCat) || selCat.includes(vendorCat);
       });
 
@@ -13226,7 +13170,7 @@ const QuoteComparisonView = ({ user }) => {
       vendor_name: awardModal.vendor_name,
       quoted_amount: awardModal.quote_amount,
       agreed_amount: finalAmount,
-      proposed_budget: totalBudget,
+      proposed_budget: activeBudget || totalBudget,
       vendor_manager_notes: awardNotes,
       status: "pending_ceo",
       awarded_by: user.id,
@@ -13539,7 +13483,16 @@ const QuoteComparisonView = ({ user }) => {
                       : `${a.vendor_name}'s quote is within budget with GHS ${Math.abs(diff).toLocaleString()} to spare. ${s?.isNewVendor ? "Note: This is a new vendor with no prior Stretchfield history." : "Vendor has prior engagement history."} You may proceed or invite more quotes for comparison.`}
                   </div>
                 </div>
-                <button onClick={() => { setAwardModal(a); setAwardNotes(""); setAgreedAmount(a.quote_amount || ""); }} style={{ marginTop: 14, background: `linear-gradient(135deg, ${T.teal}, #10B981)`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>Award Gig</button>
+                <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                  <button onClick={() => { setAwardModal(a); setAwardNotes(""); setAgreedAmount(a.quote_amount || ""); }} style={{ background: `linear-gradient(135deg, ${T.teal}, #10B981)`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>Award Gig</button>
+                  <button onClick={async () => {
+                    const msg = window.prompt("Message to vendor (explain what needs to change):", "Please review your quote. Our proposed budget for this category is GHS " + (activeBudget||0).toLocaleString() + ". Kindly revise and resubmit.");
+                    if (!msg) return;
+                    await supabase.from("rff_vendor_assignments").update({ status: "pending", quote_amount: null, quote_document_url: null, quote_submitted_at: null }).eq("id", a.id);
+                    await supabase.from("notifications").insert({ user_id: a.vendor_id, title: "Quote Revision Requested — " + (selectedRffData?.title || ""), message: msg, type: "rff" });
+                    load(); loadQuotes(selectedRff);
+                  }} style={{ background: T.amber+"15", border: "1px solid "+T.amber+"40", color: T.amber, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>Request Revision</button>
+                </div>
               </div>
             );
           })()}
@@ -13699,8 +13652,8 @@ const QuoteComparisonView = ({ user }) => {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 12, marginBottom: 16, background: T.bg, borderRadius: 8, padding: "12px 14px" }}>
               <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Vendor</div><div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13, marginTop: 3 }}>{awardModal.vendor_name}</div></div>
               <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Original Quote</div><div style={{ color: "#10B981", fontWeight: 900, fontSize: 16, marginTop: 3 }}>GHS {(awardModal.quote_amount || 0).toLocaleString()}</div></div>
-              <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Proposed Budget</div><div style={{ color: T.cyan, fontWeight: 700, fontSize: 13, marginTop: 3 }}>GHS {totalBudget.toLocaleString()}</div></div>
-              <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Variance</div><div style={{ color: (parseFloat(agreedAmount)||awardModal.quote_amount) <= totalBudget ? T.teal : T.red, fontWeight: 700, fontSize: 13, marginTop: 3 }}>{(parseFloat(agreedAmount)||awardModal.quote_amount) <= totalBudget ? "✓ Within budget" : `⚠ Over by GHS ${((parseFloat(agreedAmount)||awardModal.quote_amount) - totalBudget).toLocaleString()}`}</div></div>
+              <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Proposed Budget</div><div style={{ color: T.cyan, fontWeight: 700, fontSize: 13, marginTop: 3 }}>GHS {(activeBudget || totalBudget).toLocaleString()}</div></div>
+              <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Variance</div><div style={{ color: (parseFloat(agreedAmount)||awardModal.quote_amount) <= (activeBudget||totalBudget) ? T.teal : T.red, fontWeight: 700, fontSize: 13, marginTop: 3 }}>{(parseFloat(agreedAmount)||awardModal.quote_amount) <= (activeBudget||totalBudget) ? "✓ Within budget" : `⚠ Over by GHS ${((parseFloat(agreedAmount)||awardModal.quote_amount) - (activeBudget||totalBudget)).toLocaleString()}`}</div></div>
             </div>
 
             {/* Agreed Amount — editable */}

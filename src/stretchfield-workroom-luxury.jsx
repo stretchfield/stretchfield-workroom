@@ -13179,7 +13179,16 @@ const QuoteComparisonView = ({ user }) => {
     setBudgets([]);
   };
 
-  const categories = [...new Set(budgets.map(b => b.category))];
+  // Derive categories from vendor service_category when no budget lines exist
+  const budgetCategories = [...new Set(budgets.map(b => b.category).filter(Boolean))];
+  const vendorCategories = [...new Set(
+    quotedAssignments.map(a => {
+      const vp = vendorProfiles.find(v => v.id === a.vendor_id);
+      const va = vendorApps.find(v => v.vendor_name === a.vendor_name);
+      return vp?.service_category || va?.vendor_type || null;
+    }).filter(Boolean)
+  )];
+  const categories = budgetCategories.length > 0 ? budgetCategories : vendorCategories;
   const totalBudget = budgets.reduce((sum, b) => sum + (b.proposed_amount || 0), 0);
   // When category selected, use only that category budget for comparison
   const activeBudget = selectedCategory === "all"
@@ -13353,7 +13362,20 @@ const QuoteComparisonView = ({ user }) => {
           <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Filter by Category</label>
           <select value={selectedCategory} onChange={e => { setSelectedCategory(e.target.value); setCompareVendors([]); }} style={{ width: "100%", padding: "9px 12px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} disabled={!selectedRff}>
             <option value="all">All Categories</option>
-            {budgets.map(b => <option key={b.id} value={b.category}>{b.category} — GHS {(b.proposed_amount||0).toLocaleString()} budget</option>)}
+            {categories.map(cat => {
+              const budgetLine = budgets.find(b => b.category === cat);
+              const catVendors = quotedAssignments.filter(a => {
+                const vp = vendorProfiles.find(v => v.id === a.vendor_id);
+                const va = vendorApps.find(v => v.vendor_name === a.vendor_name);
+                const vendorCat = vp?.service_category || va?.vendor_type || "";
+                return vendorCat.toLowerCase().includes(cat.toLowerCase()) || cat.toLowerCase().includes(vendorCat.toLowerCase());
+              });
+              return (
+                <option key={cat} value={cat}>
+                  {cat} — {catVendors.length} vendor{catVendors.length !== 1 ? "s" : ""}{budgetLine ? " — GHS " + (budgetLine.proposed_amount||0).toLocaleString() + " budget" : ""}
+                </option>
+              );
+            })}
           </select>
         </div>
       </div>

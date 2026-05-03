@@ -5132,7 +5132,8 @@ const TaskCommentThread = ({ task, user }) => {
   );
 };
 
-const TasksView = ({ userRole, openTaskId, onOpenHandled }) => {
+const TasksView = ({ userRole, user, openTaskId, onOpenHandled }) => {
+  const currentUserId = user?.id;
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [members, setMembers] = useState([]);
@@ -5176,8 +5177,11 @@ const TasksView = ({ userRole, openTaskId, onOpenHandled }) => {
   };
 
   const load = async () => {
+    const isCEO = userRole === 'CEO';
     const [t, p, m, awards] = await Promise.all([
-      supabase.from('tasks').select('*').order('created_at', { ascending: false }),
+      isCEO
+        ? supabase.from('tasks').select('*').order('created_at', { ascending: false })
+        : supabase.from('tasks').select('*').eq('assignee_id', currentUserId).order('created_at', { ascending: false }),
       supabase.from('projects').select('*'),
       supabase.from('profiles').select('*').not('role', 'in', '("Client","Vendor")'),
       supabase.from('rff_awards').select('*, rffs(project_id, event_name), profiles!vendor_id(id, name, email, role)').in('status', ['confirmed','po_created']),
@@ -9400,7 +9404,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
         if (role === "Vendor Manager") return <VendorManagerDashboard user={currentUser} />;
         return <StaffDashboard user={currentUser} />;
       case "events": return <EventsView user={currentUser} userRole={currentUser.role} />;
-      case "tasks": return <TasksView userRole={currentUser.role} openTaskId={pendingResourceId} onOpenHandled={() => setPendingResourceId(null)} />;
+      case "tasks": return <TasksView userRole={currentUser.role} user={currentUser} openTaskId={pendingResourceId} onOpenHandled={() => setPendingResourceId(null)} />;
       case "vendors": return <VendorsView />;
       case "invoices": return <InvoicesView />;
       case "clients": return <ClientsView user={currentUser} />;

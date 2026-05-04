@@ -1179,6 +1179,7 @@ const VendorManagerDashboard = ({ user }) => {
   const [notifs, setNotifs] = useState([]);
   const [rffs, setRffs] = useState([]);
   const [awards, setAwards] = useState([]);
+  const [internalPortalEvent, setInternalPortalEvent] = useState(null);
 
 
   const VENDOR_TYPES = ["Event Lighting","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
@@ -1377,6 +1378,48 @@ const VendorManagerDashboard = ({ user }) => {
         </div>
       </div>
 
+
+      {/* My Events - Mini Portal Cards */}
+      {events.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 12 }}>Events</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {events.filter(e => !e.event_date || new Date(e.event_date) >= new Date(Date.now() - 30*86400000)).sort((a,b) => new Date(a.event_date||"9999") - new Date(b.event_date||"9999")).slice(0,5).map(e => {
+              const daysLeft = e.event_date ? Math.ceil((new Date(e.event_date) - new Date()) / 86400000) : null;
+              const dotColor = daysLeft !== null ? (daysLeft <= 7 ? T.red : daysLeft <= 30 ? T.amber : T.teal) : T.teal;
+              const myEventTasks = tasks.filter(t => t.project_id === e.id);
+              const pendingCount = myEventTasks.filter(t => t.status !== "completed").length;
+              return (
+                <div key={e.id} onClick={() => setInternalPortalEvent(e)} style={{ background: T.surface, border: "1px solid " + T.border, borderLeft: "3px solid " + dotColor, borderRadius: 10, padding: "14px 16px", cursor: "pointer" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.name}</div>
+                      <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{e.client}{e.event_date ? " · " + new Date(e.event_date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : ""}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0, marginLeft: 10 }}>
+                      {daysLeft !== null && <div style={{ background: dotColor+"18", border: "1px solid " + dotColor+"30", borderRadius: 6, padding: "4px 8px", textAlign: "center" }}><div style={{ color: dotColor, fontSize: 12, fontWeight: 900 }}>{daysLeft > 0 ? daysLeft : "Today"}</div>{daysLeft > 0 && <div style={{ color: dotColor, fontSize: 8, textTransform: "uppercase" }}>days</div>}</div>}
+                      {pendingCount > 0 && <div style={{ background: T.amber+"18", border: "1px solid " + T.amber+"30", borderRadius: 6, padding: "4px 8px", textAlign: "center" }}><div style={{ color: T.amber, fontSize: 12, fontWeight: 900 }}>{pendingCount}</div><div style={{ color: T.amber, fontSize: 8, textTransform: "uppercase" }}>tasks</div></div>}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
+                    <span style={{ color: T.textMuted, fontSize: 10, background: T.bg, padding: "2px 8px", borderRadius: 20, textTransform: "uppercase" }}>{e.phase || "Planning"}</span>
+                    <span style={{ color: T.cyan, fontSize: 11, fontWeight: 700 }}>Open →</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {internalPortalEvent && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", overflowY: "auto" }} onClick={() => setInternalPortalEvent(null)}>
+          <div style={{ minHeight: "100vh", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 20px" }}>
+            <div style={{ background: T.bg, borderRadius: 16, width: "100%", maxWidth: 800, padding: 28 }} onClick={e => e.stopPropagation()}>
+              <InternalEventPortal event={internalPortalEvent} user={user} allTasks={tasks} onClose={() => setInternalPortalEvent(null)} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -4890,7 +4933,7 @@ const EventsView = ({ user, userRole }) => {
                     </button>
                   ) : (
                     <span style={{ color: p.active_for_client ? T.teal : T.textMuted, fontSize: 10, fontWeight: 600 }}>
-                      {p.active_for_client ? "✓ Visible" : "○ Hidden"}
+                      {canManage ? (p.active_for_client ? "✓ Visible" : "○ Hidden") : ""}
                     </span>
                   )}
                 </div>
@@ -11068,6 +11111,8 @@ const FinanceManagerDashboard = ({ user, onTab }) => {
   const [vendorInvoices, setVendorInvoices] = useState([]);
   const [pos, setPOs] = useState([]);
   const [events, setEvents] = useState([]);
+  const [fmTasks, setFmTasks] = useState([]);
+  const [internalPortalEvent, setInternalPortalEvent] = useState(null);
 
   const load = async () => {
     const [v, est, pc, db, ci, vi, po, ev] = await Promise.all([
@@ -11088,6 +11133,8 @@ const FinanceManagerDashboard = ({ user, onTab }) => {
     setVendorInvoices(vi.data || []);
     setPOs(po.data || []);
     setEvents(ev.data || []);
+    const { data: myTasks } = await supabase.from("tasks").select("*").eq("assignee_id", user.id);
+    setFmTasks(myTasks || []);
   };
 
   useEffect(() => { load(); }, []);
@@ -11252,6 +11299,41 @@ const FinanceManagerDashboard = ({ user, onTab }) => {
           }) : <div style={{ color: T.textMuted, fontSize: 12, textAlign: 'center', padding: '16px 0' }}>No upcoming events</div>}
         </div>
       </div>
+
+      {events.filter(e => fmTasks.some(t => t.project_id === e.id)).length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 12 }}>My Events</div>
+          {events.filter(e => fmTasks.some(t => t.project_id === e.id)).slice(0,4).map(e => {
+            const daysLeft = e.event_date ? Math.ceil((new Date(e.event_date) - new Date()) / 86400000) : null;
+            const dotColor = daysLeft !== null ? (daysLeft <= 7 ? T.red : daysLeft <= 30 ? T.amber : T.teal) : T.teal;
+            const pendingCount = fmTasks.filter(t => t.project_id === e.id && t.status !== "completed").length;
+            return (
+              <div key={e.id} onClick={() => setInternalPortalEvent(e)} style={{ background: T.surface, border: "1px solid " + T.border, borderLeft: "3px solid " + dotColor, borderRadius: 10, padding: "12px 16px", cursor: "pointer", marginBottom: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{e.name}</div>
+                    <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{e.client}{e.event_date ? " · " + new Date(e.event_date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : ""}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    {daysLeft !== null && <div style={{ background: dotColor+"18", borderRadius: 6, padding: "4px 8px", textAlign: "center" }}><div style={{ color: dotColor, fontSize: 12, fontWeight: 900 }}>{daysLeft > 0 ? daysLeft : "Today"}</div>{daysLeft > 0 && <div style={{ color: dotColor, fontSize: 8, textTransform: "uppercase" }}>days</div>}</div>}
+                    {pendingCount > 0 && <div style={{ background: T.amber+"18", borderRadius: 6, padding: "4px 8px", textAlign: "center" }}><div style={{ color: T.amber, fontSize: 12, fontWeight: 900 }}>{pendingCount}</div><div style={{ color: T.amber, fontSize: 8, textTransform: "uppercase" }}>tasks</div></div>}
+                    <span style={{ color: T.cyan, fontSize: 11, fontWeight: 700 }}>Open →</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {internalPortalEvent && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", overflowY: "auto" }} onClick={() => setInternalPortalEvent(null)}>
+          <div style={{ minHeight: "100vh", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 20px" }}>
+            <div style={{ background: T.bg, borderRadius: 16, width: "100%", maxWidth: 800, padding: 28 }} onClick={e => e.stopPropagation()}>
+              <InternalEventPortal event={internalPortalEvent} user={user} allTasks={fmTasks} onClose={() => setInternalPortalEvent(null)} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -4946,13 +4946,16 @@ const EventsView = ({ user, userRole }) => {
                   </div>
                 )}
 
+                {/* Open button — all users */}
+                <div style={{ marginTop: 6 }}>
+                  <button onClick={e => { e.stopPropagation(); setInternalPortalEvent(p); }} style={{ width: "100%", padding: "7px 10px", background: T.cyan+"15", border: `1px solid ${T.cyan}30`, borderRadius: 6, cursor: "pointer", color: T.cyan, fontSize: 11, fontWeight: 700 }}>Open Event Portal</button>
+                </div>
                 {/* Assign Opportunity + Impact buttons — CEO only */}
                 {user?.role === "CEO" && (
                   <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
                     <button onClick={e => { e.stopPropagation(); setAssignModal(p); }} style={{ flex: 1, padding: "6px 10px", background: T.amber+"15", border: `1px solid ${T.amber}30`, borderRadius: 6, cursor: "pointer", color: T.amber, fontSize: 11, fontWeight: 700 }}>
-                      👤 {p.assigned_to_name ? p.assigned_to_name.split(" ")[0] : "Assign Opportunity"}
+                      👤 {p.assigned_to_name ? p.assigned_to_name.split(" ")[0] : "Assign Lead"}
                     </button>
-                    <button onClick={e => { e.stopPropagation(); setInternalPortalEvent(p); }} style={{ flex: 1, padding: "6px 10px", background: T.cyan+"15", border: `1px solid ${T.cyan}30`, borderRadius: 6, cursor: "pointer", color: T.cyan, fontSize: 11, fontWeight: 700 }}>Open</button>
                     {p.event_category && (
                       <button onClick={e => { e.stopPropagation(); setImpactEvent(impactEvent?.id === p.id ? null : p); }} style={{ flex: 1, padding: "6px 10px", background: (EVENT_ARCHETYPES[p.event_category]?.color||T.teal)+"15", border: `1px solid ${(EVENT_ARCHETYPES[p.event_category]?.color||T.teal)}30`, borderRadius: 6, cursor: "pointer", color: EVENT_ARCHETYPES[p.event_category]?.color||T.teal, fontSize: 11, fontWeight: 700 }}>Impact</button>
                     )}

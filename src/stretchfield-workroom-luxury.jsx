@@ -2808,6 +2808,7 @@ const ClientDocumentsTab = ({ evDocs, user, ev, clientInfo, approveItem, load })
       title: docUploadForm.title, document_type: 'Client Upload',
       document_url, shared_by: user.id, shared_by_name: user.name,
       uploaded_by_client: true, requires_approval: false,
+      is_internal: false,
     });
     const { data: team } = await supabase.from('profiles').select('id').in('role', ['CEO', 'Strategy & Events Lead']);
     for (const t of team || []) {
@@ -2936,7 +2937,7 @@ const ClientEventsView = ({ user }) => {
       if (evData.length > 0) {
         const { data: ms2 } = await supabase.from('client_milestones').select('*').in('project_id', evData.map(e => e.id)).order('due_date');
         setMilestones(ms2 || []);
-        const { data: dc2 } = await supabase.from('event_documents').select('*').in('project_id', evData.map(e => e.id)).order('created_at', { ascending: false });
+        const { data: dc2 } = await supabase.from('event_documents').select('*').in('project_id', evData.map(e => e.id)).eq('is_internal', false).order('created_at', { ascending: false });
         setDocuments(dc2 || []);
         const { data: mg2 } = await supabase.from('client_messages').select('*').in('project_id', evData.map(e => e.id)).order('created_at', { ascending: true });
         setMessages(mg2 || []);
@@ -3942,7 +3943,7 @@ const EventClientPortalPanel = ({ event, client, user, onClose }) => {
   const load = async () => {
     const [ms, dc, mg, fb] = await Promise.all([
       supabase.from("client_milestones").select("*").eq("project_id", event.id).order("due_date"),
-      supabase.from("event_documents").select("*").eq("project_id", event.id).order("created_at", { ascending: false }),
+      supabase.from("event_documents").select("*").eq("project_id", event.id).eq("is_internal", false).order("created_at", { ascending: false }),
       supabase.from("client_messages").select("*").eq("project_id", event.id).order("created_at", { ascending: true }),
       supabase.from("client_feedback").select("*").eq("project_id", event.id).order("created_at", { ascending: false }),
     ]);
@@ -4003,6 +4004,7 @@ const EventClientPortalPanel = ({ event, client, user, onClose }) => {
       title: docForm.title, document_type: docForm.document_type,
       document_url, shared_by: user.id, shared_by_name: user.name,
       requires_approval: docForm.requires_approval,
+      is_internal: false,
     });
     await notifyClient("Document Shared — " + docForm.title, docForm.title + " has been shared with you." + (docForm.requires_approval ? " Your approval is required." : ""));
     setDocForm({ title: "", document_type: "Event Brief", requires_approval: false });
@@ -4286,7 +4288,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
       isCEO
         ? supabase.from("tasks").select("*").eq("project_id", event.id).order("created_at", { ascending: false })
         : supabase.from("tasks").select("*").eq("project_id", event.id).or("assignee_id.eq." + user.id + ",assigned_by.eq." + user.id).order("created_at", { ascending: false }),
-      supabase.from("event_documents").select("*").eq("project_id", event.id).eq("uploaded_by_client", false).order("created_at", { ascending: false }),
+      supabase.from("event_documents").select("*").eq("project_id", event.id).eq("is_internal", true).order("created_at", { ascending: false }),
       supabase.from("event_team_messages").select("*").eq("project_id", event.id).order("created_at", { ascending: true }),
       supabase.from("profiles").select("id,name,role,avatar").not("role", "in", "(Client,Vendor,Board of Directors)"),
     ]);
@@ -4379,6 +4381,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
       document_type: docForm.document_type, document_url,
       shared_by: user.id, shared_by_name: user.name,
       uploaded_by_client: false, requires_approval: false,
+      is_internal: true,
     });
     setDocForm({ title: "", document_type: "Event Brief", share_with_client: false });
     setDocFile(null);
@@ -4704,6 +4707,7 @@ const EventsView = ({ user, userRole }) => {
 
   const canManage = ['CEO','Country Manager'].includes(user?.role);
   const canSeeTasks = ['CEO','Country Manager','Strategy & Events Lead','Vendor Manager'].includes(user?.role);
+  const isCEO = user?.role === 'CEO';
 
   const load = async () => {
     const [p, c, t, sl] = await Promise.all([
@@ -4965,12 +4969,14 @@ const EventsView = ({ user, userRole }) => {
                   </div>
                 )}
 
-                {/* View Tasks button — privileged roles only */}
+                {/* View Tasks button — opens internal portal */}
                 {canSeeTasks && (() => {
-                  const eventTaskCount = tasks.filter(t => t.project_id === p.id).length;
+                  const myEventTasks = isCEO ? tasks.filter(t => t.project_id === p.id) : tasks.filter(t => t.project_id === p.id && (t.assignee_id === user?.id || (Array.isArray(t.assignee_ids) && t.assignee_ids.includes(user?.id))));
+                  const eventTaskCount = myEventTasks.length;
+                  const pendingCount = myEventTasks.filter(t => t.status !== "completed").length;
                   return (
-                    <button onClick={() => setTaskModalEvent(p)} style={{
-                      marginTop: 14, width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
+                    <button onClick={e => { e.stopPropagation(); setInternalPortalEvent(p); }} style={{
+                      marginTop: 8, width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
                       background: T.bg, border: `1px solid ${T.border}80`,
                       borderRadius: 8, padding: "7px 12px", cursor: "pointer", transition: "all 0.15s",
                     }}
@@ -4978,9 +4984,9 @@ const EventsView = ({ user, userRole }) => {
                       onMouseLeave={e => { e.currentTarget.style.borderColor = T.border + "80"; e.currentTarget.style.background = T.bg; }}
                     >
                       <span style={{ color: T.textMuted, fontSize: 11, fontWeight: 700 }}>
-                        📋 {eventTaskCount} Task{eventTaskCount !== 1 ? "s" : ""}
+                        {eventTaskCount} Task{eventTaskCount !== 1 ? "s" : ""}{pendingCount > 0 ? " · " + pendingCount + " pending" : ""}
                       </span>
-                      <span style={{ color: T.cyan, fontSize: 11, fontWeight: 700 }}>View →</span>
+                      <span style={{ color: T.cyan, fontSize: 11, fontWeight: 700 }}>Open →</span>
                     </button>
                   );
                 })()}

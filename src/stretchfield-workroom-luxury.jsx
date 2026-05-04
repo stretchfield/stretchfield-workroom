@@ -624,7 +624,7 @@ const Btn = ({ children, onClick, variant = "primary", small }) => {
 const getNavItems = (role) => {
   const base = [{ id: "dashboard", label: "Dashboard", icon: "▪" }];
   if (["CEO","Country Manager","Vendor Manager","Strategy & Events Lead"].includes(role)) {
-    base.push({ id: "events", label: "Events", icon: "▪" }, { id: "tasks", label: "Event Tasks", icon: "▪" });
+    base.push({ id: "events", label: "Events", icon: "▪" });
   }
   if (role === "Finance Manager") {
     base.push({ id: "events", label: "Events", icon: "▪" });
@@ -661,7 +661,7 @@ const getNavItems = (role) => {
       { id: "dashboard", label: "Dashboard", group: true },
       { id: "grp-events", label: "Events & Operations", group: true, children: [
         { id: "events", label: "Events" },
-        { id: "tasks", label: "Event Tasks" },
+        { id: "tasks", label: "Events" },
         { id: "impact-intelligence", label: "Impact Intelligence" },
       ]},
       { id: "grp-crm", label: "CRM & Sales", group: true, children: [
@@ -5441,7 +5441,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
         if (role === "Vendor Manager") return <VendorManagerDashboard user={currentUser} />;
         return <StaffDashboard user={currentUser} />;
       case "events": return <EventsView user={currentUser} userRole={currentUser.role} />;
-      case "tasks": return <TasksView userRole={currentUser.role} user={currentUser} openTaskId={pendingResourceId} onOpenHandled={() => setPendingResourceId(null)} />;
+      case "tasks": return <EventsView user={currentUser} userRole={currentUser.role} />;
       case "vendors": return <VendorsView />;
       case "invoices": return <InvoicesView />;
       case "clients": return <ClientsView user={currentUser} />;
@@ -5766,7 +5766,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
           "Strategy & Events Lead": [
             { id: "dashboard", label: "Home" },
             { id: "events", label: "Events" },
-            { id: "tasks", label: "Tasks" },
+            
             { id: "calendar", label: "Calendar" },
             { id: "notifications", label: "Alerts" },
           ],
@@ -11473,3 +11473,574 @@ const FinanceApprovalsView = ({ user }) => {
     </div>
   );
 };
+
+const EventsView = ({ user, userRole }) => {
+  const [events, setEvents] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [form, setForm] = useState({ name: '', client: '', client_id: '', event_date: '', event_end_date: '', deadline: '', phase: 'Planning', event_category: '', country: 'Ghana' });
+  const [saving, setSaving] = useState(false);
+  const [taskModalEvent, setTaskModalEvent] = useState(null);
+  const [impactEvent, setImpactEvent] = useState(null);
+  const [assignModal, setAssignModal] = useState(null);
+  const [strategyLeads, setStrategyLeads] = useState([]);
+  const [editEvent, setEditEvent] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [portalEvent, setPortalEvent] = useState(null);
+  const [internalPortalEvent, setInternalPortalEvent] = useState(null);
+
+  const canManage = ['CEO','Country Manager'].includes(user?.role);
+  const canSeeTasks = ['CEO','Country Manager','Strategy & Events Lead','Vendor Manager'].includes(user?.role);
+
+  const load = async () => {
+    const [p, c, t, sl] = await Promise.all([
+      supabase.from('projects').select('*').order('created_at', { ascending: false }),
+      supabase.from('clients').select('*').order('name'),
+      supabase.from('tasks').select('*').order('created_at', { ascending: false }),
+      supabase.from('profiles').select('id, name, email, avatar').eq('role', 'Strategy & Events Lead'),
+    ]);
+    setEvents(p.data || []);
+    setClients(c.data || []);
+    setTasks(t.data || []);
+    setStrategyLeads(sl.data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleCreate = async () => {
+    if (!form.name) { alert('Event name is required'); return; }
+    setSaving(true);
+    if (!form.event_category) { alert('Please select an event category.'); setSaving(false); return; }
+    const { error } = await supabase.from('projects').insert({
+      name: form.name,
+      client: form.client || '',
+      client_id: form.client_id || null,
+      deadline: form.deadline || null,
+      event_date: form.event_date || null,
+      phase: form.phase,
+      completion: 0,
+      status: 'active',
+      tasks: 0,
+      completed: 0,
+      event_category: form.event_category,
+      country: form.country || 'Ghana',
+    });
+    if (error) { alert('Error: ' + error.message); setSaving(false); return; }
+    setModal(false);
+    setForm({ name: '', client: '', client_id: '', deadline: '', phase: 'Planning', event_category: '', country: 'Ghana' });
+    setSaving(false);
+    load();
+  };
+
+  const handleEdit = (p) => {
+    setEditEvent(p);
+    setEditForm({
+      name: p.name || '',
+      client_id: p.client_id || '',
+      client: p.client || '',
+      event_date: p.event_date || '',
+      deadline: p.deadline || '',
+      phase: p.phase || 'Planning',
+      completion: p.completion || 0,
+      status: p.status || 'active',
+      event_category: p.event_category || '',
+      country: p.country || 'Ghana',
+    });
+  };
+
+  const handleUpdate = async () => {
+    if (!editForm.name) return;
+    setSaving(true);
+    await supabase.from('projects').update({
+      name: editForm.name,
+      client: editForm.client,
+      client_id: editForm.client_id || null,
+      event_date: editForm.event_date || null,
+      event_end_date: editForm.event_end_date || null,
+      deadline: editForm.deadline || null,
+      phase: editForm.phase,
+      completion: parseInt(editForm.completion) || 0,
+      status: editForm.status,
+      event_category: editForm.event_category || null,
+      country: editForm.country || 'Ghana',
+    }).eq('id', editEvent.id);
+    setSaving(false);
+    setEditEvent(null);
+    load();
+  };
+
+  const openEdit = (u) => {
+    setEditModal(u);
+    setEditForm({ name: u.name || '', role: u.role || '', country: u.country || 'Ghana', phone: u.phone || '', newPassword: '' });
+    setError('');
+  };
+
+  const handleUserUpdate = async () => {
+    if (!editForm.name) { setError('Name is required.'); return; }
+    setSaving(true); setError('');
+    await supabase.from('profiles').update({
+      name: editForm.name,
+      role: editForm.role,
+      country: editForm.role === 'Country Manager' ? editForm.country : null,
+      phone: editForm.phone || null,
+    }).eq('id', editModal.id);
+    // Update password if provided
+    if (editForm.newPassword) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        await fetch('https://okbduzenceoknkjqnrha.supabase.co/functions/v1/delete-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ userId: editModal.id, action: 'reset-password', newPassword: editForm.newPassword }),
+        });
+      } catch (e) { console.error(e); }
+    }
+    setSaving(false);
+    setEditModal(null);
+    load();
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this event? This cannot be undone.')) return;
+    try {
+      // Step 1 — delete task comments via task IDs
+      const { data: taskList } = await supabase.from('tasks').select('id').eq('project_id', id);
+      if (taskList?.length) {
+        const taskIds = taskList.map(t => t.id);
+        await supabase.from('task_comments').delete().in('task_id', taskIds);
+      }
+      // Step 2 — delete tasks
+      await supabase.from('tasks').delete().eq('project_id', id);
+      // Step 3 — delete impact data
+      await Promise.all([
+        supabase.from('event_impact_briefs').delete().eq('project_id', id),
+        supabase.from('event_post_data').delete().eq('project_id', id),
+        supabase.from('event_scorecards').delete().eq('project_id', id),
+        supabase.from('event_impact_reports').delete().eq('project_id', id),
+        supabase.from('vendor_scorecards').delete().eq('project_id', id),
+        supabase.from('expenses').delete().eq('project_id', id),
+        supabase.from('budgets').delete().eq('project_id', id),
+        supabase.from('client_budgets').delete().eq('project_id', id),
+        supabase.from('client_expenses').delete().eq('project_id', id),
+        supabase.from('client_invoices').delete().eq('project_id', id),
+        supabase.from('feedback').delete().eq('project_id', id),
+      ]);
+      // Step 4 — delete RFF chain
+      const { data: rffList } = await supabase.from('rffs').select('id').eq('project_id', id);
+      if (rffList?.length) {
+        const rffIds = rffList.map(r => r.id);
+        // Delete invoices referencing RFFs first
+        await supabase.from('invoices').delete().in('rff_id', rffIds);
+        await Promise.all([
+          supabase.from('rff_vendor_assignments').delete().in('rff_id', rffIds),
+          supabase.from('rff_budgets').delete().in('rff_id', rffIds),
+          supabase.from('rff_awards').delete().in('rff_id', rffIds),
+        ]);
+        await supabase.from('rffs').delete().in('id', rffIds);
+      }
+      // Step 5 — delete POs and vendor invoices
+      await supabase.from('vendor_invoices').delete().eq('event_id', id);
+      await supabase.from('purchase_orders').delete().eq('event_id', id);
+      // Step 6 — delete event
+      const { error } = await supabase.from('projects').delete().eq('id', id);
+      if (error) { alert('Delete failed: ' + error.message); return; }
+      load();
+    } catch (e) {
+      alert('Delete failed: ' + e.message);
+    }
+  };
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Portfolio</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Events</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{events.length} active engagement{events.length !== 1 ? "s" : ""}</div>
+        </div>
+        {canManage && <Btn onClick={() => setModal(true)}>+ New Event</Btn>}
+      </div>
+      {events.length === 0 ? (
+        <Card style={{ textAlign: 'center', padding: 60 }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>📁</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No events yet</div>
+          <div style={{ color: T.textMuted, fontSize: 13 }}>Click "+ New Event" to get started.</div>
+        </Card>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
+          {(userRole === "Strategy & Events Lead" 
+            ? events.filter(e => e.assigned_to === user?.id || (Array.isArray(e.assigned_to_ids) && e.assigned_to_ids.includes(user?.id)))
+            : userRole === "Country Manager" 
+            ? events.filter(e => (e.country || 'Ghana') === (user?.country || 'Ghana')) 
+            : events).map((p, idx) => (
+            <div key={p.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", transition: "box-shadow 0.2s, border-color 0.2s", animationDelay: idx * 0.04 + "s" }}>
+              {/* Card header — always visible */}
+              <div style={{ padding: "20px 22px" }}
+                onMouseEnter={e => { e.currentTarget.parentElement.style.boxShadow = `0 4px 28px ${T.cyan}10`; e.currentTarget.parentElement.style.borderColor = T.cyan + "40"; }}
+                onMouseLeave={e => { e.currentTarget.parentElement.style.boxShadow = "none"; e.currentTarget.parentElement.style.borderColor = T.border; }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, letterSpacing: "-0.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
+                    <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{p.client}</div>
+                    {p.assigned_to_name && <div style={{ color: T.amber, fontSize: 10, fontWeight: 700, marginTop: 2 }}>👤 {p.assigned_to_name}</div>}
+                  </div>
+                  <Badge status={p.status} />
+                </div>
+
+                {/* Category badge + Phase row */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <div style={{ background: T.cyan + "18", color: T.cyan, padding: "2px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>{p.phase}</div>
+                    {p.event_category && (
+                      <div style={{ background: (EVENT_ARCHETYPES[p.event_category]?.color||T.teal)+"18", color: EVENT_ARCHETYPES[p.event_category]?.color||T.teal, border: `1px solid ${(EVENT_ARCHETYPES[p.event_category]?.color||T.teal)}30`, padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 800 }}>{p.event_category}</div>
+                    )}
+                  </div>
+                  {p.deadline && <div style={{ color: T.textMuted, fontSize: 11 }}>Due {p.deadline}</div>}
+                </div>
+
+                {/* Progress bar */}
+                <div style={{ height: 4, background: T.border + "44", borderRadius: 2, marginBottom: 6 }}>
+                  <div style={{ height: "100%", width: (p.completion || 0) + "%", background: `linear-gradient(90deg, ${T.cyan}, ${T.teal})`, borderRadius: 2, transition: "width 0.4s ease" }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ color: T.textMuted, fontSize: 10 }}>{p.completion || 0}% complete</div>
+                  {canManage ? (
+                    <button onClick={async (e) => {
+                      e.stopPropagation();
+                      await supabase.from("projects").update({ active_for_client: !p.active_for_client }).eq("id", p.id);
+                      load();
+                    }} style={{
+                      background: p.active_for_client ? T.teal + "18" : "none",
+                      border: `1px solid ${p.active_for_client ? T.teal + "60" : T.border}`,
+                      color: p.active_for_client ? T.teal : T.textMuted,
+                      padding: "3px 10px", borderRadius: 20, cursor: "pointer", fontSize: 10, fontWeight: 700,
+                    }}>
+                      {p.active_for_client ? "✓ Client Visible" : "○ Hidden"}
+                    </button>
+                  ) : (
+                    <span style={{ color: p.active_for_client ? T.teal : T.textMuted, fontSize: 10, fontWeight: 600 }}>
+                      {p.active_for_client ? "✓ Visible" : "○ Hidden"}
+                    </span>
+                  )}
+                </div>
+
+                {/* Edit + Delete buttons — canManage roles */}
+                {canManage && (
+                  <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+                    <button onClick={e => { e.stopPropagation(); handleEdit(p); }} style={{ flex: 1, padding: "6px 10px", background: T.cyan+"15", border: `1px solid ${T.cyan}30`, borderRadius: 6, cursor: "pointer", color: T.cyan, fontSize: 11, fontWeight: 700 }}>✎ Edit</button>
+                    <button onClick={e => { e.stopPropagation(); handleDelete(p.id); }} style={{ flex: 1, padding: "6px 10px", background: T.red+"15", border: `1px solid ${T.red}30`, borderRadius: 6, cursor: "pointer", color: T.red, fontSize: 11, fontWeight: 700 }}>🗑 Delete</button>
+                  </div>
+                )}
+
+                {/* Assign Opportunity + Impact buttons — CEO only */}
+                {user?.role === "CEO" && (
+                  <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                    <button onClick={e => { e.stopPropagation(); setAssignModal(p); }} style={{ flex: 1, padding: "6px 10px", background: T.amber+"15", border: `1px solid ${T.amber}30`, borderRadius: 6, cursor: "pointer", color: T.amber, fontSize: 11, fontWeight: 700 }}>
+                      👤 {p.assigned_to_name ? p.assigned_to_name.split(" ")[0] : "Assign Opportunity"}
+                    </button>
+                    <button onClick={e => { e.stopPropagation(); setInternalPortalEvent(p); }} style={{ flex: 1, padding: "6px 10px", background: T.cyan+"15", border: `1px solid ${T.cyan}30`, borderRadius: 6, cursor: "pointer", color: T.cyan, fontSize: 11, fontWeight: 700 }}>Open</button>
+                    {p.event_category && (
+                      <button onClick={e => { e.stopPropagation(); setImpactEvent(impactEvent?.id === p.id ? null : p); }} style={{ flex: 1, padding: "6px 10px", background: (EVENT_ARCHETYPES[p.event_category]?.color||T.teal)+"15", border: `1px solid ${(EVENT_ARCHETYPES[p.event_category]?.color||T.teal)}30`, borderRadius: 6, cursor: "pointer", color: EVENT_ARCHETYPES[p.event_category]?.color||T.teal, fontSize: 11, fontWeight: 700 }}>Impact</button>
+                    )}
+                    {p.client_id && canManage && (
+                      <button onClick={e => { e.stopPropagation(); setPortalEvent(p); }} style={{ flex: 1, padding: "6px 10px", background: T.teal+"15", border: `1px solid ${T.teal}30`, borderRadius: 6, cursor: "pointer", color: T.teal, fontSize: 11, fontWeight: 700 }}>Client Portal</button>
+                    )}
+                  </div>
+                )}
+
+                {/* View Tasks button — privileged roles only */}
+                {canSeeTasks && (() => {
+                  const eventTaskCount = tasks.filter(t => t.project_id === p.id).length;
+                  return (
+                    <button onClick={() => setTaskModalEvent(p)} style={{
+                      marginTop: 14, width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
+                      background: T.bg, border: `1px solid ${T.border}80`,
+                      borderRadius: 8, padding: "7px 12px", cursor: "pointer", transition: "all 0.15s",
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = T.cyan + "60"; e.currentTarget.style.background = T.cyan + "10"; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = T.border + "80"; e.currentTarget.style.background = T.bg; }}
+                    >
+                      <span style={{ color: T.textMuted, fontSize: 11, fontWeight: 700 }}>
+                        📋 {eventTaskCount} Task{eventTaskCount !== 1 ? "s" : ""}
+                      </span>
+                      <span style={{ color: T.cyan, fontSize: 11, fontWeight: 700 }}>View →</span>
+                    </button>
+                  );
+                })()}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {/* ── Assign Strategy Lead Modal ── */}
+      {assignModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setAssignModal(null)}>
+          <div style={{ background: T.surface, border: `1px solid ${T.amber}30`, borderRadius: 16, width: "100%", maxWidth: 480, padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Assign Strategy Lead</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>Event: <strong style={{ color: T.textPrimary }}>{assignModal.name}</strong></div>
+            {assignModal.assigned_to_name && (
+              <div style={{ background: T.amber+"12", border: `1px solid ${T.amber}30`, borderRadius: 8, padding: "10px 14px", marginBottom: 16, color: T.amber, fontSize: 12 }}>
+                Currently assigned to: <strong>{assignModal.assigned_to_name}</strong>
+              </div>
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+              {strategyLeads.map(sl => (
+                <div key={sl.id} onClick={async () => {
+                  // Toggle assignment - if already assigned, keep + add; support multiple
+                  const currentIds = (assignModal.assigned_to_ids || (assignModal.assigned_to ? [assignModal.assigned_to] : []));
+                  const isAssigned = currentIds.includes(sl.id);
+                  const newIds = isAssigned ? currentIds.filter(id => id !== sl.id) : [...currentIds, sl.id];
+                  const newNames = strategyLeads.filter(l => newIds.includes(l.id)).map(l => l.name).join(", ");
+                  await supabase.from("projects").update({ assigned_to: newIds[0] || null, assigned_to_name: newNames || null, assigned_to_ids: newIds }).eq("id", assignModal.id);
+                  if (!isAssigned) {
+                    await supabase.from("notifications").insert({ user_id: sl.id, title: "Event Assigned to You", message: `CEO assigned you to "${assignModal.name}". Check your Events tab.`, type: "task" });
+                    if (sl.email) await sendEmail(sl.email, `Event Assigned — ${assignModal.name}`, notifEmailHtml({ name: sl.name, title: "Event Assigned to You", message: `CEO has assigned you as Strategy Lead for <strong>${assignModal.name}</strong>. Please log in to view the event details.`, actionUrl: "https://workroom.stretchfield.com", actionLabel: "View Event" }));
+                  }
+                  setAssignModal(prev => ({...prev, assigned_to: newIds[0] || null, assigned_to_ids: newIds, assigned_to_name: newNames}));
+                  load();
+                }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: (assignModal.assigned_to_ids || [assignModal.assigned_to]).includes(sl.id) ? T.amber+"15" : T.bg, border: `1px solid ${(assignModal.assigned_to_ids || [assignModal.assigned_to]).includes(sl.id) ? T.amber : T.border}`, borderRadius: 10, cursor: "pointer" }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = T.amber}
+                  onMouseLeave={e => { const assigned = (assignModal.assigned_to_ids || [assignModal.assigned_to]).includes(sl.id); e.currentTarget.style.borderColor = assigned ? T.amber : T.border; }}>
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: T.amber+"20", border: `1px solid ${T.amber}40`, display: "flex", alignItems: "center", justifyContent: "center", color: T.amber, fontWeight: 800, fontSize: 13 }}>{(sl.name||"?").slice(0,2).toUpperCase()}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{sl.name}</div>
+                    <div style={{ color: T.textMuted, fontSize: 11 }}>{sl.email}</div>
+                  </div>
+                  {(assignModal.assigned_to_ids || [assignModal.assigned_to]).includes(sl.id) && <div style={{ color: T.amber, fontWeight: 900, fontSize: 16 }}>✓</div>}
+                </div>
+              ))}
+              {strategyLeads.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: 20 }}>No Strategy & Events Lead users found.</div>}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {assignModal.assigned_to && (
+                <button onClick={async () => {
+                  await supabase.from("projects").update({ assigned_to: null, assigned_to_name: null }).eq("id", assignModal.id);
+                  setAssignModal(null); load();
+                }} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>Remove Assignment</button>
+              )}
+              <button onClick={() => setAssignModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Event Tasks Modal ── */}
+      {/* Internal Event Portal */}
+      {internalPortalEvent && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", overflowY: "auto" }} onClick={() => setInternalPortalEvent(null)}>
+          <div style={{ minHeight: "100vh", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 20px" }}>
+            <div style={{ background: T.bg, borderRadius: 16, width: "100%", maxWidth: 800, padding: 28 }} onClick={e => e.stopPropagation()}>
+              <InternalEventPortal event={internalPortalEvent} user={user} allTasks={tasks} onClose={() => setInternalPortalEvent(null)} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Client Portal Manager */}
+      {portalEvent && (() => {
+        const portalClient = clients.find(c => c.id === portalEvent.client_id);
+        if (!portalClient) return null;
+        return (
+          <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", overflowY: "auto" }} onClick={() => setPortalEvent(null)}>
+            <div style={{ minHeight: "100vh", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 20px" }}>
+              <div style={{ background: T.bg, borderRadius: 16, width: "100%", maxWidth: 720, padding: 28 }} onClick={e => e.stopPropagation()}>
+                <EventClientPortalPanel event={portalEvent} client={portalClient} user={user} onClose={() => setPortalEvent(null)} />
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {taskModalEvent && canSeeTasks && (() => {
+        const eventTasks = tasks.filter(t => t.project_id === taskModalEvent.id);
+        const completed = eventTasks.filter(t => t.status === "completed").length;
+        const inProgress = eventTasks.filter(t => t.status === "in-progress").length;
+        const pending = eventTasks.filter(t => !["completed","in-progress"].includes(t.status)).length;
+        return (
+          <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+            onClick={() => setTaskModalEvent(null)}
+          >
+            <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 580, maxHeight: "80vh", display: "flex", flexDirection: "column", boxShadow: `0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px ${T.cyan}20`, animation: "fadeUp 0.25s ease" }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Modal header */}
+              <div style={{ padding: "20px 24px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexShrink: 0 }}>
+                <div>
+                  <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>Event Tasks</div>
+                  <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, letterSpacing: "-0.02em" }}>{taskModalEvent.name}</div>
+                  <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{taskModalEvent.client} · {taskModalEvent.phase}</div>
+                </div>
+                <button onClick={() => setTaskModalEvent(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = T.red + "60"; e.currentTarget.style.color = T.red; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.textMuted; }}
+                >×</button>
+              </div>
+
+              {/* Task stats strip */}
+              {eventTasks.length > 0 && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, padding: "14px 24px", borderBottom: `1px solid ${T.border}44`, flexShrink: 0 }}>
+                  {[
+                    { label: "Completed", value: completed, color: T.teal },
+                    { label: "In Progress", value: inProgress, color: T.cyan },
+                    { label: "Pending", value: pending, color: T.amber },
+                  ].map((k, i) => (
+                    <div key={i} style={{ padding: "10px 12px", background: T.bg, border: `1px solid ${T.border}44`, borderTop: `2px solid ${k.color}`, borderRadius: 8, textAlign: "center" }}>
+                      <div style={{ color: k.color, fontSize: 20, fontWeight: 900 }}>{k.value}</div>
+                      <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 2 }}>{k.label}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Task list — scrollable */}
+              <div style={{ overflowY: "auto", padding: "16px 24px", flex: 1 }}>
+                {eventTasks.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "40px 0" }}>
+                    <div style={{ fontSize: 36, marginBottom: 12 }}>📋</div>
+                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15, marginBottom: 6 }}>No tasks yet</div>
+                    <div style={{ color: T.textMuted, fontSize: 13 }}>No tasks have been assigned to this event.</div>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {eventTasks.map(t => {
+                      const pct = t.progress || 0;
+                      const barColor = t.status === "completed" ? T.teal : pct > 66 ? T.cyan : pct > 33 ? T.amber : T.magenta;
+                      const statusColors = { completed: T.teal, "in-progress": T.cyan, pending: T.amber, blocked: T.red };
+                      const statusColor = statusColors[t.status] || T.textMuted;
+                      const canComment = ["CEO", "Strategy & Events Lead"].includes(user?.role);
+                      return (
+                        <TaskCommentCard
+                          key={t.id}
+                          task={t}
+                          user={user}
+                          canComment={canComment}
+                          barColor={barColor}
+                          statusColor={statusColor}
+                          pct={pct}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div style={{ padding: "14px 24px", borderTop: `1px solid ${T.border}44`, display: "flex", justifyContent: "flex-end", flexShrink: 0 }}>
+                <button onClick={() => setTaskModalEvent(null)} style={{ background: T.cyan + "18", border: `1px solid ${T.cyan}40`, color: T.cyan, padding: "8px 24px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, letterSpacing: "0.06em" }}>Close</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Edit Event Modal */}
+      {editEvent && canManage && (
+        <Modal title="Edit Event" onClose={() => setEditEvent(null)}>
+          <Input label="Event Name" value={editForm.name} onChange={v => setEditForm({ ...editForm, name: v })} />
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>Event Category</div>
+            <select value={editForm.event_category || ""} onChange={e => setEditForm({...editForm, event_category: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+              <option value="">Select category...</option>
+              <option value="Conference/Seminar">Conference / Seminar</option>
+              <option value="Product Launch">Product Launch</option>
+              <option value="Awards Ceremony">Awards Ceremony</option>
+              <option value="Corporate Party">Corporate Party</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          {clients.length > 0 ? (
+            <Select label="Client" options={[{ value: '', label: 'Select a client...' }, ...clients.map(c => ({ value: c.id, label: c.company || c.name }))]}
+              value={editForm.client_id}
+              onChange={v => {
+                const c = clients.find(cl => cl.id === v);
+                setEditForm({ ...editForm, client_id: v, client: c ? (c.company || c.name) : '' });
+              }} />
+          ) : (
+            <Input label="Client Name" value={editForm.client} onChange={v => setEditForm({ ...editForm, client: v })} />
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Input label="Event Start Date" type="date" value={editForm.event_date} onChange={v => setEditForm({ ...editForm, event_date: v })} />
+            <Input label="Event End Date" type="date" value={editForm.event_end_date || ""} onChange={v => setEditForm({ ...editForm, event_end_date: v })} />
+          </div>
+          <Input label="Planning Deadline" type="date" value={editForm.deadline} onChange={v => setEditForm({ ...editForm, deadline: v })} />
+          <Select label="Phase" options={[
+            { value: 'Planning', label: 'Planning' },
+            { value: 'Design', label: 'Design' },
+            { value: 'Execution', label: 'Execution' },
+            { value: 'Review', label: 'Review' },
+          ]} value={editForm.phase} onChange={v => setEditForm({ ...editForm, phase: v })} />
+          <Select label="Status" options={[
+            { value: 'active', label: 'Active' },
+            { value: 'completed', label: 'Completed' },
+            { value: 'on-hold', label: 'On Hold' },
+          ]} value={editForm.status} onChange={v => setEditForm({ ...editForm, status: v })} />
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 6 }}>Completion: {editForm.completion}%</label>
+            <input type="range" min="0" max="100" value={editForm.completion}
+              onChange={e => setEditForm({ ...editForm, completion: e.target.value })}
+              style={{ width: "100%", accentColor: T.cyan }} />
+          </div>
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <Btn onClick={handleUpdate} disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</Btn>
+            <Btn variant="ghost" onClick={() => setEditEvent(null)}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {modal && (
+        <Modal title="New Event" onClose={() => setModal(false)}>
+          <Input label="Event Name" placeholder="e.g. Brand Campaign" value={form.name} onChange={v => setForm({ ...form, name: v })} />
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>Event Category *</div>
+            <select value={form.event_category} onChange={e => setForm({...form, event_category: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${form.event_category ? T.border : "#F59E0B"}`, borderRadius: 8, color: form.event_category ? T.textPrimary : T.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+              <option value="">Select event category...</option>
+              <option value="Conference/Seminar">Conference / Seminar</option>
+              <option value="Product Launch">Product Launch</option>
+              <option value="Awards Ceremony">Awards Ceremony</option>
+              <option value="Corporate Party">Corporate Party</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>Country</div>
+            <select value={form.country} onChange={e => setForm({...form, country: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+              <option value="Ghana">Ghana</option>
+              <option value="Nigeria">Nigeria</option>
+            </select>
+          </div>
+          {clients.length > 0 ? (
+            <Select label="Client" options={[{ value: '', label: 'Select a client...' }, ...clients.map(c => ({ value: c.id, label: c.company || c.name }))]}
+              value={form.client_id}
+              onChange={v => {
+                const c = clients.find(cl => cl.id === v);
+                setForm({ ...form, client_id: v, client: c ? (c.company || c.name) : '' });
+              }} />
+          ) : (
+            <Input label="Client Name" placeholder="Client company name" value={form.client} onChange={v => setForm({ ...form, client: v })} />
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Input label="Event Start Date" type="date" value={form.event_date} onChange={v => setForm({ ...form, event_date: v })} />
+            <Input label="Event End Date" type="date" value={form.event_end_date} onChange={v => setForm({ ...form, event_end_date: v })} />
+          </div>
+          <Input label="Planning Deadline" type="date" value={form.deadline} onChange={v => setForm({ ...form, deadline: v })} />
+          <Select label="Phase" options={[
+            { value: 'Planning', label: 'Planning' },
+            { value: 'Design', label: 'Design' },
+            { value: 'Execution', label: 'Execution' },
+            { value: 'Review', label: 'Review' },
+          ]} value={form.phase} onChange={v => setForm({ ...form, phase: v })} />
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <Btn onClick={handleCreate} disabled={saving}>{saving ? 'Saving...' : 'Create Event'}</Btn>
+            <Btn variant="ghost" onClick={() => setModal(false)}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+
+
+

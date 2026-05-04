@@ -1276,7 +1276,7 @@ const VendorManagerDashboard = ({ user }) => {
           {upcomingEvents.length > 0 ? upcomingEvents.slice(0,4).map((ev,i) => {
             const days = Math.ceil((new Date(ev.event_date) - now)/(1000*60*60*24));
             const color = days <= 7 ? T.red : days <= 30 ? T.amber : T.teal;
-            const archetype = EVENT_ARCHETYPES[ev.event_category];
+            const archetype = (typeof EVENT_ARCHETYPES !== "undefined" && EVENT_ARCHETYPES[ev.event_category]) || { color: T.teal, icon: "▪" };
             return (
               <div key={ev.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < 3 ? `1px solid ${T.border}33` : "none" }}>
                 <div>

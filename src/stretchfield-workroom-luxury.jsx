@@ -12368,6 +12368,772 @@ const VendorsView = ({ user }) => {
 
 
 
+const EventClientPortalPanel = ({ event, client, user, onClose }) => {
+  const [milestones, setMilestones] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [feedback, setFeedback] = useState([]);
+  const [activeSection, setActiveSection] = useState("milestones");
+  const [milestoneForm, setMilestoneForm] = useState({ title: "", description: "", due_date: "", requires_approval: false });
+  const [showMilestoneForm, setShowMilestoneForm] = useState(false);
+  const [docForm, setDocForm] = useState({ title: "", document_type: "Event Brief", requires_approval: false });
+  const [docFile, setDocFile] = useState(null);
+  const [showDocForm, setShowDocForm] = useState(false);
+  const [reply, setReply] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  const load = async () => {
+    const [ms, dc, mg, fb] = await Promise.all([
+      supabase.from("client_milestones").select("*").eq("project_id", event.id).order("due_date"),
+      supabase.from("event_documents").select("*").eq("project_id", event.id).order("created_at", { ascending: false }),
+      supabase.from("client_messages").select("*").eq("project_id", event.id).order("created_at", { ascending: true }),
+      supabase.from("client_feedback").select("*").eq("project_id", event.id).order("created_at", { ascending: false }),
+    ]);
+    setMilestones(ms.data || []);
+    setDocuments(dc.data || []);
+    setMessages(mg.data || []);
+    setFeedback(fb.data || []);
+  };
+
+  useEffect(() => { load(); }, [event.id]);
+
+  const notifyClient = async (title, message) => {
+    const { data: cp } = await supabase.from("profiles").select("id").eq("email", client.email).single();
+    if (cp) await supabase.from("notifications").insert({ user_id: cp.id, title, message, type: "task" });
+  };
+
+  const addMilestone = async () => {
+    if (!milestoneForm.title) return;
+    setSaving(true);
+    await supabase.from("client_milestones").insert({
+      project_id: event.id, title: milestoneForm.title,
+      description: milestoneForm.description || null,
+      due_date: milestoneForm.due_date || null,
+      status: "pending", requires_approval: milestoneForm.requires_approval,
+      created_by: user.id,
+    });
+    await notifyClient("New Milestone — " + event.name, milestoneForm.title + " has been added to your event timeline.");
+    setMilestoneForm({ title: "", description: "", due_date: "", requires_approval: false });
+    setShowMilestoneForm(false);
+    setSaving(false);
+    load();
+  };
+
+  const updateMilestoneStatus = async (id, status) => {
+    await supabase.from("client_milestones").update({ status, completed_at: status === "completed" ? new Date().toISOString() : null }).eq("id", id);
+    if (status === "completed") {
+      const ms = milestones.find(m => m.id === id);
+      if (ms) await notifyClient("Milestone Completed — " + ms.title, ms.title + " has been completed for " + event.name + ".");
+    }
+    load();
+  };
+
+  const shareDocument = async () => {
+    if (!docForm.title) return;
+    setSaving(true);
+    let document_url = null;
+    if (docFile) {
+      const ext = docFile.name.split(".").pop();
+      const fname = "client_doc_" + Date.now() + "." + ext;
+      const { error: upErr } = await supabase.storage.from("vendor-docs").upload(fname, docFile);
+      if (!upErr) {
+        const { data: urlData } = supabase.storage.from("vendor-docs").getPublicUrl(fname);
+        document_url = urlData.publicUrl;
+      }
+    }
+    await supabase.from("event_documents").insert({
+      project_id: event.id, client_id: client.id,
+      title: docForm.title, document_type: docForm.document_type,
+      document_url, shared_by: user.id, shared_by_name: user.name,
+      requires_approval: docForm.requires_approval,
+    });
+    await notifyClient("Document Shared — " + docForm.title, docForm.title + " has been shared with you." + (docForm.requires_approval ? " Your approval is required." : ""));
+    setDocForm({ title: "", document_type: "Event Brief", requires_approval: false });
+    setDocFile(null);
+    setShowDocForm(false);
+    setSaving(false);
+    load();
+  };
+
+  const sendReply = async () => {
+    if (!reply.trim()) return;
+    setSending(true);
+    await supabase.from("client_messages").insert({
+      project_id: event.id, client_id: client.id,
+      sender_id: user.id, sender_name: user.name, sender_role: user.role,
+      message: reply.trim(), read_by_client: false, read_by_team: true,
+    });
+    await notifyClient("New Message from Stretchfield", user.name + ": " + reply.trim().slice(0, 80));
+    setReply("");
+    setSending(false);
+    load();
+  };
+
+  const unreadCount = messages.filter(m => m.sender_role === "Client" && !m.read_by_team).length;
+  const inputStyle = { width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>Client Portal</div>
+          <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18 }}>{event.name}</div>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{client.company || client.name} · {event.phase}</div>
+        </div>
+        <button onClick={onClose} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 18 }}>×</button>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        {[
+          { id: "milestones", label: "Milestones (" + milestones.length + ")" },
+          { id: "documents", label: "Documents (" + documents.length + ")" },
+          { id: "messages", label: "Messages" + (unreadCount > 0 ? " (" + unreadCount + " new)" : "") },
+          { id: "feedback", label: "Feedback (" + feedback.length + ")" },
+        ].map(tab => (
+          <button key={tab.id} onClick={() => setActiveSection(tab.id)} style={{ padding: "9px 16px", border: "none", background: "none", cursor: "pointer", color: activeSection === tab.id ? T.cyan : T.textMuted, fontWeight: activeSection === tab.id ? 800 : 400, fontSize: 12, borderBottom: activeSection === tab.id ? `2px solid ${T.cyan}` : "2px solid transparent", marginBottom: -1 }}>{tab.label}</button>
+        ))}
+      </div>
+
+      {/* Milestones */}
+      {activeSection === "milestones" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
+            <div style={{ color: T.textMuted, fontSize: 12 }}>Visible to {client.company || client.name}</div>
+            <button onClick={() => setShowMilestoneForm(!showMilestoneForm)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>+ Add Milestone</button>
+          </div>
+          {showMilestoneForm && (
+            <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 10, padding: "16px", marginBottom: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                <div style={{ gridColumn: "1/-1" }}>
+                  <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Title</label>
+                  <input value={milestoneForm.title} onChange={e => setMilestoneForm(f => ({...f, title: e.target.value}))} placeholder="e.g. Venue Confirmed" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Due Date</label>
+                  <input type="date" value={milestoneForm.due_date} onChange={e => setMilestoneForm(f => ({...f, due_date: e.target.value}))} style={inputStyle} />
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 18 }}>
+                  <input type="checkbox" checked={milestoneForm.requires_approval} onChange={e => setMilestoneForm(f => ({...f, requires_approval: e.target.checked}))} id="ms_appr" />
+                  <label htmlFor="ms_appr" style={{ color: T.textMuted, fontSize: 12 }}>Requires client approval</label>
+                </div>
+              </div>
+              <textarea value={milestoneForm.description} onChange={e => setMilestoneForm(f => ({...f, description: e.target.value}))} placeholder="Description (optional)" rows={2} style={{ ...inputStyle, resize: "none", marginBottom: 10 }} />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={addMilestone} disabled={saving || !milestoneForm.title} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "7px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>{saving ? "Saving..." : "Add"}</button>
+                <button onClick={() => setShowMilestoneForm(false)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>Cancel</button>
+              </div>
+            </div>
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {milestones.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "30px 0" }}>No milestones yet.</div>}
+            {milestones.map(m => {
+              const sc = { pending: T.textMuted, "in-progress": T.cyan, completed: T.teal };
+              const c = sc[m.status] || T.textMuted;
+              return (
+                <div key={m.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderLeft: `3px solid ${c}`, borderRadius: 10, padding: "12px 16px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{m.title}</div>
+                      {m.description && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{m.description}</div>}
+                      {m.due_date && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>Due: {new Date(m.due_date).toLocaleDateString("en-GB")}</div>}
+                      {m.requires_approval && <div style={{ color: m.approved_by_client ? T.teal : T.amber, fontSize: 10, fontWeight: 700, marginTop: 3 }}>{m.approved_by_client ? "✓ Approved by client" : "Awaiting client approval"}</div>}
+                    </div>
+                    <div style={{ display: "flex", gap: 4 }}>
+                      {["pending","in-progress","completed"].map(s => (
+                        <button key={s} onClick={() => updateMilestoneStatus(m.id, s)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${m.status === s ? c : T.border}`, background: m.status === s ? c+"20" : "none", color: m.status === s ? c : T.textMuted, fontSize: 9, fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>{s}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Documents */}
+      {activeSection === "documents" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
+            <div style={{ color: T.textMuted, fontSize: 12 }}>Share files with client</div>
+            <button onClick={() => setShowDocForm(!showDocForm)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>+ Share Document</button>
+          </div>
+          {showDocForm && (
+            <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 10, padding: "16px", marginBottom: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                <div style={{ gridColumn: "1/-1" }}>
+                  <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Title</label>
+                  <input value={docForm.title} onChange={e => setDocForm(f => ({...f, title: e.target.value}))} placeholder="e.g. Event Brief v1" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Type</label>
+                  <select value={docForm.document_type} onChange={e => setDocForm(f => ({...f, document_type: e.target.value}))} style={{ ...inputStyle, appearance: "none" }}>
+                    {["Event Brief","Run of Show","Proposal","Contract","Programme","Other"].map(t => <option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 18 }}>
+                  <input type="checkbox" checked={docForm.requires_approval} onChange={e => setDocForm(f => ({...f, requires_approval: e.target.checked}))} id="doc_appr2" />
+                  <label htmlFor="doc_appr2" style={{ color: T.textMuted, fontSize: 12 }}>Requires client approval</label>
+                </div>
+              </div>
+              <input type="file" onChange={e => setDocFile(e.target.files[0])} style={{ ...inputStyle, marginBottom: 10, cursor: "pointer" }} />
+              {docFile && <div style={{ color: T.cyan, fontSize: 11, marginBottom: 10 }}>✓ {docFile.name}</div>}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={shareDocument} disabled={saving || !docForm.title} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "7px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>{saving ? "Sharing..." : "Share"}</button>
+                <button onClick={() => setShowDocForm(false)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>Cancel</button>
+              </div>
+            </div>
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {documents.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "30px 0" }}>No documents shared yet.</div>}
+            {documents.map(d => {
+              const [docComments, setDocComments] = React.useState([]);
+              const [expanded, setExpanded] = React.useState(false);
+              const [docMsg, setDocMsg] = React.useState("");
+              const loadComments = async () => {
+                const { data } = await supabase.from("document_comments").select("*").eq("document_id", d.id).order("created_at", { ascending: true });
+                setDocComments(data || []);
+              };
+              const sendComment = async () => {
+                if (!docMsg.trim()) return;
+                await supabase.from("document_comments").insert({ document_id: d.id, sender_id: user.id, sender_name: user.name, sender_role: user.role, message: docMsg.trim() });
+                const { data: cp } = await supabase.from("profiles").select("id").eq("email", client.email).single();
+                if (cp) await supabase.from("notifications").insert({ user_id: cp.id, title: "Comment on " + d.title, message: user.name + ": " + docMsg.trim().slice(0,60), type: "task" });
+                setDocMsg("");
+                loadComments();
+              };
+              return (
+                <div key={d.id} style={{ background: T.surface, border: `1px solid ${expanded ? T.cyan : T.border}`, borderRadius: 10, overflow: "hidden" }}>
+                  <div style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{d.title}</div>
+                        {d.uploaded_by_client && <span style={{ color: T.amber, fontSize: 9, fontWeight: 800, background: T.amber+"15", padding: "2px 6px", borderRadius: 10 }}>Client Upload</span>}
+                      </div>
+                      <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{d.document_type} · {new Date(d.created_at).toLocaleDateString("en-GB")}</div>
+                      {d.requires_approval && <div style={{ color: d.approved_by_client ? T.teal : T.amber, fontSize: 10, fontWeight: 700, marginTop: 2 }}>{d.approved_by_client ? "✓ Client approved" : "Awaiting approval"}</div>}
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {d.document_url && <a href={d.document_url} target="_blank" rel="noreferrer" style={{ color: T.cyan, fontSize: 11, fontWeight: 700, textDecoration: "none", padding: "4px 8px", border: `1px solid ${T.cyan}30`, borderRadius: 5 }}>View</a>}
+                      <button onClick={() => { setExpanded(!expanded); if (!expanded) loadComments(); }} style={{ background: expanded ? T.cyan+"15" : "none", border: `1px solid ${expanded ? T.cyan : T.border}`, color: expanded ? T.cyan : T.textMuted, padding: "4px 8px", borderRadius: 5, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>{expanded ? "Close" : "Comment"}</button>
+                    </div>
+                  </div>
+                  {expanded && (
+                    <div style={{ borderTop: `1px solid ${T.border}`, padding: "12px 16px", background: T.bg }}>
+                      <div style={{ maxHeight: 180, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
+                        {docComments.length === 0 && <div style={{ color: T.textMuted, fontSize: 12 }}>No comments yet.</div>}
+                        {docComments.map(c => {
+                          const isMe = c.sender_id === user.id;
+                          return (
+                            <div key={c.id} style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" }}>
+                              <div style={{ maxWidth: "80%", background: isMe ? T.teal+"18" : T.surface, border: `1px solid ${isMe ? T.teal+"30" : T.border}`, borderRadius: isMe ? "12px 12px 2px 12px" : "12px 12px 12px 2px", padding: "8px 12px" }}>
+                                <div style={{ color: T.textPrimary, fontSize: 12 }}>{c.message}</div>
+                              </div>
+                              <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{c.sender_name} · {new Date(c.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <input value={docMsg} onChange={e => setDocMsg(e.target.value)} onKeyDown={e => { if (e.key === "Enter") sendComment(); }} placeholder="Comment on this document..." style={{ flex: 1, padding: "7px 10px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 7, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+                        <button onClick={sendComment} disabled={!docMsg.trim()} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: "none", color: "#fff", padding: "7px 14px", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Send</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Messages */}
+      {activeSection === "messages" && (
+        <div>
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px", marginBottom: 14, maxHeight: 360, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+            {messages.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "20px 0" }}>No messages yet. Start the conversation.</div>}
+            {messages.map(m => {
+              const isTeam = m.sender_role !== "Client";
+              return (
+                <div key={m.id} style={{ display: "flex", flexDirection: "column", alignItems: isTeam ? "flex-end" : "flex-start" }}>
+                  <div style={{ maxWidth: "80%", background: isTeam ? T.teal+"18" : T.bg, border: `1px solid ${isTeam ? T.teal+"30" : T.border}`, borderRadius: isTeam ? "12px 12px 2px 12px" : "12px 12px 12px 2px", padding: "10px 14px" }}>
+                    <div style={{ color: T.textPrimary, fontSize: 13, lineHeight: 1.5 }}>{m.message}</div>
+                  </div>
+                  <div style={{ color: T.textMuted, fontSize: 10, marginTop: 3 }}>{m.sender_name} · {new Date(m.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <textarea value={reply} onChange={e => setReply(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(); }}} placeholder="Message to client..." rows={2} style={{ flex: 1, padding: "10px 14px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", resize: "none" }} />
+            <button onClick={sendReply} disabled={sending || !reply.trim()} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: "none", color: "#fff", padding: "10px 18px", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: 13, opacity: !reply.trim() ? 0.6 : 1 }}>{sending ? "..." : "Send"}</button>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback */}
+      {activeSection === "feedback" && (
+        <div>
+          {feedback.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted, fontSize: 13 }}>No feedback submitted yet. Feedback appears here after the event.</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {feedback.map(f => (
+                <div key={f.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                    <div style={{ color: T.textPrimary, fontWeight: 700 }}>{f.submitted_by_name || client.name}</div>
+                    <div style={{ display: "flex", gap: 2 }}>
+                      {[1,2,3,4,5].map(n => <span key={n} style={{ color: n <= (f.rating||0) ? T.amber : T.border, fontSize: 14 }}>★</span>)}
+                    </div>
+                  </div>
+                  {f.feedback && <div style={{ color: T.textSecondary, fontSize: 13, lineHeight: 1.6 }}>{f.feedback}</div>}
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 8 }}>{new Date(f.created_at).toLocaleDateString("en-GB")}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+
+const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
+  const [activeSection, setActiveSection] = useState("overview");
+  const [tasks, setTasks] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [sendingMsg, setSendingMsg] = useState(false);
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [showDocForm, setShowDocForm] = useState(false);
+  const [docFile, setDocFile] = useState(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [expandedDoc, setExpandedDoc] = useState(null);
+  const [docComments, setDocComments] = useState({});
+  const [docComment, setDocComment] = useState("");
+  const [taskForm, setTaskForm] = useState({ name: "", deadline: "", assignee_ids: [], status: "pending", notes: "" });
+  const [docForm, setDocForm] = useState({ title: "", document_type: "Event Brief", share_with_client: false });
+  const [savingTask, setSavingTask] = useState(false);
+
+  const isCEO = user.role === "CEO";
+  const canManage = ["CEO", "Country Manager", "Strategy & Events Lead"].includes(user.role);
+  const PHASES = ["Brief", "Planning", "Pre-Production", "Production", "Live", "Post-Production", "Completed"];
+  const phaseIdx = PHASES.indexOf(event.phase || "Planning");
+  const daysToEvent = event.event_date ? Math.ceil((new Date(event.event_date) - new Date()) / (1000*60*60*24)) : null;
+
+  const load = async () => {
+    const [tk, dc, mg, mb] = await Promise.all([
+      isCEO
+        ? supabase.from("tasks").select("*").eq("project_id", event.id).order("created_at", { ascending: false })
+        : supabase.from("tasks").select("*").eq("project_id", event.id).or("assignee_id.eq." + user.id + ",assigned_by.eq." + user.id).order("created_at", { ascending: false }),
+      supabase.from("event_documents").select("*").eq("project_id", event.id).eq("uploaded_by_client", false).order("created_at", { ascending: false }),
+      supabase.from("event_team_messages").select("*").eq("project_id", event.id).order("created_at", { ascending: true }),
+      supabase.from("profiles").select("id,name,role,avatar").not("role", "in", "(Client,Vendor,Board of Directors)"),
+    ]);
+    setTasks(tk.data || []);
+    setDocuments(dc.data || []);
+    setMessages(mg.data || []);
+    setMembers(mb.data || []);
+    // Mark messages as read
+    const unread = (mg.data || []).filter(m => m.sender_id !== user.id);
+    if (unread.length > 0) {
+      await supabase.from("event_team_messages").update({ read_by: supabase.rpc }).eq("project_id", event.id);
+    }
+  };
+
+  useEffect(() => { load(); }, [event.id]);
+
+  const myTasks = isCEO ? tasks : tasks.filter(t => t.assignee_id === user.id || (Array.isArray(t.assignee_ids) && t.assignee_ids.includes(user.id)));
+  const completedTasks = myTasks.filter(t => t.status === "completed").length;
+  const unreadMsgs = messages.filter(m => m.sender_id !== user.id).length;
+
+  const sendMessage = async () => {
+    if (!newMessage.trim()) return;
+    setSendingMsg(true);
+    await supabase.from("event_team_messages").insert({ project_id: event.id, sender_id: user.id, sender_name: user.name, sender_role: user.role, message: newMessage.trim() });
+    setNewMessage("");
+    setSendingMsg(false);
+    load();
+  };
+
+  const createTask = async () => {
+    if (!taskForm.name) return;
+    setSavingTask(true);
+    const assigneeIds = taskForm.assignee_ids;
+    // Create one task per assignee if multiple, or single task
+    if (assigneeIds.length > 1) {
+      for (const aid of assigneeIds) {
+        const assignee = members.find(m => m.id === aid);
+        await supabase.from("tasks").insert({
+          name: taskForm.name, project_id: event.id,
+          deadline: taskForm.deadline || null, status: "pending",
+          assignee_id: aid, assignee_name: assignee?.name || "",
+          assigned_by: user.id, notes: taskForm.notes || null,
+          assignee_ids: assigneeIds,
+        });
+        await supabase.from("notifications").insert({ user_id: aid, title: "New Task — " + event.name, message: taskForm.name, type: "task" });
+      }
+    } else if (assigneeIds.length === 1) {
+      const assignee = members.find(m => m.id === assigneeIds[0]);
+      await supabase.from("tasks").insert({
+        name: taskForm.name, project_id: event.id,
+        deadline: taskForm.deadline || null, status: "pending",
+        assignee_id: assigneeIds[0], assignee_name: assignee?.name || "",
+        assigned_by: user.id, notes: taskForm.notes || null,
+        assignee_ids: assigneeIds,
+      });
+      await supabase.from("notifications").insert({ user_id: assigneeIds[0], title: "New Task — " + event.name, message: taskForm.name, type: "task" });
+    } else {
+      await supabase.from("tasks").insert({
+        name: taskForm.name, project_id: event.id,
+        deadline: taskForm.deadline || null, status: "pending",
+        assigned_by: user.id, notes: taskForm.notes || null,
+      });
+    }
+    setTaskForm({ name: "", deadline: "", assignee_ids: [], status: "pending", notes: "" });
+    setShowTaskForm(false);
+    setSavingTask(false);
+    load();
+  };
+
+  const updateTaskStatus = async (taskId, status) => {
+    await supabase.from("tasks").update({ status }).eq("id", taskId);
+    load();
+  };
+
+  const uploadDoc = async () => {
+    if (!docForm.title) return;
+    setUploadingDoc(true);
+    let document_url = null;
+    if (docFile) {
+      const ext = docFile.name.split(".").pop();
+      const fname = "event_doc_" + Date.now() + "." + ext;
+      const { error: upErr } = await supabase.storage.from("vendor-docs").upload(fname, docFile);
+      if (!upErr) {
+        const { data: urlData } = supabase.storage.from("vendor-docs").getPublicUrl(fname);
+        document_url = urlData.publicUrl;
+      }
+    }
+    await supabase.from("event_documents").insert({
+      project_id: event.id, title: docForm.title,
+      document_type: docForm.document_type, document_url,
+      shared_by: user.id, shared_by_name: user.name,
+      uploaded_by_client: false, requires_approval: false,
+    });
+    setDocForm({ title: "", document_type: "Event Brief", share_with_client: false });
+    setDocFile(null);
+    setShowDocForm(false);
+    setUploadingDoc(false);
+    load();
+  };
+
+  const loadDocComments = async (docId) => {
+    const { data } = await supabase.from("document_comments").select("*").eq("document_id", docId).order("created_at", { ascending: true });
+    setDocComments(prev => ({ ...prev, [docId]: data || [] }));
+  };
+
+  const sendDocComment = async (docId) => {
+    if (!docComment.trim()) return;
+    await supabase.from("document_comments").insert({ document_id: docId, sender_id: user.id, sender_name: user.name, sender_role: user.role, message: docComment.trim() });
+    setDocComment("");
+    loadDocComments(docId);
+  };
+
+  const inputStyle = { width: "100%", padding: "9px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
+  const statusColors = { pending: T.textMuted, "in-progress": T.cyan, completed: T.teal };
+
+  return (
+    <div style={{ animation: "fadeUp 0.3s ease" }}>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+        <div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 12, fontWeight: 700, padding: 0, marginBottom: 8, display: "flex", alignItems: "center", gap: 4 }}>← Back to Events</button>
+        </div>
+      </div>
+
+      {/* Event Hero */}
+      <div style={{ background: "linear-gradient(135deg, " + T.bgDeep + ", " + T.surface + ")", border: "1px solid " + T.border, borderRadius: 16, padding: "24px 28px 20px", marginBottom: 20, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: 0, right: 0, width: 200, height: 200, background: "radial-gradient(circle, " + T.cyan + "08, transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 6 }}>{event.event_category || "Event"}</div>
+        <h1 style={{ margin: "0 0 6px", color: T.textPrimary, fontSize: 22, fontWeight: 900, letterSpacing: "-0.02em", lineHeight: 1.2 }}>{event.name}</h1>
+        <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 16 }}>
+          {event.event_date ? new Date(event.event_date).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "Date TBC"}
+          {event.client && " · " + event.client}
+        </div>
+
+        {/* Countdown */}
+        {daysToEvent !== null && (
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 12, background: daysToEvent <= 7 ? T.red+"15" : daysToEvent <= 30 ? T.amber+"15" : T.cyan+"12", border: "1px solid " + (daysToEvent <= 7 ? T.red : daysToEvent <= 30 ? T.amber : T.cyan) + "30", borderRadius: 10, padding: "10px 18px", marginBottom: 16 }}>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ color: daysToEvent <= 7 ? T.red : daysToEvent <= 30 ? T.amber : T.cyan, fontSize: 28, fontWeight: 900, lineHeight: 1 }}>{daysToEvent > 0 ? daysToEvent : daysToEvent === 0 ? "Today" : Math.abs(daysToEvent)}</div>
+              <div style={{ color: T.textMuted, fontSize: 9, textTransform: "uppercase", letterSpacing: "0.1em" }}>{daysToEvent > 0 ? "Days to go" : daysToEvent === 0 ? "" : "Days ago"}</div>
+            </div>
+            <div style={{ width: 1, height: 32, background: T.border }} />
+            <div>
+              <div style={{ color: T.textPrimary, fontSize: 12, fontWeight: 700 }}>{event.event_date ? new Date(event.event_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : ""}</div>
+              <div style={{ color: T.textMuted, fontSize: 11 }}>Event Date</div>
+            </div>
+          </div>
+        )}
+
+        {/* Phase bar */}
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+            <span style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Event Journey</span>
+            <span style={{ color: T.cyan, fontSize: 10, fontWeight: 700 }}>{event.phase || "Planning"}</span>
+          </div>
+          <div style={{ display: "flex", gap: 3 }}>
+            {PHASES.map((phase, i) => (
+              <div key={phase} title={phase} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= phaseIdx ? (i === phaseIdx ? T.cyan : T.teal) : T.border+"44" }} />
+            ))}
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
+            <span style={{ color: T.textMuted, fontSize: 9 }}>Brief</span>
+            <span style={{ color: T.textMuted, fontSize: 9 }}>Completed</span>
+          </div>
+        </div>
+
+        {/* KPI strip */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px,1fr))", gap: 10, marginTop: 16 }}>
+          {[
+            { label: "My Tasks", value: completedTasks + "/" + myTasks.length, color: T.teal },
+            { label: "Documents", value: documents.length, color: T.amber },
+            { label: "Messages", value: messages.length, color: T.cyan },
+            { label: "Pending", value: myTasks.filter(t => t.status !== "completed").length, color: myTasks.filter(t => t.status !== "completed").length > 0 ? T.red : T.textMuted },
+          ].map(k => (
+            <div key={k.label} style={{ background: T.bg, borderRadius: 8, padding: "10px 12px", border: "1px solid " + T.border }}>
+              <div style={{ color: k.color, fontWeight: 900, fontSize: 18 }}>{k.value}</div>
+              <div style={{ color: T.textMuted, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 2 }}>{k.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: "1px solid " + T.border }}>
+        {[
+          { id: "overview", label: "Overview" },
+          { id: "tasks", label: "Tasks (" + myTasks.length + ")" },
+          { id: "documents", label: "Documents (" + documents.length + ")" },
+          { id: "messages", label: "Messages" + (unreadMsgs > 0 ? " ●" : "") },
+        ].map(tab => (
+          <button key={tab.id} onClick={() => setActiveSection(tab.id)} style={{ padding: "10px 18px", border: "none", background: "none", cursor: "pointer", color: activeSection === tab.id ? T.cyan : T.textMuted, fontWeight: activeSection === tab.id ? 800 : 400, fontSize: 13, borderBottom: activeSection === tab.id ? "2px solid " + T.cyan : "2px solid transparent", marginBottom: -1, transition: "all 0.15s" }}>{tab.label}</button>
+        ))}
+      </div>
+
+      {/* Overview */}
+      {activeSection === "overview" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {myTasks.filter(t => t.status !== "completed").length > 0 && (
+            <div style={{ background: T.surface, border: "1px solid " + T.border, borderRadius: 12, padding: "18px 20px" }}>
+              <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>Pending Tasks</div>
+              {myTasks.filter(t => t.status !== "completed").slice(0,3).map(t => (
+                <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid " + T.border+"22" }}>
+                  <div>
+                    <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{t.name}</div>
+                    {t.deadline && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Due: {new Date(t.deadline).toLocaleDateString("en-GB")}</div>}
+                  </div>
+                  <span style={{ color: statusColors[t.status] || T.textMuted, fontSize: 10, fontWeight: 700, background: (statusColors[t.status] || T.textMuted)+"18", padding: "2px 8px", borderRadius: 20 }}>{t.status}</span>
+                </div>
+              ))}
+              <button onClick={() => setActiveSection("tasks")} style={{ background: "none", border: "none", color: T.cyan, fontSize: 12, fontWeight: 700, cursor: "pointer", marginTop: 8, padding: 0 }}>View all tasks →</button>
+            </div>
+          )}
+          {messages.length > 0 && (
+            <div style={{ background: T.surface, border: "1px solid " + T.border, borderRadius: 12, padding: "18px 20px" }}>
+              <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>Recent Messages</div>
+              {messages.slice(-2).map(m => (
+                <div key={m.id} style={{ padding: "8px 0", borderBottom: "1px solid " + T.border+"22" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                    <span style={{ color: m.sender_id === user.id ? T.cyan : T.teal, fontSize: 11, fontWeight: 700 }}>{m.sender_name}</span>
+                    <span style={{ color: T.textMuted, fontSize: 10 }}>{new Date(m.created_at).toLocaleDateString("en-GB")}</span>
+                  </div>
+                  <div style={{ color: T.textSecondary, fontSize: 13 }}>{m.message}</div>
+                </div>
+              ))}
+              <button onClick={() => setActiveSection("messages")} style={{ background: "none", border: "none", color: T.cyan, fontSize: 12, fontWeight: 700, cursor: "pointer", marginTop: 8, padding: 0 }}>View all messages →</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tasks */}
+      {activeSection === "tasks" && (
+        <div>
+          {canManage && (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <div style={{ color: T.textMuted, fontSize: 12 }}>{isCEO ? "All event tasks" : "Tasks assigned to you"}</div>
+              <button onClick={() => setShowTaskForm(!showTaskForm)} style={{ background: "linear-gradient(135deg, " + T.cyan + ", " + T.teal + ")", border: "none", color: "#fff", padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>+ Add Task</button>
+            </div>
+          )}
+          {showTaskForm && (
+            <div style={{ background: T.surface, border: "1px solid " + T.cyan+"30", borderRadius: 12, padding: "16px 18px", marginBottom: 16 }}>
+              <div style={{ display: "grid", gap: 10, marginBottom: 10 }}>
+                <div>
+                  <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Task Name</label>
+                  <input value={taskForm.name} onChange={e => setTaskForm(f => ({...f, name: e.target.value}))} placeholder="What needs to be done?" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Assign To (select multiple)</label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {members.map(m => {
+                      const selected = taskForm.assignee_ids.includes(m.id);
+                      return (
+                        <button key={m.id} onClick={() => setTaskForm(f => ({ ...f, assignee_ids: selected ? f.assignee_ids.filter(id => id !== m.id) : [...f.assignee_ids, m.id] }))} style={{ padding: "4px 10px", borderRadius: 20, border: "1px solid " + (selected ? T.cyan : T.border), background: selected ? T.cyan+"18" : "none", color: selected ? T.cyan : T.textMuted, fontSize: 11, fontWeight: selected ? 700 : 400, cursor: "pointer" }}>
+                          {selected ? "✓ " : ""}{m.name} <span style={{ opacity: 0.6 }}>({m.role})</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Deadline</label>
+                  <input type="date" value={taskForm.deadline} onChange={e => setTaskForm(f => ({...f, deadline: e.target.value}))} style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Notes</label>
+                  <textarea value={taskForm.notes} onChange={e => setTaskForm(f => ({...f, notes: e.target.value}))} rows={2} style={{ ...inputStyle, resize: "none" }} />
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={createTask} disabled={savingTask || !taskForm.name} style={{ background: "linear-gradient(135deg, " + T.cyan + ", " + T.teal + ")", border: "none", color: "#fff", padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, opacity: !taskForm.name ? 0.6 : 1 }}>{savingTask ? "Saving..." : "Create Task"}</button>
+                <button onClick={() => setShowTaskForm(false)} style={{ background: "none", border: "1px solid " + T.border, color: T.textMuted, padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>Cancel</button>
+              </div>
+            </div>
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {myTasks.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "30px 0" }}>No tasks yet.</div>}
+            {myTasks.map(t => {
+              const color = statusColors[t.status] || T.textMuted;
+              return (
+                <div key={t.id} style={{ background: T.surface, border: "1px solid " + T.border, borderLeft: "3px solid " + color, borderRadius: 10, padding: "12px 16px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{t.name}</div>
+                      {t.assignee_name && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Assigned to: {t.assignee_name}</div>}
+                      {t.deadline && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Due: {new Date(t.deadline).toLocaleDateString("en-GB")}</div>}
+                      {t.notes && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4, fontStyle: "italic" }}>{t.notes}</div>}
+                    </div>
+                    <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                      {["pending","in-progress","completed"].map(s => (
+                        <button key={s} onClick={() => updateTaskStatus(t.id, s)} style={{ padding: "3px 8px", borderRadius: 5, border: "1px solid " + (t.status === s ? color : T.border), background: t.status === s ? color+"20" : "none", color: t.status === s ? color : T.textMuted, fontSize: 9, fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>{s}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Documents */}
+      {activeSection === "documents" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <div style={{ color: T.textMuted, fontSize: 12 }}>Internal event documents</div>
+            <button onClick={() => setShowDocForm(!showDocForm)} style={{ background: "linear-gradient(135deg, " + T.cyan + ", " + T.teal + ")", border: "none", color: "#fff", padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>+ Upload</button>
+          </div>
+          {showDocForm && (
+            <div style={{ background: T.surface, border: "1px solid " + T.cyan+"30", borderRadius: 12, padding: "16px 18px", marginBottom: 16 }}>
+              <div style={{ display: "grid", gap: 10, marginBottom: 10 }}>
+                <div>
+                  <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Title</label>
+                  <input value={docForm.title} onChange={e => setDocForm(f => ({...f, title: e.target.value}))} placeholder="e.g. Run of Show v2" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Type</label>
+                  <select value={docForm.document_type} onChange={e => setDocForm(f => ({...f, document_type: e.target.value}))} style={{ ...inputStyle, appearance: "none" }}>
+                    {["Event Brief","Run of Show","Vendor Contract","Budget","Programme","Technical Rider","Other"].map(t => <option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <input type="file" onChange={e => setDocFile(e.target.files[0])} style={{ ...inputStyle, cursor: "pointer" }} />
+                {docFile && <div style={{ color: T.cyan, fontSize: 11 }}>✓ {docFile.name}</div>}
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={uploadDoc} disabled={uploadingDoc || !docForm.title} style={{ background: "linear-gradient(135deg, " + T.cyan + ", " + T.teal + ")", border: "none", color: "#fff", padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>{uploadingDoc ? "Uploading..." : "Upload"}</button>
+                <button onClick={() => setShowDocForm(false)} style={{ background: "none", border: "1px solid " + T.border, color: T.textMuted, padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>Cancel</button>
+              </div>
+            </div>
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {documents.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "30px 0" }}>No documents yet.</div>}
+            {documents.map(d => (
+              <div key={d.id} style={{ background: T.surface, border: "1px solid " + (expandedDoc === d.id ? T.cyan : T.border), borderRadius: 10, overflow: "hidden" }}>
+                <div style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{d.title}</div>
+                    <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{d.document_type} · {d.shared_by_name} · {new Date(d.created_at).toLocaleDateString("en-GB")}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {d.document_url && <a href={d.document_url} target="_blank" rel="noreferrer" style={{ color: T.cyan, fontSize: 11, fontWeight: 700, textDecoration: "none", padding: "4px 8px", border: "1px solid " + T.cyan+"30", borderRadius: 5 }}>View</a>}
+                    <button onClick={() => { const n = expandedDoc === d.id ? null : d.id; setExpandedDoc(n); if (n) loadDocComments(d.id); }} style={{ background: expandedDoc === d.id ? T.cyan+"15" : "none", border: "1px solid " + (expandedDoc === d.id ? T.cyan : T.border), color: expandedDoc === d.id ? T.cyan : T.textMuted, padding: "4px 8px", borderRadius: 5, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>{expandedDoc === d.id ? "Close" : "Comment"}</button>
+                  </div>
+                </div>
+                {expandedDoc === d.id && (
+                  <div style={{ borderTop: "1px solid " + T.border, padding: "12px 16px", background: T.bg }}>
+                    <div style={{ maxHeight: 180, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
+                      {(docComments[d.id] || []).length === 0 && <div style={{ color: T.textMuted, fontSize: 12 }}>No comments yet.</div>}
+                      {(docComments[d.id] || []).map(c => {
+                        const isMe = c.sender_id === user.id;
+                        return (
+                          <div key={c.id} style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" }}>
+                            <div style={{ maxWidth: "80%", background: isMe ? T.teal+"18" : T.surface, border: "1px solid " + (isMe ? T.teal+"30" : T.border), borderRadius: isMe ? "12px 12px 2px 12px" : "12px 12px 12px 2px", padding: "8px 12px" }}>
+                              <div style={{ color: T.textPrimary, fontSize: 12 }}>{c.message}</div>
+                            </div>
+                            <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{c.sender_name} · {new Date(c.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <input value={docComment} onChange={e => setDocComment(e.target.value)} onKeyDown={e => { if (e.key === "Enter") sendDocComment(d.id); }} placeholder="Comment..." style={{ flex: 1, padding: "7px 10px", background: T.surface, border: "1px solid " + T.border, borderRadius: 7, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+                      <button onClick={() => sendDocComment(d.id)} disabled={!docComment.trim()} style={{ background: "linear-gradient(135deg, " + T.teal + ", " + T.cyan + ")", border: "none", color: "#fff", padding: "7px 14px", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Send</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Messages */}
+      {activeSection === "messages" && (
+        <div>
+          <div style={{ background: T.surface, border: "1px solid " + T.border, borderRadius: 12, padding: "16px", marginBottom: 14, maxHeight: 400, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+            {messages.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "20px 0" }}>No messages yet. Start the team conversation.</div>}
+            {messages.map(m => {
+              const isMe = m.sender_id === user.id;
+              return (
+                <div key={m.id} style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" }}>
+                  <div style={{ maxWidth: "80%", background: isMe ? T.cyan+"18" : T.bg, border: "1px solid " + (isMe ? T.cyan+"30" : T.border), borderRadius: isMe ? "12px 12px 2px 12px" : "12px 12px 12px 2px", padding: "10px 14px" }}>
+                    <div style={{ color: isMe ? T.cyan : T.teal, fontSize: 10, fontWeight: 700, marginBottom: 4 }}>{m.sender_name} · {m.sender_role}</div>
+                    <div style={{ color: T.textPrimary, fontSize: 13 }}>{m.message}</div>
+                  </div>
+                  <div style={{ color: T.textMuted, fontSize: 10, marginTop: 3 }}>{new Date(m.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <textarea value={newMessage} onChange={e => setNewMessage(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }}} placeholder="Message the team..." rows={2} style={{ flex: 1, padding: "10px 14px", background: T.surface, border: "1px solid " + T.border, borderRadius: 10, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", resize: "none" }} />
+            <button onClick={sendMessage} disabled={sendingMsg || !newMessage.trim()} style={{ background: "linear-gradient(135deg, " + T.cyan + ", " + T.teal + ")", border: "none", color: "#fff", padding: "10px 18px", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: 13, opacity: !newMessage.trim() ? 0.6 : 1 }}>{sendingMsg ? "..." : "Send"}</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+
 const EventsView = ({ user, userRole }) => {
   const [events, setEvents] = useState([]);
   const [clients, setClients] = useState([]);

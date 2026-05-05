@@ -661,7 +661,6 @@ const getNavItems = (role) => {
       { id: "dashboard", label: "Dashboard", group: true },
       { id: "grp-events", label: "Events & Operations", group: true, children: [
         { id: "events", label: "Events" },
-        { id: "tasks", label: "Events" },
         { id: "impact-intelligence", label: "Impact Intelligence" },
       ]},
       { id: "grp-crm", label: "CRM & Sales", group: true, children: [
@@ -5458,10 +5457,6 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "finance-approvals": return <FinanceApprovalsView user={currentUser} />;
       case "scorecards": return <VendorScorecardsView user={currentUser} />;
       case "vendor-analytics": return <VendorAnalyticsView user={currentUser} />;
-      case "vendor-ratings": return <VendorRatingsView user={currentUser} />;
-      case "rff-approvals": return <RFFApprovalsView user={currentUser} />;
-      case "vendor-assignment": return <VendorAssignmentView user={currentUser} />;
-      case "scorecards": return <VendorScorecardsView user={currentUser} />;
       case "vendor-ratings": return <VendorRatingsView user={currentUser} />;
       case "rff-approvals": return <RFFApprovalsView user={currentUser} />;
       case "vendor-assignment": return <VendorAssignmentView user={currentUser} />;
@@ -11983,6 +11978,396 @@ const OpportunitiesView = ({ user, onNavigate }) => {
 
 
 
+const VendorsView = ({ user }) => {
+  const [rffs, setRffs] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [expandedEvent, setExpandedEvent] = useState(null);
+  const [showAppModal, setShowAppModal] = useState(false);
+  const [showApprovalsPanel, setShowApprovalsPanel] = useState(false);
+  const [vendorApps, setVendorApps] = useState([]);
+  const [expandedRff, setExpandedRff] = useState(null);
+  const [form, setForm] = useState({ title: '', description: '', client_id: '', client_name: '', project_id: '', event_name: '', deadline: '', event_type: '' });
+  const [file, setFile] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [resubmitModal, setResubmitModal] = useState(null);
+  const [resubmitFile, setResubmitFile] = useState(null);
+  const [resubmitNotes, setResubmitNotes] = useState('');
+  const isVendorManager = user?.role === 'Vendor Manager';
+
+  const load = async () => {
+    const [r, e, c, apps] = await Promise.all([
+      supabase.from('rffs').select('*').order('created_at', { ascending: false }),
+      supabase.from('projects').select('*'),
+      supabase.from('clients').select('*'),
+      supabase.from('vendor_applications').select('*').order('created_at', { ascending: false }),
+    ]);
+    // Show all RFFs for Vendor Manager/CEO/Admin
+    setRffs(r.data || []);
+    setEvents(e.data || []);
+    setClients(c.data || []);
+    setVendorApps(apps.data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const generateRffCode = async (eventType) => {
+    const typeMap = { "Conference/Seminar": "CS", "Product Launch": "PL", "Awards Ceremony": "AWD", "Corporate Party": "CP", "Other": "OTH" };
+    const prefix = typeMap[eventType] || "GEN";
+    const year = new Date().getFullYear().toString().slice(-2);
+    // Get or create sequence for this type+year
+    const { data: seq } = await supabase.from("rff_sequences").select("*").eq("event_type", prefix).eq("year", parseInt("20"+year)).single();
+    let nextSeq = 1;
+    if (seq) {
+      nextSeq = (seq.last_sequence || 0) + 1;
+      await supabase.from("rff_sequences").update({ last_sequence: nextSeq }).eq("id", seq.id);
+    } else {
+      await supabase.from("rff_sequences").insert({ event_type: prefix, year: parseInt("20"+year), last_sequence: 1 });
+    }
+    return `ST/${prefix}/${year}/${String(nextSeq).padStart(3, "0")}`;
+  };
+
+  const handleCreate = async () => {
+    if (!form.client_id || !form.project_id) { setError('Client and event are required.'); return; }
+    if (!form.event_type) { setError('Please select an event type.'); return; }
+    setSaving(true); setError('');
+    let document_url = '';
+    let document_name = '';
+    if (file) {
+      const ext = file.name.split('.').pop();
+      const filename = `rff_${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from('rffs').upload(filename, file);
+      if (uploadErr) { setError('Upload failed: ' + uploadErr.message); setSaving(false); return; }
+      const { data: urlData } = supabase.storage.from('rffs').getPublicUrl(filename);
+      document_url = urlData.publicUrl;
+      document_name = file.name;
+    }
+    const rffCode = await generateRffCode(form.event_type);
+    const { error } = await supabase.from('rffs').insert({
+      title: rffCode, description: form.description, quote_deadline: form.quote_deadline || null,
+      client_id: form.client_id, client_name: form.client_name,
+      project_id: form.project_id, event_name: form.event_name,
+      deadline: form.deadline || null, document_url, document_name,
+      status: 'pending', submitted_for_approval: true, approved: false,
+      event_type: form.event_type, rff_code: rffCode,
+    });
+    if (error) { setError(error.message); setSaving(false); return; }
+    setModal(false);
+    setForm({ title: '', description: '', client_id: '', client_name: '', project_id: '', event_name: '', deadline: '', event_type: '' });
+    setFile(null); setSaving(false); load();
+  };
+
+  const handleResubmit = async () => {
+    setSaving(true);
+    let document_url = resubmitModal.document_url || '';
+    let document_name = resubmitModal.document_name || '';
+    if (resubmitFile) {
+      const ext = resubmitFile.name.split('.').pop();
+      const filename = `rff_${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from('rffs').upload(filename, resubmitFile);
+      if (!uploadErr) {
+        const { data: urlData } = supabase.storage.from('rffs').getPublicUrl(filename);
+        document_url = urlData.publicUrl;
+        document_name = resubmitFile.name;
+      }
+    }
+    await supabase.from('rffs').update({
+      status: 'pending',
+      approved: false,
+      submitted_for_approval: true,
+      declined_notes: null,
+      document_url,
+      document_name,
+      status_notes: resubmitNotes,
+    }).eq('id', resubmitModal.id);
+    // Notify CEO
+    const { data: ceos } = await supabase.from('profiles').select('id').in('role', ['CEO', 'Country Manager']);
+    if (ceos) await Promise.all(ceos.map(c => supabase.from('notifications').insert({ user_id: c.id, title: 'RFF Resubmitted', message: `RFF "${resubmitModal.title}" has been revised and resubmitted for approval.`, type: 'rff' })));
+    setResubmitModal(null); setResubmitFile(null); setResubmitNotes('');
+    setSaving(false); load();
+  };
+
+  // Group RFFs by event
+  const grouped = events.reduce((acc, e) => {
+    const eventRffs = rffs.filter(r => r.project_id === e.id);
+    if (eventRffs.length > 0) acc[e.id] = { event: e, rffs: eventRffs };
+    return acc;
+  }, {});
+
+  const totalPending = rffs.filter(r => r.status === 'pending').length;
+  const totalApproved = rffs.filter(r => r.approved).length;
+  const totalQuotes = rffs.filter(r => r.status === 'quote-submitted').length;
+  const totalDeclined = rffs.filter(r => r.status === 'declined').length;
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Procurement</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Vendors & RFFs</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{rffs.length} requests across {Object.keys(grouped).length} event{Object.keys(grouped).length !== 1 ? "s" : ""}</div>
+        </div>
+        <Btn onClick={() => setModal(true)}>+ New RFF</Btn>
+      </div>
+
+      {/* Vendor Applications Panel — CEO */}
+      {showApprovalsPanel && user?.role === "CEO" && (
+        <div style={{ marginBottom: 24, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 20 }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 16, marginBottom: 16 }}>Vendor Applications</div>
+          <VendorApprovalsPanel user={user} onLoginCreated={load} />
+        </div>
+      )}
+
+      {/* Vendor Manager — approved vendors with account status */}
+      {user?.role === "Vendor Manager" && vendorApps.filter(a => ["approved","login-created"].includes(a.status)).length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 12 }}>Approved Vendors — Account Status</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+            {vendorApps.filter(a => ["approved","login-created"].includes(a.status)).map(app => (
+              <div key={app.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${app.status === "login-created" ? "#10B981" : T.amber}`, borderRadius: 10, padding: "14px 16px" }}>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 2 }}>{app.vendor_name}</div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 6 }}>{app.vendor_type} · {app.contact_person}</div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 8 }}>{app.contact_email}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: app.status === "login-created" ? "#10B981" : T.amber }} />
+                  <span style={{ color: app.status === "login-created" ? "#10B981" : T.amber, fontSize: 11, fontWeight: 700 }}>
+                    {app.status === "login-created" ? "Portal Access Granted" : "Awaiting Login Creation"}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Pending Approval", value: totalPending, color: T.amber },
+          { label: "CEO Approved", value: totalApproved, color: T.teal },
+          { label: "Quotes In", value: totalQuotes, color: T.cyan },
+          { label: "Declined", value: totalDeclined, color: T.red },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "16px 18px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {Object.keys(grouped).length === 0 ? (
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>📋</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No RFFs yet</div>
+          <div style={{ color: T.textMuted, fontSize: 13 }}>Create an RFF and assign it to a client event.</div>
+        </div>
+      ) : <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>{Object.values(grouped).map(({ event: e, rffs: eventRffs }) => (
+        <div key={e.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+          {/* Event Group Header */}
+          <button onClick={() => setExpandedEvent(expandedEvent === e.id ? null : e.id)} style={{
+            width: "100%", background: expandedEvent === e.id ? T.cyan + "08" : "none",
+            border: "none", borderBottom: expandedEvent === e.id ? `1px solid ${T.border}` : "none",
+            padding: "16px 20px", cursor: "pointer",
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 4, height: 36, background: `linear-gradient(180deg, ${T.cyan}, ${T.teal})`, borderRadius: 2, flexShrink: 0 }} />
+              <div style={{ textAlign: "left" }}>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{e.name}</div>
+                <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{e.client} · {eventRffs.length} RFF{eventRffs.length > 1 ? "s" : ""}</div>
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", gap: 5 }}>
+                {["pending","quote-received","quote-submitted","quote-approved","approved","declined"].map(s => {
+                  const count = eventRffs.filter(r => r.status === s).length;
+                  if (!count) return null;
+                  return <Badge key={s} status={s} />;
+                })}
+              </div>
+              <span style={{ color: T.textMuted, fontSize: 16, transition: "transform 0.2s", display: "inline-block", transform: expandedEvent === e.id ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+            </div>
+          </button>
+
+          {expandedEvent === e.id && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 12, padding: "16px 20px" }}>
+              {eventRffs.map(r => (
+                <div key={r.id} style={{ marginBottom: 0 }}>
+                  <div onClick={() => setExpandedRff(expandedRff === r.id ? null : r.id)} style={{ cursor: "pointer", background: T.bg, border: `1px solid ${T.border}`, borderTop: `2px solid ${T.cyan}`, borderRadius: 10, padding: "16px 18px", transition: "box-shadow 0.2s" }}
+                    onMouseEnter={e => e.currentTarget.style.boxShadow = `0 4px 20px ${T.cyan}12`}
+                    onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                      <div>
+                        <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{r.title}</div>
+                        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>📅 Due {r.deadline}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+                          <div style={{ color: r.quote_deadline ? T.amber : T.textMuted, fontSize: 11, fontWeight: r.quote_deadline ? 700 : 400 }}>
+                            {r.quote_deadline ? "⏰ Quote Due: " + new Date(r.quote_deadline).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "No quote deadline set"}
+                          </div>
+                          {isVendorManager && <button onClick={e => { e.stopPropagation(); const dl = window.prompt("Set quote deadline (YYYY-MM-DDTHH:MM):", r.quote_deadline ? r.quote_deadline.slice(0,16) : new Date(Date.now()+7*24*60*60*1000).toISOString().slice(0,16)); if (dl) { supabase.from("rffs").update({ quote_deadline: dl }).eq("id", r.id).then(() => load()); } }} style={{ background: T.amber+"15", border: "1px solid " + T.amber + "30", color: T.amber, padding: "2px 8px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>✎ Set Deadline</button>}
+                        </div>
+                        {/* Status indicators for Vendor Manager */}
+                        {isVendorManager && r.status === 'pending' && r.submitted_for_approval && (
+                          <div style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", background: T.amber + "15", border: "1px solid " + T.amber + "33", borderRadius: 20 }}>
+                            <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.amber }} />
+                            <span style={{ color: T.amber, fontSize: 11, fontWeight: 700 }}>Pending CEO Approval</span>
+                          </div>
+                        )}
+                        {isVendorManager && r.status === 'approved' && (
+                          <div style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", background: T.teal + "15", border: "1px solid " + T.teal + "33", borderRadius: 20 }}>
+                            <span style={{ color: T.teal, fontSize: 11, fontWeight: 700 }}>✓ Approved by CEO</span>
+                          </div>
+                        )}
+                        {r.status === 'declined' && r.declined_notes && (
+                          <div style={{ marginTop: 6, padding: "8px 10px", background: "#F43F5E10", border: "1px solid #F43F5E33", borderRadius: 6 }}>
+                            <div style={{ color: "#F43F5E", fontSize: 11, fontWeight: 700 }}>⛔ Declined by CEO</div>
+                            <div style={{ color: T.textSecondary, fontSize: 11, marginTop: 2 }}>{r.declined_notes}</div>
+                            {isVendorManager && (
+                              <button onClick={e => { e.stopPropagation(); setResubmitModal(r); setResubmitNotes(''); setResubmitFile(null); }} style={{ marginTop: 8, padding: "5px 12px", background: T.cyan + "20", border: "1px solid " + T.cyan + "44", borderRadius: 6, cursor: "pointer", color: T.cyan, fontSize: 11, fontWeight: 700 }}>
+                                🔄 Revise & Resubmit
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {r.description && <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 4 }}>{r.description}</div>}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Badge status={r.status} />
+                        <span style={{ color: T.textMuted, fontSize: 14 }}>{expandedRff === r.id ? '▾' : '▸'}</span>
+                      </div>
+                    </div>
+                    {r.document_url && (
+                      <a href={r.document_url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        color: T.cyan, fontSize: 12, fontWeight: 600, textDecoration: 'none',
+                        background: T.cyan + '15', padding: '5px 12px', borderRadius: 6,
+                        border: `1px solid ${T.cyan}33`,
+                      }}>📄 {r.document_name || 'Download RFF'}</a>
+                    )}
+                    {['CEO','Country Manager'].includes(user?.role) && !r.approved && (
+                      <button onClick={async (e) => { e.stopPropagation(); await supabase.from('rffs').update({ approved: true, approved_by: user.id }).eq('id', r.id); load(); }} style={{
+                        marginLeft: 8, background: T.teal + '20', border: `1px solid ${T.teal}`, color: T.teal,
+                        padding: '5px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                      }}>✓ Approve RFF</button>
+                    )}
+                    {r.approved && <span style={{ marginLeft: 8, color: T.teal, fontSize: 12, fontWeight: 600 }}>✓ Approved for Vendors</span>}
+                  </div>
+
+                  {/* Quotes submitted for this RFF */}
+                  {expandedRff === r.id && (
+                    <div style={{ marginTop: 8, paddingLeft: 16 }}>
+                      {r.status === 'pending' ? (
+                        <div style={{ color: T.textMuted, fontSize: 13, padding: '12px 16px', background: T.surface, borderRadius: 8, border: `1px solid ${T.border}` }}>
+                          ⏳ No quotes submitted yet
+                        </div>
+                      ) : (
+                        <Card style={{ borderLeft: `3px solid ${T.cyan}` }}>
+                          <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>Quote Received</div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{r.vendor || 'Vendor'}</div>
+                            {(() => { const vp = vendors.find(v => v.name === r.vendor); if (!vp || !vp.vendor_scorecard_count) return <span style={{ fontSize: 10, color: T.textMuted, padding: '2px 8px', borderRadius: 20, border: '1px solid ' + T.border }}>Unrated</span>; const t = getTier(vp.vendor_score || 0); return <span style={{ fontSize: 10, fontWeight: 700, color: t.color, padding: '2px 8px', borderRadius: 20, background: t.bg, border: '1px solid ' + t.color + '44' }}>{t.label} {vp.vendor_score}%</span>; })()}
+                          </div>
+                              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Amount: <span style={{ color: T.amber, fontWeight: 700 }}>GHS {(r.amount || 0).toLocaleString()}</span></div>
+                            </div>
+                            <Badge status={r.status} />
+                          </div>
+                          {r.quote_url && (
+                            <a href={r.quote_url} target="_blank" rel="noopener noreferrer" style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 12,
+                              color: T.teal, fontSize: 12, fontWeight: 600, textDecoration: 'none',
+                              background: T.teal + '15', padding: '5px 12px', borderRadius: 6,
+                              border: `1px solid ${T.teal}33`,
+                            }}>📎 {r.quote_filename || 'View Quote'}</a>
+                          )}
+                          {(r.status === 'quote-submitted' || r.status === 'quote-received') && (
+                            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                              <Btn small onClick={async () => {
+                                // Update RFF status
+                                await supabase.from('rffs').update({ status: 'quote-approved' }).eq('id', r.id);
+                                // Update vendor assignment status
+                                await supabase.from('rff_vendor_assignments').update({ status: 'quote-approved' }).eq('rff_id', r.id);
+                                // Notify vendor
+                                const { data: assigns } = await supabase.from('rff_vendor_assignments').select('vendor_id, profiles(name, email)').eq('rff_id', r.id);
+                                for (const a of assigns || []) {
+                                  await supabase.from('notifications').insert({ user_id: a.vendor_id, title: 'Quote Approved — ' + r.title, message: 'Your quote for "' + r.title + '" has been approved. You may now submit your invoice.', type: 'rff' });
+                                }
+                                load();
+                              }}>✓ Approve Quote</Btn>
+                              <Btn small variant="ghost" onClick={async () => {
+                                await supabase.from('rffs').update({ status: 'pending', quote_url: null, quote_filename: null }).eq('id', r.id);
+                                await supabase.from('rff_vendor_assignments').update({ status: 'pending' }).eq('rff_id', r.id);
+                                load();
+                              }}>✕ Reject</Btn>
+                            </div>
+                          )}
+                          {r.status === 'quote-approved' && <div style={{ color: T.teal, fontSize: 12, fontWeight: 600, marginTop: 12 }}>✓ Quote Approved — Awaiting Invoice</div>}
+                          {/* Vendors assigned + deadline */}
+                          <VendorAssignmentPanel rffId={r.id} quoteDeadline={r.quote_deadline} />
+                        </Card>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}</div>}
+
+      }{modal && (
+        <Modal title="New RFF" onClose={() => { setModal(false); setError(''); }}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>Event Type *</div>
+            <select value={form.event_type} onChange={e => setForm({ ...form, event_type: e.target.value })} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${form.event_type ? T.border : T.amber}`, borderRadius: 8, color: form.event_type ? T.textPrimary : T.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+              <option value="">Select event type...</option>
+              <option value="Conference/Seminar">Conference / Seminar (ST/CS)</option>
+              <option value="Product Launch">Product Launch (ST/PL)</option>
+              <option value="Awards Ceremony">Awards Ceremony (ST/AWD)</option>
+              <option value="Corporate Party">Corporate Party (ST/CP)</option>
+              <option value="Other">Other (ST/OTH)</option>
+            </select>
+          </div>
+          {form.event_type && (
+            <div style={{ marginBottom: 14, padding: "8px 12px", background: T.cyan+"12", border: `1px solid ${T.cyan}30`, borderRadius: 8 }}>
+              <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>RFF Code Preview</div>
+              <div style={{ color: T.cyan, fontWeight: 900, fontSize: 16 }}>ST/{{"Conference/Seminar":"CS","Product Launch":"PL","Awards Ceremony":"AWD","Corporate Party":"CP","Other":"OTH"}[form.event_type]}/{new Date().getFullYear().toString().slice(-2)}/###</div>
+            </div>
+          )}
+          <Input label="Description" placeholder="Brief description of what's needed" value={form.description} onChange={v => setForm({ ...form, description: v })} />
+          <Select label="Client" options={[{ value: '', label: 'Select client...' }, ...clients.map(c => ({ value: c.id, label: c.company || c.name }))]}
+            value={form.client_id}
+            onChange={v => { const c = clients.find(x => x.id === v); setForm({ ...form, client_id: v, client_name: c ? (c.company || c.name) : '', project_id: '', event_name: '' }); }} />
+          <Select label="Event" options={[{ value: '', label: form.client_id ? 'Select event...' : 'Select client first...' }, ...events.filter(e => e.client_id === form.client_id).map(e => ({ value: e.id, label: e.name }))]}
+            value={form.project_id}
+            onChange={v => { const e = events.find(x => x.id === v); setForm({ ...form, project_id: v, event_name: e ? e.name : '' }); }} />
+          <Input label="Deadline" type="date" value={form.deadline} onChange={v => setForm({ ...form, deadline: v })} />
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Upload RFF Document (PDF)</div>
+            <input type="file" accept=".pdf" onChange={e => setFile(e.target.files[0])} style={{
+              width: '100%', padding: '10px', background: T.bg,
+              border: `1px solid ${T.border}`, borderRadius: 6,
+              color: T.textSecondary, fontSize: 13, cursor: 'pointer',
+            }} />
+            {file && <div style={{ color: T.cyan, fontSize: 12, marginTop: 6 }}>✓ {file.name}</div>}
+          </div>
+          {error && <div style={{ color: '#F43F5E', fontSize: 12, marginTop: 4 }}>{error}</div>}
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <Btn onClick={handleCreate} disabled={saving}>{saving ? 'Uploading...' : 'Create RFF'}</Btn>
+            <Btn variant="ghost" onClick={() => { setModal(false); setError(''); }}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+
+
 const EventsView = ({ user, userRole }) => {
   const [events, setEvents] = useState([]);
   const [clients, setClients] = useState([]);
@@ -12263,7 +12648,7 @@ const EventsView = ({ user, userRole }) => {
                 {canSeeTasks && (() => {
                   const eventTaskCount = tasks.filter(t => t.project_id === p.id).length;
                   return (
-                    <button onClick={() => setTaskModalEvent(p)} style={{
+                    <button onClick={e => { e.stopPropagation(); setInternalPortalEvent(p); }} style={{
                       marginTop: 14, width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
                       background: T.bg, border: `1px solid ${T.border}80`,
                       borderRadius: 8, padding: "7px 12px", cursor: "pointer", transition: "all 0.15s",

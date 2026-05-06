@@ -4621,6 +4621,7 @@ const ImpactIntelligenceSummary = ({ user }) => {
   );
 };
 
+
 const ZohoBooksView = ({ user }) => {
   const [connected, setConnected] = useState(false);
   const [checking, setChecking] = useState(true);
@@ -13132,6 +13133,1377 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
   );
 };
 
+
+
+const InvoicesView = () => {
+  const [invoices, setInvoices] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [form, setForm] = useState({ vendor: '', amount: '', status: 'pending', date: '' });
+  const [saving, setSaving] = useState(false);
+
+  const load = async () => {
+    const { data } = await supabase.from('invoices').select('*').order('created_at', { ascending: false });
+    setInvoices(data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleApprove = async (id) => {
+    await supabase.from('invoices').update({ status: 'approved' }).eq('id', id);
+    load();
+  };
+
+  // Summary stats
+  const totalPending = invoices.filter(i => i.status === "pending").reduce((a, i) => a + (i.amount || 0), 0);
+  const totalApproved = invoices.filter(i => i.status === "approved").reduce((a, i) => a + (i.amount || 0), 0);
+  const totalPaid = invoices.filter(i => i.status === "paid").reduce((a, i) => a + (i.amount || 0), 0);
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Invoices</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Review and approve vendor invoices</div>
+      </div>
+
+      {/* Summary strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Pending", value: "GHS " + totalPending.toLocaleString(), count: invoices.filter(i => i.status === "pending").length, color: T.amber },
+          { label: "Approved", value: "GHS " + totalApproved.toLocaleString(), count: invoices.filter(i => i.status === "approved").length, color: T.teal },
+          { label: "Paid", value: "GHS " + totalPaid.toLocaleString(), count: invoices.filter(i => i.status === "paid").length, color: T.cyan },
+        ].map((s, i) => (
+          <div key={i} style={{ padding: "16px 18px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${s.color}`, borderRadius: 10 }}>
+            <div style={{ color: s.color, fontSize: 18, fontWeight: 900 }}>{s.value}</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+              <div style={{ color: T.textPrimary, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>{s.label}</div>
+              <div style={{ color: T.textMuted, fontSize: 11 }}>{s.count} invoice{s.count !== 1 ? "s" : ""}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {invoices.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>🧾</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No invoices yet</div>
+          <div style={{ color: T.textMuted, fontSize: 13 }}>Invoices submitted by vendors will appear here.</div>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
+          {invoices.map(inv => (
+            <div key={inv.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px", transition: "box-shadow 0.2s" }}
+              onMouseEnter={e => e.currentTarget.style.boxShadow = `0 4px 24px ${T.cyan}10`}
+              onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                <div>
+                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{inv.vendor}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>{inv.event_name || "—"}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{inv.date}</div>
+                </div>
+                <Badge status={inv.status} />
+              </div>
+              <div style={{ color: T.gold, fontSize: 20, fontWeight: 900, marginBottom: 12 }}>GHS {(inv.amount || 0).toLocaleString()}</div>
+              {inv.status === "pending" && (
+                <Btn small onClick={() => handleApprove(inv.id)}>✓ Approve</Btn>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+
+const EventImpactView = ({ user, project }) => {
+  const [activeTab, setActiveTab] = useState("brief");
+  const [brief, setBrief] = useState(null);
+  const [postData, setPostData] = useState(null);
+  const [scorecard, setScorecard] = useState(null);
+  const [report, setReport] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [briefForm, setBriefForm] = useState({
+    impact_objective: "", target_audience: "", observable_signal: "",
+    kpi1_name: "", kpi1_target: "", kpi1_method: "", kpi1_timing: "",
+    kpi2_name: "", kpi2_target: "", kpi2_method: "", kpi2_timing: "",
+    kpi3_name: "", kpi3_target: "", kpi3_method: "", kpi3_timing: "",
+    tool_pre_survey: "No", tool_digital_tracking: "No", tool_live_monitoring: "No",
+    tool_post_survey: "No", tool_30day_survey: "No", tool_90day_tracking: "No",
+    tool_social_listening: "No", tool_commercial_data: "No",
+    story_before: "", story_design: "", story_outcome: "",
+  });
+  const [postForm, setPostForm] = useState({
+    total_attendees: "", target_audience_pct: "", no_show_rate: "",
+    avg_dwell_time: "", digital_completion_pct: "", interactive_participation_pct: "",
+    satisfaction_score: "", nps_score: "", positive_sentiment_pct: "",
+    behaviour_30day: "", behaviour_90day: "", knowledge_recall_pct: "",
+    retention_rate: "", revenue_shift_pct: "", opportunities_generated: "",
+    organic_posts: "", organic_reach: "", earned_media: "",
+  });
+  const [scorecardForm, setScorecardForm] = useState({
+    behavioural_change_target: "", behavioural_change_score: 0,
+    emotional_impact_target: "", emotional_impact_score: 0,
+    data_engagement_target: "", data_engagement_score: 0,
+    connection_target: "", connection_score: 0,
+    brand_visibility_target: "", brand_visibility_score: 0,
+    commercial_target: "", commercial_score: 0,
+    commentary: "",
+  });
+  const [reportForm, setReportForm] = useState({
+    headline: "", problem_challenge: "", problem_previous: "", problem_inaction: "",
+    design1_name: "", design1_intent: "", design2_name: "", design2_intent: "", design3_name: "", design3_intent: "",
+    metric1_label: "", metric1_value: "", metric2_label: "", metric2_value: "",
+    metric3_label: "", metric3_value: "", metric4_label: "", metric4_value: "",
+    client_quote: "", quote_attribution: "", one_line_story: "",
+  });
+
+  const archetype = EVENT_ARCHETYPES[project?.event_category] || EVENT_ARCHETYPES["Conference/Seminar"];
+
+  const load = async () => {
+    const [{ data: b }, { data: pd }, { data: sc }, { data: rp }] = await Promise.all([
+      supabase.from("event_impact_briefs").select("*").eq("project_id", project.id).single(),
+      supabase.from("event_post_data").select("*").eq("project_id", project.id).single(),
+      supabase.from("event_scorecards").select("*").eq("project_id", project.id).single(),
+      supabase.from("event_impact_reports").select("*").eq("project_id", project.id).single(),
+    ]);
+    if (b) { setBrief(b); setBriefForm(b); }
+    if (pd) { setPostData(pd); setPostForm(pd); }
+    if (sc) { setScorecard(sc); setScorecardForm(sc); }
+    if (rp) { setReport(rp); setReportForm(rp); }
+
+    // Auto-fill KPI suggestions if no brief yet
+    if (!b && archetype.kpiSuggestions) {
+      const s = archetype.kpiSuggestions;
+      setBriefForm(prev => ({
+        ...prev,
+        kpi1_name: s[0]?.name || "", kpi1_target: s[0]?.target || "", kpi1_method: s[0]?.method || "", kpi1_timing: s[0]?.timing || "",
+        kpi2_name: s[1]?.name || "", kpi2_target: s[1]?.target || "", kpi2_method: s[1]?.method || "", kpi2_timing: s[1]?.timing || "",
+        kpi3_name: s[2]?.name || "", kpi3_target: s[2]?.target || "", kpi3_method: s[2]?.method || "", kpi3_timing: s[2]?.timing || "",
+        tool_pre_survey: archetype.tools.pre_survey,
+        tool_digital_tracking: archetype.tools.digital_tracking,
+        tool_live_monitoring: archetype.tools.live_monitoring,
+        tool_post_survey: archetype.tools.post_survey,
+        tool_30day_survey: archetype.tools.day30_survey,
+        tool_90day_tracking: archetype.tools.day90_tracking,
+        tool_social_listening: archetype.tools.social_listening,
+        tool_commercial_data: archetype.tools.commercial_data,
+        story_before: archetype.storyTemplate.before,
+        story_design: archetype.storyTemplate.design,
+        story_outcome: archetype.storyTemplate.outcome,
+      }));
+      setScorecardForm(prev => {
+        const updated = { ...prev };
+        archetype.dimensions.forEach(d => {
+          updated[d.key + "_target"] = d.description;
+        });
+        return updated;
+      });
+    }
+  };
+
+  useEffect(() => { if (project?.id) load(); }, [project?.id]);
+
+  const saveBrief = async () => {
+    setSaving(true);
+    if (brief) {
+      await supabase.from("event_impact_briefs").update({ ...briefForm, updated_at: new Date().toISOString() }).eq("id", brief.id);
+    } else {
+      await supabase.from("event_impact_briefs").insert({ ...briefForm, project_id: project.id, event_type: project.event_category, created_by: user.id });
+    }
+    setSaving(false); load();
+  };
+
+  const savePostData = async () => {
+    setSaving(true);
+    if (postData) {
+      await supabase.from("event_post_data").update({ ...postForm, updated_at: new Date().toISOString() }).eq("id", postData.id);
+    } else {
+      await supabase.from("event_post_data").insert({ ...postForm, project_id: project.id, created_by: user.id });
+    }
+    setSaving(false); load();
+  };
+
+  const calcOverallScore = () => {
+    const dims = archetype.dimensions;
+    let total = 0;
+    dims.forEach(d => {
+      const score = parseFloat(scorecardForm[d.key + "_score"]) || 0;
+      total += score * d.weight;
+    });
+    return Math.round(total * 10) / 10;
+  };
+
+  const saveScorecard = async () => {
+    setSaving(true);
+    const overall = calcOverallScore();
+    if (scorecard) {
+      await supabase.from("event_scorecards").update({ ...scorecardForm, overall_score: overall }).eq("id", scorecard.id);
+    } else {
+      await supabase.from("event_scorecards").insert({ ...scorecardForm, overall_score: overall, project_id: project.id, created_by: user.id });
+    }
+    setSaving(false); load();
+  };
+
+  const saveReport = async () => {
+    setSaving(true);
+    if (report) {
+      await supabase.from("event_impact_reports").update({ ...reportForm, updated_at: new Date().toISOString() }).eq("id", report.id);
+    } else {
+      await supabase.from("event_impact_reports").insert({ ...reportForm, project_id: project.id, created_by: user.id });
+    }
+    setSaving(false); load();
+  };
+
+  const overallScore = scorecard ? scorecard.overall_score : calcOverallScore();
+  const scoreLabel = getScoreLabel(overallScore);
+
+  const inputStyle = { width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
+  const labelStyle = { color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 };
+  const sectionStyle = { color: archetype.color, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12, marginTop: 24, paddingBottom: 6, borderBottom: `1px solid ${archetype.color}30` };
+
+  const tabs = [
+    { id: "brief", label: "📝 Impact Brief", done: !!brief },
+    { id: "scorecard", label: "📊 Scorecard", done: !!scorecard },
+    { id: "post-data", label: "📈 Post-Event Data", done: !!postData },
+    { id: "report", label: "🏆 Impact Report", done: !!report },
+  ];
+
+  return (
+    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+      {/* Header */}
+      <div style={{ padding: "16px 20px", background: archetype.color+"12", borderBottom: `1px solid ${archetype.color}30`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <div style={{ color: archetype.color, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 3 }}>Impact Intelligence — {project?.event_category}</div>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{project?.name}</div>
+        </div>
+        {scorecard && (
+          <div style={{ textAlign: "right" }}>
+            <div style={{ color: scoreLabel.color, fontWeight: 900, fontSize: 28 }}>{overallScore}/10</div>
+            <div style={{ color: scoreLabel.color, fontSize: 11, fontWeight: 700 }}>{scoreLabel.label}</div>
+          </div>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: "flex", borderBottom: `1px solid ${T.border}`, background: T.bg }}>
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
+            padding: "10px 16px", cursor: "pointer", fontSize: 12, fontWeight: 700,
+            border: "none", borderBottom: `2px solid ${activeTab === t.id ? archetype.color : "transparent"}`,
+            background: "none", color: activeTab === t.id ? archetype.color : T.textMuted,
+            display: "flex", alignItems: "center", gap: 6,
+          }}>
+            {t.label}
+            {t.done && <span style={{ background: "#10B98120", color: "#10B981", borderRadius: "50%", width: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9 }}>✓</span>}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ padding: "20px 24px", maxHeight: 600, overflowY: "auto" }}>
+
+        {/* ── IMPACT BRIEF TAB ── */}
+        {activeTab === "brief" && (
+          <div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 16 }}>Define what success looks like before the event. KPIs pre-filled based on {project?.event_category} archetype.</div>
+
+            <div style={sectionStyle}>Impact Objective</div>
+            <div style={{ marginBottom: 12 }}><label style={labelStyle}>In one sentence, what must change as a result of this event?</label><textarea value={briefForm.impact_objective} onChange={e => setBriefForm({...briefForm, impact_objective: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} /></div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 12, marginBottom: 12 }}>
+              <div><label style={labelStyle}>Who specifically should change?</label><input value={briefForm.target_audience} onChange={e => setBriefForm({...briefForm, target_audience: e.target.value})} style={inputStyle} placeholder="Target audience segment" /></div>
+              <div><label style={labelStyle}>How will you know it changed?</label><input value={briefForm.observable_signal} onChange={e => setBriefForm({...briefForm, observable_signal: e.target.value})} style={inputStyle} placeholder="Observable signal" /></div>
+            </div>
+
+            <div style={sectionStyle}>Measurable KPIs</div>
+            {[1,2,3].map(n => (
+              <div key={n} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
+                <div style={{ color: archetype.color, fontSize: 11, fontWeight: 800, marginBottom: 8 }}>KPI {n}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 10, marginBottom: 8 }}>
+                  <div><label style={labelStyle}>Name</label><input value={briefForm[`kpi${n}_name`]} onChange={e => setBriefForm({...briefForm, [`kpi${n}_name`]: e.target.value})} style={inputStyle} /></div>
+                  <div><label style={labelStyle}>Target</label><input value={briefForm[`kpi${n}_target`]} onChange={e => setBriefForm({...briefForm, [`kpi${n}_target`]: e.target.value})} style={inputStyle} /></div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 10 }}>
+                  <div><label style={labelStyle}>Measurement Method</label><input value={briefForm[`kpi${n}_method`]} onChange={e => setBriefForm({...briefForm, [`kpi${n}_method`]: e.target.value})} style={inputStyle} /></div>
+                  <div><label style={labelStyle}>When Measured</label><input value={briefForm[`kpi${n}_timing`]} onChange={e => setBriefForm({...briefForm, [`kpi${n}_timing`]: e.target.value})} style={inputStyle} /></div>
+                </div>
+              </div>
+            ))}
+
+            <div style={sectionStyle}>Measurement Tools</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 8, marginBottom: 16 }}>
+              {[
+                ["tool_pre_survey", "Pre-Event Survey / Baseline"],
+                ["tool_digital_tracking", "Digital Tracking System"],
+                ["tool_live_monitoring", "Live Engagement Monitoring"],
+                ["tool_post_survey", "Post-Event Pulse Survey"],
+                ["tool_30day_survey", "30-Day Follow-Up Survey"],
+                ["tool_90day_tracking", "90-Day Behaviour Tracking"],
+                ["tool_social_listening", "Social Listening"],
+                ["tool_commercial_data", "Commercial Data Pull"],
+              ].map(([key, label]) => (
+                <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6 }}>
+                  <span style={{ color: T.textSecondary, fontSize: 12 }}>{label}</span>
+                  <select value={briefForm[key]} onChange={e => setBriefForm({...briefForm, [key]: e.target.value})} style={{ padding: "3px 8px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 4, color: briefForm[key] === "Yes" ? archetype.color : T.textMuted, fontSize: 11, fontFamily: "inherit", outline: "none" }}>
+                    <option>Yes</option><option>No</option><option>N/A</option>
+                  </select>
+                </div>
+              ))}
+            </div>
+
+            <div style={sectionStyle}>Impact Story Intent</div>
+            <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "14px 16px", marginBottom: 16 }}>
+              <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 10, fontStyle: "italic" }}>Draft the story you intend to tell — complete with actuals after the event</div>
+              <div style={{ marginBottom: 10 }}><label style={labelStyle}>Before Stretchfield, [CLIENT] struggled with...</label><input value={briefForm.story_before} onChange={e => setBriefForm({...briefForm, story_before: e.target.value})} style={inputStyle} /></div>
+              <div style={{ marginBottom: 10 }}><label style={labelStyle}>We designed [ELEMENT] because...</label><input value={briefForm.story_design} onChange={e => setBriefForm({...briefForm, story_design: e.target.value})} style={inputStyle} /></div>
+              <div><label style={labelStyle}>As a result, [OUTCOME] happened...</label><input value={briefForm.story_outcome} onChange={e => setBriefForm({...briefForm, story_outcome: e.target.value})} style={inputStyle} /></div>
+            </div>
+
+            <button onClick={saveBrief} disabled={saving} style={{ background: `linear-gradient(135deg, ${archetype.color}, ${archetype.color}99)`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Save Impact Brief"}</button>
+          </div>
+        )}
+
+        {/* ── SCORECARD TAB ── */}
+        {activeTab === "scorecard" && (
+          <div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 16 }}>Score each impact dimension 0–10. Weights are pre-set for {project?.event_category} events.</div>
+            {archetype.dimensions.map(dim => (
+              <div key={dim.key} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "14px 16px", marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                  <div>
+                    <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{dim.label}</div>
+                    <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{dim.description}</div>
+                    <div style={{ color: archetype.color, fontSize: 10, marginTop: 2 }}>Benchmark: {dim.benchmark}</div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 16 }}>
+                    <div style={{ color: T.textMuted, fontSize: 10, marginBottom: 3 }}>Weight: {Math.round(dim.weight*100)}%</div>
+                    <input type="number" min="0" max="10" step="0.1" value={scorecardForm[dim.key+"_score"]} onChange={e => setScorecardForm({...scorecardForm, [dim.key+"_score"]: e.target.value})} style={{ width: 60, padding: "6px 8px", background: T.surface, border: `2px solid ${archetype.color}40`, borderRadius: 6, color: archetype.color, fontSize: 16, fontWeight: 900, textAlign: "center", fontFamily: "inherit", outline: "none" }} />
+                    <div style={{ color: T.textMuted, fontSize: 9, textAlign: "center" }}>/10</div>
+                  </div>
+                </div>
+                <div><label style={labelStyle}>Target Set</label><input value={scorecardForm[dim.key+"_target"]} onChange={e => setScorecardForm({...scorecardForm, [dim.key+"_target"]: e.target.value})} style={inputStyle} /></div>
+              </div>
+            ))}
+            <div style={{ background: archetype.color+"15", border: `2px solid ${archetype.color}40`, borderRadius: 10, padding: "16px 20px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Overall Impact Score</div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ color: archetype.color, fontWeight: 900, fontSize: 32 }}>{calcOverallScore()}</div>
+                <div style={{ color: getScoreLabel(calcOverallScore()).color, fontSize: 12, fontWeight: 700 }}>{getScoreLabel(calcOverallScore()).label}</div>
+              </div>
+            </div>
+            <div style={{ marginBottom: 16 }}><label style={labelStyle}>Commentary</label><textarea value={scorecardForm.commentary} onChange={e => setScorecardForm({...scorecardForm, commentary: e.target.value})} rows={3} style={{...inputStyle, resize: "vertical"}} placeholder="Overall notes on event performance..." /></div>
+            <button onClick={saveScorecard} disabled={saving} style={{ background: `linear-gradient(135deg, ${archetype.color}, ${archetype.color}99)`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Save Scorecard"}</button>
+          </div>
+        )}
+
+        {/* ── POST-EVENT DATA TAB ── */}
+        {activeTab === "post-data" && (
+          <div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 16 }}>Enter actuals after the event. Compare against your pre-set targets from the Impact Brief.</div>
+
+            {[
+              { section: "Attendance & Reach", fields: [["total_attendees","Total Attendees","number"],["target_audience_pct","% Target Audience","number"],["no_show_rate","No-Show Rate (%)","number"]] },
+              { section: "Engagement & Dwell", fields: [["avg_dwell_time","Average Dwell Time (mins)","number"],["digital_completion_pct","Digital Touchpoint Completion (%)","number"],["interactive_participation_pct","Interactive Feature Participation (%)","number"]] },
+              { section: "Sentiment & Satisfaction", fields: [["satisfaction_score","Post-Event Satisfaction Score (/10)","number"],["nps_score","NPS Score","number"],["positive_sentiment_pct","Positive Sentiment % (social/survey)","number"]] },
+              { section: "Behaviour Change", fields: [["behaviour_30day","30-Day Behaviour Signal","text"],["behaviour_90day","90-Day Behaviour Signal","text"],["knowledge_recall_pct","Knowledge/Recall Score (%)","number"]] },
+              { section: "Commercial Outcomes", fields: [["retention_rate","Retention Rate (%)","number"],["revenue_shift_pct","Revenue Contribution Shift (%)","number"],["opportunities_generated","Pipeline/Opportunitys Generated","number"]] },
+              { section: "Social & Brand", fields: [["organic_posts","Organic Social Posts Generated","number"],["organic_reach","Total Organic Reach (impressions)","number"],["earned_media","Earned Media Placements","number"]] },
+            ].map(({ section, fields }) => (
+              <div key={section}>
+                <div style={sectionStyle}>{section}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginBottom: 8 }}>
+                  {fields.map(([key, label, type]) => (
+                    <div key={key}>
+                      <label style={labelStyle}>{label}</label>
+                      <input type={type} value={postForm[key]} onChange={e => setPostForm({...postForm, [key]: e.target.value})} style={inputStyle} placeholder="Enter actual" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {/* Benchmark comparison */}
+            {(postForm.satisfaction_score || postForm.nps_score) && (
+              <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 12 }}>vs. Industry Benchmarks</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 10 }}>
+                  {[
+                    ["Satisfaction", postForm.satisfaction_score, "7.1/10", "8.5+/10"],
+                    ["NPS", postForm.nps_score, "+22", "+50"],
+                    ["Sentiment", postForm.positive_sentiment_pct+"%", "64%", "85%+"],
+                  ].filter(([,v]) => v && v !== "undefined%").map(([label, actual, industry, sfTarget]) => (
+                    <div key={label} style={{ background: T.surface, borderRadius: 8, padding: "10px 12px", border: `1px solid ${T.border}` }}>
+                      <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
+                      <div style={{ color: archetype.color, fontWeight: 900, fontSize: 18 }}>{actual}</div>
+                      <div style={{ color: T.textMuted, fontSize: 10, marginTop: 4 }}>Industry: {industry}</div>
+                      <div style={{ color: "#10B981", fontSize: 10 }}>SF Target: {sfTarget}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button onClick={savePostData} disabled={saving} style={{ background: `linear-gradient(135deg, ${archetype.color}, ${archetype.color}99)`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Save Post-Event Data"}</button>
+          </div>
+        )}
+
+        {/* ── IMPACT REPORT TAB ── */}
+        {activeTab === "report" && (
+          <div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 16 }}>Build your client impact story. This becomes your case study and pitch asset.</div>
+
+            <div style={{ marginBottom: 12 }}><label style={labelStyle}>Headline Impact Statement</label><input value={reportForm.headline} onChange={e => setReportForm({...reportForm, headline: e.target.value})} style={inputStyle} placeholder="One powerful line that captures the entire impact" /></div>
+
+            <div style={sectionStyle}>The Problem (Before Stretchfield)</div>
+            <div style={{ marginBottom: 10 }}><label style={labelStyle}>What was the business challenge?</label><textarea value={reportForm.problem_challenge} onChange={e => setReportForm({...reportForm, problem_challenge: e.target.value})} rows={2} style={{...inputStyle, resize:"vertical"}} /></div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 12, marginBottom: 12 }}>
+              <div><label style={labelStyle}>What wasn't working?</label><textarea value={reportForm.problem_previous} onChange={e => setReportForm({...reportForm, problem_previous: e.target.value})} rows={2} style={{...inputStyle, resize:"vertical"}} /></div>
+              <div><label style={labelStyle}>Cost of inaction?</label><textarea value={reportForm.problem_inaction} onChange={e => setReportForm({...reportForm, problem_inaction: e.target.value})} rows={2} style={{...inputStyle, resize:"vertical"}} /></div>
+            </div>
+
+            <div style={sectionStyle}>What Stretchfield Engineered</div>
+            {[1,2,3].map(n => (
+              <div key={n} style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 10, marginBottom: 10 }}>
+                <div><label style={labelStyle}>Design Element {n}</label><input value={reportForm[`design${n}_name`]} onChange={e => setReportForm({...reportForm, [`design${n}_name`]: e.target.value})} style={inputStyle} placeholder="Element name" /></div>
+                <div><label style={labelStyle}>Intent (why this?)</label><input value={reportForm[`design${n}_intent`]} onChange={e => setReportForm({...reportForm, [`design${n}_intent`]: e.target.value})} style={inputStyle} placeholder="Strategic reason" /></div>
+              </div>
+            ))}
+
+            <div style={sectionStyle}>Measured Outcomes</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 10, marginBottom: 16 }}>
+              {[1,2,3,4].map(n => (
+                <div key={n} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 8, background: T.bg, padding: "10px 12px", borderRadius: 8, border: `1px solid ${T.border}` }}>
+                  <div><label style={labelStyle}>Metric {n}</label><input value={reportForm[`metric${n}_label`]} onChange={e => setReportForm({...reportForm, [`metric${n}_label`]: e.target.value})} style={inputStyle} placeholder="Label" /></div>
+                  <div><label style={labelStyle}>Value</label><input value={reportForm[`metric${n}_value`]} onChange={e => setReportForm({...reportForm, [`metric${n}_value`]: e.target.value})} style={inputStyle} placeholder="e.g. 87%" /></div>
+                </div>
+              ))}
+            </div>
+
+            <div style={sectionStyle}>Client Voice</div>
+            <div style={{ marginBottom: 10 }}><label style={labelStyle}>Client Quote</label><textarea value={reportForm.client_quote} onChange={e => setReportForm({...reportForm, client_quote: e.target.value})} rows={3} style={{...inputStyle, resize:"vertical"}} placeholder="Direct quote from client..." /></div>
+            <div style={{ marginBottom: 16 }}><label style={labelStyle}>Attribution</label><input value={reportForm.quote_attribution} onChange={e => setReportForm({...reportForm, quote_attribution: e.target.value})} style={inputStyle} placeholder="Name, Title, Company" /></div>
+
+            <div style={sectionStyle}>The One-Line Story</div>
+            <div style={{ background: T.bg, border: `1px solid ${archetype.color}30`, borderRadius: 8, padding: "14px 16px", marginBottom: 16 }}>
+              <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 8 }}>Complete this sentence:</div>
+              <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 6, fontStyle: "italic" }}>"A [DESIGN ELEMENT] we placed into [EVENT NAME] because [STRATEGIC INTENT] resulted in [MEASURABLE OUTCOME] for [CLIENT], proving that [BUSINESS TRUTH]."</div>
+              <textarea value={reportForm.one_line_story} onChange={e => setReportForm({...reportForm, one_line_story: e.target.value})} rows={3} style={{...inputStyle, resize:"vertical"}} placeholder="Write your one-line impact story..." />
+            </div>
+
+            {/* Score summary */}
+            {scorecard && (
+              <div style={{ background: archetype.color+"12", border: `1px solid ${archetype.color}30`, borderRadius: 10, padding: "14px 16px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>Overall Impact Score</div>
+                  <div style={{ color: T.textMuted, fontSize: 11 }}>Benchmarked against: Industry avg {BENCHMARKS.satisfaction_score.industry} satisfaction | SF Target {BENCHMARKS.satisfaction_score.sf_target}</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ color: archetype.color, fontWeight: 900, fontSize: 32 }}>{scorecard.overall_score}/10</div>
+                  <div style={{ color: getScoreLabel(scorecard.overall_score).color, fontSize: 12, fontWeight: 700 }}>{getScoreLabel(scorecard.overall_score).label}</div>
+                </div>
+              </div>
+            )}
+
+            <button onClick={saveReport} disabled={saving} style={{ background: `linear-gradient(135deg, ${archetype.color}, ${archetype.color}99)`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13, marginRight: 10 }}>{saving ? "Saving..." : "Save Impact Report"}</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+
+
+const CEOClientFinanceView = ({ user }) => {
+  const [clients, setClients] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [budgets, setBudgets] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [tab, setTab] = useState("budget");
+  const [saving, setSaving] = useState(false);
+
+  // Budget form
+  const [budgetForm, setBudgetForm] = useState({ agreed_budget: "", management_fee_pct: "15" });
+  // Expense form
+  const [expenseForm, setExpenseForm] = useState({ category: "Venue", description: "", amount: "" });
+  // Invoice form
+  const [invoiceForm, setInvoiceForm] = useState({ title: "", file_url: "" });
+
+  const load = async () => {
+    const [cl, ev, bud, exp, inv] = await Promise.all([
+      supabase.from("clients").select("*").order("name"),
+      supabase.from("projects").select("*").order("name"),
+      supabase.from("client_budgets").select("*"),
+      supabase.from("client_expenses").select("*").order("created_at", { ascending: false }),
+      supabase.from("client_invoices").select("*").order("created_at", { ascending: false }),
+    ]);
+    setClients(cl.data || []);
+    setEvents(ev.data || []);
+    setBudgets(bud.data || []);
+    setExpenses(exp.data || []);
+    setInvoices(inv.data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const clientEvents = events.filter(e => e.client_id === selectedClient);
+  const currentBudget = budgets.find(b => b.project_id === selectedEvent && b.client_id === selectedClient);
+  const currentExpenses = expenses.filter(e => e.project_id === selectedEvent && e.client_id === selectedClient);
+  const currentInvoices = invoices.filter(i => i.project_id === selectedEvent && i.client_id === selectedClient);
+
+  const handleSaveBudget = async () => {
+    if (!selectedClient || !selectedEvent) return;
+    setSaving(true);
+    if (currentBudget) {
+      await supabase.from("client_budgets").update({
+        agreed_budget: parseFloat(budgetForm.agreed_budget),
+        management_fee_pct: parseFloat(budgetForm.management_fee_pct),
+        updated_at: new Date().toISOString(),
+      }).eq("id", currentBudget.id);
+    } else {
+      await supabase.from("client_budgets").insert({
+        project_id: selectedEvent, client_id: selectedClient,
+        agreed_budget: parseFloat(budgetForm.agreed_budget),
+        management_fee_pct: parseFloat(budgetForm.management_fee_pct),
+      });
+    }
+    setSaving(false);
+    load();
+  };
+
+  const handleAddExpense = async () => {
+    if (!selectedClient || !selectedEvent || !expenseForm.amount) return;
+    setSaving(true);
+    await supabase.from("client_expenses").insert({
+      project_id: selectedEvent, client_id: selectedClient,
+      category: expenseForm.category,
+      description: expenseForm.description,
+      amount: parseFloat(expenseForm.amount),
+    });
+    setExpenseForm({ category: "Venue", description: "", amount: "" });
+    setSaving(false);
+    load();
+  };
+
+  const handleDeleteExpense = async (id) => {
+    await supabase.from("client_expenses").delete().eq("id", id);
+    load();
+  };
+
+  const handleUploadInvoice = async () => {
+    if (!selectedClient || !selectedEvent || !invoiceForm.title || !invoiceForm.file_url) return;
+    setSaving(true);
+    await supabase.from("client_invoices").insert({
+      project_id: selectedEvent, client_id: selectedClient,
+      title: invoiceForm.title, file_url: invoiceForm.file_url,
+      uploaded_by: user.id,
+    });
+    setInvoiceForm({ title: "", file_url: "" });
+    setSaving(false);
+    load();
+  };
+
+  const handleDeleteInvoice = async (id) => {
+    await supabase.from("client_invoices").delete().eq("id", id);
+    load();
+  };
+
+  // Sync budget form when event selected
+  useEffect(() => {
+    if (currentBudget) {
+      setBudgetForm({ agreed_budget: currentBudget.agreed_budget, management_fee_pct: currentBudget.management_fee_pct });
+    } else {
+      setBudgetForm({ agreed_budget: "", management_fee_pct: "15" });
+    }
+  }, [selectedEvent, budgets]);
+
+  const totalSpent = currentExpenses.reduce((s, e) => s + (e.amount || 0), 0);
+  const agreedBudget = currentBudget?.agreed_budget || 0;
+  const spentPct = agreedBudget > 0 ? Math.min(100, Math.round((totalSpent / agreedBudget) * 100)) : 0;
+
+  const categoryColors = {
+    "Venue": "#00C8FF", "Catering": "#00E5C8", "Production": "#C9A84C",
+    "Logistics": "#3B7BFF", "Management Fee": "#E879F9", "Other": "#8BA3C7",
+  };
+
+  const inputStyle = { width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
+  const labelStyle = { color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5, display: "block" };
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>CEO · Finance</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Client Financials</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Set budgets, record spend and upload invoices per client event</div>
+      </div>
+
+      {/* Client + Event selectors */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 24 }}>
+        <div>
+          <label style={labelStyle}>Select Client</label>
+          <select value={selectedClient || ""} onChange={e => { setSelectedClient(e.target.value); setSelectedEvent(null); }}
+            style={inputStyle}>
+            <option value="">— Choose client —</option>
+            {clients.map(c => <option key={c.id} value={c.id}>{c.company || c.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Select Event</label>
+          <select value={selectedEvent || ""} onChange={e => setSelectedEvent(e.target.value)} style={inputStyle} disabled={!selectedClient}>
+            <option value="">— Choose event —</option>
+            {clientEvents.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {selectedEvent && (
+        <>
+          {/* Summary strip */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginBottom: 20 }}>
+            {[
+              { label: "Agreed Budget", value: agreedBudget > 0 ? `GHS ${agreedBudget.toLocaleString()}` : "Not set", color: T.cyan },
+              { label: "Total Recorded Spend", value: `GHS ${totalSpent.toLocaleString()}`, color: T.amber },
+              { label: "Utilisation", value: agreedBudget > 0 ? spentPct + "%" : "—", color: spentPct > 90 ? T.red : T.teal },
+            ].map((k, i) => (
+              <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+                <div style={{ color: k.color, fontSize: 18, fontWeight: 900 }}>{k.value}</div>
+                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 4 }}>{k.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Tabs */}
+          <div style={{ display: "flex", gap: 6, marginBottom: 20, borderBottom: `1px solid ${T.border}`, paddingBottom: 0 }}>
+            {["budget", "expenses", "invoices"].map(t => (
+              <button key={t} onClick={() => setTab(t)} style={{
+                padding: "9px 18px", background: "none", border: "none", borderBottom: `2px solid ${tab === t ? T.cyan : "transparent"}`,
+                color: tab === t ? T.cyan : T.textMuted, cursor: "pointer", fontSize: 12, fontWeight: 700,
+                textTransform: "uppercase", letterSpacing: "0.06em", transition: "all 0.15s",
+              }}>{t}</button>
+            ))}
+          </div>
+
+          {/* Budget tab */}
+          {tab === "budget" && (
+            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "22px 24px" }}>
+              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 18 }}>{currentBudget ? "Update Budget" : "Set Budget"}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 16 }}>
+                <div>
+                  <label style={labelStyle}>Agreed Budget (GHS)</label>
+                  <input type="number" value={budgetForm.agreed_budget} onChange={e => setBudgetForm({ ...budgetForm, agreed_budget: e.target.value })} placeholder="e.g. 50000" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Management Fee %</label>
+                  <input type="number" min="15" max="30" value={budgetForm.management_fee_pct} onChange={e => setBudgetForm({ ...budgetForm, management_fee_pct: e.target.value })} placeholder="15–30" style={inputStyle} />
+                </div>
+              </div>
+              {budgetForm.agreed_budget && (
+                <div style={{ padding: "10px 14px", background: T.cyan + "10", border: `1px solid ${T.cyan}30`, borderRadius: 8, marginBottom: 16, fontSize: 12, color: T.cyan }}>
+                  Management Fee: GHS {(parseFloat(budgetForm.agreed_budget) * parseFloat(budgetForm.management_fee_pct) / 100).toLocaleString()} ({budgetForm.management_fee_pct}%)
+                </div>
+              )}
+              <button onClick={handleSaveBudget} disabled={saving || !budgetForm.agreed_budget} style={{
+                background: T.cyan + "20", border: `1px solid ${T.cyan}40`, color: T.cyan,
+                padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, opacity: !budgetForm.agreed_budget ? 0.5 : 1,
+              }}>{saving ? "Saving..." : currentBudget ? "Update Budget" : "Save Budget"}</button>
+            </div>
+          )}
+
+          {/* Expenses tab */}
+          {tab === "expenses" && (
+            <div>
+              <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "22px 24px", marginBottom: 16 }}>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Add Expense Entry</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <label style={labelStyle}>Category</label>
+                    <select value={expenseForm.category} onChange={e => setExpenseForm({ ...expenseForm, category: e.target.value })} style={inputStyle}>
+                      {["Venue","Catering","Production","Logistics","Management Fee","Other"].map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Description</label>
+                    <input value={expenseForm.description} onChange={e => setExpenseForm({ ...expenseForm, description: e.target.value })} placeholder="Brief description" style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Amount (GHS)</label>
+                    <input type="number" value={expenseForm.amount} onChange={e => setExpenseForm({ ...expenseForm, amount: e.target.value })} placeholder="0.00" style={inputStyle} />
+                  </div>
+                </div>
+                <button onClick={handleAddExpense} disabled={saving || !expenseForm.amount} style={{
+                  background: T.teal + "20", border: `1px solid ${T.teal}40`, color: T.teal,
+                  padding: "9px 20px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, opacity: !expenseForm.amount ? 0.5 : 1,
+                }}>+ Add Entry</button>
+              </div>
+
+              {/* Expense list */}
+              {currentExpenses.length === 0 ? (
+                <div style={{ color: T.textMuted, fontSize: 13, fontStyle: "italic", textAlign: "center", padding: 30 }}>No expenses recorded yet.</div>
+              ) : (
+                <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ borderBottom: `1px solid ${T.border}` }}>
+                        {["Category","Description","Amount",""].map((h, i) => (
+                          <th key={i} style={{ padding: "12px 16px", textAlign: i === 2 ? "right" : "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {currentExpenses.map((e, i) => (
+                        <tr key={e.id} style={{ borderBottom: i < currentExpenses.length - 1 ? `1px solid ${T.border}44` : "none" }}>
+                          <td style={{ padding: "12px 16px" }}>
+                            <span style={{ background: (categoryColors[e.category] || T.textMuted) + "20", color: categoryColors[e.category] || T.textMuted, border: `1px solid ${categoryColors[e.category] || T.textMuted}30`, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 700 }}>{e.category}</span>
+                          </td>
+                          <td style={{ padding: "12px 16px", color: T.textPrimary, fontSize: 13 }}>{e.description || "—"}</td>
+                          <td style={{ padding: "12px 16px", color: T.amber, fontWeight: 700, fontSize: 13, textAlign: "right" }}>GHS {parseFloat(e.amount).toLocaleString()}</td>
+                          <td style={{ padding: "12px 16px", textAlign: "right" }}>
+                            <button onClick={() => handleDeleteExpense(e.id)} style={{ background: "none", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 16 }}
+                              onMouseEnter={el => el.currentTarget.style.color = T.red}
+                              onMouseLeave={el => el.currentTarget.style.color = T.textMuted}>×</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ borderTop: `1px solid ${T.border}` }}>
+                        <td colSpan={2} style={{ padding: "12px 16px", color: T.textMuted, fontSize: 12, fontWeight: 700 }}>Total</td>
+                        <td style={{ padding: "12px 16px", color: T.amber, fontWeight: 900, fontSize: 14, textAlign: "right" }}>GHS {totalSpent.toLocaleString()}</td>
+                        <td />
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Invoices tab */}
+          {tab === "invoices" && (
+            <div>
+              <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "22px 24px", marginBottom: 16 }}>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Upload Invoice</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <label style={labelStyle}>Invoice Title</label>
+                    <input value={invoiceForm.title} onChange={e => setInvoiceForm({ ...invoiceForm, title: e.target.value })} placeholder="e.g. Final Invoice — Brand Event 2025" style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>File URL (Supabase Storage / Drive link)</label>
+                    <input value={invoiceForm.file_url} onChange={e => setInvoiceForm({ ...invoiceForm, file_url: e.target.value })} placeholder="https://..." style={inputStyle} />
+                  </div>
+                </div>
+                <button onClick={handleUploadInvoice} disabled={saving || !invoiceForm.title || !invoiceForm.file_url} style={{
+                  background: T.cyan + "20", border: `1px solid ${T.cyan}40`, color: T.cyan,
+                  padding: "9px 20px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, opacity: (!invoiceForm.title || !invoiceForm.file_url) ? 0.5 : 1,
+                }}>Upload Invoice</button>
+              </div>
+
+              {currentInvoices.length === 0 ? (
+                <div style={{ color: T.textMuted, fontSize: 13, fontStyle: "italic", textAlign: "center", padding: 30 }}>No invoices uploaded yet.</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {currentInvoices.map(inv => (
+                    <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ fontSize: 24 }}>📑</div>
+                        <div>
+                          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{inv.title}</div>
+                          <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{new Date(inv.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 10 }}>
+                        <a href={inv.file_url} target="_blank" rel="noopener noreferrer" style={{ background: T.cyan + "18", border: `1px solid ${T.cyan}40`, color: T.cyan, padding: "7px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, textDecoration: "none" }}>View</a>
+                        <button onClick={() => handleDeleteInvoice(inv.id)} style={{ background: T.red + "18", border: `1px solid ${T.red}40`, color: T.red, padding: "7px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {data.length > 0 && (
+                <div style={{ padding: "12px 16px", borderTop: `1px solid ${T.border}`, background: T.bg, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ color: T.textMuted, fontSize: 11 }}>{data.length} records · Read-only view · Create and edit in Zoho Books</span>
+                  <a href="https://books.zoho.com" target="_blank" rel="noopener noreferrer" style={{ color: "#E67E22", fontSize: 11, fontWeight: 700, textDecoration: "none" }}>Open Zoho Books ↗</a>
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
+
+
+const ClientFinanceView = ({ user }) => {
+  const [clientInfo, setClientInfo] = useState(null);
+  const [events, setEvents] = useState([]);
+  const [budgets, setBudgets] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+
+  const load = async () => {
+    let clientData = null;
+    const { data: byProfile } = await supabase.from("clients").select("*").eq("profile_id", user.id).single();
+    if (byProfile) { clientData = byProfile; }
+    else {
+      const { data: byEmail } = await supabase.from("clients").select("*").eq("email", user.email).single();
+      if (byEmail) { clientData = byEmail; await supabase.from("clients").update({ profile_id: user.id }).eq("id", byEmail.id); }
+    }
+    if (!clientData) return;
+    setClientInfo(clientData);
+    const [ev, bud, exp, inv] = await Promise.all([
+      supabase.from("projects").select("*").eq("client_id", clientData.id).eq("active_for_client", true),
+      supabase.from("client_budgets").select("*").eq("client_id", clientData.id),
+      supabase.from("client_expenses").select("*").eq("client_id", clientData.id),
+      supabase.from("client_invoices").select("*").eq("client_id", clientData.id).order("created_at", { ascending: false }),
+    ]);
+    setEvents(ev.data || []);
+    setBudgets(bud.data || []);
+    setExpenses(exp.data || []);
+    setInvoices(inv.data || []);
+    if ((ev.data || []).length > 0 && !selectedEvent) setSelectedEvent((ev.data || [])[0].id);
+  };
+
+  useEffect(() => { load(); }, [user.id]);
+
+  const currentBudget = budgets.find(b => b.project_id === selectedEvent);
+  const currentExpenses = expenses.filter(e => e.project_id === selectedEvent);
+  const currentInvoices = invoices.filter(i => i.project_id === selectedEvent);
+  const currentEvent = events.find(e => e.id === selectedEvent);
+
+  const agreedBudget = currentBudget?.agreed_budget || 0;
+  const mgmtFeePct = currentBudget?.management_fee_pct || 15;
+  const mgmtFee = agreedBudget * (mgmtFeePct / 100);
+  const totalSpent = currentExpenses.reduce((s, e) => s + (e.amount || 0), 0);
+  const remaining = agreedBudget - totalSpent;
+  const spentPct = agreedBudget > 0 ? Math.min(100, Math.round((totalSpent / agreedBudget) * 100)) : 0;
+
+  const categoryTotals = currentExpenses.reduce((acc, e) => {
+    acc[e.category] = (acc[e.category] || 0) + (e.amount || 0);
+    return acc;
+  }, {});
+
+  const categoryColors = {
+    "Venue": "#00C8FF", "Catering": "#00E5C8", "Production": "#C9A84C",
+    "Logistics": "#3B7BFF", "Management Fee": "#E879F9", "Other": "#8BA3C7",
+  };
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Client Portal</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Budget & Financials</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Track your event spend and download invoices</div>
+      </div>
+
+      {events.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>💰</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No financial data yet</div>
+          <div style={{ color: T.textMuted, fontSize: 13 }}>Budget information will appear here once your event is set up.</div>
+        </div>
+      ) : (
+        <>
+          {/* Event selector pills */}
+          {events.length > 1 && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
+              {events.map(e => (
+                <button key={e.id} onClick={() => setSelectedEvent(e.id)} style={{
+                  padding: "6px 16px", borderRadius: 20, border: `1px solid ${selectedEvent === e.id ? T.cyan : T.border}`,
+                  background: selectedEvent === e.id ? T.cyan + "20" : "none", color: selectedEvent === e.id ? T.cyan : T.textMuted,
+                  cursor: "pointer", fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", transition: "all 0.15s",
+                }}>{e.name}</button>
+              ))}
+            </div>
+          )}
+
+          {currentEvent && (
+            <>
+              {/* Event title */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18 }}>{currentEvent.name}</div>
+                <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{currentEvent.phase} · Due {currentEvent.deadline || "TBD"}</div>
+              </div>
+
+              {/* KPI strip */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, marginBottom: 24 }}>
+                {[
+                  { label: "Agreed Budget", value: agreedBudget > 0 ? `GHS ${agreedBudget.toLocaleString()}` : "—", color: T.cyan },
+                  { label: "Total Spent", value: totalSpent > 0 ? `GHS ${totalSpent.toLocaleString()}` : "—", color: T.amber },
+                  { label: "Remaining", value: agreedBudget > 0 ? `GHS ${remaining.toLocaleString()}` : "—", color: remaining < 0 ? T.red : T.teal },
+                  { label: "Mgmt Fee", value: agreedBudget > 0 ? `GHS ${mgmtFee.toLocaleString()} (${mgmtFeePct}%)` : "—", color: T.magenta },
+                ].map((k, i) => (
+                  <div key={i} style={{ padding: "16px 18px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+                    <div style={{ color: k.color, fontSize: 16, fontWeight: 900, marginBottom: 4 }}>{k.value}</div>
+                    <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Budget utilisation bar */}
+              {agreedBudget > 0 && (
+                <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 22px", marginBottom: 20 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>Budget Utilisation</div>
+                    <div style={{ color: spentPct > 90 ? T.red : spentPct > 70 ? T.amber : T.teal, fontWeight: 900, fontSize: 18 }}>{spentPct}%</div>
+                  </div>
+                  <div style={{ height: 12, background: T.border + "44", borderRadius: 6, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: spentPct + "%", background: spentPct > 90 ? `linear-gradient(90deg,${T.amber},${T.red})` : `linear-gradient(90deg,${T.cyan},${T.teal})`, borderRadius: 6, transition: "width 0.6s ease" }} />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
+                    <div style={{ color: T.textMuted, fontSize: 11 }}>GHS {totalSpent.toLocaleString()} spent</div>
+                    <div style={{ color: T.textMuted, fontSize: 11 }}>of GHS {agreedBudget.toLocaleString()}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Spend by category */}
+              {Object.keys(categoryTotals).length > 0 && (
+                <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 22px", marginBottom: 20 }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Spend by Category</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {Object.entries(categoryTotals).map(([cat, amt]) => {
+                      const pct = agreedBudget > 0 ? Math.round((amt / agreedBudget) * 100) : 0;
+                      const color = categoryColors[cat] || T.textMuted;
+                      return (
+                        <div key={cat}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <div style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                              <span style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{cat}</span>
+                            </div>
+                            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                              <span style={{ color: T.textMuted, fontSize: 11 }}>{pct}%</span>
+                              <span style={{ color: color, fontWeight: 700, fontSize: 13 }}>GHS {amt.toLocaleString()}</span>
+                            </div>
+                          </div>
+                          <div style={{ height: 5, background: T.border + "44", borderRadius: 3 }}>
+                            <div style={{ height: "100%", width: pct + "%", background: color, borderRadius: 3, transition: "width 0.4s ease" }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Invoices */}
+              <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 22px" }}>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 16 }}>📄 Invoices</div>
+                {currentInvoices.length === 0 ? (
+                  <div style={{ color: T.textMuted, fontSize: 13, fontStyle: "italic", textAlign: "center", padding: "20px 0" }}>No invoices uploaded yet.</div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {currentInvoices.map(inv => (
+                      <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: T.bg, border: `1px solid ${T.border}44`, borderRadius: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <div style={{ fontSize: 22 }}>📑</div>
+                          <div>
+                            <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{inv.title}</div>
+                            <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{new Date(inv.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>
+                          </div>
+                        </div>
+                        <a href={inv.file_url} target="_blank" rel="noopener noreferrer" style={{
+                          background: T.cyan + "18", border: `1px solid ${T.cyan}40`, color: T.cyan,
+                          padding: "7px 16px", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                          textDecoration: "none", letterSpacing: "0.06em",
+                        }}>Download</a>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
+
+
+const FeedbackView = ({ userRole }) => {
+  const [feedback, setFeedback] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const canSeeDetailed = ["CEO", "Administrator", "Strategy & Events Lead", "Vendor Manager"].includes(userRole);
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from("feedback").select("*").order("created_at", { ascending: false }),
+      supabase.from("projects").select("*"),
+    ]).then(([f, e]) => { setFeedback(f.data || []); setEvents(e.data || []); setLoading(false); });
+  }, []);
+
+  const filtered = selectedEvent === "all" ? feedback : feedback.filter(f => f.project_id === selectedEvent);
+  const avgRating = filtered.length ? (filtered.reduce((a, f) => a + f.rating, 0) / filtered.length).toFixed(1) : 0;
+
+  return (
+    <div>
+      <PageHeader title="Client Feedback" subtitle="Event satisfaction and reviews" />
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
+        <Stat icon="⭐" label="Avg Rating" value={avgRating + "/5"} color={T.amber} />
+        <Stat icon="💬" label="Total Reviews" value={filtered.length} color={T.cyan} />
+        <Stat icon="✅" label="5-Star" value={filtered.filter(f => f.rating === 5).length} color={T.teal} />
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
+        <button onClick={() => setSelectedEvent("all")} style={{ padding: "7px 16px", borderRadius: 20, border: "1px solid " + (selectedEvent === "all" ? T.cyan : T.border), background: selectedEvent === "all" ? T.cyan + "20" : "none", color: selectedEvent === "all" ? T.cyan : T.textMuted, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>All Events</button>
+        {events.filter(e => feedback.some(f => f.project_id === e.id)).map(e => (
+          <button key={e.id} onClick={() => setSelectedEvent(e.id)} style={{ padding: "7px 16px", borderRadius: 20, border: "1px solid " + (selectedEvent === e.id ? T.cyan : T.border), background: selectedEvent === e.id ? T.cyan + "20" : "none", color: selectedEvent === e.id ? T.cyan : T.textMuted, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>{e.name}</button>
+        ))}
+      </div>
+      {loading ? <div style={{ color: T.textMuted, textAlign: "center", padding: 60 }}>Loading...</div>
+      : filtered.length === 0 ? (
+        <Card style={{ textAlign: "center", padding: 60 }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>💬</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No feedback yet</div>
+        </Card>
+      ) : filtered.map(f => (
+        <Card key={f.id} style={{ marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+            <div>
+              <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{f.client_name}</div>
+              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>📁 {f.event_name} · {new Date(f.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>
+            </div>
+            <div style={{ color: "#F59E0B", fontSize: 18 }}>{"★".repeat(f.rating)}{"☆".repeat(5 - f.rating)}</div>
+          </div>
+          <div style={{ color: T.textSecondary, fontSize: 13, fontStyle: "italic", marginBottom: canSeeDetailed && f.detailed_feedback ? 10 : 0 }}>"{f.summary}"</div>
+          {canSeeDetailed && f.detailed_feedback && (
+            <div style={{ padding: "10px 14px", background: T.bg, borderRadius: 6, border: "1px solid " + T.border, marginTop: 8 }}>
+              <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Detailed Feedback</div>
+              <div style={{ color: T.textSecondary, fontSize: 13 }}>{f.detailed_feedback}</div>
+            </div>
+          )}
+        </Card>
+      ))}
+    </div>
+  );
+};
+
+// ─── STRATEGY OVERVIEW ────────────────────────────────────────────────────────
+
+
+const StrategyOverviewView = () => {
+  const [clients, setClients] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [feedback, setFeedback] = useState([]);
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from("clients").select("*"),
+      supabase.from("projects").select("*").eq("status", "active"),
+      supabase.from("feedback").select("*").order("created_at", { ascending: false }),
+    ]).then(([c, e, f]) => { setClients(c.data || []); setEvents(e.data || []); setFeedback(f.data || []); });
+  }, []);
+
+  return (
+    <div>
+      <PageHeader title="Client & Event Overview" subtitle="Pictorial view of all active clients and events" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 20 }}>
+        {clients.map(c => {
+          const clientEvents = events.filter(e => e.client_id === c.id);
+          const clientFeedback = feedback.filter(f => f.client_id === c.id);
+          const avgRating = clientFeedback.length ? (clientFeedback.reduce((a, f) => a + f.rating, 0) / clientFeedback.length).toFixed(1) : null;
+          return (
+            <Card key={c.id}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16, paddingBottom: 14, borderBottom: "1px solid " + T.border }}>
+                <Avatar initials={(c.company || c.name).slice(0,2).toUpperCase()} size={48} color={T.blue} />
+                <div>
+                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{c.company || c.name}</div>
+                  <div style={{ color: T.textMuted, fontSize: 12 }}>{c.name}</div>
+                  {avgRating && <div style={{ color: "#F59E0B", fontSize: 12, marginTop: 2 }}>{"★".repeat(Math.round(avgRating))} {avgRating}/5</div>}
+                </div>
+              </div>
+              {clientEvents.length === 0 ? <div style={{ color: T.textMuted, fontSize: 12 }}>No active events</div>
+              : clientEvents.map(e => (
+                <div key={e.id} style={{ marginBottom: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <div style={{ color: T.textSecondary, fontSize: 13, fontWeight: 600 }}>📁 {e.name}</div>
+                    <span style={{ color: T.cyan, fontSize: 12 }}>{e.completion || 0}%</span>
+                  </div>
+                  <ProgressBar value={e.completion || 0} />
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>{e.phase} · Due {e.deadline}</div>
+                  {feedback.filter(f => f.project_id === e.id).slice(0,1).map(f => (
+                    <div key={f.id} style={{ marginTop: 8, padding: "8px 10px", background: T.cyan + "10", borderRadius: 6, border: "1px solid " + T.cyan + "22" }}>
+                      <div style={{ color: "#F59E0B", fontSize: 11 }}>{"★".repeat(f.rating)}</div>
+                      <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 2, fontStyle: "italic" }}>"{f.summary}"</div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ─── CLIENT FEEDBACK FORM ─────────────────────────────────────────────────────
+
+
+const BudgetView = ({ user }) => {
+  const [budgets, setBudgets] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [form, setForm] = useState({ project_id: "", event_name: "", total_budget: "", notes: "" });
+  const [saving, setSaving] = useState(false);
+  const canEdit = ["CEO", "Administrator", "Finance Manager"].includes(user?.role);
+
+  const load = async () => {
+    const [b, ev, ex, inv] = await Promise.all([
+      supabase.from("budgets").select("*"),
+      supabase.from("projects").select("*").order("created_at", { ascending: false }),
+      supabase.from("expenses").select("*"),
+      supabase.from("invoices").select("*"),
+    ]);
+    setBudgets(b.data || []);
+    setEvents(ev.data || []);
+    setExpenses(ex.data || []);
+    setInvoices(inv.data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleCreate = async () => {
+    if (!form.project_id || !form.total_budget) return;
+    setSaving(true);
+    await supabase.from("budgets").insert({
+      project_id: form.project_id, event_name: form.event_name,
+      total_budget: parseFloat(form.total_budget), notes: form.notes,
+      created_by: user.id,
+    });
+    setModal(false);
+    setForm({ project_id: "", event_name: "", total_budget: "", notes: "" });
+    setSaving(false);
+    load();
+  };
+
+  const eventsWithBudget = events.map(ev => {
+    const budget = budgets.find(b => b.project_id === ev.id);
+    const spent = expenses.filter(e => e.project_id === ev.id).reduce((a, e) => a + (e.amount || 0), 0);
+    const invoiced = invoices.filter(i => i.project_id === ev.id).reduce((a, i) => a + (i.amount || 0), 0);
+    const remaining = (budget?.total_budget || 0) - spent - invoiced;
+    const pct = budget ? Math.min(100, Math.round(((spent + invoiced) / budget.total_budget) * 100)) : 0;
+    return { ...ev, budget, spent, invoiced, remaining, pct };
+  });
+
+  const totalBudget = budgets.reduce((a, b) => a + (b.total_budget || 0), 0);
+  const totalSpent = expenses.reduce((a, e) => a + (e.amount || 0), 0);
+  const totalInvoiced = invoices.reduce((a, i) => a + (i.amount || 0), 0);
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+        <PageHeader title="Budget Management" subtitle="Event budgets vs actual spend" />
+        {canEdit && <Btn onClick={() => setModal(true)}>+ Set Budget</Btn>}
+      </div>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
+        <Stat icon="🎯" label="Total Budgeted" value={"GHS " + totalBudget.toLocaleString()} color={T.cyan} />
+        <Stat icon="📤" label="Total Expenses" value={"GHS " + totalSpent.toLocaleString()} color={T.amber} />
+        <Stat icon="🧾" label="Total Invoiced" value={"GHS " + totalInvoiced.toLocaleString()} color={T.magenta} />
+        <Stat icon="💰" label="Remaining" value={"GHS " + (totalBudget - totalSpent - totalInvoiced).toLocaleString()} color={T.teal} />
+      </div>
+      {eventsWithBudget.filter(e => e.budget).map(ev => (
+        <Card key={ev.id} style={{ marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+            <div>
+              <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{ev.name}</div>
+              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{ev.phase} · Due {ev.deadline}</div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ color: ev.pct >= 90 ? "#F43F5E" : ev.pct >= 70 ? T.amber : T.teal, fontWeight: 800, fontSize: 18 }}>{ev.pct}%</div>
+              <div style={{ color: T.textMuted, fontSize: 11 }}>of budget used</div>
+            </div>
+          </div>
+          <ProgressBar value={ev.pct} height={10} color={ev.pct >= 90 ? "#F43F5E" : ev.pct >= 70 ? T.amber : T.teal} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginTop: 14 }}>
+            {[["🎯 Budget", ev.budget.total_budget, T.cyan], ["📤 Expenses", ev.spent, T.amber], ["🧾 Invoiced", ev.invoiced, T.magenta], ["💰 Remaining", ev.remaining, ev.remaining < 0 ? "#F43F5E" : T.teal]].map(([label, val, color]) => (
+              <div key={label} style={{ padding: "10px", background: T.bg, borderRadius: 8, border: "1px solid " + T.border }}>
+                <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 4 }}>{label}</div>
+                <div style={{ color, fontWeight: 700, fontSize: 13 }}>GHS {(val || 0).toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+          {ev.budget.notes && <div style={{ color: T.textMuted, fontSize: 12, marginTop: 10, fontStyle: "italic" }}>{ev.budget.notes}</div>}
+        </Card>
+      ))}
+      {eventsWithBudget.filter(e => !e.budget).length > 0 && (
+        <Card style={{ marginTop: 8 }}>
+          <div style={{ color: T.textMuted, fontSize: 12, fontWeight: 600, marginBottom: 12 }}>Events without budgets</div>
+          {eventsWithBudget.filter(e => !e.budget).map(ev => (
+            <div key={ev.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid " + T.border }}>
+              <div style={{ color: T.textSecondary, fontSize: 13 }}>{ev.name}</div>
+              {canEdit && <button onClick={() => { setForm({ project_id: ev.id, event_name: ev.name, total_budget: "", notes: "" }); setModal(true); }} style={{ background: "none", border: "1px solid " + T.cyan, color: T.cyan, padding: "4px 12px", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>+ Set Budget</button>}
+            </div>
+          ))}
+        </Card>
+      )}
+      {modal && (
+        <Modal title="Set Event Budget" onClose={() => setModal(false)}>
+          <Select label="Event" options={[{ value: "", label: "Select event..." }, ...events.map(e => ({ value: e.id, label: e.name }))]}
+            value={form.project_id} onChange={v => { const e = events.find(x => x.id === v); setForm({ ...form, project_id: v, event_name: e ? e.name : "" }); }} />
+          <Input label="Total Budget (GHS)" type="number" placeholder="0" value={form.total_budget} onChange={v => setForm({ ...form, total_budget: v })} />
+          <Input label="Notes" placeholder="Budget notes..." value={form.notes} onChange={v => setForm({ ...form, notes: v })} />
+          <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+            <Btn onClick={handleCreate} disabled={saving}>{saving ? "Saving..." : "Set Budget"}</Btn>
+            <Btn variant="ghost" onClick={() => setModal(false)}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+// ─── EXPENSE TRACKER ──────────────────────────────────────────────────────────
+
+
+const ExpenseView = ({ user }) => {
+  const [expenses, setExpenses] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [form, setForm] = useState({ project_id: "", event_name: "", category: "", description: "", amount: "", date: "", vendor: "" });
+  const [saving, setSaving] = useState(false);
+  const [filter, setFilter] = useState("all");
+  const canEdit = ["CEO", "Administrator", "Finance Manager"].includes(user?.role);
+  const canApprove = ["CEO", "Administrator"].includes(user?.role);
+
+  const categories = ["Venue", "Catering", "Equipment", "Staffing", "Marketing", "Transport", "Accommodation", "Decor", "Technology", "Miscellaneous"];
+
+  const load = async () => {
+    const [ex, ev] = await Promise.all([
+      supabase.from("expenses").select("*").order("created_at", { ascending: false }),
+      supabase.from("projects").select("*"),
+    ]);
+    setExpenses(ex.data || []);
+    setEvents(ev.data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleCreate = async () => {
+    if (!form.description || !form.amount) return;
+    setSaving(true);
+    let receipt_url = "", receipt_name = "";
+    if (receiptFile) {
+      const ext = receiptFile.name.split(".").pop();
+      const filename = "receipt_" + Date.now() + "." + ext;
+      const { error: uploadErr } = await supabase.storage.from("rffs").upload(filename, receiptFile);
+      if (!uploadErr) {
+        const { data: urlData } = supabase.storage.from("rffs").getPublicUrl(filename);
+        receipt_url = urlData.publicUrl;
+        receipt_name = receiptFile.name;
+      }
+    }
+    await supabase.from("expenses").insert({
+      project_id: form.project_id || null, event_name: form.event_name,
+      category: form.category, description: form.description,
+      amount: parseFloat(form.amount), date: form.date || new Date().toISOString().split("T")[0],
+      vendor: form.vendor, receipt_url, receipt_name,
+      created_by: user.id, approved: false,
+    });
+    setModal(false);
+    setForm({ project_id: "", event_name: "", category: "", description: "", amount: "", date: "", vendor: "" });
+    setReceiptFile(null);
+    setSaving(false);
+    load();
+  };
+
+  const filtered = filter === "all" ? expenses : expenses.filter(e => e.category === filter);
+  const total = filtered.reduce((a, e) => a + (e.amount || 0), 0);
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+        <PageHeader title="Expense Tracker" subtitle="Log and manage company expenses" />
+        {canEdit && <Btn onClick={() => setModal(true)}>+ Log Expense</Btn>}
+      </div>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
+        <Stat icon="📤" label="Total Expenses" value={"GHS " + total.toLocaleString()} color={T.amber} />
+        <Stat icon="✅" label="Approved" value={filtered.filter(e => e.approved).length} color={T.teal} />
+        <Stat icon="⏳" label="Pending Approval" value={filtered.filter(e => !e.approved).length} color={T.magenta} />
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
+        <button onClick={() => setFilter("all")} style={{ padding: "6px 14px", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: 600, border: "1px solid " + (filter === "all" ? T.cyan : T.border), background: filter === "all" ? T.cyan + "20" : "none", color: filter === "all" ? T.cyan : T.textMuted }}>All</button>
+        {categories.map(c => expenses.some(e => e.category === c) && (
+          <button key={c} onClick={() => setFilter(c)} style={{ padding: "6px 14px", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: 600, border: "1px solid " + (filter === c ? T.cyan : T.border), background: filter === c ? T.cyan + "20" : "none", color: filter === c ? T.cyan : T.textMuted }}>{c}</button>
+        ))}
+      </div>
+      {filtered.length === 0 ? (
+        <Card style={{ textAlign: "center", padding: 60 }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>📤</div>
+          <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No expenses yet</div>
+        </Card>
+      ) : filtered.map(e => (
+        <Card key={e.id} style={{ marginBottom: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{e.description}</div>
+              <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>
+                {e.category && <span style={{ background: T.cyan + "20", color: T.cyan, padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600, marginRight: 8 }}>{e.category}</span>}
+                {e.event_name && <span>📁 {e.event_name} · </span>}
+                {e.vendor && <span>🏢 {e.vendor} · </span>}
+                {e.date}
+              </div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ color: T.amber, fontWeight: 800, fontSize: 16 }}>GHS {(e.amount || 0).toLocaleString()}</div>
+              <div style={{ marginTop: 4 }}>
+                {e.approved
+                  ? <span style={{ color: T.teal, fontSize: 11, fontWeight: 600 }}>✓ Approved</span>
+                  : canApprove
+                    ? <button onClick={async () => { await supabase.from("expenses").update({ approved: true, approved_by: user.id }).eq("id", e.id); load(); }} style={{ background: T.teal + "20", border: "1px solid " + T.teal, color: T.teal, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>✓ Approve</button>
+                    : <span style={{ color: T.amber, fontSize: 11, fontWeight: 600 }}>⏳ Pending</span>
+                }
+              </div>
+            </div>
+          </div>
+          {e.receipt_url && (
+            <div style={{ marginTop: 10 }}>
+              <a href={e.receipt_url} target="_blank" rel="noopener noreferrer" style={{ color: T.cyan, fontSize: 12, fontWeight: 600, textDecoration: "none" }}>📎 {e.receipt_name || "View Receipt"}</a>
+            </div>
+          )}
+        </Card>
+      ))}
+      {modal && (
+        <Modal title="Log Expense" onClose={() => setModal(false)}>
+          <Input label="Description" placeholder="What was this expense for?" value={form.description} onChange={v => setForm({ ...form, description: v })} />
+          <Input label="Amount (GHS)" type="number" placeholder="0" value={form.amount} onChange={v => setForm({ ...form, amount: v })} />
+          <Select label="Category" options={[{ value: "", label: "Select category..." }, ...categories.map(c => ({ value: c, label: c }))]}
+            value={form.category} onChange={v => setForm({ ...form, category: v })} />
+          <Select label="Event (optional)" options={[{ value: "", label: "Not event specific" }, ...events.map(e => ({ value: e.id, label: e.name }))]}
+            value={form.project_id} onChange={v => { const e = events.find(x => x.id === v); setForm({ ...form, project_id: v, event_name: e ? e.name : "" }); }} />
+          <Input label="Vendor / Supplier" placeholder="Who was paid?" value={form.vendor} onChange={v => setForm({ ...form, vendor: v })} />
+          <Input label="Date" type="date" value={form.date} onChange={v => setForm({ ...form, date: v })} />
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Receipt (optional)</div>
+            <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setReceiptFile(e.target.files[0])} style={{ width: "100%", padding: "10px", background: T.bg, border: "1px solid " + T.border, borderRadius: 6, color: T.textSecondary, fontSize: 13, cursor: "pointer" }} />
+            {receiptFile && <div style={{ color: T.cyan, fontSize: 12, marginTop: 6 }}>✓ {receiptFile.name}</div>}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <Btn onClick={handleCreate} disabled={saving}>{saving ? "Saving..." : "Log Expense"}</Btn>
+            <Btn variant="ghost" onClick={() => setModal(false)}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+// ─── FINANCIAL REPORTS ────────────────────────────────────────────────────────
 
 
 const EventsView = ({ user, userRole }) => {

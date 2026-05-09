@@ -14535,13 +14535,26 @@ const EventIntelligenceReport = ({ event, user, onClose }) => {
 
   const load = async () => {
     setLoadingReport(true);
-    const { data, error } = await supabase.from("event_intelligence_reports").select("*").eq("project_id", event.id).maybeSingle();
-    if (data) {
-      setReport(data);
-      setForm(f => ({ ...f, ...data }));
-    } else {
-      const { data: newReport } = await supabase.from("event_intelligence_reports").insert({ project_id: event.id, status: "draft" }).select().single();
-      if (newReport) setReport(newReport);
+    try {
+      const { data } = await supabase.from("event_intelligence_reports").select("*").eq("project_id", event.id).maybeSingle();
+      if (data) {
+        setReport(data);
+        setForm(f => ({ ...f, ...data }));
+      } else {
+        // Create new report record
+        const { data: newReport, error: insertErr } = await supabase.from("event_intelligence_reports").insert({ project_id: event.id, status: "draft" }).select().single();
+        if (newReport) {
+          setReport(newReport);
+        } else {
+          // If insert fails (e.g. duplicate), try fetching again
+          const { data: existing } = await supabase.from("event_intelligence_reports").select("*").eq("project_id", event.id).maybeSingle();
+          if (existing) { setReport(existing); setForm(f => ({ ...f, ...existing })); }
+          else setReport({ id: null, project_id: event.id, status: "draft" });
+        }
+      }
+    } catch(e) {
+      console.error("Report load error:", e);
+      setReport({ id: null, project_id: event.id, status: "draft" });
     }
     setLoadingReport(false);
   };

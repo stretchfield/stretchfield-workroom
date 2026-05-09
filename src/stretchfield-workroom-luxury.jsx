@@ -14695,7 +14695,12 @@ const EventIntelligenceReport = ({ event, user, onClose }) => {
     setLoadingReport(false);
   };
 
-  useEffect(() => { load(); }, [event.id]);
+  useEffect(() => {
+    load();
+    // Fallback: if still loading after 5 seconds, force show UI
+    const timeout = setTimeout(() => setLoadingReport(false), 5000);
+    return () => clearTimeout(timeout);
+  }, [event.id]);
 
   const saveSection = async (section) => {
     if (!report) return;

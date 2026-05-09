@@ -15337,7 +15337,7 @@ Use professional, consultative language that positions Stretchfield as a strateg
         {sections.map(tab => (
           <button key={tab.id} onClick={() => setActiveSection(tab.id)} style={{ padding: "8px 14px", border: "none", background: "none", cursor: "pointer", color: activeSection === tab.id ? T.cyan : T.textMuted, fontWeight: activeSection === tab.id ? 800 : 400, fontSize: 12, borderBottom: activeSection === tab.id ? "2px solid " + T.cyan : "2px solid transparent", marginBottom: -1, whiteSpace: "nowrap" }}>{tab.label}</button>
         ))}
-      </div>}
+      </div>
 
       {/* Overview */}
       {activeSection === "overview" && (

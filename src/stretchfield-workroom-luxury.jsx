@@ -15175,6 +15175,8 @@ const PaymentAuthorisationView = ({ user }) => {
   const [awards, setAwards] = useState([]);
   const [rffs, setRffs] = useState([]);
   const [invoices, setInvoices] = useState([]);
+  const [vendorApps, setVendorApps] = useState([]);
+  const [vendorWarning, setVendorWarning] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [signModal, setSignModal] = useState(null);
   const [signature, setSignature] = useState("");
@@ -15198,18 +15200,20 @@ const PaymentAuthorisationView = ({ user }) => {
 
   const load = async () => {
     try {
-      const [au, vp, aw, rf, inv] = await Promise.all([
+      const [au, vp, aw, rf, inv, va] = await Promise.all([
         supabase.from("payment_authorisations").select("*").order("created_at", { ascending: false }),
         supabase.from("profiles").select("*").eq("role", "Vendor"),
         supabase.from("rff_awards").select("*").eq("status", "confirmed"),
         supabase.from("rffs").select("*"),
         supabase.from("vendor_invoices").select("*"),
+        supabase.from("vendor_apps").select("*"),
       ]);
       setAuths(au.data || []);
       setVendors(vp.data || []);
       setAwards(aw.data || []);
       setRffs(rf.data || []);
       setInvoices(inv.data || []);
+      setVendorApps(va.data || []);
     } catch(e) { console.error("PaymentAuth load error:", e); }
   };
 
@@ -15373,11 +15377,37 @@ const PaymentAuthorisationView = ({ user }) => {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
             <div>
               <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Vendor</label>
-              <select value={form.vendor_id} onChange={e => setForm(f => ({...f, vendor_id: e.target.value}))} style={{ ...inputStyle, appearance: "none" }}>
+              <select value={form.vendor_id} onChange={e => {
+                const vid = e.target.value;
+                const vApp = vendorApps.find(a => a.vendor_id === vid || a.linked_vendor_id === vid);
+                const vProfile = vendors.find(v => v.id === vid);
+                const hasBank = vApp?.bank_name && vApp?.account_number && vApp?.account_name;
+                const hasMomo = vApp?.mobile_money_number || vApp?.momo_number;
+                if (!hasBank && !hasMomo) {
+                  setVendorWarning("⚠ This vendor's payment details are incomplete. Please update their onboarding profile before proceeding.");
+                } else {
+                  setVendorWarning("");
+                }
+                setForm(f => ({
+                  ...f,
+                  vendor_id: vid,
+                  bank_name: vApp?.bank_name || "",
+                  account_number: vApp?.account_number || "",
+                  account_name: vApp?.account_name || vApp?.company_name || vProfile?.name || "",
+                  mobile_money_number: vApp?.mobile_money_number || vApp?.momo_number || "",
+                  payment_method: hasBank ? "bank_transfer" : hasMomo ? "mobile_money" : f.payment_method,
+                }));
+              }} style={{ ...inputStyle, appearance: "none" }}>
                 <option value="">Select vendor...</option>
                 {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
               </select>
             </div>
+            {vendorWarning && (
+              <div style={{ gridColumn: "1/-1", background: T.amber+"12", border: "1px solid " + T.amber+"40", borderRadius: 8, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                <span style={{ color: T.amber, fontSize: 13, fontWeight: 600 }}>{vendorWarning}</span>
+                <button onClick={() => window.open(BASE_URL + "?tab=vendor-onboarding", "_blank")} style={{ background: T.amber, border: "none", color: "#fff", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>Complete Profile →</button>
+              </div>
+            )}
             <div>
               <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Related RFF</label>
               <select value={form.rff_id} onChange={e => setForm(f => ({...f, rff_id: e.target.value}))} style={{ ...inputStyle, appearance: "none" }}>

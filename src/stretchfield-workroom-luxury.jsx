@@ -12933,10 +12933,10 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveSection(tab.id)} style={{ padding: "10px 18px", border: "none", background: "none", cursor: "pointer", color: activeSection === tab.id ? T.cyan : T.textMuted, fontWeight: activeSection === tab.id ? 800 : 400, fontSize: 13, borderBottom: activeSection === tab.id ? "2px solid " + T.cyan : "2px solid transparent", marginBottom: -1, transition: "all 0.15s" }}>{tab.label}</button>
         ))}
-      </div>
+      </div>}
 
       {/* Overview */}
-      {activeSection === "overview" && (
+      {!loadingReport && activeSection === "overview" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {myTasks.filter(t => t.status !== "completed").length > 0 && (
             <div style={{ background: T.surface, border: "1px solid " + T.border, borderRadius: 12, padding: "18px 20px" }}>
@@ -14515,6 +14515,7 @@ const ExpenseView = ({ user }) => {
 
 const EventIntelligenceReport = ({ event, user, onClose }) => {
   const [report, setReport] = useState(null);
+  const [loadingReport, setLoadingReport] = useState(true);
   const [activeSection, setActiveSection] = useState("overview");
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -14533,14 +14534,16 @@ const EventIntelligenceReport = ({ event, user, onClose }) => {
   const isVM = user.role === "Vendor Manager";
 
   const load = async () => {
-    const { data } = await supabase.from("event_intelligence_reports").select("*").eq("project_id", event.id).single();
+    setLoadingReport(true);
+    const { data, error } = await supabase.from("event_intelligence_reports").select("*").eq("project_id", event.id).maybeSingle();
     if (data) {
       setReport(data);
       setForm(f => ({ ...f, ...data }));
     } else {
       const { data: newReport } = await supabase.from("event_intelligence_reports").insert({ project_id: event.id, status: "draft" }).select().single();
-      setReport(newReport);
+      if (newReport) setReport(newReport);
     }
+    setLoadingReport(false);
   };
 
   useEffect(() => { load(); }, [event.id]);
@@ -14721,15 +14724,16 @@ Use professional, consultative language that positions Stretchfield as a strateg
         </div>
       </div>
 
+      {loadingReport && <div style={{ color: T.textMuted, textAlign: "center", padding: "30px 0" }}>Loading report...</div>}
       {/* Tabs */}
-      <div style={{ display: "flex", gap: 2, marginBottom: 20, borderBottom: "1px solid " + T.border, overflowX: "auto" }}>
+      {!loadingReport && <div style={{ display: "flex", gap: 2, marginBottom: 20, borderBottom: "1px solid " + T.border, overflowX: "auto" }}>
         {sections.map(tab => (
           <button key={tab.id} onClick={() => setActiveSection(tab.id)} style={{ padding: "8px 14px", border: "none", background: "none", cursor: "pointer", color: activeSection === tab.id ? T.cyan : T.textMuted, fontWeight: activeSection === tab.id ? 800 : 400, fontSize: 12, borderBottom: activeSection === tab.id ? "2px solid " + T.cyan : "2px solid transparent", marginBottom: -1, whiteSpace: "nowrap" }}>{tab.label}</button>
         ))}
-      </div>
+      </div>}
 
       {/* Overview */}
-      {activeSection === "overview" && (
+      {!loadingReport && activeSection === "overview" && (
         <div>
           <div style={{ background: "linear-gradient(135deg, " + T.bgDeep + ", " + T.surface + ")", border: "1px solid " + T.border, borderRadius: 14, padding: "20px 24px", marginBottom: 16 }}>
             <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>Report Status</div>
@@ -14758,7 +14762,7 @@ Use professional, consultative language that positions Stretchfield as a strateg
       )}
 
       {/* Operational Section - Strategy Lead */}
-      {activeSection === "operational" && (
+      {!loadingReport && activeSection === "operational" && (
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <div>
@@ -14805,7 +14809,7 @@ Use professional, consultative language that positions Stretchfield as a strateg
       )}
 
       {/* Audience Section - Strategy Lead */}
-      {activeSection === "audience" && (
+      {!loadingReport && activeSection === "audience" && (
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <div>
@@ -14878,7 +14882,7 @@ Use professional, consultative language that positions Stretchfield as a strateg
       )}
 
       {/* Vendor Section - VM */}
-      {activeSection === "vendor" && (
+      {!loadingReport && activeSection === "vendor" && (
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <div>
@@ -14925,7 +14929,7 @@ Use professional, consultative language that positions Stretchfield as a strateg
       )}
 
       {/* Strategic Section - CEO */}
-      {activeSection === "strategic" && (
+      {!loadingReport && activeSection === "strategic" && (
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <div>
@@ -14969,7 +14973,7 @@ Use professional, consultative language that positions Stretchfield as a strateg
       )}
 
       {/* Intelligence Summary */}
-      {activeSection === "intelligence" && (
+      {!loadingReport && activeSection === "intelligence" && (
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <div>

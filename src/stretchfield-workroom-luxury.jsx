@@ -16099,24 +16099,64 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
             {/* Signature Pad */}
             <div style={{ marginBottom: 16 }}>
               <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", marginBottom: 8 }}>Your Signature</div>
-              <div style={{ background: T.bg, border: "2px solid " + T.cyan+"40", borderRadius: 10, padding: 4, position: "relative" }}>
-                <canvas
-                  ref={canvasRef}
-                  width={440}
-                  height={140}
-                  style={{ display: "block", width: "100%", height: 140, cursor: "crosshair", borderRadius: 8, touchAction: "none" }}
-                  onMouseDown={startDraw}
-                  onMouseMove={draw}
-                  onMouseUp={stopDraw}
-                  onMouseLeave={stopDraw}
-                  onTouchStart={startDraw}
-                  onTouchMove={draw}
-                  onTouchEnd={stopDraw}
-                />
-                <div style={{ position: "absolute", bottom: 10, right: 12, color: T.textMuted, fontSize: 10, pointerEvents: "none" }}>Sign above</div>
-                <button onClick={clearSignature} style={{ position: "absolute", top: 8, right: 8, background: T.surface, border: "1px solid " + T.border, color: T.textMuted, padding: "3px 8px", borderRadius: 5, cursor: "pointer", fontSize: 10 }}>Clear</button>
+              {/* Saved signature option */}
+              {user.saved_signature && !signature && (
+                <div style={{ background: T.teal+"10", border: "1px solid "+T.teal+"30", borderRadius: 10, padding: "12px 14px", marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ color: T.teal, fontSize: 11, fontWeight: 700, marginBottom: 4 }}>Saved Signature Available</div>
+                    <img src={user.saved_signature} style={{ height: 40, maxWidth: 200, objectFit: "contain" }} alt="saved sig" />
+                  </div>
+                  <button onClick={() => setSignature(user.saved_signature)} style={{ background: "linear-gradient(135deg,"+T.teal+","+T.cyan+")", border: "none", color: "#fff", padding: "8px 16px", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Use This</button>
+                </div>
+              )}
+              {signature && signature === user.saved_signature ? (
+                <div style={{ background: T.teal+"10", border: "1px solid "+T.teal+"30", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
+                  <div style={{ color: T.teal, fontSize: 11, fontWeight: 700, marginBottom: 4 }}>✓ Using saved signature</div>
+                  <img src={signature} style={{ height: 50, maxWidth: 250, objectFit: "contain" }} alt="signature" />
+                  <button onClick={() => setSignature("")} style={{ display: "block", marginTop: 8, background: "none", border: "1px solid "+T.border, color: T.textMuted, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11 }}>Draw instead</button>
+                </div>
+              ) : (
+                <div style={{ background: T.bg, border: "2px solid " + T.cyan+"40", borderRadius: 10, padding: 4, position: "relative" }}>
+                  <canvas
+                    ref={canvasRef}
+                    width={440}
+                    height={140}
+                    style={{ display: "block", width: "100%", height: 140, cursor: "crosshair", borderRadius: 8, touchAction: "none" }}
+                    onMouseDown={startDraw}
+                    onMouseMove={draw}
+                    onMouseUp={stopDraw}
+                    onMouseLeave={stopDraw}
+                    onTouchStart={startDraw}
+                    onTouchMove={draw}
+                    onTouchEnd={stopDraw}
+                  />
+                  <div style={{ position: "absolute", bottom: 10, right: 12, color: T.textMuted, fontSize: 10, pointerEvents: "none" }}>Sign above</div>
+                  <button onClick={clearSignature} style={{ position: "absolute", top: 8, right: 8, background: T.surface, border: "1px solid " + T.border, color: T.textMuted, padding: "3px 8px", borderRadius: 5, cursor: "pointer", fontSize: 10 }}>Clear</button>
+                </div>
+              )}
+              {signature && signature !== user.saved_signature && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
+                  <div style={{ color: T.teal, fontSize: 11, fontWeight: 700 }}>✓ Signature captured</div>
+                  <button onClick={async () => {
+                    await supabase.from("profiles").update({ saved_signature: signature }).eq("id", user.id);
+                    user.saved_signature = signature;
+                    alert("Signature saved to your profile!");
+                  }} style={{ background: T.teal+"15", border: "1px solid "+T.teal+"30", color: T.teal, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>Save for future use</button>
+                </div>
+              )}
+              {/* Upload signature option */}
+              <div style={{ marginTop: 10 }}>
+                <label style={{ color: T.textMuted, fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ background: T.surface, border: "1px solid "+T.border, padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700 }}>↑ Upload Signature Image</span>
+                  <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = ev => setSignature(ev.target.result);
+                    reader.readAsDataURL(file);
+                  }} />
+                </label>
               </div>
-              {signature && <div style={{ color: T.teal, fontSize: 11, fontWeight: 700, marginTop: 4 }}>✓ Signature captured</div>}
             </div>
 
             <div style={{ marginBottom: 16 }}>

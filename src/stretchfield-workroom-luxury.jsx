@@ -4806,7 +4806,7 @@ const ImpactIntelligenceSummary = ({ user }) => {
     return { category: cat, count: catEvents.length, avgScore: avgCatScore, color: EVENT_ARCHETYPES[cat].color };
   }).filter(c => c.count > 0);
 
-  if (loading) return <div style={{ padding: "60px 0", textAlign: "center", color: T.textMuted, fontSize: 13 }}>Loading Impact Intelligence...</div>;
+  if (loading) return <div style={{ padding: '60px 0', textAlign: 'center', color: T.textMuted, fontSize: 13 }}>Loading Impact Intelligence...</div>;
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>

@@ -15177,6 +15177,9 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
   const [invoices, setInvoices] = useState([]);
   const [vendorApps, setVendorApps] = useState([]);
   const [vendorWarning, setVendorWarning] = useState("");
+  const [editVendorModal, setEditVendorModal] = useState(null);
+  const [editVendorForm, setEditVendorForm] = useState({});
+  const [savingVendor, setSavingVendor] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [signModal, setSignModal] = useState(null);
   const [signature, setSignature] = useState("");
@@ -15405,7 +15408,20 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
             {vendorWarning && (
               <div style={{ gridColumn: "1/-1", background: T.amber+"12", border: "1px solid " + T.amber+"40", borderRadius: 8, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                 <span style={{ color: T.amber, fontSize: 13, fontWeight: 600 }}>{vendorWarning}</span>
-                <button onClick={() => { setShowForm(false); onNavigate && onNavigate("vendor-onboarding"); }} style={{ background: T.amber, border: "none", color: "#fff", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>Complete Vendor Profile →</button>
+                <button onClick={() => {
+                  const vApp = vendorApps.find(a => a.vendor_id === form.vendor_id || a.linked_vendor_id === form.vendor_id);
+                  const vProfile = vendors.find(v => v.id === form.vendor_id);
+                  setEditVendorForm({
+                    id: vApp?.id || null,
+                    vendor_id: form.vendor_id,
+                    bank_name: vApp?.bank_name || "",
+                    account_number: vApp?.account_number || "",
+                    account_name: vApp?.account_name || vProfile?.name || "",
+                    mobile_money_number: vApp?.mobile_money_number || vApp?.momo_number || "",
+                    payment_terms: vApp?.payment_terms || "",
+                  });
+                  setEditVendorModal(vProfile || vApp);
+                }} style={{ background: T.amber, border: "none", color: "#fff", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>Edit Vendor Profile →</button>
               </div>
             )}
             <div>
@@ -15543,6 +15559,70 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
           );
         })}
       </div>
+
+      {/* Vendor Edit Modal */}
+      {editVendorModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 800, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setEditVendorModal(null)}>
+          <div style={{ background: T.surface, border: "1px solid " + T.amber+"40", borderRadius: 16, width: "100%", maxWidth: 480, padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Update Payment Details</div>
+            <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 20 }}>{editVendorModal.name || editVendorModal.company_name} — add bank or mobile money details</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
+              {[
+                ["bank_name", "Bank Name", "e.g. Absa Ghana"],
+                ["account_name", "Account Name", "Account holder name"],
+                ["account_number", "Account Number", "Account number"],
+                ["mobile_money_number", "Mobile Money Number", "e.g. 0244000000"],
+                ["payment_terms", "Payment Terms", "e.g. Net 7 days"],
+              ].map(([key, label, placeholder]) => (
+                <div key={key}>
+                  <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>{label}</label>
+                  <input value={editVendorForm[key] || ""} onChange={e => setEditVendorForm(f => ({...f, [key]: e.target.value}))} placeholder={placeholder} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={async () => {
+                setSavingVendor(true);
+                // Update vendor_apps if record exists, otherwise update profiles
+                if (editVendorForm.id) {
+                  await supabase.from("vendor_apps").update({
+                    bank_name: editVendorForm.bank_name,
+                    account_name: editVendorForm.account_name,
+                    account_number: editVendorForm.account_number,
+                    mobile_money_number: editVendorForm.mobile_money_number,
+                    payment_terms: editVendorForm.payment_terms,
+                  }).eq("id", editVendorForm.id);
+                } else {
+                  // Update profiles table
+                  await supabase.from("profiles").update({
+                    bank_name: editVendorForm.bank_name,
+                    account_name: editVendorForm.account_name,
+                    account_number: editVendorForm.account_number,
+                    mobile_money_number: editVendorForm.mobile_money_number,
+                  }).eq("id", editVendorForm.vendor_id);
+                }
+                // Auto-fill the payment form
+                const hasBank = editVendorForm.bank_name && editVendorForm.account_number && editVendorForm.account_name;
+                const hasMomo = editVendorForm.mobile_money_number;
+                setForm(f => ({
+                  ...f,
+                  bank_name: editVendorForm.bank_name || "",
+                  account_number: editVendorForm.account_number || "",
+                  account_name: editVendorForm.account_name || "",
+                  mobile_money_number: editVendorForm.mobile_money_number || "",
+                  payment_terms: editVendorForm.payment_terms || "",
+                  payment_method: hasBank ? "bank_transfer" : hasMomo ? "mobile_money" : f.payment_method,
+                }));
+                setVendorWarning("");
+                setSavingVendor(false);
+                setEditVendorModal(null);
+                load(); // Refresh vendor apps
+              }} disabled={savingVendor} style={{ flex: 1, background: "linear-gradient(135deg, " + T.cyan + ", " + T.teal + ")", border: "none", color: "#fff", padding: "11px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{savingVendor ? "Saving..." : "Save & Apply"}</button>
+              <button onClick={() => setEditVendorModal(null)} style={{ background: "none", border: "1px solid " + T.border, color: T.textMuted, padding: "11px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Signature Modal */}
       {signModal && (

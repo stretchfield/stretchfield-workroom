@@ -6411,19 +6411,26 @@ const NotificationsView = ({ user, onNavigate }) => {
       let resolvedTarget = "notifications";
       const t = note.title?.toLowerCase() || "";
       const m = note.message?.toLowerCase() || "";
-      if (t.includes("task") || t.includes("comment") || t.includes("replied")) resolvedTarget = "tasks";
+      // Map notifications to valid tab IDs
+      if (t.includes("task") || t.includes("comment") || t.includes("replied")) resolvedTarget = "events";
+      else if (t.includes("new task")) resolvedTarget = "events";
       else if (t.includes("rff approved") || t.includes("rff declined") || t.includes("rff resubmitted")) resolvedTarget = "vendors";
       else if (t.includes("vendor application") || t.includes("vendor onboarding")) resolvedTarget = "vendor-onboarding";
       else if (t.includes("quote submitted")) resolvedTarget = "quotes-received";
-      else if (t.includes("contract award") && t.includes("pending")) resolvedTarget = "contract-awards";
-      else if (t.includes("contract award confirmed") || t.includes("gig confirmed")) resolvedTarget = "purchase-orders";
-      else if (t.includes("purchase order")) resolvedTarget = "vendor-invoices-submit";
-      else if (t.includes("invoice received")) resolvedTarget = "vendor-invoices";
-      else if (t.includes("opportunity") || t.includes("crm")) resolvedTarget = "crm";
-      else if (t.includes("opportunity") || t.includes("converted")) resolvedTarget = "leads";
-      else if (t.includes("vendor assigned") || t.includes("new rff assignment")) resolvedTarget = "rffs";
+      else if (t.includes("contract award") || t.includes("gig confirmed")) resolvedTarget = "purchase-orders";
+      else if (t.includes("purchase order")) resolvedTarget = "purchase-orders";
+      else if (t.includes("payment authoris") || t.includes("payment request")) resolvedTarget = "payment-authorisation";
+      else if (t.includes("payment voucher") || t.includes("voucher")) resolvedTarget = "finance";
+      else if (t.includes("invoice")) resolvedTarget = "vendor-invoices";
+      else if (t.includes("intelligence report")) resolvedTarget = "events";
+      else if (t.includes("opportunity") || t.includes("lead won") || t.includes("crm")) resolvedTarget = "opportunities";
+      else if (t.includes("vendor assigned") || t.includes("new rff")) resolvedTarget = "vendors";
+      else if (t.includes("rff")) resolvedTarget = "vendors";
       else if (note.type === "rff") resolvedTarget = "vendors";
-      else if (note.type === "task") resolvedTarget = "tasks";
+      else if (note.type === "task") resolvedTarget = "events";
+      else if (note.type === "crm") resolvedTarget = "opportunities";
+      else if (note.type === "finance") resolvedTarget = "finance";
+      else resolvedTarget = "dashboard";
       onNavigate(resolvedTarget, note.resource_id || null);
     }
   };
@@ -9673,12 +9680,18 @@ const QuotesReceivedView = ({ user }) => {
                           </div>
                         ))}
 
+                        {/* Go to Compare button */}
+                        {quotedAssignments.length > 0 && (
+                          <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
+                            <a href={BASE_URL + "?tab=quote-comparison"} onClick={e => { e.preventDefault(); }} style={{ background: "linear-gradient(135deg," + T.cyan + "," + T.teal + ")", border: "none", color: "#fff", padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, textDecoration: "none", display: "inline-block" }}>Go to Quote Comparison & Award →</a>
+                          </div>
+                        )}
                         {/* Summary */}
-                        {filteredAssignments.length > 0 && (
+                        {quotedAssignments.length > 0 && (
                           <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${T.border}44`, display: "flex", gap: 20 }}>
-                            <span style={{ color: T.textMuted, fontSize: 12 }}>Lowest: <strong style={{ color: T.teal }}>GHS {Math.min(...quotedAssignments.map(a => a.quote_amount)).toLocaleString()}</strong></span>
-                            <span style={{ color: T.textMuted, fontSize: 12 }}>Highest: <strong style={{ color: T.amber }}>GHS {Math.max(...quotedAssignments.map(a => a.quote_amount)).toLocaleString()}</strong></span>
-                            <span style={{ color: T.textMuted, fontSize: 12 }}>Avg: <strong style={{ color: T.cyan }}>GHS {Math.round(quotedAssignments.reduce((s,a) => s + a.quote_amount, 0) / quotedAssignments.length).toLocaleString()}</strong></span>
+                            <span style={{ color: T.textMuted, fontSize: 12 }}>Lowest: <strong style={{ color: T.teal }}>GHS {Math.min(...quotedAssignments.map(a => parseFloat(a.quote_amount))).toLocaleString()}</strong></span>
+                            <span style={{ color: T.textMuted, fontSize: 12 }}>Highest: <strong style={{ color: T.amber }}>GHS {Math.max(...quotedAssignments.map(a => parseFloat(a.quote_amount))).toLocaleString()}</strong></span>
+                            <span style={{ color: T.textMuted, fontSize: 12 }}>Avg: <strong style={{ color: T.cyan }}>GHS {Math.round(quotedAssignments.reduce((s,a) => s + parseFloat(a.quote_amount), 0) / quotedAssignments.length).toLocaleString()}</strong></span>
                           </div>
                         )}
                       </div>

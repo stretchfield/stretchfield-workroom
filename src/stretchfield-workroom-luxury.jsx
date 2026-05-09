@@ -6530,26 +6530,50 @@ const NotificationsView = ({ user, onNavigate }) => {
       let resolvedTarget = "notifications";
       const t = note.title?.toLowerCase() || "";
       const m = note.message?.toLowerCase() || "";
-      // Map notifications to valid tab IDs
-      if (t.includes("task") || t.includes("comment") || t.includes("replied")) resolvedTarget = "events";
-      else if (t.includes("new task")) resolvedTarget = "events";
-      else if (t.includes("rff approved") || t.includes("rff declined") || t.includes("rff resubmitted")) resolvedTarget = "vendors";
-      else if (t.includes("vendor application") || t.includes("vendor onboarding")) resolvedTarget = "vendor-onboarding";
-      else if (t.includes("quote submitted")) resolvedTarget = "quotes-received";
-      else if (t.includes("contract award") || t.includes("gig confirmed")) resolvedTarget = "purchase-orders";
-      else if (t.includes("purchase order")) resolvedTarget = "purchase-orders";
-      else if (t.includes("payment authoris") || t.includes("payment request")) resolvedTarget = "payment-authorisation";
-      else if (t.includes("payment voucher") || t.includes("voucher")) resolvedTarget = "finance";
-      else if (t.includes("invoice")) resolvedTarget = "vendor-invoices";
-      else if (t.includes("intelligence report")) resolvedTarget = "events";
-      else if (t.includes("opportunity") || t.includes("lead won") || t.includes("crm")) resolvedTarget = "opportunities";
-      else if (t.includes("vendor assigned") || t.includes("new rff")) resolvedTarget = "vendors";
-      else if (t.includes("rff")) resolvedTarget = "vendors";
-      else if (note.type === "rff") resolvedTarget = "vendors";
-      else if (note.type === "task") resolvedTarget = "events";
-      else if (note.type === "crm") resolvedTarget = "opportunities";
-      else if (note.type === "finance") resolvedTarget = "finance";
-      else resolvedTarget = "dashboard";
+      const role = user?.role || "";
+
+      // Smart routing based on role + notification type
+      if (t.includes("new task") || t.includes("task assigned")) {
+        resolvedTarget = "events"; // Task is in event portal
+      } else if (t.includes("rff approved") || t.includes("rff declined")) {
+        resolvedTarget = role === "Vendor Manager" ? "vendors" : "vendors";
+      } else if (t.includes("quote submitted") || t.includes("quotes received")) {
+        resolvedTarget = "quotes-received";
+      } else if (t.includes("new rff assignment") || t.includes("request for quote")) {
+        resolvedTarget = role === "Vendor" ? "dashboard" : "vendor-assignment";
+      } else if (t.includes("contract award") || t.includes("gig confirmed")) {
+        resolvedTarget = role === "Finance Manager" ? "purchase-orders" : "purchase-orders";
+      } else if (t.includes("purchase order")) {
+        resolvedTarget = role === "Vendor" ? "dashboard" : "purchase-orders";
+      } else if (t.includes("payment authoris") || t.includes("payment request") || t.includes("awaiting your signature")) {
+        resolvedTarget = "payment-authorisation";
+      } else if (t.includes("voucher approved") || t.includes("payment voucher")) {
+        resolvedTarget = role === "Finance Manager" ? "finance" : "finance";
+      } else if (t.includes("invoice") && role === "Vendor") {
+        resolvedTarget = "dashboard";
+      } else if (t.includes("invoice")) {
+        resolvedTarget = "vendor-invoices";
+      } else if (t.includes("intelligence report") || t.includes("report section")) {
+        resolvedTarget = "events";
+      } else if (t.includes("lead won") || t.includes("approval required")) {
+        resolvedTarget = "opportunities";
+      } else if (t.includes("change order") || t.includes("contract amendment")) {
+        resolvedTarget = role === "Vendor" ? "dashboard" : "quote-comparison";
+      } else if (t.includes("scorecard") || t.includes("performance review")) {
+        resolvedTarget = role === "Vendor" ? "dashboard" : "scorecards";
+      } else if (t.includes("leave")) {
+        resolvedTarget = "dashboard";
+      } else if (note.type === "rff") {
+        resolvedTarget = role === "Vendor" ? "dashboard" : "vendors";
+      } else if (note.type === "task") {
+        resolvedTarget = "events";
+      } else if (note.type === "crm") {
+        resolvedTarget = "opportunities";
+      } else if (note.type === "finance") {
+        resolvedTarget = "finance";
+      } else {
+        resolvedTarget = "dashboard";
+      }
       onNavigate(resolvedTarget, note.resource_id || null);
     }
   };

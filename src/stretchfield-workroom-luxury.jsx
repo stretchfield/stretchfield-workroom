@@ -5459,6 +5459,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "finance-approvals": return <FinanceApprovalsView user={currentUser} />;
       case "scorecards": return <VendorScorecardsView user={currentUser} />;
       case "vendor-analytics": return <VendorAnalyticsView user={currentUser} />;
+      case "payment-authorisation": return <PaymentAuthorisationView user={currentUser} />;
       case "vendor-ratings": return <VendorRatingsView user={currentUser} />;
       case "rff-approvals": return <RFFApprovalsView user={currentUser} />;
       case "vendor-assignment": return <VendorAssignmentView user={currentUser} />;

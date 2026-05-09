@@ -812,6 +812,7 @@ const getNavItems = (role) => {
         { id: "purchase-orders", label: "Purchase Orders" },
         { id: "vendor-invoices", label: "Vendor Invoices" },
             { id: "payment-authorisation", label: "Payment Authorisation" },
+            { id: "budget-vs-actuals", label: "Budget vs Actuals" },
         { id: "zoho-books", label: "Zoho Books" },
       ]},
       { id: "grp-clients", label: "Clients", group: true, children: [
@@ -832,7 +833,7 @@ const getNavItems = (role) => {
     ];
   }
   if (role === "Vendor Manager") {
-    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quotes-received", label: "Quotes Received", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" }, { id: "vendor-analytics", label: "Vendor Analytics", icon: "▪" }, { id: "payment-authorisation", label: "Payment Authorisation", icon: "▪" });
+    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quotes-received", label: "Quotes Received", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" }, { id: "vendor-analytics", label: "Vendor Analytics", icon: "▪" }, { id: "payment-authorisation", label: "Payment Authorisation", icon: "▪" }, { id: "budget-vs-actuals", label: "Budget vs Actuals", icon: "▪" });
   }
   if (["CEO","Country Manager","Vendor Manager","Finance Manager"].includes(role)) {
     base.push({ id: "invoices", label: "Invoices", icon: "▪" });
@@ -5590,6 +5591,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "scorecards": return <VendorScorecardsView user={currentUser} />;
       case "vendor-analytics": return <VendorAnalyticsView user={currentUser} />;
       case "payment-authorisation": return <PaymentAuthorisationView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
+      case "budget-vs-actuals": return <BudgetVsActualsView user={currentUser} />;
       case "vendor-ratings": return <VendorRatingsView user={currentUser} />;
       case "rff-approvals": return <RFFApprovalsView user={currentUser} />;
       case "vendor-assignment": return <VendorAssignmentView user={currentUser} />;
@@ -16127,6 +16129,204 @@ const EmailTestPanel = ({ user }) => {
           <strong style={{ color: T.textPrimary }}>Email Infrastructure:</strong> All emails are sent via Resend using the verified domain <strong style={{ color: T.cyan }}>stretchfield.com</strong>. Sender address is <strong style={{ color: T.cyan }}>info@stretchfield.com</strong>. Check your spam folder if emails don't arrive within 2 minutes.
         </div>
       </div>
+    </div>
+  );
+};
+
+const BudgetVsActualsView = ({ user }) => {
+  const [events, setEvents] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [budgets, setBudgets] = useState([]);
+  const [pos, setPos] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [vouchers, setVouchers] = useState([]);
+  const [awards, setAwards] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    supabase.from("projects").select("*").not("event_category","is",null).order("event_date",{ascending:false}).then(({data}) => setEvents(data||[]));
+  }, []);
+
+  const loadEvent = async (eventId) => {
+    setLoading(true);
+    const [b, p, inv, v, aw] = await Promise.all([
+      supabase.from("rff_budgets").select("*,rffs(id,title,project_id)").eq("rffs.project_id", eventId),
+      supabase.from("purchase_orders").select("*").eq("event_id", eventId),
+      supabase.from("vendor_invoices").select("*").eq("event_id", eventId),
+      supabase.from("payment_vouchers").select("*").eq("project_id", eventId),
+      supabase.from("rff_awards").select("*,rffs(project_id)").eq("rffs.project_id", eventId),
+    ]);
+    // Also get budgets directly from rffs linked to this project
+    const { data: rffs } = await supabase.from("rffs").select("id").eq("project_id", eventId);
+    const rffIds = (rffs||[]).map(r => r.id);
+    let allBudgets = [];
+    if (rffIds.length > 0) {
+      const { data: bd } = await supabase.from("rff_budgets").select("*").in("rff_id", rffIds);
+      allBudgets = bd || [];
+    }
+    setBudgets(allBudgets);
+    setPos(p.data||[]);
+    setInvoices(inv.data||[]);
+    setVouchers(v.data||[]);
+    setAwards(aw.data||[]);
+    setLoading(false);
+  };
+
+  const totalBudget = budgets.reduce((s,b) => s + (parseFloat(b.proposed_amount)||0), 0);
+  const totalCommitted = pos.reduce((s,p) => s + (parseFloat(p.amount)||0), 0);
+  const totalInvoiced = invoices.reduce((s,i) => s + (parseFloat(i.amount)||0), 0);
+  const totalPaid = invoices.filter(i=>i.status==="paid").reduce((s,i) => s + (parseFloat(i.amount)||0), 0);
+  const totalVouchers = vouchers.reduce((s,v) => s + (parseFloat(v.amount)||0), 0);
+  const variance = totalBudget - totalCommitted;
+  const variancePct = totalBudget ? Math.round((variance/totalBudget)*100) : 0;
+
+  // Group by category
+  const categories = [...new Set(budgets.map(b => b.category))];
+
+  const inputStyle = { width:"100%", padding:"9px 12px", background:T.bg, border:"1px solid "+T.border, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", appearance:"none", boxSizing:"border-box" };
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:"1px solid "+T.border }}>
+        <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Finance</div>
+        <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Budget vs Actuals</h2>
+        <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Per-event budget tracking — committed spend vs actual invoiced vs paid</div>
+      </div>
+
+      {/* Event selector */}
+      <div style={{ marginBottom:20 }}>
+        <select value={selectedEvent?.id||""} onChange={e => {
+          const ev = events.find(ev => ev.id === e.target.value);
+          setSelectedEvent(ev||null);
+          if (ev) loadEvent(ev.id);
+        }} style={inputStyle}>
+          <option value="">Select an event...</option>
+          {events.map(e => <option key={e.id} value={e.id}>{e.name} {e.event_date ? "· "+new Date(e.event_date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}) : ""}</option>)}
+        </select>
+      </div>
+
+      {loading && <div style={{ color:T.textMuted, textAlign:"center", padding:"40px 0" }}>Loading...</div>}
+
+      {selectedEvent && !loading && (
+        <>
+          {/* KPI Strip */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))", gap:12, marginBottom:24 }}>
+            {[
+              { label:"Total Budget", value:"GHS "+totalBudget.toLocaleString(), color:T.cyan },
+              { label:"Committed (POs)", value:"GHS "+totalCommitted.toLocaleString(), color:T.amber },
+              { label:"Invoiced", value:"GHS "+totalInvoiced.toLocaleString(), color:T.magenta },
+              { label:"Paid Out", value:"GHS "+totalPaid.toLocaleString(), color:T.teal },
+              { label:"Variance", value:(variance >= 0 ? "+" : "")+variance.toLocaleString(), color:variance >= 0 ? T.teal : T.red },
+            ].map(k => (
+              <div key={k.label} style={{ padding:"14px 16px", background:T.surface, border:"1px solid "+T.border, borderTop:"2px solid "+k.color, borderRadius:10 }}>
+                <div style={{ color:k.color, fontSize:16, fontWeight:900 }}>{k.value}</div>
+                <div style={{ color:T.textMuted, fontSize:10, fontWeight:600, marginTop:4, textTransform:"uppercase" }}>{k.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Budget utilisation bar */}
+          {totalBudget > 0 && (
+            <div style={{ background:T.surface, border:"1px solid "+T.border, borderRadius:12, padding:"18px 20px", marginBottom:20 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
+                <span style={{ color:T.textPrimary, fontWeight:700, fontSize:13 }}>Budget Utilisation</span>
+                <span style={{ color:totalCommitted > totalBudget ? T.red : T.teal, fontWeight:800, fontSize:13 }}>{Math.round((totalCommitted/totalBudget)*100)}% committed</span>
+              </div>
+              <div style={{ height:10, background:T.border+"44", borderRadius:5, overflow:"hidden" }}>
+                <div style={{ height:"100%", width:Math.min(100, Math.round((totalCommitted/totalBudget)*100))+"%", background:totalCommitted > totalBudget ? T.red : "linear-gradient(90deg,"+T.cyan+","+T.teal+")", borderRadius:5, transition:"width 0.6s ease" }} />
+              </div>
+              <div style={{ display:"flex", justifyContent:"space-between", marginTop:6, fontSize:11, color:T.textMuted }}>
+                <span>GHS 0</span>
+                <span>Budget: GHS {totalBudget.toLocaleString()}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Category breakdown */}
+          {categories.length > 0 ? (
+            <div style={{ background:T.surface, border:"1px solid "+T.border, borderRadius:12, overflow:"hidden", marginBottom:20 }}>
+              <div style={{ padding:"14px 20px", borderBottom:"1px solid "+T.border }}>
+                <div style={{ color:T.textPrimary, fontWeight:800, fontSize:14 }}>Category Breakdown</div>
+              </div>
+              <div style={{ overflowX:"auto" }}>
+                <table style={{ width:"100%", borderCollapse:"collapse", minWidth:700 }}>
+                  <thead>
+                    <tr style={{ background:T.bgDeep }}>
+                      {["Category","Budgeted","Committed (PO)","Invoiced","Paid","Variance","Status"].map(h => (
+                        <th key={h} style={{ padding:"10px 14px", textAlign:"left", color:T.textMuted, fontSize:10, fontWeight:800, textTransform:"uppercase", borderBottom:"1px solid "+T.border }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categories.map((cat, i) => {
+                      const catBudget = budgets.filter(b=>b.category===cat).reduce((s,b)=>s+(parseFloat(b.proposed_amount)||0),0);
+                      const catPOs = pos.filter(p => {
+                        const award = awards.find(a => a.id === p.rff_award_id);
+                        return award?.category === cat;
+                      }).reduce((s,p)=>s+(parseFloat(p.amount)||0),0);
+                      const catInvoiced = invoices.filter(inv => inv.category === cat).reduce((s,i)=>s+(parseFloat(i.amount)||0),0);
+                      const catPaid = invoices.filter(inv => inv.category === cat && inv.status==="paid").reduce((s,i)=>s+(parseFloat(i.amount)||0),0);
+                      const catVariance = catBudget - catPOs;
+                      const pct = catBudget ? Math.round((catPOs/catBudget)*100) : 0;
+                      const status = catPOs === 0 ? "unspent" : catPOs > catBudget ? "over" : pct > 80 ? "near-limit" : "on-track";
+                      const statusColors = { unspent:T.textMuted, over:T.red, "near-limit":T.amber, "on-track":T.teal };
+                      return (
+                        <tr key={cat} style={{ borderBottom:i<categories.length-1?"1px solid "+T.border+"22":"none" }}>
+                          <td style={{ padding:"12px 14px", color:T.textPrimary, fontWeight:700, fontSize:13 }}>{cat}</td>
+                          <td style={{ padding:"12px 14px", color:T.textSecondary, fontSize:13 }}>GHS {catBudget.toLocaleString()}</td>
+                          <td style={{ padding:"12px 14px", color:T.amber, fontSize:13, fontWeight:catPOs>0?700:400 }}>{catPOs > 0 ? "GHS "+catPOs.toLocaleString() : "—"}</td>
+                          <td style={{ padding:"12px 14px", color:T.magenta, fontSize:13, fontWeight:catInvoiced>0?700:400 }}>{catInvoiced > 0 ? "GHS "+catInvoiced.toLocaleString() : "—"}</td>
+                          <td style={{ padding:"12px 14px", color:T.teal, fontSize:13, fontWeight:catPaid>0?700:400 }}>{catPaid > 0 ? "GHS "+catPaid.toLocaleString() : "—"}</td>
+                          <td style={{ padding:"12px 14px", color:catVariance>=0?T.teal:T.red, fontWeight:700, fontSize:13 }}>{catVariance>=0?"+":""}{catVariance.toLocaleString()}</td>
+                          <td style={{ padding:"12px 14px" }}>
+                            <span style={{ color:statusColors[status], fontSize:10, fontWeight:800, background:statusColors[status]+"15", padding:"2px 8px", borderRadius:20, textTransform:"uppercase" }}>{status}</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ background:T.bgDeep, borderTop:"2px solid "+T.border }}>
+                      <td style={{ padding:"12px 14px", color:T.textMuted, fontWeight:800, fontSize:12, textTransform:"uppercase" }}>Total</td>
+                      <td style={{ padding:"12px 14px", color:T.cyan, fontWeight:900, fontSize:13 }}>GHS {totalBudget.toLocaleString()}</td>
+                      <td style={{ padding:"12px 14px", color:T.amber, fontWeight:900, fontSize:13 }}>GHS {totalCommitted.toLocaleString()}</td>
+                      <td style={{ padding:"12px 14px", color:T.magenta, fontWeight:900, fontSize:13 }}>{totalInvoiced>0?"GHS "+totalInvoiced.toLocaleString():"—"}</td>
+                      <td style={{ padding:"12px 14px", color:T.teal, fontWeight:900, fontSize:13 }}>{totalPaid>0?"GHS "+totalPaid.toLocaleString():"—"}</td>
+                      <td style={{ padding:"12px 14px", color:variance>=0?T.teal:T.red, fontWeight:900, fontSize:13 }}>{variance>=0?"+":""}{variance.toLocaleString()}</td>
+                      <td />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div style={{ textAlign:"center", padding:"40px", color:T.textMuted, background:T.surface, borderRadius:12, border:"1px solid "+T.border }}>No budget lines found for this event. Budget lines are created when RFFs are raised and approved.</div>
+          )}
+
+          {/* Vouchers */}
+          {vouchers.length > 0 && (
+            <div style={{ background:T.surface, border:"1px solid "+T.border, borderRadius:12, padding:"18px 20px" }}>
+              <div style={{ color:T.textPrimary, fontWeight:800, fontSize:14, marginBottom:12 }}>Payment Vouchers</div>
+              {vouchers.map(v => (
+                <div key={v.id} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:"1px solid "+T.border+"22" }}>
+                  <div>
+                    <div style={{ color:T.textPrimary, fontWeight:600, fontSize:13 }}>{v.voucher_number} — {v.payee}</div>
+                    <div style={{ color:T.textMuted, fontSize:11 }}>{v.description}</div>
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ color:T.amber, fontWeight:700, fontSize:13 }}>GHS {parseFloat(v.amount||0).toLocaleString()}</div>
+                    <div style={{ color:v.status==="paid"?T.teal:T.amber, fontSize:10, fontWeight:700 }}>{v.status}</div>
+                  </div>
+                </div>
+              ))}
+              <div style={{ marginTop:10, padding:"10px 0", borderTop:"1px solid "+T.border, display:"flex", justifyContent:"space-between" }}>
+                <span style={{ color:T.textMuted, fontSize:12, fontWeight:700 }}>Total Vouchers</span>
+                <span style={{ color:T.amber, fontWeight:900, fontSize:14 }}>GHS {totalVouchers.toLocaleString()}</span>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };

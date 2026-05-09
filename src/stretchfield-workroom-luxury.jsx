@@ -5589,7 +5589,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "finance-approvals": return <FinanceApprovalsView user={currentUser} />;
       case "scorecards": return <VendorScorecardsView user={currentUser} />;
       case "vendor-analytics": return <VendorAnalyticsView user={currentUser} />;
-      case "payment-authorisation": return <PaymentAuthorisationView user={currentUser} />;
+      case "payment-authorisation": return <PaymentAuthorisationView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
       case "vendor-ratings": return <VendorRatingsView user={currentUser} />;
       case "rff-approvals": return <RFFApprovalsView user={currentUser} />;
       case "vendor-assignment": return <VendorAssignmentView user={currentUser} />;
@@ -15169,7 +15169,7 @@ Use professional, consultative language that positions Stretchfield as a strateg
   );
 };
 
-const PaymentAuthorisationView = ({ user }) => {
+const PaymentAuthorisationView = ({ user, onNavigate }) => {
   const [auths, setAuths] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [awards, setAwards] = useState([]);
@@ -15405,7 +15405,7 @@ const PaymentAuthorisationView = ({ user }) => {
             {vendorWarning && (
               <div style={{ gridColumn: "1/-1", background: T.amber+"12", border: "1px solid " + T.amber+"40", borderRadius: 8, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                 <span style={{ color: T.amber, fontSize: 13, fontWeight: 600 }}>{vendorWarning}</span>
-                <button onClick={() => window.open(BASE_URL + "?tab=vendor-onboarding", "_blank")} style={{ background: T.amber, border: "none", color: "#fff", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>Complete Profile →</button>
+                <button onClick={() => { setShowForm(false); onNavigate && onNavigate("vendor-onboarding"); }} style={{ background: T.amber, border: "none", color: "#fff", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>Complete Vendor Profile →</button>
               </div>
             )}
             <div>

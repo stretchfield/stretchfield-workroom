@@ -1901,15 +1901,17 @@ const VendorDashboard = ({ user }) => {
   const [invoices, setInvoices] = useState([]);
   const [awards, setAwards] = useState([]);
   const [profile, setProfile] = useState(null);
+  const [pos, setPOs] = useState([]);
 
   const load = async () => {
-    const [asn, tk, sc, inv, aw, pr] = await Promise.all([
+    const [asn, tk, sc, inv, aw, pr, po] = await Promise.all([
       supabase.from("rff_vendor_assignments").select("*, rffs(id,title,event_name,status,quote_deadline)").eq("vendor_id", user.id).order("created_at", { ascending: false }),
       supabase.from("tasks").select("*").eq("assignee_id", user.id).order("created_at", { ascending: false }),
       supabase.from("vendor_scorecards").select("*").eq("vendor_id", user.id).order("created_at", { ascending: false }),
       supabase.from("vendor_invoices").select("*").eq("vendor_id", user.id).order("created_at", { ascending: false }),
       supabase.from("rff_awards").select("*").eq("vendor_id", user.id),
       supabase.from("profiles").select("*").eq("id", user.id).single(),
+      supabase.from("purchase_orders").select("id,internal_po_number,event_name,amount,currency,status,notes,created_at,rff_id").eq("vendor_id", user.id).order("created_at", { ascending: false }),
     ]);
     setAssignments(asn.data || []);
     setRffs((asn.data || []).map(a => a.rffs).filter(Boolean));
@@ -1918,6 +1920,7 @@ const VendorDashboard = ({ user }) => {
     setInvoices(inv.data || []);
     setAwards(aw.data || []);
     setProfile(pr.data || null);
+    setPOs(po.data || []);
   };
 
   useEffect(() => { load(); }, [user.id]);
@@ -2021,6 +2024,44 @@ const VendorDashboard = ({ user }) => {
                       )}
                     </div>
                     <span style={{ color: statusColors[a.status] || T.textMuted, fontSize: 10, fontWeight: 700, background: (statusColors[a.status] || T.textMuted)+"18", padding: "3px 10px", borderRadius: 20 }}>{statusLabels[a.status] || a.status}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Purchase Orders */}
+      {pos.length > 0 && (
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px", marginBottom: 20 }}>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 14 }}>Purchase Orders</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {pos.map(po => {
+              const statusColors = { draft: T.textMuted, sent: T.cyan, invoiced: T.amber, paid: T.teal };
+              const statusColor = statusColors[po.status] || T.textMuted;
+              return (
+                <div key={po.id} style={{ background: T.bg, border: "1px solid " + T.border, borderLeft: "3px solid " + statusColor, borderRadius: 10, padding: "14px 16px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                    <div>
+                      <div style={{ color: T.cyan, fontWeight: 800, fontSize: 14 }}>{po.internal_po_number || "PO-" + po.id?.slice(0,8)}</div>
+                      <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600, marginTop: 2 }}>{po.event_name}</div>
+                      {po.notes && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3, fontStyle: "italic" }}>{po.notes}</div>}
+                      <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>Issued: {new Date(po.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ color: T.gold, fontWeight: 900, fontSize: 18 }}>{po.currency || "GHS"} {parseFloat(po.amount||0).toLocaleString()}</div>
+                      <span style={{ color: statusColor, fontSize: 10, fontWeight: 800, background: statusColor+"18", padding: "2px 8px", borderRadius: 20, display: "inline-block", marginTop: 4, textTransform: "uppercase" }}>{po.status}</span>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <button onClick={() => {
+                      const poData = { ...po, vendor_name: user.name };
+                      downloadPDF(generatePOPDF(poData, { name: user.name, email: user.email }, { title: po.rff_title }, { name: po.event_name, event_date: null, client: "" }), "PO-" + (po.internal_po_number||po.id) + ".html");
+                    }} style={{ background: T.cyan+"15", border: "1px solid " + T.cyan+"30", color: T.cyan, padding: "6px 14px", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>↓ Download PO</button>
+                    {po.status !== "paid" && (
+                      <button onClick={() => {}} style={{ background: T.teal+"15", border: "1px solid " + T.teal+"30", color: T.teal, padding: "6px 14px", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Submit Invoice →</button>
+                    )}
                   </div>
                 </div>
               );

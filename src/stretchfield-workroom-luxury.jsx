@@ -14515,7 +14515,7 @@ const ExpenseView = ({ user }) => {
 
 const EventIntelligenceReport = ({ event, user, onClose }) => {
   const [report, setReport] = useState(null);
-  const [loadingReport, setLoadingReport] = useState(true);
+  const [loadingReport, setLoadingReport] = useState(false);
   const [activeSection, setActiveSection] = useState("overview");
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -14707,12 +14707,6 @@ Use professional, consultative language that positions Stretchfield as a strateg
     { id: "strategic", label: "Strategic" + (report?.ceo_submitted_at ? " ✓" : "") },
     { id: "intelligence", label: "Intelligence Summary" },
   ];
-
-  if (loadingReport) return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "60px 0", color: T.textMuted, fontSize: 13 }}>
-      Loading Intelligence Report...
-    </div>
-  );
 
   return (
     <div style={{ animation: "fadeUp 0.3s ease" }}>

@@ -12933,7 +12933,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveSection(tab.id)} style={{ padding: "10px 18px", border: "none", background: "none", cursor: "pointer", color: activeSection === tab.id ? T.cyan : T.textMuted, fontWeight: activeSection === tab.id ? 800 : 400, fontSize: 13, borderBottom: activeSection === tab.id ? "2px solid " + T.cyan : "2px solid transparent", marginBottom: -1, transition: "all 0.15s" }}>{tab.label}</button>
         ))}
-      </div>}
+      </div>
 
       {/* Overview */}
       {activeSection === "overview" && (
@@ -14695,6 +14695,12 @@ Use professional, consultative language that positions Stretchfield as a strateg
     { id: "intelligence", label: "Intelligence Summary" },
   ];
 
+  if (loadingReport) return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "60px 0", color: T.textMuted, fontSize: 13 }}>
+      Loading Intelligence Report...
+    </div>
+  );
+
   return (
     <div style={{ animation: "fadeUp 0.3s ease" }}>
       {/* Header */}
@@ -14724,16 +14730,15 @@ Use professional, consultative language that positions Stretchfield as a strateg
         </div>
       </div>
 
-      {loadingReport && <div style={{ color: T.textMuted, textAlign: "center", padding: "30px 0" }}>Loading report...</div>}
       {/* Tabs */}
-      {!loadingReport && <div style={{ display: "flex", gap: 2, marginBottom: 20, borderBottom: "1px solid " + T.border, overflowX: "auto" }}>
+      <div style={{ display: "flex", gap: 2, marginBottom: 20, borderBottom: "1px solid " + T.border, overflowX: "auto" }}>
         {sections.map(tab => (
           <button key={tab.id} onClick={() => setActiveSection(tab.id)} style={{ padding: "8px 14px", border: "none", background: "none", cursor: "pointer", color: activeSection === tab.id ? T.cyan : T.textMuted, fontWeight: activeSection === tab.id ? 800 : 400, fontSize: 12, borderBottom: activeSection === tab.id ? "2px solid " + T.cyan : "2px solid transparent", marginBottom: -1, whiteSpace: "nowrap" }}>{tab.label}</button>
         ))}
       </div>}
 
       {/* Overview */}
-      {!loadingReport && activeSection === "overview" && (
+      {activeSection === "overview" && (
         <div>
           <div style={{ background: "linear-gradient(135deg, " + T.bgDeep + ", " + T.surface + ")", border: "1px solid " + T.border, borderRadius: 14, padding: "20px 24px", marginBottom: 16 }}>
             <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>Report Status</div>
@@ -14762,7 +14767,7 @@ Use professional, consultative language that positions Stretchfield as a strateg
       )}
 
       {/* Operational Section - Strategy Lead */}
-      {!loadingReport && activeSection === "operational" && (
+      {activeSection === "operational" && (
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <div>
@@ -14809,7 +14814,7 @@ Use professional, consultative language that positions Stretchfield as a strateg
       )}
 
       {/* Audience Section - Strategy Lead */}
-      {!loadingReport && activeSection === "audience" && (
+      {activeSection === "audience" && (
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <div>
@@ -14882,7 +14887,7 @@ Use professional, consultative language that positions Stretchfield as a strateg
       )}
 
       {/* Vendor Section - VM */}
-      {!loadingReport && activeSection === "vendor" && (
+      {activeSection === "vendor" && (
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <div>
@@ -14929,7 +14934,7 @@ Use professional, consultative language that positions Stretchfield as a strateg
       )}
 
       {/* Strategic Section - CEO */}
-      {!loadingReport && activeSection === "strategic" && (
+      {activeSection === "strategic" && (
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <div>
@@ -14973,7 +14978,7 @@ Use professional, consultative language that positions Stretchfield as a strateg
       )}
 
       {/* Intelligence Summary */}
-      {!loadingReport && activeSection === "intelligence" && (
+      {activeSection === "intelligence" && (
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <div>

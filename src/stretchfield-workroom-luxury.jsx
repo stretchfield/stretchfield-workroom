@@ -1911,7 +1911,7 @@ const VendorDashboard = ({ user }) => {
       supabase.from("vendor_invoices").select("*").eq("vendor_id", user.id).order("created_at", { ascending: false }),
       supabase.from("rff_awards").select("*").eq("vendor_id", user.id),
       supabase.from("profiles").select("*").eq("id", user.id).single(),
-      supabase.from("purchase_orders").select("id,internal_po_number,event_name,amount,currency,status,notes,created_at,rff_id").eq("vendor_id", user.id).order("created_at", { ascending: false }),
+      supabase.from("purchase_orders").select("id,internal_po_number,event_name,amount,currency,status,notes,created_at,rff_id").eq("vendor_id", user.id).in("status", ["sent","invoiced","paid"]).order("created_at", { ascending: false }),
     ]);
     setAssignments(asn.data || []);
     setRffs((asn.data || []).map(a => a.rffs).filter(Boolean));
@@ -8748,7 +8748,7 @@ const generatePOPDF = (po, vendor, rff, event) => {
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: Arial, sans-serif; color: #0A1628; background: #fff; }
   .page { width: 794px; min-height: 1123px; margin: 0 auto; padding: 48px 56px; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 28px; border-bottom: 3px solid #00C8FF; margin-bottom: 32px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 28px; border-bottom: 3px solid #00C8FF; margin-bottom: 32px; background: linear-gradient(135deg, #f8faff 0%, #eef2ff 100%); margin: -48px -56px 32px; padding: 48px 56px 28px; }
   .logo-area .company { font-size: 22px; font-weight: 900; color: #060B14; letter-spacing: -0.02em; }
   .logo-area .tagline { font-size: 11px; color: #5A6E8A; font-style: italic; margin-top: 4px; }
   .logo-area .contact { font-size: 11px; color: #5A6E8A; margin-top: 8px; line-height: 1.6; }
@@ -8784,6 +8784,7 @@ const generatePOPDF = (po, vendor, rff, event) => {
 </style>
 </head>
 <body>
+<div style="height:6px;background:linear-gradient(90deg,#FF6B35,#FF3CAC,#784BA0,#2B86C5,#00C8FF);width:100%;"></div>
 <div class="page">
   <!-- Header -->
   <div class="header">
@@ -8942,9 +8943,11 @@ const generateVoucherPDF = (voucher, approver, financeManager) => {
 </style>
 </head>
 <body>
+<div style="height:6px;background:linear-gradient(90deg,#FF6B35,#FF3CAC,#784BA0,#2B86C5,#00C8FF);width:100%;"></div>
 <div class="page">
   <div class="header">
     <div>
+      <img src="https://workroom.stretchfield.com/logo512.png" alt="Stretchfield" style="height:40px;width:40px;display:block;margin-bottom:8px;" />
       <div class="company">STRETCHFIELD</div>
       <div class="tagline">We don't plan events. We engineer impact.</div>
       <div style="font-size:11px;color:#5A6E8A;margin-top:6px;">info@stretchfield.com · www.stretchfield.com</div>
@@ -9031,181 +9034,276 @@ const PurchaseOrderView = ({ user }) => {
   const [rffs, setRffs] = useState([]);
   const [events, setEvents] = useState([]);
   const [vendorProfiles, setVendorProfiles] = useState([]);
-  const [poModal, setPoModal] = useState(null);
-  const [poForm, setPoForm] = useState({ currency: "GHS", notes: "", vendor_email: "" });
+  const [vendorApps, setVendorApps] = useState([]);
   const [saving, setSaving] = useState(false);
   const [zohoStatus, setZohoStatus] = useState("");
+  const [previewPO, setPreviewPO] = useState(null);
+  const [notesModal, setNotesModal] = useState(null);
+  const [editNotes, setEditNotes] = useState("");
+  const [poForm, setPoForm] = useState({ currency: "GHS", notes: "" });
 
   const load = async () => {
-    const [{ data: aw }, { data: po }, { data: rf }, { data: ev }, { data: vp }] = await Promise.all([
-      supabase.from("rff_awards").select("*").in("status", ["confirmed"]),
+    const [{ data: aw }, { data: po }, { data: rf }, { data: ev }, { data: vp }, { data: va }] = await Promise.all([
+      supabase.from("rff_awards").select("*").in("status", ["confirmed","po_created"]),
       supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }),
       supabase.from("rffs").select("*"),
       supabase.from("projects").select("*"),
-      supabase.from("profiles").select("id, name, email, phone, company_name, service_category").eq("role", "Vendor"),
+      supabase.from("profiles").select("id,name,email,phone,company_name,service_category").eq("role","Vendor"),
+      supabase.from("vendor_apps").select("*"),
     ]);
     setAwards(aw || []);
     setPOs(po || []);
     setRffs(rf || []);
     setEvents(ev || []);
     setVendorProfiles(vp || []);
+    setVendorApps(va || []);
   };
 
   useEffect(() => { load(); }, []);
 
-  const handleCreatePO = async () => {
-    if (!poModal) return;
+  const handleCreatePO = async (award) => {
     setSaving(true);
     setZohoStatus("");
-    const rff = rffs.find(r => r.id === poModal.rff_id);
+    const rff = rffs.find(r => r.id === award.rff_id);
     const event = events.find(e => e.id === rff?.project_id);
+    const vendor = vendorProfiles.find(v => v.id === award.vendor_id);
+    const vApp = vendorApps.find(a => a.vendor_id === award.vendor_id || a.linked_vendor_id === award.vendor_id);
 
-    // Generate internal PO number from RFF code
+    // Generate PO number
     let internalPoNumber = "";
     if (rff?.rff_code) {
-      // Count existing POs for this RFF to determine vendor suffix
-      const { data: existingPos } = await supabase.from("purchase_orders").select("id").eq("rff_id", poModal.rff_id);
+      const { data: existingPos } = await supabase.from("purchase_orders").select("id").eq("rff_id", award.rff_id);
       const vendorSuffix = (existingPos?.length || 0) === 0 ? "" : String(existingPos.length + 1);
-      internalPoNumber = `PO/${rff.rff_code}${vendorSuffix}`;
+      internalPoNumber = "PO/" + rff.rff_code + vendorSuffix;
+    } else {
+      const year = new Date().getFullYear();
+      const { data: allPos } = await supabase.from("purchase_orders").select("id");
+      internalPoNumber = "PO/" + year + "/" + String((allPos?.length||0)+1).padStart(3,"0");
     }
 
-    // Create PO in Supabase
     const { data: po } = await supabase.from("purchase_orders").insert({
-      rff_id: poModal.rff_id,
-      rff_award_id: poModal.id,
-      vendor_id: poModal.vendor_id,
-      vendor_name: poModal.vendor_name,
+      rff_id: award.rff_id,
+      rff_award_id: award.id,
+      vendor_id: award.vendor_id,
+      vendor_name: award.vendor_name,
       event_id: rff?.project_id,
       event_name: rff?.event_name || event?.name,
-      amount: poModal.quoted_amount,
+      amount: award.agreed_amount || award.quoted_amount,
       currency: poForm.currency,
       notes: poForm.notes,
       status: "draft",
       created_by: user.id,
       internal_po_number: internalPoNumber,
+      payment_terms: vApp?.payment_terms || "",
+      bank_name: vApp?.bank_name || "",
+      account_name: vApp?.account_name || vendor?.name || "",
+      account_number: vApp?.account_number || "",
     }).select().single();
 
-    // Push to Zoho Books
+    // Sync to Zoho
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const zohoRes = await fetch("/api/zoho-sync?action=create-po", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
-        body: JSON.stringify({
-          vendor_name: poModal.vendor_name,
-          amount: poModal.quoted_amount,
-          currency: poForm.currency,
-          notes: poForm.notes,
-          rff_title: rff?.title,
-          event_name: rff?.event_name,
-          po_id: po?.id,
-        }),
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session?.access_token },
+        body: JSON.stringify({ vendor_name: award.vendor_name, amount: award.agreed_amount || award.quoted_amount, currency: poForm.currency, notes: poForm.notes, rff_title: rff?.title, event_name: rff?.event_name, po_id: po?.id }),
       });
       const zohoData = await zohoRes.json();
       if (zohoData.purchaseorder) {
-        await supabase.from("purchase_orders").update({
-          zoho_po_id: zohoData.purchaseorder.purchaseorder_id,
-          zoho_po_number: zohoData.purchaseorder.purchaseorder_number,
-          status: "sent",
-        }).eq("id", po.id);
-        setZohoStatus(`✅ PO ${zohoData.purchaseorder.purchaseorder_number} created in Zoho Books`);
+        await supabase.from("purchase_orders").update({ zoho_po_id: zohoData.purchaseorder.purchaseorder_id, zoho_po_number: zohoData.purchaseorder.purchaseorder_number }).eq("id", po.id);
+        setZohoStatus("✅ PO " + zohoData.purchaseorder.purchaseorder_number + " created in Zoho Books");
       }
     } catch (e) {
       setZohoStatus("⚠ PO saved locally. Zoho sync failed: " + e.message);
     }
 
-    // Update award status
-    await supabase.from("rff_awards").update({ status: "po_created" }).eq("id", poModal.id);
-
-    // Notify vendor
-    if (poModal.vendor_id) {
-      await supabase.from("notifications").insert({
-        user_id: poModal.vendor_id,
-        title: "Purchase Order Created",
-        message: `A Purchase Order has been raised for your services on "${rff?.event_name}". Please submit your invoice.`,
-        type: "rff",
-      });
-      // Send PO email to vendor
-      if (poForm.vendor_email) {
-        await sendEmail(
-          poForm.vendor_email,
-          `Purchase Order ${internalPoNumber} — Stretchfield`,
-          poEmailHtml({
-            vendorName: poModal.vendor_name,
-            poNumber: internalPoNumber,
-            eventName: rff?.event_name || "",
-            amount: poModal.quoted_amount,
-            currency: poForm.currency,
-            notes: poForm.notes,
-          })
-        );
-      }
-    }
-
+    await supabase.from("rff_awards").update({ status: "po_created" }).eq("id", award.id);
     setSaving(false);
-    setPoModal(null);
+    setPoForm({ currency: "GHS", notes: "" });
     load();
   };
 
+  const publishPO = async (po) => {
+    if (!window.confirm("Publish this PO to the vendor portal? The vendor will be notified and can download it.")) return;
+    await supabase.from("purchase_orders").update({ status: "sent" }).eq("id", po.id);
+    await supabase.from("notifications").insert({ user_id: po.vendor_id, title: "Purchase Order — " + po.internal_po_number, message: "A Purchase Order has been issued for " + (po.event_name||"your services") + ". Log in to view and download.", type: "rff" });
+    const { data: vp } = await supabase.from("profiles").select("email,name").eq("id", po.vendor_id).single();
+    if (vp?.email) await sendEmail(vp.email, "Purchase Order " + po.internal_po_number + " — Stretchfield", poEmailHtml({ vendorName: vp.name, poNumber: po.internal_po_number, eventName: po.event_name||"", amount: po.amount, currency: po.currency||"GHS", notes: po.notes||"" }));
+    load();
+  };
+
+  const saveNotes = async () => {
+    if (!notesModal) return;
+    await supabase.from("purchase_orders").update({ notes: editNotes }).eq("id", notesModal.id);
+    setNotesModal(null);
+    load();
+  };
+
+  // Awards that don't have a PO yet
+  const pendingAwards = awards.filter(a => a.status === "confirmed" && !pos.find(p => p.rff_award_id === a.id));
+
+  const inputStyle = { width:"100%", padding:"9px 12px", background:T.bg, border:"1px solid "+T.border, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" };
+
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
-      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
-        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Purchase Orders</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{awards.length} confirmed gigs awaiting PO · {pos.length} POs created</div>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: "1px solid "+T.border }}>
+        <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Finance</div>
+        <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Purchase Orders</h2>
+        <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>{pendingAwards.length} confirmed awards awaiting PO · {pos.length} POs created</div>
       </div>
 
-      {zohoStatus && <div style={{ padding: "10px 14px", background: T.teal + "12", border: `1px solid ${T.teal}30`, borderRadius: 8, color: T.teal, fontSize: 13, marginBottom: 16 }}>{zohoStatus}</div>}
+      {zohoStatus && <div style={{ padding:"10px 14px", background:T.teal+"12", border:"1px solid "+T.teal+"30", borderRadius:8, color:T.teal, fontSize:13, marginBottom:16 }}>{zohoStatus}</div>}
 
+      {/* Confirmed Awards Awaiting PO */}
+      {pendingAwards.length > 0 && (
+        <div style={{ marginBottom:28 }}>
+          <div style={{ color:T.textMuted, fontSize:11, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:12 }}>Awaiting Purchase Order</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {pendingAwards.map(award => {
+              const rff = rffs.find(r => r.id === award.rff_id);
+              const event = events.find(e => e.id === rff?.project_id);
+              const vendor = vendorProfiles.find(v => v.id === award.vendor_id);
+              const vApp = vendorApps.find(a => a.vendor_id === award.vendor_id || a.linked_vendor_id === award.vendor_id);
+              const amount = award.agreed_amount || award.quoted_amount;
+              return (
+                <div key={award.id} style={{ background:T.surface, border:"1px solid "+T.cyan+"30", borderLeft:"4px solid "+T.cyan, borderRadius:12, padding:"18px 20px" }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14 }}>
+                    <div>
+                      <div style={{ color:T.textPrimary, fontWeight:900, fontSize:16 }}>{award.vendor_name}</div>
+                      <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{rff?.title} {event?.name ? "· "+event.name : ""}</div>
+                      <div style={{ color:T.gold, fontWeight:900, fontSize:18, marginTop:6 }}>GHS {parseFloat(amount||0).toLocaleString()}</div>
+                      <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>Approved quote — locked and non-editable</div>
+                    </div>
+                    <span style={{ color:T.cyan, fontSize:10, fontWeight:800, background:T.cyan+"15", padding:"3px 10px", borderRadius:20 }}>CONFIRMED</span>
+                  </div>
 
+                  {/* Auto-filled vendor details */}
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:8, marginBottom:14 }}>
+                    {[
+                      ["Vendor", award.vendor_name],
+                      ["Category", rff?.category || vendor?.service_category || "—"],
+                      ["Bank", vApp?.bank_name || "—"],
+                      ["Account", vApp?.account_number || "—"],
+                      ["Payment Terms", vApp?.payment_terms || "—"],
+                    ].map(([label, val]) => (
+                      <div key={label} style={{ background:T.bg, borderRadius:6, padding:"8px 10px" }}>
+                        <div style={{ color:T.textMuted, fontSize:9, fontWeight:700, textTransform:"uppercase", marginBottom:2 }}>{label}</div>
+                        <div style={{ color:T.textPrimary, fontSize:12, fontWeight:600 }}>{val}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Notes only editable field */}
+                  <div style={{ marginBottom:12 }}>
+                    <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Notes (optional)</label>
+                    <textarea value={poForm.notes} onChange={e => setPoForm(f=>({...f,notes:e.target.value}))} placeholder="Any special instructions or notes for this PO..." rows={2} style={{ ...inputStyle, resize:"none" }} />
+                  </div>
+
+                  <button onClick={() => handleCreatePO(award)} disabled={saving} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#fff", padding:"10px 24px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving ? "Generating..." : "Generate Purchase Order"}</button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Existing POs */}
       {pos.length > 0 && (
         <div>
-          <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Purchase Orders</div>
-          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <div style={{ color:T.textMuted, fontSize:11, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:12 }}>Purchase Orders</div>
+          <div style={{ background:T.surface, border:"1px solid "+T.border, borderRadius:12, overflow:"hidden" }}>
+            <table style={{ width:"100%", borderCollapse:"collapse" }}>
               <thead>
-                <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
-                  {["PO Number","Vendor","Event","Amount","Zoho Status","Status",""].map(h => (
-                    <th key={h} style={{ padding: "10px 14px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>
+                <tr style={{ background:T.bg, borderBottom:"1px solid "+T.border }}>
+                  {["PO Number","Vendor","Event","Amount","Zoho","Status","Actions"].map(h => (
+                    <th key={h} style={{ padding:"10px 14px", textAlign:"left", color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {pos.map((po, i) => (
-                  <tr key={po.id} style={{ borderBottom: i < pos.length-1 ? `1px solid ${T.border}44` : "none" }}
-                    onMouseEnter={e => e.currentTarget.style.background = T.bg}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                    <td style={{ padding: "10px 14px" }}>
-                      <div style={{ color: T.cyan, fontSize: 12, fontWeight: 700 }}>{po.internal_po_number || po.zoho_po_number || "—"}</div>
-                      {po.zoho_po_number && po.internal_po_number && <div style={{ color: T.textMuted, fontSize: 10 }}>Zoho: {po.zoho_po_number}</div>}
-                    </td>
-                    <td style={{ padding: "10px 14px", color: T.textPrimary, fontSize: 12, fontWeight: 600 }}>{po.vendor_name}</td>
-                    <td style={{ padding: "10px 14px", color: T.textSecondary, fontSize: 12 }}>{po.event_name}</td>
-                    <td style={{ padding: "10px 14px", color: T.amber, fontSize: 12, fontWeight: 700 }}>{po.currency} {(po.amount||0).toLocaleString()}</td>
-                    <td style={{ padding: "10px 14px" }}><span style={{ color: po.zoho_po_id ? T.teal : T.textMuted, fontSize: 11, fontWeight: 600 }}>{po.zoho_po_id ? "✓ In Zoho" : "Local only"}</span></td>
-                    <td style={{ padding: "10px 14px" }}><span style={{ background: T.teal + "18", color: T.teal, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{po.status}</span></td>
-                    <td style={{ padding: "10px 14px" }}>
-                      <button onClick={() => {
-                        const vendor = vendorProfiles.find(v => v.id === po.vendor_id);
-                        const rff = rffs.find(r => r.id === po.rff_id);
-                        const event = events.find(e => e.id === po.event_id);
-                        downloadPDF(generatePOPDF(po, vendor, rff, event), `PO-${po.internal_po_number || po.id}.html`);
-                      }} style={{ background: T.cyan+"15", border: "1px solid " + T.cyan+"30", color: T.cyan, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>↓ PDF</button>
-                    </td>
-                  </tr>
-                ))}
+                {pos.map((po, i) => {
+                  const vendor = vendorProfiles.find(v => v.id === po.vendor_id);
+                  const rff = rffs.find(r => r.id === po.rff_id);
+                  const event = events.find(e => e.id === po.event_id);
+                  const statusColors = { draft:T.amber, sent:T.teal, invoiced:T.cyan, paid:T.teal };
+                  return (
+                    <tr key={po.id} style={{ borderBottom:i<pos.length-1?"1px solid "+T.border+"44":"none" }}>
+                      <td style={{ padding:"10px 14px" }}>
+                        <div style={{ color:T.cyan, fontSize:12, fontWeight:700 }}>{po.internal_po_number||"—"}</div>
+                        {po.zoho_po_number && <div style={{ color:T.textMuted, fontSize:10 }}>Zoho: {po.zoho_po_number}</div>}
+                      </td>
+                      <td style={{ padding:"10px 14px", color:T.textPrimary, fontSize:12, fontWeight:600 }}>{po.vendor_name}</td>
+                      <td style={{ padding:"10px 14px", color:T.textSecondary, fontSize:12 }}>{po.event_name}</td>
+                      <td style={{ padding:"10px 14px", color:T.amber, fontSize:12, fontWeight:700 }}>{po.currency||"GHS"} {(po.amount||0).toLocaleString()}</td>
+                      <td style={{ padding:"10px 14px" }}><span style={{ color:po.zoho_po_id?T.teal:T.textMuted, fontSize:11 }}>{po.zoho_po_id?"✓ Zoho":"Local"}</span></td>
+                      <td style={{ padding:"10px 14px" }}>
+                        <span style={{ background:(statusColors[po.status]||T.textMuted)+"18", color:statusColors[po.status]||T.textMuted, borderRadius:20, padding:"2px 10px", fontSize:10, fontWeight:700, textTransform:"uppercase" }}>{po.status}</span>
+                      </td>
+                      <td style={{ padding:"10px 14px" }}>
+                        <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                          {/* Preview button */}
+                          <button onClick={() => setPreviewPO({ po, vendor, rff, event })} style={{ background:T.cyan+"15", border:"1px solid "+T.cyan+"30", color:T.cyan, padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>Preview</button>
+                          {/* Download PDF */}
+                          <button onClick={() => downloadPDF(generatePOPDF(po, vendor, rff, event), "PO-"+(po.internal_po_number||po.id)+".html")} style={{ background:T.surface, border:"1px solid "+T.border, color:T.textMuted, padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>↓ PDF</button>
+                          {/* Edit notes — draft only */}
+                          {po.status === "draft" && <button onClick={() => { setNotesModal(po); setEditNotes(po.notes||""); }} style={{ background:T.amber+"15", border:"1px solid "+T.amber+"30", color:T.amber, padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>Notes</button>}
+                          {/* Publish — draft only */}
+                          {po.status === "draft" && <button onClick={() => publishPO(po)} style={{ background:T.teal+"15", border:"1px solid "+T.teal+"30", color:T.teal, padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>↑ Publish</button>}
+                          {po.status === "sent" && <span style={{ color:T.teal, fontSize:10, fontWeight:700 }}>✓ Published</span>}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
+      {/* PO Preview Modal */}
+      {previewPO && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.9)", backdropFilter:"blur(8px)", overflowY:"auto" }} onClick={() => setPreviewPO(null)}>
+          <div style={{ minHeight:"100vh", display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"24px 20px" }}>
+            <div style={{ background:"#fff", borderRadius:12, width:"100%", maxWidth:794, overflow:"hidden" }} onClick={e => e.stopPropagation()}>
+              {/* Modal actions */}
+              <div style={{ background:T.bgDeep, padding:"12px 20px", display:"flex", justifyContent:"space-between", alignItems:"center", borderBottom:"1px solid "+T.border }}>
+                <div style={{ color:T.textPrimary, fontWeight:700, fontSize:14 }}>PO Preview — {previewPO.po.internal_po_number}</div>
+                <div style={{ display:"flex", gap:8 }}>
+                  <button onClick={() => downloadPDF(generatePOPDF(previewPO.po, previewPO.vendor, previewPO.rff, previewPO.event), "PO-"+(previewPO.po.internal_po_number||previewPO.po.id)+".html")} style={{ background:T.cyan+"15", border:"1px solid "+T.cyan+"30", color:T.cyan, padding:"6px 14px", borderRadius:6, cursor:"pointer", fontSize:12, fontWeight:700 }}>↓ Download PDF</button>
+                  {previewPO.po.status === "draft" && <button onClick={() => { publishPO(previewPO.po); setPreviewPO(null); }} style={{ background:"linear-gradient(135deg,"+T.teal+","+T.cyan+")", border:"none", color:"#fff", padding:"6px 14px", borderRadius:6, cursor:"pointer", fontSize:12, fontWeight:700 }}>↑ Publish to Vendor</button>}
+                  <button onClick={() => setPreviewPO(null)} style={{ background:"none", border:"1px solid "+T.border, color:T.textMuted, padding:"6px 12px", borderRadius:6, cursor:"pointer", fontSize:12 }}>✕ Close</button>
+                </div>
+              </div>
+              {/* PO HTML preview */}
+              <iframe
+                srcDoc={generatePOPDF(previewPO.po, previewPO.vendor, previewPO.rff, previewPO.event)}
+                style={{ width:"100%", height:"80vh", border:"none" }}
+                title="PO Preview"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
+      {/* Notes Edit Modal */}
+      {notesModal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.8)", backdropFilter:"blur(6px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setNotesModal(null)}>
+          <div style={{ background:T.surface, border:"1px solid "+T.amber+"40", borderRadius:14, width:"100%", maxWidth:440, padding:28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16, marginBottom:4 }}>Edit Notes</div>
+            <div style={{ color:T.textMuted, fontSize:12, marginBottom:16 }}>{notesModal.internal_po_number} — notes only. Amount and vendor details are locked.</div>
+            <textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} rows={4} placeholder="Add notes or instructions..." style={{ ...inputStyle, resize:"none", marginBottom:14 }} />
+            <div style={{ display:"flex", gap:8 }}>
+              <button onClick={saveNotes} style={{ flex:1, background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#fff", padding:"10px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>Save Notes</button>
+              <button onClick={() => setNotesModal(null)} style={{ background:"none", border:"1px solid "+T.border, color:T.textMuted, padding:"10px 16px", borderRadius:8, cursor:"pointer", fontSize:13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
 
 const VendorInvoiceView = ({ user }) => {
   const [invoices, setInvoices] = useState([]);

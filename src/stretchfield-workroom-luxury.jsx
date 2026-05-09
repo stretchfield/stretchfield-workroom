@@ -683,6 +683,7 @@ const getNavItems = (role) => {
         { id: "client-financials", label: "Client Financials" },
         { id: "purchase-orders", label: "Purchase Orders" },
         { id: "vendor-invoices", label: "Vendor Invoices" },
+            { id: "payment-authorisation", label: "Payment Authorisation" },
         { id: "zoho-books", label: "Zoho Books" },
       ]},
       { id: "grp-clients", label: "Clients", group: true, children: [
@@ -702,7 +703,7 @@ const getNavItems = (role) => {
     ];
   }
   if (role === "Vendor Manager") {
-    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quotes-received", label: "Quotes Received", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" }, { id: "vendor-analytics", label: "Vendor Analytics", icon: "▪" });
+    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quotes-received", label: "Quotes Received", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" }, { id: "vendor-analytics", label: "Vendor Analytics", icon: "▪" }, { id: "payment-authorisation", label: "Payment Authorisation", icon: "▪" });
   }
   if (["CEO","Country Manager","Vendor Manager","Finance Manager"].includes(role)) {
     base.push({ id: "invoices", label: "Invoices", icon: "▪" });
@@ -715,7 +716,7 @@ const getNavItems = (role) => {
   }
   if (["Finance Manager","CEO"].includes(role)) {
     base.push({ id: "purchase-orders", label: "Purchase Orders", icon: "▪" });
-    base.push({ id: "vendor-invoices", label: "Vendor Invoices", icon: "▪" });
+    base.push({ id: "vendor-invoices", label: "Vendor Invoices", icon: "▪" }, { id: "payment-authorisation", label: "Payment Authorisation", icon: "▪" });
   }
   if (["CEO"].includes(role)) {
     base.push({ id: "client-financials", label: "Client Financials", icon: "▪" });
@@ -15020,6 +15021,410 @@ Use professional, consultative language that positions Stretchfield as a strateg
               {!isCEO && <div style={{ color: T.textMuted, fontSize: 12 }}>CEO will generate this summary after all sections are submitted.</div>}
             </div>
           )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const PaymentAuthorisationView = ({ user }) => {
+  const [auths, setAuths] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [awards, setAwards] = useState([]);
+  const [rffs, setRffs] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [signModal, setSignModal] = useState(null);
+  const [signature, setSignature] = useState("");
+  const [signNotes, setSignNotes] = useState("");
+  const [rejectModal, setRejectModal] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    vendor_id: "", rff_id: "", invoice_id: "", agreed_amount: "",
+    payment_method: "bank_transfer", bank_name: "", account_number: "",
+    account_name: "", mobile_money_number: "", payment_terms: "", notes: "",
+    work_confirmed: false, invoice_matches_po: false,
+  });
+  const canvasRef = React.useRef(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [lastPos, setLastPos] = useState(null);
+
+  const isVM = user.role === "Vendor Manager";
+  const isFinance = user.role === "Finance Manager";
+  const isCEO = user.role === "CEO";
+
+  const load = async () => {
+    const [au, vp, aw, rf, inv] = await Promise.all([
+      supabase.from("payment_authorisations").select("*").order("created_at", { ascending: false }),
+      supabase.from("profiles").select("*").eq("role", "Vendor"),
+      supabase.from("rff_awards").select("*").eq("status", "confirmed"),
+      supabase.from("rffs").select("*"),
+      supabase.from("vendor_invoices").select("*"),
+    ]);
+    setAuths(au.data || []);
+    setVendors(vp.data || []);
+    setAwards(aw.data || []);
+    setRffs(rf.data || []);
+    setInvoices(inv.data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  // Signature pad functions
+  const getPos = (e, canvas) => {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  };
+
+  const startDraw = (e) => {
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    setIsDrawing(true);
+    setLastPos(getPos(e, canvas));
+  };
+
+  const draw = (e) => {
+    e.preventDefault();
+    if (!isDrawing || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const pos = getPos(e, canvas);
+    ctx.beginPath();
+    ctx.moveTo(lastPos.x, lastPos.y);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.strokeStyle = "#0ea5e9";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.stroke();
+    setLastPos(pos);
+  };
+
+  const stopDraw = (e) => {
+    e.preventDefault();
+    setIsDrawing(false);
+    if (canvasRef.current) {
+      setSignature(canvasRef.current.toDataURL());
+    }
+  };
+
+  const clearSignature = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setSignature("");
+  };
+
+  const submitRequest = async () => {
+    if (!form.vendor_id || !form.agreed_amount) { alert("Vendor and amount required"); return; }
+    setSaving(true);
+    const vendor = vendors.find(v => v.id === form.vendor_id);
+    const rff = rffs.find(r => r.id === form.rff_id);
+    await supabase.from("payment_authorisations").insert({
+      vendor_id: form.vendor_id,
+      vendor_name: vendor?.name || "",
+      rff_id: form.rff_id || null,
+      rff_title: rff?.title || "",
+      event_name: rff?.event_name || "",
+      agreed_amount: parseFloat(form.agreed_amount),
+      payment_method: form.payment_method,
+      bank_name: form.bank_name,
+      account_number: form.account_number,
+      account_name: form.account_name,
+      mobile_money_number: form.mobile_money_number,
+      payment_terms: form.payment_terms,
+      notes: form.notes,
+      work_confirmed: form.work_confirmed,
+      invoice_matches_po: form.invoice_matches_po,
+      requested_by: user.id,
+      requested_by_name: user.name,
+      requested_at: new Date().toISOString(),
+      status: "pending_finance",
+    });
+    // Notify Finance
+    const { data: fin } = await supabase.from("profiles").select("id").eq("role", "Finance Manager");
+    for (const f of fin || []) {
+      await supabase.from("notifications").insert({ user_id: f.id, title: "Payment Authorisation Request", message: "VM has submitted a payment request for " + (vendor?.name || "vendor") + " — GHS " + parseFloat(form.agreed_amount).toLocaleString() + ". Please review and sign.", type: "task" });
+    }
+    setForm({ vendor_id: "", rff_id: "", invoice_id: "", agreed_amount: "", payment_method: "bank_transfer", bank_name: "", account_number: "", account_name: "", mobile_money_number: "", payment_terms: "", notes: "", work_confirmed: false, invoice_matches_po: false });
+    setShowForm(false);
+    setSaving(false);
+    load();
+  };
+
+  const signApprove = async (auth) => {
+    if (!signature) { alert("Please sign before approving"); return; }
+    setSaving(true);
+    const updates = {};
+    if (isFinance) {
+      Object.assign(updates, { finance_approved_by: user.id, finance_approved_by_name: user.name, finance_approved_at: new Date().toISOString(), finance_signature: signature, finance_notes: signNotes, status: "pending_ceo" });
+      const { data: ceos } = await supabase.from("profiles").select("id").eq("role", "CEO");
+      for (const c of ceos || []) {
+        await supabase.from("notifications").insert({ user_id: c.id, title: "Payment Awaiting CEO Approval", message: "Finance has approved payment for " + auth.vendor_name + " — GHS " + (auth.agreed_amount||0).toLocaleString() + ". Your signature is required.", type: "task" });
+      }
+    } else if (isCEO) {
+      Object.assign(updates, { ceo_approved_by: user.id, ceo_approved_by_name: user.name, ceo_approved_at: new Date().toISOString(), ceo_signature: signature, ceo_notes: signNotes, status: "approved" });
+      // Notify vendor + VM + Finance
+      await supabase.from("notifications").insert({ user_id: auth.vendor_id, title: "Payment Authorised — " + auth.vendor_name, message: "Your payment of GHS " + (auth.agreed_amount||0).toLocaleString() + " has been fully authorised. Expect payment per agreed terms.", type: "task" });
+      const { data: vm } = await supabase.from("profiles").select("id").eq("role", "Vendor Manager");
+      for (const v of vm || []) await supabase.from("notifications").insert({ user_id: v.id, title: "Payment Approved — " + auth.vendor_name, message: "CEO has signed off payment of GHS " + (auth.agreed_amount||0).toLocaleString() + " for " + auth.vendor_name + ".", type: "task" });
+    }
+    await supabase.from("payment_authorisations").update(updates).eq("id", auth.id);
+    setSignModal(null);
+    setSignature("");
+    setSignNotes("");
+    setSaving(false);
+    load();
+  };
+
+  const reject = async (auth) => {
+    if (!rejectReason) { alert("Please provide rejection reason"); return; }
+    await supabase.from("payment_authorisations").update({ status: "rejected", rejected_by: user.id, rejected_reason: rejectReason, rejected_at: new Date().toISOString() }).eq("id", auth.id);
+    const { data: vm } = await supabase.from("profiles").select("id").eq("role", "Vendor Manager");
+    for (const v of vm || []) await supabase.from("notifications").insert({ user_id: v.id, title: "Payment Request Rejected", message: auth.vendor_name + " payment rejected: " + rejectReason, type: "task" });
+    setRejectModal(null);
+    setRejectReason("");
+    load();
+  };
+
+  const statusColors = { pending_finance: T.amber, pending_ceo: T.cyan, approved: T.teal, rejected: T.red };
+  const statusLabels = { pending_finance: "Awaiting Finance", pending_ceo: "Awaiting CEO", approved: "✓ Approved", rejected: "✗ Rejected" };
+  const inputStyle = { width: "100%", padding: "9px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
+
+  const myAuths = isCEO ? auths : isFinance ? auths.filter(a => ["pending_finance","pending_ceo","approved","rejected"].includes(a.status)) : auths.filter(a => a.requested_by === user.id);
+  const pendingCount = auths.filter(a => (isFinance && a.status === "pending_finance") || (isCEO && a.status === "pending_ceo")).length;
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: "1px solid " + T.border, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800 }}>Payment Authorisation</h2>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Three-step payment approval: VM Request → Finance Sign-off → CEO Approval</div>
+        </div>
+        {isVM && <button onClick={() => setShowForm(!showForm)} style={{ background: "linear-gradient(135deg, " + T.cyan + ", " + T.teal + ")", border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>+ New Request</button>}
+      </div>
+
+      {/* Pending alert */}
+      {pendingCount > 0 && (
+        <div style={{ background: T.amber+"12", border: "1px solid " + T.amber+"30", borderRadius: 10, padding: "12px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: T.amber }} />
+          <span style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>{pendingCount} payment request{pendingCount !== 1 ? "s" : ""} awaiting your signature</span>
+        </div>
+      )}
+
+      {/* New Request Form */}
+      {showForm && isVM && (
+        <div style={{ background: T.surface, border: "1px solid " + T.cyan+"30", borderRadius: 14, padding: "22px 24px", marginBottom: 24 }}>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 16, marginBottom: 16 }}>New Payment Request</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+            <div>
+              <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Vendor</label>
+              <select value={form.vendor_id} onChange={e => setForm(f => ({...f, vendor_id: e.target.value}))} style={{ ...inputStyle, appearance: "none" }}>
+                <option value="">Select vendor...</option>
+                {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Related RFF</label>
+              <select value={form.rff_id} onChange={e => setForm(f => ({...f, rff_id: e.target.value}))} style={{ ...inputStyle, appearance: "none" }}>
+                <option value="">Select RFF...</option>
+                {rffs.map(r => <option key={r.id} value={r.id}>{r.title} — {r.event_name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Agreed Amount (GHS)</label>
+              <input type="number" value={form.agreed_amount} onChange={e => setForm(f => ({...f, agreed_amount: e.target.value}))} placeholder="0.00" style={inputStyle} />
+            </div>
+            <div>
+              <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Payment Method</label>
+              <select value={form.payment_method} onChange={e => setForm(f => ({...f, payment_method: e.target.value}))} style={{ ...inputStyle, appearance: "none" }}>
+                {["bank_transfer", "mobile_money", "cheque", "cash"].map(m => <option key={m} value={m}>{m.replace("_", " ").toUpperCase()}</option>)}
+              </select>
+            </div>
+            {form.payment_method === "bank_transfer" && <>
+              <div>
+                <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Bank Name</label>
+                <input value={form.bank_name} onChange={e => setForm(f => ({...f, bank_name: e.target.value}))} placeholder="e.g. Absa Ghana" style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Account Number</label>
+                <input value={form.account_number} onChange={e => setForm(f => ({...f, account_number: e.target.value}))} placeholder="Account number" style={inputStyle} />
+              </div>
+              <div style={{ gridColumn: "1/-1" }}>
+                <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Account Name</label>
+                <input value={form.account_name} onChange={e => setForm(f => ({...f, account_name: e.target.value}))} placeholder="Account holder name" style={inputStyle} />
+              </div>
+            </>}
+            {form.payment_method === "mobile_money" && (
+              <div style={{ gridColumn: "1/-1" }}>
+                <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Mobile Money Number</label>
+                <input value={form.mobile_money_number} onChange={e => setForm(f => ({...f, mobile_money_number: e.target.value}))} placeholder="e.g. 0244000000" style={inputStyle} />
+              </div>
+            )}
+            <div>
+              <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Payment Terms</label>
+              <select value={form.payment_terms} onChange={e => setForm(f => ({...f, payment_terms: e.target.value}))} style={{ ...inputStyle, appearance: "none" }}>
+                <option value="">Select terms...</option>
+                {["Immediate", "Net 7 days", "Net 14 days", "Net 30 days", "50% upfront paid, balance now", "Custom"].map(t => <option key={t}>{t}</option>)}
+              </select>
+            </div>
+            <div style={{ gridColumn: "1/-1" }}>
+              <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Notes</label>
+              <textarea value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} rows={2} placeholder="Any additional notes for Finance and CEO..." style={{ ...inputStyle, resize: "none" }} />
+            </div>
+          </div>
+          {/* Confirmations */}
+          <div style={{ background: T.bg, border: "1px solid " + T.border, borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", marginBottom: 10 }}>Confirmation Checklist</div>
+            {[["work_confirmed", "I confirm that the work/service has been delivered to Stretchfield's satisfaction"], ["invoice_matches_po", "I confirm that the invoice amount matches the approved Purchase Order"]].map(([key, label]) => (
+              <div key={key} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                <input type="checkbox" checked={form[key]} onChange={e => setForm(f => ({...f, [key]: e.target.checked}))} id={key} style={{ width: 16, height: 16, cursor: "pointer" }} />
+                <label htmlFor={key} style={{ color: form[key] ? T.teal : T.textMuted, fontSize: 13, cursor: "pointer", fontWeight: form[key] ? 600 : 400 }}>{label}</label>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={submitRequest} disabled={saving || !form.vendor_id || !form.agreed_amount || !form.work_confirmed || !form.invoice_matches_po} style={{ background: "linear-gradient(135deg, " + T.cyan + ", " + T.teal + ")", border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13, opacity: (!form.vendor_id || !form.agreed_amount || !form.work_confirmed || !form.invoice_matches_po) ? 0.5 : 1 }}>{saving ? "Submitting..." : "Submit to Finance"}</button>
+            <button onClick={() => setShowForm(false)} style={{ background: "none", border: "1px solid " + T.border, color: T.textMuted, padding: "10px 16px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Authorisation List */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {myAuths.length === 0 && <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted, background: T.surface, borderRadius: 12, border: "1px solid " + T.border, fontSize: 13 }}>No payment requests yet.</div>}
+        {myAuths.map(auth => {
+          const statusColor = statusColors[auth.status] || T.textMuted;
+          const canSign = (isFinance && auth.status === "pending_finance") || (isCEO && auth.status === "pending_ceo");
+          const canReject = (isFinance && auth.status === "pending_finance") || (isCEO && auth.status === "pending_ceo");
+          return (
+            <div key={auth.id} style={{ background: T.surface, border: "1px solid " + (canSign ? statusColor+"50" : T.border), borderLeft: "4px solid " + statusColor, borderRadius: 12, padding: "20px 22px" }}>
+              {/* Header */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                <div>
+                  <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 16 }}>{auth.vendor_name}</div>
+                  <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{auth.rff_title} {auth.event_name ? "· " + auth.event_name : ""}</div>
+                  <div style={{ color: T.gold, fontWeight: 900, fontSize: 18, marginTop: 6 }}>GHS {(auth.agreed_amount||0).toLocaleString()}</div>
+                  {auth.payment_terms && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Terms: {auth.payment_terms}</div>}
+                </div>
+                <span style={{ color: statusColor, fontSize: 11, fontWeight: 800, background: statusColor+"15", padding: "4px 12px", borderRadius: 20 }}>{statusLabels[auth.status] || auth.status}</span>
+              </div>
+
+              {/* Payment Details */}
+              {(auth.bank_name || auth.mobile_money_number) && (
+                <div style={{ background: T.bg, border: "1px solid " + T.border, borderRadius: 8, padding: "10px 14px", marginBottom: 12 }}>
+                  <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", marginBottom: 6 }}>Payment Details</div>
+                  {auth.bank_name && <div style={{ color: T.textPrimary, fontSize: 12 }}>🏦 {auth.bank_name} · {auth.account_name} · {auth.account_number}</div>}
+                  {auth.mobile_money_number && <div style={{ color: T.textPrimary, fontSize: 12 }}>📱 Mobile Money: {auth.mobile_money_number}</div>}
+                </div>
+              )}
+
+              {/* Approval Chain */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+                {[
+                  { label: "VM Request", name: auth.requested_by_name, date: auth.requested_at, done: !!auth.requested_at, color: T.cyan },
+                  { label: "Finance Sign-off", name: auth.finance_approved_by_name, date: auth.finance_approved_at, done: !!auth.finance_approved_at, sig: auth.finance_signature, color: T.amber },
+                  { label: "CEO Approval", name: auth.ceo_approved_by_name, date: auth.ceo_approved_at, done: !!auth.ceo_approved_at, sig: auth.ceo_signature, color: T.teal },
+                ].map((step, i) => (
+                  <div key={i} style={{ flex: 1, minWidth: 140, background: step.done ? step.color+"12" : T.bg, border: "1px solid " + (step.done ? step.color+"40" : T.border), borderRadius: 8, padding: "10px 12px" }}>
+                    <div style={{ color: step.done ? step.color : T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", marginBottom: 4 }}>{step.done ? "✓ " : ""}{step.label}</div>
+                    {step.done ? (
+                      <>
+                        <div style={{ color: T.textPrimary, fontSize: 11, fontWeight: 600 }}>{step.name}</div>
+                        <div style={{ color: T.textMuted, fontSize: 10 }}>{new Date(step.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
+                        {step.sig && <img src={step.sig} alt="signature" style={{ width: "100%", height: 40, objectFit: "contain", marginTop: 6, filter: "invert(0.7) hue-rotate(180deg)" }} />}
+                      </>
+                    ) : (
+                      <div style={{ color: T.textMuted, fontSize: 11 }}>Pending</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {auth.rejected_reason && (
+                <div style={{ background: T.red+"10", border: "1px solid " + T.red+"30", borderRadius: 8, padding: "10px 14px", marginBottom: 12 }}>
+                  <div style={{ color: T.red, fontWeight: 700, fontSize: 12, marginBottom: 3 }}>Rejected</div>
+                  <div style={{ color: T.textSecondary, fontSize: 12 }}>{auth.rejected_reason}</div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              {canSign && (
+                <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+                  <button onClick={() => { setSignModal(auth); setSignature(""); setSignNotes(""); clearSignature && clearSignature(); }} style={{ background: "linear-gradient(135deg, " + T.teal + ", " + T.cyan + ")", border: "none", color: "#fff", padding: "9px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>✍ Sign & Approve</button>
+                  {canReject && <button onClick={() => setRejectModal(auth)} style={{ background: T.red+"12", border: "1px solid " + T.red+"30", color: T.red, padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>Reject</button>}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Signature Modal */}
+      {signModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 700, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setSignModal(null)}>
+          <div style={{ background: T.surface, border: "1px solid " + T.teal+"40", borderRadius: 16, width: "100%", maxWidth: 500, padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Sign & Approve Payment</div>
+            <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 20 }}>{signModal.vendor_name} · GHS {(signModal.agreed_amount||0).toLocaleString()}</div>
+
+            {/* Signature Pad */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", marginBottom: 8 }}>Your Signature</div>
+              <div style={{ background: T.bg, border: "2px solid " + T.cyan+"40", borderRadius: 10, padding: 4, position: "relative" }}>
+                <canvas
+                  ref={canvasRef}
+                  width={440}
+                  height={140}
+                  style={{ display: "block", width: "100%", height: 140, cursor: "crosshair", borderRadius: 8, touchAction: "none" }}
+                  onMouseDown={startDraw}
+                  onMouseMove={draw}
+                  onMouseUp={stopDraw}
+                  onMouseLeave={stopDraw}
+                  onTouchStart={startDraw}
+                  onTouchMove={draw}
+                  onTouchEnd={stopDraw}
+                />
+                <div style={{ position: "absolute", bottom: 10, right: 12, color: T.textMuted, fontSize: 10, pointerEvents: "none" }}>Sign above</div>
+                <button onClick={clearSignature} style={{ position: "absolute", top: 8, right: 8, background: T.surface, border: "1px solid " + T.border, color: T.textMuted, padding: "3px 8px", borderRadius: 5, cursor: "pointer", fontSize: 10 }}>Clear</button>
+              </div>
+              {signature && <div style={{ color: T.teal, fontSize: 11, fontWeight: 700, marginTop: 4 }}>✓ Signature captured</div>}
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 5 }}>Notes (optional)</label>
+              <textarea value={signNotes} onChange={e => setSignNotes(e.target.value)} rows={2} placeholder="Any conditions, notes or instructions..." style={{ width: "100%", padding: "9px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", resize: "none", boxSizing: "border-box" }} />
+            </div>
+
+            <div style={{ background: T.amber+"10", border: "1px solid " + T.amber+"30", borderRadius: 8, padding: "10px 14px", marginBottom: 18, fontSize: 12, color: T.amber }}>
+              By signing, you confirm you have reviewed and authorise this payment of GHS {(signModal.agreed_amount||0).toLocaleString()} to {signModal.vendor_name}.
+            </div>
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => signApprove(signModal)} disabled={saving || !signature} style={{ flex: 1, background: "linear-gradient(135deg, " + T.teal + ", " + T.cyan + ")", border: "none", color: "#fff", padding: "12px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 14, opacity: !signature ? 0.5 : 1 }}>{saving ? "Processing..." : "Confirm & Sign"}</button>
+              <button onClick={() => setSignModal(null)} style={{ background: "none", border: "1px solid " + T.border, color: T.textMuted, padding: "12px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Modal */}
+      {rejectModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 700, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setRejectModal(null)}>
+          <div style={{ background: T.surface, border: "1px solid " + T.red+"30", borderRadius: 16, width: "100%", maxWidth: 440, padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Reject Payment Request</div>
+            <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 20 }}>{rejectModal.vendor_name} · GHS {(rejectModal.agreed_amount||0).toLocaleString()}</div>
+            <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} rows={3} placeholder="Reason for rejection..." style={{ width: "100%", padding: "10px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", resize: "none", boxSizing: "border-box", marginBottom: 16 }} />
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => reject(rejectModal)} disabled={!rejectReason} style={{ flex: 1, background: T.red, border: "none", color: "#fff", padding: "10px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>Confirm Rejection</button>
+              <button onClick={() => setRejectModal(null)} style={{ background: "none", border: "1px solid " + T.border, color: T.textMuted, padding: "10px 16px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

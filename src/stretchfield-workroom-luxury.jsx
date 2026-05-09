@@ -44,13 +44,13 @@ const generatePassword = (email) => {
 
 const emailHeader = (title) => `
 <div style="background:linear-gradient(135deg,#060B14 0%,#0A1628 100%);padding:32px 40px 28px;border-radius:12px 12px 0 0;">
-  <table style="width:100%;border-collapse:collapse;">
+  <table style="border-collapse:collapse;">
     <tr>
-      <td style="vertical-align:middle;">
-        <span style="color:#00C8FF;font-size:13px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;">STRETCHFIELD WORKROOM</span>
+      <td style="vertical-align:middle;padding-right:10px;">
+        <img src="https://workroom.stretchfield.com/logo512.png" alt="Stretchfield" style="height:32px;width:32px;display:block;" onerror="this.style.display='none'" />
       </td>
-      <td style="text-align:right;vertical-align:middle;">
-        <img src="https://workroom.stretchfield.com/logo512.png" alt="Stretchfield" style="height:36px;width:36px;display:inline-block;" onerror="this.style.display='none'" />
+      <td style="vertical-align:middle;">
+        <span style="color:#00C8FF;font-size:13px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;line-height:32px;">STRETCHFIELD WORKROOM</span>
       </td>
     </tr>
   </table>

@@ -12936,7 +12936,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
       </div>}
 
       {/* Overview */}
-      {!loadingReport && activeSection === "overview" && (
+      {activeSection === "overview" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {myTasks.filter(t => t.status !== "completed").length > 0 && (
             <div style={{ background: T.surface, border: "1px solid " + T.border, borderRadius: 12, padding: "18px 20px" }}>

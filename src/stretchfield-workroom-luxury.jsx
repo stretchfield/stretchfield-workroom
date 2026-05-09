@@ -4687,6 +4687,8 @@ const ImpactIntelligenceSummary = ({ user }) => {
     return { category: cat, count: catEvents.length, avgScore: avgCatScore, color: EVENT_ARCHETYPES[cat].color };
   }).filter(c => c.count > 0);
 
+  if (loading) return <div style={{ padding: "60px 0", textAlign: "center", color: T.textMuted, fontSize: 13 }}>Loading Impact Intelligence...</div>;
+
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
       <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
@@ -4701,7 +4703,7 @@ const ImpactIntelligenceSummary = ({ user }) => {
           { label: "Events Tracked", value: events.length, color: T.cyan },
           { label: "Briefs Completed", value: briefs.length, color: T.teal },
           { label: "Scorecards", value: scorecards.length, color: T.amber },
-          { label: "Avg Impact Score", value: avgScore ? `${avgScore}/10` : "—", color: avgScore >= 7 ? "#10B981" : avgScore >= 5 ? T.amber : T.red },
+          { label: "Avg Impact Score", value: avgScore ? `${avgScore}/10` : "—", color: parseFloat(avgScore) >= 7 ? "#10B981" : parseFloat(avgScore) >= 5 ? T.amber : T.red },
         ].map((k,i) => (
           <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
             <div style={{ color: k.color, fontSize: 20, fontWeight: 900 }}>{k.value}</div>
@@ -15103,7 +15105,7 @@ const ExpenseView = ({ user }) => {
 
 const EventIntelligenceReport = ({ event, user, onClose }) => {
   const [report, setReport] = useState(null);
-  const [loadingReport, setLoadingReport] = useState(false);
+
   const [activeSection, setActiveSection] = useState("overview");
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -15122,37 +15124,29 @@ const EventIntelligenceReport = ({ event, user, onClose }) => {
   const isVM = user.role === "Vendor Manager";
 
   const load = async () => {
-    setLoadingReport(true);
     try {
-      const { data } = await supabase.from("event_intelligence_reports").select("*").eq("project_id", event.id).maybeSingle();
-      if (data) {
-        setReport(data);
-        setForm(f => ({ ...f, ...data }));
+      // Try to get existing report
+      const { data: existing } = await supabase.from("event_intelligence_reports").select("*").eq("project_id", event.id).maybeSingle();
+      if (existing) {
+        setReport(existing);
+        setForm(f => ({ ...f, ...existing }));
+        return;
+      }
+      // Create new one
+      const { data: created } = await supabase.from("event_intelligence_reports").insert({ project_id: event.id, status: "draft" }).select().single();
+      if (created) {
+        setReport(created);
       } else {
-        // Create new report record
-        const { data: newReport, error: insertErr } = await supabase.from("event_intelligence_reports").insert({ project_id: event.id, status: "draft" }).select().single();
-        if (newReport) {
-          setReport(newReport);
-        } else {
-          // If insert fails (e.g. duplicate), try fetching again
-          const { data: existing } = await supabase.from("event_intelligence_reports").select("*").eq("project_id", event.id).maybeSingle();
-          if (existing) { setReport(existing); setForm(f => ({ ...f, ...existing })); }
-          else setReport({ id: null, project_id: event.id, status: "draft" });
-        }
+        // Fallback — render with empty report so UI still shows
+        setReport({ id: null, project_id: event.id, status: "draft" });
       }
     } catch(e) {
-      console.error("Report load error:", e);
+      console.error("Report load:", e);
       setReport({ id: null, project_id: event.id, status: "draft" });
     }
-    setLoadingReport(false);
   };
 
-  useEffect(() => {
-    load();
-    // Fallback: if still loading after 5 seconds, force show UI
-    const timeout = setTimeout(() => setLoadingReport(false), 5000);
-    return () => clearTimeout(timeout);
-  }, [event.id]);
+  useEffect(() => { load(); }, [event.id]);
 
   const saveSection = async (section) => {
     if (!report) return;

@@ -79,6 +79,102 @@ const poEmailHtml = ({ vendorName, poNumber, eventName, amount, currency, notes 
 );
 
 
+const rffEmailHtml = ({ vendorName, rffTitle, eventName, deadline, category, notes }) => emailWrap(
+  emailHeader(`Request for Quote — ${rffTitle}`),
+  `<p style="color:#0A1628;font-size:14px;margin:0 0 16px;">Dear <strong>${vendorName}</strong>,</p>
+  <p style="color:#0A1628;font-size:14px;margin:0 0 20px;">Stretchfield has selected you as a preferred vendor and would like to invite you to submit a quote for the following engagement.</p>
+  <div style="background:#fff;border:1px solid #C2C9DC;border-radius:8px;padding:20px 24px;margin-bottom:20px;">
+    <table style="width:100%;border-collapse:collapse;">
+      ${emailRow("RFF Title", rffTitle)}
+      ${emailRow("Event", eventName || "—")}
+      ${emailRow("Category", category || "—")}
+      ${deadline ? emailRow("Quote Deadline", new Date(deadline).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })) : ""}
+      ${notes ? emailRow("Notes", notes) : ""}
+    </table>
+  </div>
+  <div style="background:#E8F8FF;border:1px solid #00C8FF30;border-radius:8px;padding:14px 18px;margin-bottom:20px;color:#0A1628;font-size:13px;line-height:1.6;">
+    Please log in to the Stretchfield Vendor Portal to view full details and submit your quote. Quotes submitted after the deadline will not be considered.
+  </div>
+  ${emailBtn("Submit Your Quote", BASE_URL)}`
+);
+
+const paymentAuthorisedEmailHtml = ({ vendorName, amount, eventName, paymentMethod, paymentTerms, bankName, accountNumber, accountName, mobileNumber }) => emailWrap(
+  emailHeader(`Payment Authorised — GHS ${parseFloat(amount || 0).toLocaleString()}`),
+  `<p style="color:#0A1628;font-size:14px;margin:0 0 16px;">Dear <strong>${vendorName}</strong>,</p>
+  <p style="color:#0A1628;font-size:14px;margin:0 0 20px;">We are pleased to confirm that your payment has been fully authorised and approved by Stretchfield leadership. You should expect to receive payment as per your agreed terms.</p>
+  <div style="background:#fff;border:1px solid #C2C9DC;border-radius:8px;padding:20px 24px;margin-bottom:20px;">
+    <table style="width:100%;border-collapse:collapse;">
+      ${emailRow("Amount", `<strong style="color:#00C8FF;font-size:16px;">GHS ${parseFloat(amount || 0).toLocaleString()}</strong>`)}
+      ${eventName ? emailRow("Event", eventName) : ""}
+      ${paymentTerms ? emailRow("Payment Terms", paymentTerms) : ""}
+      ${paymentMethod ? emailRow("Payment Method", paymentMethod.replace("_", " ").toUpperCase()) : ""}
+      ${bankName ? emailRow("Bank", bankName) : ""}
+      ${accountName ? emailRow("Account Name", accountName) : ""}
+      ${accountNumber ? emailRow("Account Number", accountNumber) : ""}
+      ${mobileNumber ? emailRow("Mobile Money", mobileNumber) : ""}
+    </table>
+  </div>
+  <div style="background:#E8FFF5;border:1px solid #00E5C830;border-radius:8px;padding:14px 18px;margin-bottom:20px;color:#0A1628;font-size:13px;">
+    ✓ This payment has been signed off by Stretchfield's Finance Manager and CEO. If you have any questions, please contact your Vendor Manager.
+  </div>
+  ${emailBtn("View in Vendor Portal", BASE_URL)}`
+);
+
+const taskEmailHtml = ({ staffName, taskName, eventName, deadline, assignedBy, notes }) => emailWrap(
+  emailHeader(`New Task Assigned`),
+  `<p style="color:#0A1628;font-size:14px;margin:0 0 16px;">Hi <strong>${staffName}</strong>,</p>
+  <p style="color:#0A1628;font-size:14px;margin:0 0 20px;">A new task has been assigned to you on Stretchfield WorkRoom.</p>
+  <div style="background:#fff;border:1px solid #C2C9DC;border-left:4px solid #00C8FF;border-radius:8px;padding:20px 24px;margin-bottom:20px;">
+    <div style="color:#0A1628;font-size:16px;font-weight:800;margin-bottom:12px;">${taskName}</div>
+    <table style="width:100%;border-collapse:collapse;">
+      ${eventName ? emailRow("Event", eventName) : ""}
+      ${deadline ? emailRow("Deadline", new Date(deadline).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })) : ""}
+      ${assignedBy ? emailRow("Assigned By", assignedBy) : ""}
+      ${notes ? emailRow("Notes", notes) : ""}
+    </table>
+  </div>
+  ${emailBtn("View Task in WorkRoom", BASE_URL)}`
+);
+
+const paymentRequestEmailHtml = ({ financeName, vendorName, amount, eventName, paymentMethod, requestedBy, workConfirmed, invoiceMatchesPO }) => emailWrap(
+  emailHeader(`Payment Request — ${vendorName}`),
+  `<p style="color:#0A1628;font-size:14px;margin:0 0 16px;">Hi <strong>${financeName}</strong>,</p>
+  <p style="color:#0A1628;font-size:14px;margin:0 0 20px;">A payment authorisation request has been submitted and requires your review and signature.</p>
+  <div style="background:#fff;border:1px solid #C2C9DC;border-radius:8px;padding:20px 24px;margin-bottom:20px;">
+    <table style="width:100%;border-collapse:collapse;">
+      ${emailRow("Vendor", vendorName)}
+      ${emailRow("Amount", `<strong style="color:#00C8FF;font-size:15px;">GHS ${parseFloat(amount || 0).toLocaleString()}</strong>`)}
+      ${eventName ? emailRow("Event", eventName) : ""}
+      ${paymentMethod ? emailRow("Payment Method", paymentMethod.replace("_", " ").toUpperCase()) : ""}
+      ${emailRow("Requested By", requestedBy)}
+      ${emailRow("Work Confirmed", workConfirmed ? "✓ Yes" : "—")}
+      ${emailRow("Invoice Matches PO", invoiceMatchesPO ? "✓ Yes" : "—")}
+    </table>
+  </div>
+  <div style="background:#FFF8E8;border:1px solid #F59E0B30;border-radius:8px;padding:14px 18px;margin-bottom:20px;color:#A86000;font-size:13px;">
+    Please log in to WorkRoom to review the full details, verify payment information and add your digital signature.
+  </div>
+  ${emailBtn("Review & Sign Payment", BASE_URL)}`
+);
+
+const intelligenceReportEmailHtml = ({ ceoName, eventName, clientName, submittedBy, section }) => emailWrap(
+  emailHeader(`Intelligence Report Update — ${eventName}`),
+  `<p style="color:#0A1628;font-size:14px;margin:0 0 16px;">Hi <strong>${ceoName}</strong>,</p>
+  <p style="color:#0A1628;font-size:14px;margin:0 0 20px;">A new section of the Event Intelligence Report has been submitted and is ready for your review.</p>
+  <div style="background:#fff;border:1px solid #C2C9DC;border-left:4px solid #00E5C8;border-radius:8px;padding:20px 24px;margin-bottom:20px;">
+    <table style="width:100%;border-collapse:collapse;">
+      ${emailRow("Event", eventName)}
+      ${clientName ? emailRow("Client", clientName) : ""}
+      ${emailRow("Section Submitted", section)}
+      ${emailRow("Submitted By", submittedBy)}
+      ${emailRow("Date", new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }))}
+    </table>
+  </div>
+  <p style="color:#0A1628;font-size:13px;margin:0 0 20px;">Once all sections are complete, you can log in to generate the AI-powered Intelligence Summary for this event.</p>
+  ${emailBtn("View Intelligence Report", BASE_URL)}`
+);
+
+
 
 const sendNotificationEmail = async (userId, title, message, actionTab) => {
   try {
@@ -691,6 +787,7 @@ const getNavItems = (role) => {
       ]},
       { id: "grp-people", label: "People", group: true, children: [
         { id: "users", label: "User Management" },
+            { id: "email-test", label: "Email Templates" },
         { id: "hr", label: "HR" },
       ]},
       { id: "grp-intelligence", label: "Intelligence", group: true, children: [
@@ -5447,6 +5544,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "invoices": return <InvoicesView />;
       case "clients": return <ClientsView user={currentUser} />;
       case "users": return <UsersView user={currentUser} />;
+      case "email-test": return <EmailTestPanel user={currentUser} />;
       case "crm": return <CRMView user={currentUser} />;
       case "crm-insights": return ["CEO","Country Manager"].includes(currentUser.role) ? <CRMDashboardCEO user={currentUser} /> : <CRMDashboardSM user={currentUser} />;
       case "sm-tasks": return <SMTasksView user={currentUser} />;
@@ -15430,6 +15528,132 @@ const PaymentAuthorisationView = ({ user }) => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+const EmailTestPanel = ({ user }) => {
+  const [sending, setSending] = useState({});
+  const [results, setResults] = useState({});
+  const [testEmail, setTestEmail] = useState(user.email || "");
+
+  const send = async (templateId, subject, html) => {
+    if (!testEmail) { alert("Enter a test email address"); return; }
+    setSending(s => ({ ...s, [templateId]: true }));
+    try {
+      await sendEmail(testEmail, subject, html);
+      setResults(r => ({ ...r, [templateId]: "sent" }));
+    } catch(e) {
+      setResults(r => ({ ...r, [templateId]: "failed" }));
+    }
+    setSending(s => ({ ...s, [templateId]: false }));
+  };
+
+  const templates = [
+    {
+      id: "welcome",
+      name: "Welcome / Login Details",
+      description: "Sent when a new user account is created",
+      subject: "Welcome to Stretchfield WorkRoom",
+      html: () => welcomeEmailHtml({ name: "Kwesi Yamoah", email: testEmail, password: "Test@Stretch1Sf", role: "CEO" }),
+    },
+    {
+      id: "notification",
+      name: "General Notification",
+      description: "Used for in-app notifications and alerts",
+      subject: "Stretchfield — New Notification",
+      html: () => notifEmailHtml({ name: "Kwesi", title: "Test Notification", message: "This is a test notification from Stretchfield WorkRoom. Your account is active and working correctly.", actionUrl: BASE_URL, actionLabel: "Open WorkRoom" }),
+    },
+    {
+      id: "rff",
+      name: "RFF — Request for Quote",
+      description: "Sent to vendor when assigned to an RFF",
+      subject: "Request for Quote — Event Lighting Services",
+      html: () => rffEmailHtml({ vendorName: "Akwaaba Ushers", rffTitle: "Event Lighting Services", eventName: "2nd African Health Workforce Forum", deadline: new Date(Date.now() + 7*86400000).toISOString(), category: "Event Lighting", notes: "Please include breakdown of lighting rigs and setup costs." }),
+    },
+    {
+      id: "task",
+      name: "Task Assignment",
+      description: "Sent when a task is assigned to a staff member",
+      subject: "New Task Assigned — Stretchfield WorkRoom",
+      html: () => taskEmailHtml({ staffName: "Edem Somevi", taskName: "Confirm Production Run Flow & Stakeholder Activities", eventName: "2nd African Health Workforce Forum", deadline: new Date(Date.now() + 3*86400000).toISOString(), assignedBy: "Kwesi Yamoah", notes: "Please liaise with WHO team and confirm by Friday." }),
+    },
+    {
+      id: "payment_request",
+      name: "Payment Request (Finance)",
+      description: "Sent to Finance when VM submits a payment request",
+      subject: "Payment Authorisation Request — Akwaaba Ushers",
+      html: () => paymentRequestEmailHtml({ financeName: "Isaac Obeng", vendorName: "Akwaaba Ushers", amount: 5500, eventName: "2nd African Health Workforce Forum", paymentMethod: "bank_transfer", requestedBy: "Afua Asubonteng-Boateng", workConfirmed: true, invoiceMatchesPO: true }),
+    },
+    {
+      id: "payment_authorised",
+      name: "Payment Authorised (Vendor)",
+      description: "Sent to vendor when CEO approves payment",
+      subject: "Payment Authorised — GHS 5,500",
+      html: () => paymentAuthorisedEmailHtml({ vendorName: "Akwaaba Ushers", amount: 5500, eventName: "2nd African Health Workforce Forum", paymentMethod: "bank_transfer", paymentTerms: "Net 7 days", bankName: "Absa Ghana", accountNumber: "1234567890", accountName: "Akwaaba Ushers Ltd" }),
+    },
+    {
+      id: "purchase_order",
+      name: "Purchase Order",
+      description: "Sent to vendor when a PO is raised",
+      subject: "Purchase Order — PO-2026-001",
+      html: () => poEmailHtml({ vendorName: "Akwaaba Ushers", poNumber: "PO-2026-001", eventName: "2nd African Health Workforce Forum", amount: 5500, currency: "GHS", notes: "Please invoice upon completion of service." }),
+    },
+    {
+      id: "intelligence_report",
+      name: "Intelligence Report Update",
+      description: "Sent to CEO when a report section is submitted",
+      subject: "Intelligence Report Update — 2nd African Health Workforce Forum",
+      html: () => intelligenceReportEmailHtml({ ceoName: "Kwesi Yamoah", eventName: "2nd African Health Workforce Forum", clientName: "WHO", submittedBy: "Edem Somevi", section: "Operational Intelligence" }),
+    },
+  ];
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid " + T.border }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>System</div>
+        <h2 style={{ margin: "0 0 6px", color: T.textPrimary, fontSize: 22, fontWeight: 800 }}>Email Templates & Testing</h2>
+        <div style={{ color: T.textMuted, fontSize: 12 }}>Preview and test all Stretchfield email templates. Emails sent via Resend from info@stretchfield.com</div>
+      </div>
+
+      {/* Test email input */}
+      <div style={{ background: T.surface, border: "1px solid " + T.cyan+"30", borderRadius: 12, padding: "18px 20px", marginBottom: 24, display: "flex", gap: 12, alignItems: "flex-end" }}>
+        <div style={{ flex: 1 }}>
+          <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 5 }}>Send Test Emails To</label>
+          <input value={testEmail} onChange={e => setTestEmail(e.target.value)} placeholder="your@email.com" style={{ width: "100%", padding: "10px 14px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+        </div>
+        <div style={{ color: T.textMuted, fontSize: 12, paddingBottom: 10 }}>All test emails will be sent to this address</div>
+      </div>
+
+      {/* Template list */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {templates.map(t => {
+          const status = results[t.id];
+          const isSending = sending[t.id];
+          return (
+            <div key={t.id} style={{ background: T.surface, border: "1px solid " + T.border, borderRadius: 12, padding: "18px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{t.name}</div>
+                  {status === "sent" && <span style={{ color: T.teal, fontSize: 10, fontWeight: 700, background: T.teal+"15", padding: "2px 8px", borderRadius: 20 }}>✓ Sent</span>}
+                  {status === "failed" && <span style={{ color: T.red, fontSize: 10, fontWeight: 700, background: T.red+"15", padding: "2px 8px", borderRadius: 20 }}>✗ Failed</span>}
+                </div>
+                <div style={{ color: T.textMuted, fontSize: 12 }}>{t.description}</div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3, fontStyle: "italic" }}>Subject: {t.subject}</div>
+              </div>
+              <button onClick={() => send(t.id, t.subject, t.html())} disabled={isSending || !testEmail} style={{ background: isSending ? T.surface : "linear-gradient(135deg, " + T.cyan + ", " + T.teal + ")", border: "1px solid " + (isSending ? T.border : "transparent"), color: isSending ? T.textMuted : "#fff", padding: "9px 20px", borderRadius: 8, cursor: isSending ? "not-allowed" : "pointer", fontWeight: 700, fontSize: 12, whiteSpace: "nowrap", minWidth: 100 }}>
+                {isSending ? "Sending..." : "Send Test"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ marginTop: 24, background: T.surface, border: "1px solid " + T.border, borderRadius: 10, padding: "14px 18px" }}>
+        <div style={{ color: T.textMuted, fontSize: 11, lineHeight: 1.6 }}>
+          <strong style={{ color: T.textPrimary }}>Email Infrastructure:</strong> All emails are sent via Resend using the verified domain <strong style={{ color: T.cyan }}>stretchfield.com</strong>. Sender address is <strong style={{ color: T.cyan }}>info@stretchfield.com</strong>. Check your spam folder if emails don't arrive within 2 minutes.
+        </div>
+      </div>
     </div>
   );
 };

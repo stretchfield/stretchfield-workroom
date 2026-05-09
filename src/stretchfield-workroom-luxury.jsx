@@ -1321,7 +1321,7 @@ const VendorManagerDashboard = ({ user }) => {
       supabase.from("projects").select("*").eq("status", "active"),
       supabase.from("notifications").select("*").eq("user_id", user.id).eq("read", false).limit(5),
       supabase.from("rffs").select("*").order("created_at", { ascending: false }),
-      supabase.from("rff_awards").select("*").in("status", ["confirmed","po_created"]),
+      supabase.from("rff_awards").select("*").in("status", ["confirmed","po_created","invoiced","paid"]),
     ]).then(([v, t, ev, n, r, aw]) => {
       setVendors(v.data || []);
       setTasks(t.data || []);
@@ -8852,8 +8852,9 @@ const generatePOPDF = (po, vendor, rff, event) => {
   <div class="terms-box">
     <div class="label">Payment Terms & Instructions</div>
     <div class="value">
-      Please submit your invoice to <strong>info@stretchfield.com</strong> referencing PO Number <strong>${poNumber}</strong> upon completion of service delivery.<br>
-      Payment will be processed in accordance with agreed payment terms.
+      Please log in to <strong>Stretchfield WorkRoom</strong> at <strong>workroom.stretchfield.com</strong> to submit your invoice referencing PO Number <strong>${poNumber}</strong> upon completion of service delivery.<br>
+      Do not send invoices via email. All invoices must be submitted through the Stretchfield WorkRoom Vendor Portal.<br>
+      Payment will be processed in accordance with your agreed payment terms once your invoice is verified.
     </div>
   </div>
 
@@ -9044,7 +9045,7 @@ const PurchaseOrderView = ({ user }) => {
 
   const load = async () => {
     const [{ data: aw }, { data: po }, { data: rf }, { data: ev }, { data: vp }, { data: va }] = await Promise.all([
-      supabase.from("rff_awards").select("*").in("status", ["confirmed","po_created"]),
+      supabase.from("rff_awards").select("*").in("status", ["confirmed","po_created","invoiced","paid"]),
       supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }),
       supabase.from("rffs").select("*"),
       supabase.from("projects").select("*"),
@@ -9120,7 +9121,7 @@ const PurchaseOrderView = ({ user }) => {
     await supabase.from("rff_awards").update({ status: "po_created" }).eq("id", award.id);
     setSaving(false);
     setPoForm({ currency: "GHS", notes: "" });
-    load();
+    await load();
   };
 
   const publishPO = async (po) => {

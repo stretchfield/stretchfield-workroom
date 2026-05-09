@@ -7276,6 +7276,11 @@ const FinanceDashboard = ({ user, onTab }) => {
                         {isFinance && v.status === 'approved' && (
                           <button onClick={() => markPaid(v)} style={{ background: T.cyan+'18', border: `1px solid ${T.cyan}30`, color: T.cyan, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>Mark Paid</button>
                         )}
+                        <button onClick={async () => {
+                          const { data: ceo } = await supabase.from('profiles').select('name').eq('role','CEO').single();
+                          const { data: fm } = await supabase.from('profiles').select('name').eq('role','Finance Manager').single();
+                          downloadPDF(generateVoucherPDF(v, ceo, fm), `Voucher-${v.voucher_number}.html`);
+                        }} style={{ background: T.teal+'15', border: `1px solid ${T.teal}30`, color: T.teal, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>↓ PDF</button>
                       </div>
                     </td>
                   </tr>
@@ -8687,6 +8692,296 @@ const GigConfirmationView = ({ user }) => {
   );
 };
 
+
+// ── PDF Generator Utilities ──
+const generatePOPDF = (po, vendor, rff, event) => {
+  const poNumber = po.internal_po_number || po.zoho_po_number || "PO-" + po.id?.slice(0,8);
+  const date = new Date(po.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; color: #0A1628; background: #fff; }
+  .page { width: 794px; min-height: 1123px; margin: 0 auto; padding: 48px 56px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 28px; border-bottom: 3px solid #00C8FF; margin-bottom: 32px; }
+  .logo-area .company { font-size: 22px; font-weight: 900; color: #060B14; letter-spacing: -0.02em; }
+  .logo-area .tagline { font-size: 11px; color: #5A6E8A; font-style: italic; margin-top: 4px; }
+  .logo-area .contact { font-size: 11px; color: #5A6E8A; margin-top: 8px; line-height: 1.6; }
+  .po-title { text-align: right; }
+  .po-title .label { font-size: 11px; font-weight: 700; color: #00C8FF; letter-spacing: 0.14em; text-transform: uppercase; }
+  .po-title .number { font-size: 28px; font-weight: 900; color: #060B14; letter-spacing: -0.02em; margin-top: 4px; }
+  .po-title .date { font-size: 12px; color: #5A6E8A; margin-top: 4px; }
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+  .meta-box { background: #F4F6FB; border-radius: 8px; padding: 16px 20px; }
+  .meta-box .label { font-size: 10px; font-weight: 700; color: #00C8FF; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+  .meta-box .value { font-size: 13px; color: #0A1628; font-weight: 600; line-height: 1.6; }
+  .meta-box .sub { font-size: 11px; color: #5A6E8A; margin-top: 2px; }
+  .section-title { font-size: 10px; font-weight: 700; color: #5A6E8A; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; }
+  table.items { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+  table.items thead tr { background: #060B14; }
+  table.items thead th { padding: 10px 14px; text-align: left; font-size: 10px; font-weight: 700; color: #00C8FF; text-transform: uppercase; letter-spacing: 0.08em; }
+  table.items tbody tr { border-bottom: 1px solid #E8EBF4; }
+  table.items tbody td { padding: 12px 14px; font-size: 13px; color: #0A1628; }
+  .total-row { background: #F4F6FB; }
+  .total-row td { font-weight: 800; font-size: 15px; }
+  .total-amount { color: #00C8FF; font-size: 18px; font-weight: 900; }
+  .terms-box { background: #F4F6FB; border-left: 4px solid #00C8FF; border-radius: 0 8px 8px 0; padding: 14px 18px; margin-bottom: 28px; }
+  .terms-box .label { font-size: 10px; font-weight: 700; color: #5A6E8A; text-transform: uppercase; margin-bottom: 6px; }
+  .terms-box .value { font-size: 13px; color: #0A1628; line-height: 1.6; }
+  .signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 40px; }
+  .sig-box { border-top: 2px solid #C2C9DC; padding-top: 10px; }
+  .sig-box .name { font-size: 12px; font-weight: 700; color: #0A1628; margin-top: 4px; }
+  .sig-box .role { font-size: 10px; color: #5A6E8A; }
+  .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #E8EBF4; display: flex; justify-content: space-between; align-items: center; }
+  .footer .left { font-size: 10px; color: #5A6E8A; line-height: 1.8; }
+  .footer .right { font-size: 10px; color: #5A6E8A; text-align: right; }
+  .badge { display: inline-block; background: #00C8FF18; color: #00C8FF; border: 1px solid #00C8FF40; border-radius: 20px; padding: 3px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<div class="page">
+  <!-- Header -->
+  <div class="header">
+    <div class="logo-area">
+      <div class="company">STRETCHFIELD</div>
+      <div class="tagline">We don't plan events. We engineer impact.</div>
+      <div class="contact">
+        info@stretchfield.com · www.stretchfield.com<br>
+        Accra, Ghana
+      </div>
+    </div>
+    <div class="po-title">
+      <div class="label">Purchase Order</div>
+      <div class="number">${poNumber}</div>
+      <div class="date">Issued: ${date}</div>
+      ${po.zoho_po_number ? '<div class="date" style="color:#00C8FF;">Zoho: ' + po.zoho_po_number + '</div>' : ''}
+    </div>
+  </div>
+
+  <!-- Meta Grid -->
+  <div class="meta-grid">
+    <div class="meta-box">
+      <div class="label">Vendor / Supplier</div>
+      <div class="value">${po.vendor_name}</div>
+      ${vendor?.email ? '<div class="sub">' + vendor.email + '</div>' : ''}
+      ${vendor?.phone ? '<div class="sub">' + vendor.phone + '</div>' : ''}
+      ${vendor?.service_category ? '<div class="sub">' + vendor.service_category + '</div>' : ''}
+    </div>
+    <div class="meta-box">
+      <div class="label">Event / Project</div>
+      <div class="value">${po.event_name || event?.name || "—"}</div>
+      ${rff?.title ? '<div class="sub">RFF: ' + rff.title + '</div>' : ''}
+      ${event?.event_date ? '<div class="sub">Event Date: ' + new Date(event.event_date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) + '</div>' : ''}
+      ${event?.client ? '<div class="sub">Client: ' + event.client + '</div>' : ''}
+    </div>
+  </div>
+
+  <!-- Line Items -->
+  <div class="section-title">Service Details</div>
+  <table class="items">
+    <thead>
+      <tr>
+        <th style="width:50%">Description</th>
+        <th>Category</th>
+        <th style="text-align:right">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>${rff?.title || "Professional Services — " + po.vendor_name}</td>
+        <td>${rff?.category || vendor?.service_category || "—"}</td>
+        <td style="text-align:right;font-weight:700;">${po.currency || "GHS"} ${parseFloat(po.amount||0).toLocaleString()}</td>
+      </tr>
+      ${po.notes ? '<tr><td colspan="3" style="color:#5A6E8A;font-size:12px;font-style:italic;">Note: ' + po.notes + '</td></tr>' : ''}
+    </tbody>
+    <tfoot>
+      <tr class="total-row">
+        <td colspan="2" style="text-align:right;padding:12px 14px;">Total Amount</td>
+        <td style="text-align:right;padding:12px 14px;" class="total-amount">${po.currency || "GHS"} ${parseFloat(po.amount||0).toLocaleString()}</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <!-- Terms -->
+  <div class="terms-box">
+    <div class="label">Payment Terms & Instructions</div>
+    <div class="value">
+      Please submit your invoice to <strong>info@stretchfield.com</strong> referencing PO Number <strong>${poNumber}</strong> upon completion of service delivery.<br>
+      Payment will be processed in accordance with agreed payment terms.
+    </div>
+  </div>
+
+  <!-- Signatures -->
+  <div class="section-title">Authorisation</div>
+  <div class="signatures">
+    <div class="sig-box">
+      <div style="height:40px;"></div>
+      <div class="name">Vendor Manager</div>
+      <div class="role">Prepared by</div>
+    </div>
+    <div class="sig-box">
+      <div style="height:40px;"></div>
+      <div class="name">Finance Manager</div>
+      <div class="role">Reviewed by</div>
+    </div>
+    <div class="sig-box">
+      <div style="height:40px;"></div>
+      <div class="name">CEO</div>
+      <div class="role">Authorised by · Stretchfield</div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="left">
+      <strong>STRETCHFIELD</strong><br>
+      www.stretchfield.com · info@stretchfield.com<br>
+      © ${new Date().getFullYear()} Stretchfield. All rights reserved.
+    </div>
+    <div class="right">
+      <span class="badge">${po.status?.toUpperCase() || "DRAFT"}</span><br>
+      <span style="margin-top:4px;display:block;">Document ID: ${po.id?.slice(0,8).toUpperCase()}</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>`;
+  return html;
+};
+
+const downloadPDF = (html, filename) => {
+  const blob = new Blob([html], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, "_blank");
+  if (win) {
+    win.onload = () => {
+      win.print();
+    };
+  }
+};
+
+const generateVoucherPDF = (voucher, approver, financeManager) => {
+  const date = new Date(voucher.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; color: #0A1628; background: #fff; }
+  .page { width: 794px; min-height: 1123px; margin: 0 auto; padding: 48px 56px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 24px; border-bottom: 3px solid #00C8FF; margin-bottom: 28px; }
+  .company { font-size: 22px; font-weight: 900; color: #060B14; }
+  .tagline { font-size: 11px; color: #5A6E8A; font-style: italic; margin-top: 3px; }
+  .voucher-title { text-align: right; }
+  .voucher-title .label { font-size: 11px; font-weight: 700; color: #00C8FF; letter-spacing: 0.14em; text-transform: uppercase; }
+  .voucher-title .number { font-size: 26px; font-weight: 900; color: #060B14; margin-top: 4px; }
+  .amount-hero { background: linear-gradient(135deg, #060B14, #0A1628); border-radius: 10px; padding: 24px 28px; margin-bottom: 28px; display: flex; justify-content: space-between; align-items: center; }
+  .amount-hero .label { font-size: 10px; font-weight: 700; color: #5A7A9A; text-transform: uppercase; letter-spacing: 0.1em; }
+  .amount-hero .amount { font-size: 32px; font-weight: 900; color: #00C8FF; margin-top: 4px; }
+  .amount-hero .right { text-align: right; }
+  .amount-hero .type { font-size: 11px; color: #5A7A9A; }
+  .amount-hero .type-val { font-size: 14px; font-weight: 700; color: #E8F0FF; margin-top: 3px; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .detail-box { background: #F4F6FB; border-radius: 8px; padding: 14px 18px; }
+  .detail-box .label { font-size: 10px; font-weight: 700; color: #5A6E8A; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 5px; }
+  .detail-box .value { font-size: 13px; color: #0A1628; font-weight: 600; line-height: 1.5; }
+  .sig-section { margin-top: 36px; }
+  .sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 12px; }
+  .sig-box { border: 1px solid #C2C9DC; border-radius: 8px; padding: 16px 18px; min-height: 100px; }
+  .sig-box .label { font-size: 10px; font-weight: 700; color: #5A6E8A; text-transform: uppercase; margin-bottom: 8px; }
+  .sig-box img { max-height: 50px; max-width: 100%; }
+  .sig-box .name { font-size: 12px; font-weight: 700; color: #0A1628; margin-top: 8px; border-top: 1px solid #E8EBF4; padding-top: 6px; }
+  .sig-box .date { font-size: 10px; color: #5A6E8A; }
+  .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #E8EBF4; display: flex; justify-content: space-between; font-size: 10px; color: #5A6E8A; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div>
+      <div class="company">STRETCHFIELD</div>
+      <div class="tagline">We don't plan events. We engineer impact.</div>
+      <div style="font-size:11px;color:#5A6E8A;margin-top:6px;">info@stretchfield.com · www.stretchfield.com</div>
+    </div>
+    <div class="voucher-title">
+      <div class="label">Payment Voucher</div>
+      <div class="number">${voucher.voucher_number}</div>
+      <div style="font-size:12px;color:#5A6E8A;margin-top:4px;">${date}</div>
+    </div>
+  </div>
+
+  <div class="amount-hero">
+    <div>
+      <div class="label">Amount to Pay</div>
+      <div class="amount">GHS ${parseFloat(voucher.amount||0).toLocaleString()}</div>
+    </div>
+    <div class="right">
+      <div class="type">Payment Type</div>
+      <div class="type-val">${(voucher.payment_type||"").replace(/_/g," ").toUpperCase()}</div>
+      <div class="type" style="margin-top:8px;">Status</div>
+      <div class="type-val" style="color:#00E5C8;">${(voucher.status||"").toUpperCase()}</div>
+    </div>
+  </div>
+
+  <div class="detail-grid">
+    <div class="detail-box">
+      <div class="label">Payee</div>
+      <div class="value">${voucher.payee}</div>
+    </div>
+    <div class="detail-box">
+      <div class="label">Description</div>
+      <div class="value">${voucher.description}</div>
+    </div>
+    <div class="detail-box">
+      <div class="label">Account / Category</div>
+      <div class="value">${voucher.account || "—"}</div>
+    </div>
+    <div class="detail-box">
+      <div class="label">Reference</div>
+      <div class="value">${voucher.reference || voucher.voucher_number}</div>
+    </div>
+    ${voucher.event_name ? '<div class="detail-box"><div class="label">Event</div><div class="value">' + voucher.event_name + '</div></div>' : ''}
+    <div class="detail-box">
+      <div class="label">Raised By</div>
+      <div class="value">${financeManager?.name || "Finance Manager"}</div>
+    </div>
+  </div>
+
+  <div class="sig-section">
+    <div style="font-size:10px;font-weight:700;color:#5A6E8A;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px;">Authorisation Signatures</div>
+    <div class="sig-grid">
+      <div class="sig-box">
+        <div class="label">Finance Manager</div>
+        <div style="height:50px;border-bottom:1px dashed #C2C9DC;margin-bottom:8px;display:flex;align-items:center;">
+          ${voucher.fm_signature ? '<img src="' + voucher.fm_signature + '" />' : '<span style="color:#C2C9DC;font-size:11px;">Signature</span>'}
+        </div>
+        <div class="name">${financeManager?.name || "Finance Manager"}</div>
+        <div class="date">${voucher.created_at ? new Date(voucher.created_at).toLocaleDateString("en-GB") : ""}</div>
+      </div>
+      <div class="sig-box">
+        <div class="label">CEO Approval</div>
+        <div style="height:50px;border-bottom:1px dashed #C2C9DC;margin-bottom:8px;display:flex;align-items:center;">
+          ${voucher.ceo_signature ? '<img src="' + voucher.ceo_signature + '" />' : '<span style="color:#C2C9DC;font-size:11px;">Pending CEO signature</span>'}
+        </div>
+        <div class="name">${approver?.name || "CEO"}</div>
+        <div class="date">${voucher.approved_at ? new Date(voucher.approved_at).toLocaleDateString("en-GB") : "Pending"}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>STRETCHFIELD · www.stretchfield.com · Accra, Ghana</span>
+    <span>Voucher ID: ${voucher.id?.slice(0,8).toUpperCase()} · © ${new Date().getFullYear()} Stretchfield</span>
+  </div>
+</div>
+</body>
+</html>`;
+  return html;
+};
+
 const PurchaseOrderView = ({ user }) => {
   const [awards, setAwards] = useState([]);
   const [pos, setPOs] = useState([]);
@@ -8829,7 +9124,7 @@ const PurchaseOrderView = ({ user }) => {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
-                  {["PO Number","Vendor","Event","Amount","Zoho Status","Status"].map(h => (
+                  {["PO Number","Vendor","Event","Amount","Zoho Status","Status",""].map(h => (
                     <th key={h} style={{ padding: "10px 14px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>
                   ))}
                 </tr>
@@ -8848,6 +9143,14 @@ const PurchaseOrderView = ({ user }) => {
                     <td style={{ padding: "10px 14px", color: T.amber, fontSize: 12, fontWeight: 700 }}>{po.currency} {(po.amount||0).toLocaleString()}</td>
                     <td style={{ padding: "10px 14px" }}><span style={{ color: po.zoho_po_id ? T.teal : T.textMuted, fontSize: 11, fontWeight: 600 }}>{po.zoho_po_id ? "✓ In Zoho" : "Local only"}</span></td>
                     <td style={{ padding: "10px 14px" }}><span style={{ background: T.teal + "18", color: T.teal, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{po.status}</span></td>
+                    <td style={{ padding: "10px 14px" }}>
+                      <button onClick={() => {
+                        const vendor = vendorProfiles.find(v => v.id === po.vendor_id);
+                        const rff = rffs.find(r => r.id === po.rff_id);
+                        const event = events.find(e => e.id === po.event_id);
+                        downloadPDF(generatePOPDF(po, vendor, rff, event), `PO-${po.internal_po_number || po.id}.html`);
+                      }} style={{ background: T.cyan+"15", border: "1px solid " + T.cyan+"30", color: T.cyan, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>↓ PDF</button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

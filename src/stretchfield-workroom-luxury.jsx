@@ -974,24 +974,29 @@ const CEODashboard = ({ onTab, user }) => {
   const [feedback, setFeedback] = useState([]);
   const [clients, setClients] = useState([]);
   const [rffs, setRffs] = useState([]);
-  const [unreadNotifs, setUnreadNotifs] = useState([]);
-
+  const [paymentAuths, setPaymentAuths] = useState([]);
+  const [vouchers, setVouchers] = useState([]);
+  const [awards, setAwards] = useState([]);
   const [loading, setLoading] = React.useState(true);
+  const [internalPortalEvent, setInternalPortalEvent] = useState(null);
 
   useEffect(() => {
     const loadAll = async () => {
       setLoading(true);
-      const [ev, inv, tk, cl, fb, op, tg, rf, vp, sc] = await Promise.all([
-        supabase.from('projects').select('*').order('created_at', { ascending: false }),
+      const [ev, inv, tk, cl, fb, op, tg, rf, vp, sc, pa, vo, aw] = await Promise.all([
+        supabase.from('projects').select('*').order('event_date', { ascending: true }),
         supabase.from('invoices').select('*').order('created_at', { ascending: false }),
-        supabase.from('tasks').select('*'),
+        supabase.from('tasks').select('*').order('created_at', { ascending: false }),
         supabase.from('clients').select('*'),
         supabase.from('feedback').select('*').order('created_at', { ascending: false }),
-        supabase.from('opportunities').select('*'),
+        supabase.from('opportunities').select('*').order('created_at', { ascending: false }),
         supabase.from('sales_targets').select('*'),
         supabase.from('rffs').select('*'),
         supabase.from('profiles').select('*').eq('role', 'Vendor'),
         supabase.from('vendor_scorecards').select('*').order('created_at', { ascending: false }),
+        supabase.from('payment_authorisations').select('*').order('created_at', { ascending: false }),
+        supabase.from('payment_vouchers').select('*').order('created_at', { ascending: false }),
+        supabase.from('rff_awards').select('*'),
       ]);
       setEvents(ev.data || []);
       setInvoices(inv.data || []);
@@ -1000,547 +1005,292 @@ const CEODashboard = ({ onTab, user }) => {
       setFeedback(fb.data || []);
       setOpportunitys(op.data || []);
       setTargets(tg.data || []);
-      const rffData = rf.data || [];
-      setRffs(rffData);
-      setVendors([...new Set(rffData.map(r => r.vendor).filter(Boolean))]);
+      setRffs(rf.data || []);
+      setVendors([...new Set((rf.data||[]).map(r => r.vendor).filter(Boolean))]);
       setVendorProfiles(vp.data || []);
       setScorecards(sc.data || []);
+      setPaymentAuths(pa.data || []);
+      setVouchers(vo.data || []);
+      setAwards(aw.data || []);
       setLoading(false);
     };
     loadAll();
   }, []);
 
-  // Live unread notifications for CEO - polls every 5s + realtime
-  useEffect(() => {
-    if (!user?.id) return;
-    const fetch = () => supabase.from('notifications').select('*').eq('user_id', user.id).eq('read', false).order('created_at', { ascending: false }).then(({ data }) => setUnreadNotifs(data || []));
-    fetch();
-    const sub = supabase.channel('ceo-dash-notif-' + user.id)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications' }, fetch)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, fetch)
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'notifications' }, fetch)
-      .subscribe();
-    const interval = setInterval(fetch, 5000);
-    return () => { supabase.removeChannel(sub); clearInterval(interval); };
-  }, [user?.id]);
+  const now = new Date();
+  const greeting = now.getHours() < 12 ? "Good Morning" : now.getHours() < 17 ? "Good Afternoon" : "Good Evening";
+
+  // Key metrics
+  const activeEvents = events.filter(e => !["Completed","Cancelled"].includes(e.phase||""));
+  const upcomingEvents = events.filter(e => e.event_date && new Date(e.event_date) >= now).slice(0,3);
+  const wonOpps = opportunities.filter(o => o.status === "won");
+  const pipeline = opportunities.filter(o => !["won","lost"].includes(o.status));
+  const pipelineValue = pipeline.reduce((s,o) => s+(o.value||0), 0);
+  const revenueYTD = wonOpps.filter(o => o.closed_date && new Date(o.closed_date).getFullYear() === now.getFullYear()).reduce((s,o) => s+(o.value||0), 0);
+  const pendingPayments = paymentAuths.filter(p => p.status === "pending_ceo");
+  const pendingTasks = tasks.filter(t => t.status !== "completed");
+  const avgRating = scorecards.length > 0 ? (scorecards.reduce((s,sc) => s+(sc.total_pct||0), 0)/scorecards.length).toFixed(0) : 0;
+  const recentFeedback = feedback.slice(0,3);
+  const totalBusiness = awards.reduce((s,a) => s+(parseFloat(a.agreed_amount)||0), 0);
 
   if (loading) return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", flexDirection: "column", gap: 16 }}>
-      <div style={{ width: 40, height: 40, border: `3px solid ${T.border}`, borderTop: `3px solid ${T.cyan}`, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-      <div style={{ color: T.textMuted, fontSize: 13 }}>Loading dashboard...</div>
+    <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ width: 36, height: 36, border: "3px solid "+T.border, borderTop: "3px solid "+T.cyan, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
     </div>
   );
 
-  const pendingInvoices = invoices.filter(i => i.status === 'pending');
-  const openTasks = tasks.filter(t => t.status !== 'completed');
-  const wonOpportunitys = opportunities.filter(l => l.status === 'won');
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const mtdRevenue = wonOpportunitys.filter(l => l.closed_date && new Date(l.closed_date) >= startOfMonth).reduce((a, l) => a + (l.value || 0), 0);
-  const ytdRevenue = wonOpportunitys.filter(l => l.closed_date && new Date(l.closed_date) >= startOfYear).reduce((a, l) => a + (l.value || 0), 0);
-  const totalRevenue = wonOpportunitys.reduce((a, l) => a + (l.value || 0), 0);
-  const closingPct = opportunities.length ? Math.round((wonOpportunitys.length / opportunities.length) * 100) : 0;
-  const avgCycle = wonOpportunitys.filter(l => l.sales_cycle_days).length
-    ? Math.round(wonOpportunitys.filter(l => l.sales_cycle_days).reduce((a, l) => a + l.sales_cycle_days, 0) / wonOpportunitys.filter(l => l.sales_cycle_days).length) : 0;
-  const pendingRffs = rffs.filter(r => r.status === 'pending' && r.approved);
-  const wonOpportunitysAwaitingApproval = opportunities.filter(l => l.status === 'won' && !l.approved);
-  const avgRating = feedback.length ? (feedback.reduce((a, f) => a + f.rating, 0) / feedback.length).toFixed(1) : null;
-  const upcomingEvents = events
-    .filter(e => e.event_date && new Date(e.event_date) >= new Date())
-    .sort((a, b) => new Date(a.event_date) - new Date(b.event_date))
-    .slice(0, 5);
-
-  const now2 = new Date();
-  const greeting = now2.getHours() < 12 ? 'Good Morning' : now2.getHours() < 17 ? 'Good Afternoon' : 'Good Evening';
-  const dateStr = now2.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-
   return (
-    <div style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      <style>{`
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
-        .exec-card { animation: fadeUp 0.4s ease forwards; }
-        .exec-kpi:hover { transform: translateY(-2px); transition: transform 0.2s ease; }
-      `}</style>
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
 
-      {/* Executive Header */}
-      <div style={{ marginBottom: 32, paddingBottom: 24, borderBottom: '1px solid ' + T.border }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
+      {/* ── HERO GREETING ── */}
+      <div style={{ background: "linear-gradient(135deg, "+T.bgDeep+" 0%, #0D1F36 60%, "+T.bgDeep+" 100%)", border: "1px solid "+T.border, borderRadius: 16, padding: "32px 36px", marginBottom: 24, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: -60, right: -60, width: 280, height: 280, background: "radial-gradient(circle, "+T.cyan+"08, transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: -40, left: 200, width: 200, height: 200, background: "radial-gradient(circle, "+T.teal+"06, transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
           <div>
-            <div style={{ color: T.textMuted, fontSize: 12, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>{dateStr}</div>
-            <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: T.textPrimary, letterSpacing: '-0.02em' }}>{greeting}</h1>
-            <div style={{ color: T.textMuted, fontSize: 14, marginTop: 4 }}>Here's your company at a glance</div>
-          </div>
-          {(unreadNotifs.length > 0 || wonOpportunitysAwaitingApproval.length > 0 || pendingInvoices.length > 0) && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 260 }}>
-              {unreadNotifs.slice(0, 2).map(n => (
-                <div key={n.id} onClick={() => onTab('notifications')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', background: 'linear-gradient(135deg, ' + T.amber + '18, ' + T.amber + '08)', border: '1px solid ' + T.amber + '33', borderRadius: 8, cursor: 'pointer', backdropFilter: 'blur(8px)' }}>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: T.amber, flexShrink: 0, boxShadow: '0 0 6px ' + T.amber }} />
-                  <div style={{ color: T.amber, fontSize: 12, fontWeight: 600, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.title}</div>
-                  <span style={{ color: T.amber, fontSize: 11, opacity: 0.7 }}>→</span>
-                </div>
-              ))}
-              {wonOpportunitysAwaitingApproval.length > 0 && (
-                <div onClick={() => onTab('crm')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', background: 'linear-gradient(135deg, ' + T.teal + '18, ' + T.teal + '08)', border: '1px solid ' + T.teal + '33', borderRadius: 8, cursor: 'pointer' }}>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: T.teal, flexShrink: 0, boxShadow: '0 0 6px ' + T.teal }} />
-                  <div style={{ color: T.teal, fontSize: 12, fontWeight: 600 }}>{wonOpportunitysAwaitingApproval.length} Won Opportunity{wonOpportunitysAwaitingApproval.length > 1 ? 's' : ''} Awaiting Approval</div>
-                  <span style={{ color: T.teal, fontSize: 11, opacity: 0.7 }}>→</span>
-                </div>
-              )}
-              {pendingInvoices.length > 0 && (
-                <div onClick={() => onTab('invoices')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', background: 'linear-gradient(135deg, ' + T.magenta + '18, ' + T.magenta + '08)', border: '1px solid ' + T.magenta + '33', borderRadius: 8, cursor: 'pointer' }}>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: T.magenta, flexShrink: 0, boxShadow: '0 0 6px ' + T.magenta }} />
-                  <div style={{ color: T.magenta, fontSize: 12, fontWeight: 600 }}>{pendingInvoices.length} Invoice{pendingInvoices.length > 1 ? 's' : ''} Pending · GHS {pendingInvoices.reduce((a, i) => a + (i.amount || 0), 0).toLocaleString()}</div>
-                  <span style={{ color: T.magenta, fontSize: 11, opacity: 0.7 }}>→</span>
-                </div>
-              )}
+            <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>
+              {now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
             </div>
-          )}
+            <h1 style={{ margin: "0 0 6px", fontSize: 28, fontWeight: 900, color: T.textPrimary, letterSpacing: "-0.03em" }}>{greeting}, {user?.name?.split(" ")[0]}.</h1>
+            <div style={{ color: T.textMuted, fontSize: 14, maxWidth: 480 }}>
+              {activeEvents.length} active event{activeEvents.length !== 1 ? "s" : ""} in flight
+              {pendingPayments.length > 0 && <span style={{ color: T.amber, fontWeight: 700 }}> · {pendingPayments.length} payment{pendingPayments.length !== 1 ? "s" : ""} awaiting your signature</span>}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 12 }}>
+            {pendingPayments.length > 0 && (
+              <button onClick={() => onTab("payment-authorisation")} style={{ background: T.amber+"15", border: "1px solid "+T.amber+"40", color: T.amber, padding: "10px 18px", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>
+                ✍ Sign Payments ({pendingPayments.length})
+              </button>
+            )}
+            <button onClick={() => onTab("events")} style={{ background: "linear-gradient(135deg,"+T.cyan+","+T.teal+")", border: "none", color: "#060B14", padding: "10px 20px", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>
+              View All Events →
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Revenue Command Centre */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 24 }}>
-        {[
-          { label: 'Total Revenue', value: 'GHS ' + totalRevenue.toLocaleString(), sub: wonOpportunitys.length + ' deals closed', color: '#C9A84C', gradient: 'linear-gradient(135deg, #C9A84C22, #C9A84C08)' },
-          { label: 'YTD Revenue', value: 'GHS ' + ytdRevenue.toLocaleString(), sub: 'Year to date', color: T.cyan, gradient: 'linear-gradient(135deg, ' + T.cyan + '22, ' + T.cyan + '08)' },
-          { label: 'MTD Revenue', value: 'GHS ' + mtdRevenue.toLocaleString(), sub: 'This month', color: T.teal, gradient: 'linear-gradient(135deg, ' + T.teal + '22, ' + T.teal + '08)' },
-        ].map((k, i) => (
-          <div key={i} className="exec-kpi" style={{ padding: '20px 22px', background: k.gradient, border: '1px solid ' + k.color + '33', borderRadius: 14, animationDelay: (i * 0.08) + 's' }}>
-            <div style={{ color: k.color, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, opacity: 0.8 }}>{k.label}</div>
-            <div style={{ color: k.color, fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em', marginBottom: 4 }}>{k.value}</div>
-            <div style={{ color: T.textMuted, fontSize: 11 }}>{k.sub}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* KPI Strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginBottom: 28 }}>
-        {[
-          { label: 'Active Events', value: events.filter(e => e.status === 'active').length, sub: events.length + ' total', color: T.cyan, tab: 'events' },
-          { label: 'Clients', value: clients.length, sub: 'active', color: T.blue, tab: 'clients' },
-          { label: 'Vendors', value: vendors.length, sub: 'registered', color: T.teal, tab: 'vendors' },
-          { label: 'Open Tasks', value: openTasks.length, sub: 'in progress', color: T.magenta, tab: 'tasks' },
-          { label: 'Closing Rate', value: closingPct + '%', sub: 'win rate', color: '#C9A84C', tab: 'crm' },
-          { label: 'Client Rating', value: avgRating ? avgRating + '/5' : '—', sub: 'avg score', color: T.amber, tab: 'feedback' },
-        ].map((k, i) => (
-          <div key={i} onClick={() => onTab(k.tab)} className="exec-kpi" style={{ padding: '14px 16px', background: T.surface, border: '1px solid ' + T.border, borderTop: '2px solid ' + k.color, borderRadius: 10, cursor: 'pointer', animationDelay: (0.24 + i * 0.06) + 's', textAlign: 'center' }}>
-            <div style={{ color: k.color, fontSize: 20, fontWeight: 900, letterSpacing: '-0.02em' }}>{k.value}</div>
-            <div style={{ color: T.textPrimary, fontSize: 11, fontWeight: 600, marginTop: 4 }}>{k.label}</div>
-            <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{k.sub}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Main 3-col executive grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 18, marginBottom: 18 }}>
-        {/* Event Progress */}
-        <div style={{ background: T.surface, border: '1px solid ' + T.border, borderRadius: 14, padding: '20px 22px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, letterSpacing: '-0.01em' }}>Active Events</div>
-            <button onClick={() => onTab('events')} style={{ background: 'none', border: 'none', color: T.cyan, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>View All →</button>
-          </div>
-          {events.filter(e => e.status === 'active').slice(0, 4).map((e, i) => (
-            <div key={e.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: i < 3 ? '1px solid ' + T.border + '55' : 'none' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div>
-                  <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 700 }}>{e.name}</div>
-                  <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{e.phase} · {e.client}</div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ color: e.completion >= 80 ? T.teal : e.completion >= 50 ? T.cyan : T.amber, fontWeight: 900, fontSize: 16 }}>{e.completion || 0}%</div>
-                </div>
-              </div>
-              <div style={{ height: 4, background: T.border + '44', borderRadius: 2, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: (e.completion || 0) + '%', background: e.completion >= 80 ? T.teal : e.completion >= 50 ? T.cyan : T.amber, borderRadius: 2, transition: 'width 0.6s ease' }} />
-              </div>
+        {/* Mini KPI bar */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginTop: 24, paddingTop: 20, borderTop: "1px solid "+T.border+"44" }}>
+          {[
+            { label: "Active Events", value: activeEvents.length, color: T.cyan, tab: "events" },
+            { label: "Pipeline Value", value: "GHS "+Math.round(pipelineValue/1000)+"k", color: T.teal, tab: "opportunities" },
+            { label: "Revenue YTD", value: "GHS "+Math.round(revenueYTD/1000)+"k", color: "#10B981", tab: "opportunities" },
+            { label: "Open Tasks", value: pendingTasks.length, color: pendingTasks.length > 5 ? T.amber : T.textMuted, tab: "events" },
+            { label: "Vendor Rating", value: avgRating+"%", color: parseInt(avgRating) >= 70 ? T.teal : T.amber, tab: "scorecards" },
+            { label: "Total Business", value: "GHS "+Math.round(totalBusiness/1000)+"k", color: T.gold, tab: "vendors" },
+          ].map(k => (
+            <div key={k.label} onClick={() => onTab(k.tab)} style={{ cursor: "pointer", padding: "12px 14px", background: T.bg+"80", border: "1px solid "+T.border+"44", borderRadius: 10, transition: "border-color 0.15s" }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = k.color+"60"}
+              onMouseLeave={e => e.currentTarget.style.borderColor = T.border+"44"}>
+              <div style={{ color: k.color, fontSize: 18, fontWeight: 900, letterSpacing: "-0.02em" }}>{k.value}</div>
+              <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>{k.label}</div>
             </div>
           ))}
         </div>
+      </div>
 
-        {/* Opportunities Pipeline — elegant funnel */}
-        <div style={{ background: T.surface, border: '1px solid ' + T.border, borderRadius: 14, padding: '20px 22px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, letterSpacing: '-0.01em' }}>Pipeline</div>
-            <button onClick={() => onTab('crm')} style={{ background: 'none', border: 'none', color: T.cyan, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>View All →</button>
+      {/* ── TWO COLUMN LAYOUT ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+
+        {/* LEFT: Upcoming Events */}
+        <div style={{ background: T.surface, border: "1px solid "+T.border, borderRadius: 14, padding: "20px 22px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div>
+              <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 3 }}>Operations</div>
+              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Upcoming Events</div>
+            </div>
+            <button onClick={() => onTab("events")} style={{ background: "none", border: "none", color: T.cyan, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>View all →</button>
           </div>
-          {['new','contacted','qualified','proposal','won','lost'].map(s => {
-            const count = opportunities.filter(l => l.status === s).length;
-            const val = opportunities.filter(l => l.status === s).reduce((a, l) => a + (l.value || 0), 0);
-            if (!count) return null;
-            const colors = { new: T.cyan, contacted: T.blue, qualified: T.amber, proposal: T.magenta, won: T.teal, lost: '#F43F5E' };
-            const maxVal = Math.max(...['new','contacted','qualified','proposal','won','lost'].map(st => opportunities.filter(l => l.status === st).reduce((a,l) => a + (l.value||0), 0)));
-            const barW = maxVal > 0 ? Math.round((val / maxVal) * 100) : 0;
+          {upcomingEvents.length === 0 ? (
+            <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "20px 0" }}>No upcoming events</div>
+          ) : upcomingEvents.map(e => {
+            const days = Math.ceil((new Date(e.event_date) - now) / 86400000);
+            const color = days <= 7 ? T.red : days <= 30 ? T.amber : T.teal;
+            const PHASES = ["Brief","Planning","Pre-Production","Production","Live","Post-Production","Completed"];
+            const phaseIdx = PHASES.indexOf(e.phase||"Planning");
             return (
-              <div key={s} style={{ marginBottom: 10 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ color: colors[s], fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{s}</span>
-                  <span style={{ color: T.textMuted, fontSize: 11 }}>{count} · GHS {val.toLocaleString()}</span>
+              <div key={e.id} onClick={() => setInternalPortalEvent(e)} style={{ display: "flex", gap: 14, padding: "12px 0", borderBottom: "1px solid "+T.border+"33", cursor: "pointer" }}>
+                <div style={{ width: 44, height: 44, borderRadius: 10, background: color+"15", border: "1px solid "+color+"30", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <div style={{ color, fontSize: 14, fontWeight: 900, lineHeight: 1 }}>{days > 0 ? days : "T"}</div>
+                  <div style={{ color, fontSize: 8, textTransform: "uppercase", fontWeight: 700 }}>{days > 0 ? "days" : "oday"}</div>
                 </div>
-                <div style={{ height: 3, background: T.border + '44', borderRadius: 2 }}>
-                  <div style={{ height: '100%', width: barW + '%', background: colors[s], borderRadius: 2, opacity: 0.8 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.name}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{e.client} · {new Date(e.event_date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</div>
+                  <div style={{ display: "flex", gap: 3, marginTop: 6 }}>
+                    {PHASES.map((ph,i) => <div key={ph} style={{ flex: 1, height: 3, borderRadius: 2, background: i <= phaseIdx ? (i === phaseIdx ? T.cyan : T.teal+"80") : T.border+"44" }} />)}
+                  </div>
+                </div>
+                <div style={{ flexShrink: 0 }}>
+                  <span style={{ color: T.cyan, fontSize: 10, fontWeight: 700 }}>{e.phase||"Planning"}</span>
                 </div>
               </div>
             );
           })}
-          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid ' + T.border + '44', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: T.textMuted, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Pipeline Value</span>
-            <span style={{ color: '#C9A84C', fontWeight: 800, fontSize: 15 }}>GHS {opportunities.filter(l => !['won','lost'].includes(l.status)).reduce((a, l) => a + (l.value || 0), 0).toLocaleString()}</span>
-          </div>
         </div>
-      </div>
 
-      {/* Bottom row — Invoices + Feedback side by side */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 18 }}>
-        <div style={{ background: T.surface, border: '1px solid ' + T.border, borderRadius: 14, padding: '20px 22px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>Recent Invoices</div>
-            <button onClick={() => onTab('invoices')} style={{ background: 'none', border: 'none', color: T.cyan, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>View All →</button>
-          </div>
-          {invoices.slice(0, 4).map((inv, i) => (
-            <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i < 3 ? '1px solid ' + T.border + '44' : 'none' }}>
-              <div>
-                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{inv.vendor || 'Vendor'}</div>
-                <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{inv.event_name}</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 700 }}>GHS {(inv.amount || 0).toLocaleString()}</div>
-                <Badge status={inv.status} />
-              </div>
+        {/* RIGHT: Pipeline & Revenue */}
+        <div style={{ background: T.surface, border: "1px solid "+T.border, borderRadius: 14, padding: "20px 22px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div>
+              <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 3 }}>Business Development</div>
+              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Pipeline & Revenue</div>
             </div>
-          ))}
-        </div>
-
-        <div style={{ background: T.surface, border: '1px solid ' + T.border, borderRadius: 14, padding: '20px 22px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>Client Feedback</div>
-            <button onClick={() => onTab('feedback')} style={{ background: 'none', border: 'none', color: T.cyan, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>View All →</button>
+            <button onClick={() => onTab("opportunities")} style={{ background: "none", border: "none", color: T.cyan, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>View all →</button>
           </div>
-          {feedback.length === 0 ? (
-            <div style={{ color: T.textMuted, fontSize: 13, padding: '20px 0', textAlign: 'center' }}>No feedback yet.</div>
-          ) : feedback.slice(0, 3).map((f, i) => (
-            <div key={f.id} style={{ padding: '10px 0', borderBottom: i < 2 ? '1px solid ' + T.border + '44' : 'none' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 700 }}>{f.client_name}</div>
-                <div style={{ color: '#C9A84C', fontSize: 12, letterSpacing: 2 }}>{'★'.repeat(f.rating)}{'☆'.repeat(5 - f.rating)}</div>
-              </div>
-              <div style={{ color: T.textMuted, fontSize: 10, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{f.event_name}</div>
-              <div style={{ color: T.textSecondary, fontSize: 12, fontStyle: 'italic', opacity: 0.8 }}>"{f.summary}"</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Sales Targets Progress */}
-      {targets.length > 0 && (
-        <div style={{ background: T.surface, border: '1px solid ' + T.border, borderRadius: 14, padding: '20px 22px', marginBottom: 18 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>Sales Team Performance</div>
-            <button onClick={() => onTab('crm-insights')} style={{ background: 'none', border: 'none', color: T.cyan, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Full Insights →</button>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
-            {targets.map(t => {
-              const repWon = wonOpportunitys.filter(l => l.assigned_to === t.rep_id || l.created_by === t.rep_id);
-              const repRevenue = repWon.reduce((a, l) => a + (l.value || 0), 0);
-              const pct = Math.min(100, Math.round((repRevenue / t.target_amount) * 100));
-              const col = pct >= 100 ? T.teal : pct >= 60 ? T.cyan : T.amber;
-              return (
-                <div key={t.id} style={{ padding: '16px', background: T.bg, borderRadius: 10, border: '1px solid ' + T.border, borderTop: '2px solid ' + col }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{t.rep_name}</div>
-                    <span style={{ color: col, fontSize: 14, fontWeight: 900 }}>{pct}%</span>
-                  </div>
-                  <div style={{ height: 4, background: T.border + '44', borderRadius: 2, marginBottom: 10 }}>
-                    <div style={{ height: '100%', width: pct + '%', background: col, borderRadius: 2 }} />
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <div style={{ color: col, fontSize: 12, fontWeight: 700 }}>GHS {repRevenue.toLocaleString()}</div>
-                    <div style={{ color: T.textMuted, fontSize: 11 }}>/ GHS {t.target_amount.toLocaleString()}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Vendor Ratings Summary — A/B/C/D grades only */}
-      {vendorProfiles.length > 0 && (
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Vendor Grades</div>
-            <button onClick={() => onTab('vendors')} style={{ background: 'none', border: 'none', color: T.cyan, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Full Ratings →</button>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
-            {vendorProfiles.sort((a,b) => (b.vendor_score||0) - (a.vendor_score||0)).map(v => {
-              const score = v.vendor_score || 0;
-              const count = v.vendor_scorecard_count || 0;
-              const isUnrated = count === 0;
-              // A/B/C/D grading
-              let grade, gradeColor, gradeBg;
-              if (isUnrated) { grade = '—'; gradeColor = T.textMuted; gradeBg = T.bg; }
-              else if (score >= 85) { grade = 'A'; gradeColor = '#10B981'; gradeBg = '#10B98115'; }
-              else if (score >= 70) { grade = 'B'; gradeColor = T.cyan; gradeBg = T.cyan + '15'; }
-              else if (score >= 50) { grade = 'C'; gradeColor = T.amber; gradeBg = T.amber + '15'; }
-              else { grade = 'D'; gradeColor = '#F43F5E'; gradeBg = '#F43F5E15'; }
-              return (
-                <div key={v.id} style={{ padding: '12px 14px', background: T.surface, border: '1px solid ' + gradeColor + '44', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: gradeBg, border: '2px solid ' + gradeColor + '66', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 900, color: gradeColor, flexShrink: 0 }}>{grade}</div>
-                  <div>
-                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{v.name}</div>
-                    <div style={{ color: gradeColor, fontSize: 11, fontWeight: 600, marginTop: 2 }}>{isUnrated ? 'Unrated' : grade === 'D' ? '⛔ Do Not Engage' : grade === 'A' ? 'Excellent' : grade === 'B' ? 'Good' : 'Fair'}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-
-const VendorManagerDashboard = ({ user }) => {
-  const [vendors, setVendors] = useState([]);
-  const [tasks, setTasks] = useState([]);
-  const [events, setEvents] = useState([]);
-  const [notifs, setNotifs] = useState([]);
-  const [rffs, setRffs] = useState([]);
-  const [awards, setAwards] = useState([]);
-  const [internalPortalEvent, setInternalPortalEvent] = useState(null);
-
-
-  const VENDOR_TYPES = ["Event Lighting","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
-
-  const loadVM = () => {
-    Promise.all([
-      supabase.from("profiles").select("*").eq("role", "Vendor").order("name"),
-      supabase.from("tasks").select("*").eq("assignee_id", user.id),
-      supabase.from("projects").select("*").eq("status", "active"),
-      supabase.from("notifications").select("*").eq("user_id", user.id).eq("read", false).limit(5),
-      supabase.from("rffs").select("*").order("created_at", { ascending: false }),
-      supabase.from("rff_awards").select("*").in("status", ["confirmed","po_created","invoiced","paid"]),
-    ]).then(([v, t, ev, n, r, aw]) => {
-      setVendors(v.data || []);
-      setTasks(t.data || []);
-      setEvents(ev.data || []);
-      setNotifs(n.data || []);
-      setRffs(r.data || []);
-      setAwards(aw.data || []);
-    });
-  };
-
-  useEffect(() => { loadVM(); }, [user.id]);
-
-
-
-  const now = new Date();
-  const greeting = now.getHours() < 12 ? "Good Morning" : now.getHours() < 17 ? "Good Afternoon" : "Good Evening";
-  const dateStr = now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
-  const pending = tasks.filter(t => t.status !== "completed");
-  const pendingRffs = rffs.filter(r => !r.approved);
-  const upcomingEvents = events.filter(e => e.event_date && new Date(e.event_date) >= now).sort((a,b) => new Date(a.event_date) - new Date(b.event_date));
-
-  // Group vendors by service_category
-  const vendorsByCategory = VENDOR_TYPES.reduce((acc, type) => {
-    const list = vendors.filter(v => v.service_category === type);
-    if (list.length > 0) acc[type] = list;
-    return acc;
-  }, {});
-  // Uncategorised vendors
-  const uncategorised = vendors.filter(v => !v.service_category || !VENDOR_TYPES.includes(v.service_category));
-
-  const getTierColor = (score, count) => {
-    if (!count) return T.textMuted;
-    if (score >= 85) return "#10B981";
-    if (score >= 70) return T.teal;
-    if (score >= 50) return T.amber;
-    return T.red;
-  };
-
-  return (
-    <div style={{ animation: "fadeUp 0.35s ease" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>{dateStr}</div>
-        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: T.textPrimary, letterSpacing: "-0.02em" }}>{greeting}, {user.name.split(" ")[0]}</h1>
-        <div style={{ color: T.textMuted, fontSize: 13, marginTop: 4 }}>Vendor network overview and procurement status</div>
-      </div>
-
-      {/* KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 12, marginBottom: 24 }}>
-        {[
-          { label: "Total Vendors", value: vendors.length, color: T.cyan },
-          { label: "Active Events", value: events.length, color: T.teal },
-          { label: "Pending RFFs", value: pendingRffs.length, color: T.amber },
-          { label: "Confirmed Gigs", value: awards.length, color: "#10B981" },
-        ].map((k,i) => (
-          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
-            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
-            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Alerts */}
-      {notifs.length > 0 && (
-        <div style={{ marginBottom: 20 }}>
-          {notifs.slice(0,3).map(n => (
-            <div key={n.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: T.amber+"12", border: `1px solid ${T.amber}30`, borderRadius: 8, marginBottom: 6 }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.amber, flexShrink: 0 }} />
-              <div style={{ color: T.amber, fontSize: 12, fontWeight: 600, flex: 1 }}>{n.title}</div>
-              <div style={{ color: T.textMuted, fontSize: 11 }}>{n.message?.slice(0,60)}...</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Two column layout */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 16, marginBottom: 24 }}>
-
-        {/* Upcoming Events */}
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px" }}>
-          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 14 }}>Upcoming Events</div>
-          {upcomingEvents.length > 0 ? upcomingEvents.slice(0,4).map((ev,i) => {
-            const days = Math.ceil((new Date(ev.event_date) - now)/(1000*60*60*24));
-            const color = days <= 7 ? T.red : days <= 30 ? T.amber : T.teal;
-            const archetype = (typeof EVENT_ARCHETYPES !== "undefined" && EVENT_ARCHETYPES[ev.event_category]) || { color: T.teal, icon: "▪" };
+          {/* Revenue bar */}
+          {targets.length > 0 && (() => {
+            const target = targets.reduce((latest, t) => !latest || new Date(t.created_at) > new Date(latest.created_at) ? t : latest, null);
+            const pct = target ? Math.min(100, Math.round((revenueYTD / target.target_amount) * 100)) : 0;
             return (
-              <div key={ev.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < 3 ? `1px solid ${T.border}33` : "none" }}>
-                <div>
-                  <div style={{ color: T.textPrimary, fontWeight: 600, fontSize: 12 }}>{ev.name}</div>
-                  {ev.event_category && <div style={{ color: archetype?.color||T.cyan, fontSize: 10, fontWeight: 700 }}>{ev.event_category}</div>}
+              <div style={{ background: T.bg, borderRadius: 10, padding: "14px 16px", marginBottom: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ color: T.textMuted, fontSize: 11, fontWeight: 700 }}>Revenue vs Target</span>
+                  <span style={{ color: T.teal, fontSize: 11, fontWeight: 800 }}>{pct}%</span>
                 </div>
-                <div style={{ color, fontWeight: 800, fontSize: 13 }}>{days}d</div>
+                <div style={{ height: 8, background: T.border+"44", borderRadius: 4, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: pct+"%", background: "linear-gradient(90deg,"+T.cyan+","+T.teal+")", borderRadius: 4, transition: "width 0.8s ease" }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
+                  <span style={{ color: T.teal, fontSize: 11, fontWeight: 700 }}>GHS {revenueYTD.toLocaleString()}</span>
+                  <span style={{ color: T.textMuted, fontSize: 11 }}>Target: GHS {(target?.target_amount||0).toLocaleString()}</span>
+                </div>
               </div>
             );
-          }) : <div style={{ color: T.textMuted, fontSize: 12, textAlign: "center", padding: "16px 0" }}>No upcoming events</div>}
-        </div>
-
-        {/* My Tasks */}
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px" }}>
-          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 14 }}>My Tasks</div>
-          {pending.length > 0 ? pending.slice(0,4).map((t,i) => (
-            <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < Math.min(pending.length,4)-1 ? `1px solid ${T.border}33` : "none" }}>
-              <div style={{ color: T.textPrimary, fontSize: 12, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</div>
-              <div style={{ color: t.deadline && new Date(t.deadline) < now ? T.red : T.textMuted, fontSize: 10, flexShrink: 0, marginLeft: 8 }}>{t.deadline || "No date"}</div>
-            </div>
-          )) : <div style={{ color: T.textMuted, fontSize: 12, textAlign: "center", padding: "16px 0" }}>No pending tasks</div>}
-        </div>
-      </div>
-
-      {/* Vendor Directory by Category */}
-      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-        <div style={{ padding: "16px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Vendor Directory</div>
-            <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{vendors.length} vendors across {Object.keys(vendorsByCategory).length} categories</div>
-          </div>
-        </div>
-
-        <div style={{ padding: "16px 20px" }}>
-          {Object.entries(vendorsByCategory).map(([category, catVendors]) => (
-            <div key={category} style={{ marginBottom: 20 }}>
-              {/* Category Header */}
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, paddingBottom: 6, borderBottom: `1px solid ${T.border}` }}>
-                <div style={{ background: T.cyan+"18", border: `1px solid ${T.cyan}30`, borderRadius: 20, padding: "3px 12px", display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ color: T.cyan, fontWeight: 900, fontSize: 16 }}>{catVendors.length}</span>
-                  <span style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>vendor{catVendors.length !== 1 ? "s" : ""}</span>
-                </div>
-                <span style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{category}</span>
+          })()}
+          {/* Recent opportunities */}
+          {pipeline.slice(0,4).map(o => (
+            <div key={o.id} onClick={() => onTab("opportunities")} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid "+T.border+"33", cursor: "pointer" }}>
+              <div>
+                <div style={{ color: T.textPrimary, fontWeight: 600, fontSize: 13 }}>{o.company}</div>
+                <div style={{ color: T.textMuted, fontSize: 11 }}>{o.event_type||o.stage}</div>
               </div>
-
-              {/* Vendor List */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px,1fr))", gap: 8 }}>
-                {catVendors.map(v => {
-                  const tierColor = getTierColor(v.vendor_score, v.vendor_scorecard_count);
-                  const isPoor = v.vendor_scorecard_count > 0 && (v.vendor_score||0) < 50;
-                  return (
-                    <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: isPoor ? T.red+"08" : T.bg, border: `1px solid ${isPoor ? T.red+"30" : T.border}`, borderRadius: 8 }}>
-                      <div style={{ width: 30, height: 30, borderRadius: "50%", background: tierColor+"20", border: `1px solid ${tierColor}40`, display: "flex", alignItems: "center", justifyContent: "center", color: tierColor, fontWeight: 800, fontSize: 11, flexShrink: 0 }}>
-                        {(v.name||"?").slice(0,2).toUpperCase()}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.name}</div>
-                        <div style={{ color: T.textMuted, fontSize: 10, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.company_name || v.email || ""}</div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-                          {v.vendor_scorecard_count > 0 ? (
-                            <span style={{ color: tierColor, fontSize: 10, fontWeight: 700 }}>{v.vendor_score}% · {getTier(v.vendor_score).label}</span>
-                          ) : (
-                            <span style={{ color: T.textMuted, fontSize: 10 }}>Unrated</span>
-                          )}
-                          {isPoor && <span style={{ color: T.red, fontSize: 9, fontWeight: 700 }}>⛔ Blocked</span>}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div style={{ textAlign: "right" }}>
+                <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>GHS {(o.value||0).toLocaleString()}</div>
+                <div style={{ color: T.textMuted, fontSize: 10, textTransform: "uppercase" }}>{o.status}</div>
               </div>
             </div>
           ))}
-
-          {/* Uncategorised */}
-          {uncategorised.length > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, paddingBottom: 6, borderBottom: `1px solid ${T.border}` }}>
-                <div style={{ background: T.textMuted+"18", border: `1px solid ${T.border}`, borderRadius: 20, padding: "3px 12px", display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ color: T.textMuted, fontWeight: 900, fontSize: 16 }}>{uncategorised.length}</span>
-                  <span style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>vendor{uncategorised.length !== 1 ? "s" : ""}</span>
-                </div>
-                <span style={{ color: T.textMuted, fontWeight: 700, fontSize: 13 }}>Uncategorised</span>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px,1fr))", gap: 8 }}>
-                {uncategorised.map(v => (
-                  <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8 }}>
-                    <div style={{ width: 30, height: 30, borderRadius: "50%", background: T.border, display: "flex", alignItems: "center", justifyContent: "center", color: T.textMuted, fontWeight: 800, fontSize: 11, flexShrink: 0 }}>{(v.name||"?").slice(0,2).toUpperCase()}</div>
-                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>{v.name}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {vendors.length === 0 && (
-            <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted, fontSize: 13 }}>No vendors onboarded yet. Use the Add New Vendor tab to get started.</div>
-          )}
+          {pipeline.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "20px 0" }}>No active pipeline</div>}
         </div>
       </div>
 
+      {/* ── THREE COLUMN ROW ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20, marginBottom: 20 }}>
 
-      {/* My Events - Mini Portal Cards */}
-      {events.length > 0 && (
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 12 }}>Events</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {events.filter(e => !e.event_date || new Date(e.event_date) >= new Date(Date.now() - 30*86400000)).sort((a,b) => new Date(a.event_date||"9999") - new Date(b.event_date||"9999")).slice(0,5).map(e => {
-              const daysLeft = e.event_date ? Math.ceil((new Date(e.event_date) - new Date()) / 86400000) : null;
-              const dotColor = daysLeft !== null ? (daysLeft <= 7 ? T.red : daysLeft <= 30 ? T.amber : T.teal) : T.teal;
-              const myEventTasks = tasks.filter(t => t.project_id === e.id);
-              const pendingCount = myEventTasks.filter(t => t.status !== "completed").length;
+        {/* Pending Actions */}
+        <div style={{ background: T.surface, border: "1px solid "+T.border, borderRadius: 14, padding: "18px 20px" }}>
+          <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 3 }}>Action Required</div>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 14 }}>Pending Actions</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {pendingPayments.length > 0 && (
+              <div onClick={() => onTab("payment-authorisation")} style={{ background: T.amber+"10", border: "1px solid "+T.amber+"30", borderRadius: 8, padding: "10px 12px", cursor: "pointer" }}>
+                <div style={{ color: T.amber, fontWeight: 800, fontSize: 12 }}>✍ {pendingPayments.length} Payment{pendingPayments.length!==1?"s":""} to Sign</div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Awaiting your signature</div>
+              </div>
+            )}
+            {(() => {
+              const pendingApprovals = opportunities.filter(o => o.status === "pending_approval");
+              return pendingApprovals.length > 0 ? (
+                <div onClick={() => onTab("opportunities")} style={{ background: T.cyan+"10", border: "1px solid "+T.cyan+"30", borderRadius: 8, padding: "10px 12px", cursor: "pointer" }}>
+                  <div style={{ color: T.cyan, fontWeight: 800, fontSize: 12 }}>🏆 {pendingApprovals.length} Lead{pendingApprovals.length!==1?"s":""} Won — Approve</div>
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Ready for approval</div>
+                </div>
+              ) : null;
+            })()}
+            {(() => {
+              const pendingRFFs = rffs.filter(r => r.status === "pending_approval" || r.status === "submitted");
+              return pendingRFFs.length > 0 ? (
+                <div onClick={() => onTab("rff-approvals")} style={{ background: T.teal+"10", border: "1px solid "+T.teal+"30", borderRadius: 8, padding: "10px 12px", cursor: "pointer" }}>
+                  <div style={{ color: T.teal, fontWeight: 800, fontSize: 12 }}>📋 {pendingRFFs.length} RFF{pendingRFFs.length!==1?"s":""} to Approve</div>
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Awaiting CEO approval</div>
+                </div>
+              ) : null;
+            })()}
+            {pendingPayments.length === 0 && opportunities.filter(o=>o.status==="pending_approval").length === 0 && rffs.filter(r=>r.status==="pending_approval"||r.status==="submitted").length === 0 && (
+              <div style={{ color: T.teal, fontSize: 13, fontWeight: 700, textAlign: "center", padding: "16px 0" }}>✓ All clear</div>
+            )}
+          </div>
+        </div>
+
+        {/* Vendor Performance */}
+        <div style={{ background: T.surface, border: "1px solid "+T.border, borderRadius: 14, padding: "18px 20px" }}>
+          <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 3 }}>Procurement</div>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 14 }}>Vendor Performance</div>
+          <div style={{ background: T.bg, borderRadius: 10, padding: "12px 14px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ color: T.textMuted, fontSize: 10, textTransform: "uppercase", fontWeight: 700 }}>Avg Rating</div>
+              <div style={{ color: avgRating >= 70 ? T.teal : T.amber, fontWeight: 900, fontSize: 24 }}>{avgRating}%</div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ color: T.textMuted, fontSize: 10, textTransform: "uppercase", fontWeight: 700 }}>Active Vendors</div>
+              <div style={{ color: T.cyan, fontWeight: 900, fontSize: 24 }}>{vendorProfiles.length}</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {scorecards.slice(0,3).map(sc => {
+              const vp = vendorProfiles.find(v => v.id === sc.vendor_id);
+              const tier = getTier(sc.total_pct);
               return (
-                <div key={e.id} onClick={() => setInternalPortalEvent(e)} style={{ background: T.surface, border: "1px solid " + T.border, borderLeft: "3px solid " + dotColor, borderRadius: 10, padding: "14px 16px", cursor: "pointer" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.name}</div>
-                      <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{e.client}{e.event_date ? " · " + new Date(e.event_date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : ""}</div>
-                    </div>
-                    <div style={{ display: "flex", gap: 6, flexShrink: 0, marginLeft: 10 }}>
-                      {daysLeft !== null && <div style={{ background: dotColor+"18", border: "1px solid " + dotColor+"30", borderRadius: 6, padding: "4px 8px", textAlign: "center" }}><div style={{ color: dotColor, fontSize: 12, fontWeight: 900 }}>{daysLeft > 0 ? daysLeft : "Today"}</div>{daysLeft > 0 && <div style={{ color: dotColor, fontSize: 8, textTransform: "uppercase" }}>days</div>}</div>}
-                      {pendingCount > 0 && <div style={{ background: T.amber+"18", border: "1px solid " + T.amber+"30", borderRadius: 6, padding: "4px 8px", textAlign: "center" }}><div style={{ color: T.amber, fontSize: 12, fontWeight: 900 }}>{pendingCount}</div><div style={{ color: T.amber, fontSize: 8, textTransform: "uppercase" }}>tasks</div></div>}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
-                    <span style={{ color: T.textMuted, fontSize: 10, background: T.bg, padding: "2px 8px", borderRadius: 20, textTransform: "uppercase" }}>{e.phase || "Planning"}</span>
-                    <span style={{ color: T.cyan, fontSize: 11, fontWeight: 700 }}>Open →</span>
-                  </div>
+                <div key={sc.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ color: T.textPrimary, fontSize: 12, fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{vp?.name || sc.vendor_name || "Vendor"}</div>
+                  <span style={{ color: tier?.color||T.textMuted, fontSize: 11, fontWeight: 700, background: (tier?.color||T.textMuted)+"15", padding: "1px 8px", borderRadius: 20, marginLeft: 8 }}>{sc.total_pct}%</span>
                 </div>
               );
             })}
           </div>
+          <button onClick={() => onTab("scorecards")} style={{ background: "none", border: "none", color: T.cyan, fontSize: 11, fontWeight: 700, cursor: "pointer", marginTop: 10, padding: 0 }}>View all scorecards →</button>
         </div>
-      )}
+
+        {/* Client Feedback */}
+        <div style={{ background: T.surface, border: "1px solid "+T.border, borderRadius: 14, padding: "18px 20px" }}>
+          <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 3 }}>Client Experience</div>
+          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 14 }}>Recent Feedback</div>
+          {recentFeedback.length === 0 ? (
+            <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "16px 0" }}>No feedback yet</div>
+          ) : recentFeedback.map(f => {
+            const stars = f.rating || f.overall_rating || 0;
+            return (
+              <div key={f.id} style={{ padding: "10px 0", borderBottom: "1px solid "+T.border+"33" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                  <span style={{ color: T.textPrimary, fontSize: 12, fontWeight: 700 }}>{f.client_name || f.name || "Client"}</span>
+                  <span style={{ color: T.amber, fontSize: 12 }}>{"★".repeat(Math.round(stars))}{"☆".repeat(5-Math.round(stars))}</span>
+                </div>
+                {f.comment && <div style={{ color: T.textMuted, fontSize: 11, lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{f.comment}</div>}
+              </div>
+            );
+          })}
+          <button onClick={() => onTab("feedback-summary")} style={{ background: "none", border: "none", color: T.cyan, fontSize: 11, fontWeight: 700, cursor: "pointer", marginTop: 10, padding: 0 }}>View all feedback →</button>
+        </div>
+      </div>
+
+      {/* ── FINANCIAL SNAPSHOT ── */}
+      <div style={{ background: "linear-gradient(135deg, "+T.bgDeep+", #0D1F36)", border: "1px solid "+T.border, borderRadius: 14, padding: "20px 24px", marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div>
+            <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 3 }}>Finance</div>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Financial Snapshot</div>
+          </div>
+          <button onClick={() => onTab("finance")} style={{ background: "none", border: "none", color: T.cyan, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Finance →</button>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px,1fr))", gap: 12 }}>
+          {[
+            { label: "Total Vendor Spend", value: "GHS "+totalBusiness.toLocaleString(), color: T.gold, tab: "vendor-analytics" },
+            { label: "Pending Payments", value: "GHS "+(paymentAuths.filter(p=>p.status==="pending_ceo").reduce((s,p)=>s+(p.agreed_amount||0),0)).toLocaleString(), color: T.amber, tab: "payment-authorisation" },
+            { label: "Approved Payments", value: "GHS "+(paymentAuths.filter(p=>p.status==="approved").reduce((s,p)=>s+(p.agreed_amount||0),0)).toLocaleString(), color: T.teal, tab: "payment-authorisation" },
+            { label: "Vouchers Pending", value: vouchers.filter(v=>v.status==="pending_approval").length, color: T.cyan, tab: "finance" },
+          ].map(k => (
+            <div key={k.label} onClick={() => onTab(k.tab)} style={{ background: T.bg+"60", border: "1px solid "+T.border+"44", borderRadius: 10, padding: "14px 16px", cursor: "pointer" }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = k.color+"40"}
+              onMouseLeave={e => e.currentTarget.style.borderColor = T.border+"44"}>
+              <div style={{ color: k.color, fontWeight: 900, fontSize: 16 }}>{k.value}</div>
+              <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginTop: 4 }}>{k.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Internal Event Portal Modal */}
       {internalPortalEvent && (
         <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", overflowY: "auto" }} onClick={() => setInternalPortalEvent(null)}>
           <div style={{ minHeight: "100vh", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 20px" }}>
@@ -1553,6 +1303,7 @@ const VendorManagerDashboard = ({ user }) => {
     </div>
   );
 };
+
 
 const StaffDashboard = ({ user }) => {
   const [tasks, setTasks] = useState([]);

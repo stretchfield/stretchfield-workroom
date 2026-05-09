@@ -2559,9 +2559,18 @@ const UsersView = ({ user }) => {
                   <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14, fontFamily: "monospace" }}>{loginDetailsModal.email}</div>
                 </div>
                 <div>
-                  <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>Password (auto-generated)</div>
-                  <div style={{ color: T.cyan, fontWeight: 700, fontSize: 14, fontFamily: "monospace" }}>{generatePassword(loginDetailsModal.email)}</div>
-                  <div style={{ color: T.textMuted, fontSize: 10, marginTop: 3 }}>Note: If user changed their password, this will differ.</div>
+                  <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>Password</div>
+                  {loginDetailsModal.password_hash ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ color: T.cyan, fontWeight: 700, fontSize: 14, fontFamily: "monospace" }}>{loginDetailsModal.password_hash}</div>
+                      <span style={{ color: T.teal, fontSize: 10, fontWeight: 700, background: T.teal+"15", padding: "1px 6px", borderRadius: 10 }}>✓ User set</span>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>Not yet set by user</div>
+                      <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>User has not set their password yet. Send a reset link.</div>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>Role</div>
@@ -2569,8 +2578,17 @@ const UsersView = ({ user }) => {
                 </div>
               </div>
             </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => { navigator.clipboard.writeText("Email: " + loginDetailsModal.email + "\nPassword: " + generatePassword(loginDetailsModal.email)); alert("Copied!"); }} style={{ flex: 1, background: T.cyan+"15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "10px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Copy Details</button>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {loginDetailsModal.password_hash && (
+                <button onClick={() => { navigator.clipboard.writeText("Email: " + loginDetailsModal.email + "\nPassword: " + loginDetailsModal.password_hash); alert("Copied!"); }} style={{ flex: 1, background: T.cyan+"15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "10px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Copy Details</button>
+              )}
+              <button onClick={async () => {
+                const { data, error } = await supabase.auth.admin.generateLink({ type: "recovery", email: loginDetailsModal.email, options: { redirectTo: "https://workroom.stretchfield.com/" } });
+                if (error || !data?.properties?.action_link) { alert("Failed to generate link: " + error?.message); return; }
+                const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;"><div style="height:6px;background:linear-gradient(90deg,#FF6B35,#FF3CAC,#784BA0,#2B86C5,#00C8FF);"></div><div style="background:#060B14;padding:28px 32px;"><table style="width:100%;"><tr><td><span style="color:#00C8FF;font-size:12px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;">STRETCHFIELD WORKROOM</span></td><td style="text-align:right;"><img src="https://workroom.stretchfield.com/logo512.png" style="height:32px;" /></td></tr></table><div style="color:#E8F0FF;font-size:20px;font-weight:800;margin-top:16px;padding-top:16px;border-top:1px solid #1A2E4A;">Set Your Password</div></div><div style="padding:28px 32px;background:#F4F6FB;"><p style="color:#0A1628;font-size:14px;">Hi <strong>${loginDetailsModal.name}</strong>,</p><p style="color:#0A1628;font-size:14px;">Click below to set your Stretchfield WorkRoom password.</p><a href="${data.properties.action_link}" style="display:inline-block;background:linear-gradient(135deg,#00C8FF,#00E5C8);color:#060B14;padding:12px 28px;border-radius:8px;font-weight:800;font-size:13px;text-decoration:none;margin:16px 0;">Set My Password →</a><p style="color:#5A6E8A;font-size:12px;">Log in at workroom.stretchfield.com after setting your password.</p></div></div>`;
+                await fetch("/api/send-email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ to: loginDetailsModal.email, subject: "Set Your Stretchfield WorkRoom Password", html }) });
+                alert("Password reset link sent to " + loginDetailsModal.email);
+              }} style={{ flex: 1, background: T.amber+"15", border: `1px solid ${T.amber}30`, color: T.amber, padding: "10px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>↗ Send Reset Link</button>
               <button onClick={() => setLoginDetailsModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>Close</button>
             </div>
           </div>

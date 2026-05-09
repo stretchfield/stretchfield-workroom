@@ -10971,7 +10971,14 @@ const VendorOnboardingView = ({ user }) => {
                       {fields.map(([key, label]) => (
                         <div key={key}>
                           <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 4 }}>{label}</label>
-                          <input value={editVendorForm[key] || ""} onChange={e => setEditVendorForm({...editVendorForm, [key]: e.target.value})} style={{ width: "100%", padding: "8px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                          {key === "payment_terms" ? (
+                            <select value={editVendorForm[key] || ""} onChange={e => setEditVendorForm({...editVendorForm, [key]: e.target.value})} style={{ width: "100%", padding: "8px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", appearance: "none", boxSizing: "border-box" }}>
+                              <option value="">Select payment terms...</option>
+                              {["Immediate", "Net 7 days", "Net 14 days", "Net 30 days", "50% upfront, balance on completion", "50% upfront paid, balance now", "100% upfront", "Custom"].map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                          ) : (
+                            <input value={editVendorForm[key] || ""} onChange={e => setEditVendorForm({...editVendorForm, [key]: e.target.value})} style={{ width: "100%", padding: "8px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                          )}
                         </div>
                       ))}
                     </div>
@@ -15465,7 +15472,7 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
               <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Payment Terms</label>
               <select value={form.payment_terms} onChange={e => setForm(f => ({...f, payment_terms: e.target.value}))} style={{ ...inputStyle, appearance: "none" }}>
                 <option value="">Select terms...</option>
-                {["Immediate", "Net 7 days", "Net 14 days", "Net 30 days", "50% upfront paid, balance now", "Custom"].map(t => <option key={t}>{t}</option>)}
+                {["Immediate", "Net 7 days", "Net 14 days", "Net 30 days", "50% upfront, balance on completion", "50% upfront paid, balance now", "100% upfront", "Custom"].map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
             <div style={{ gridColumn: "1/-1" }}>
@@ -15572,13 +15579,19 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
                 ["account_name", "Account Name", "Account holder name"],
                 ["account_number", "Account Number", "Account number"],
                 ["mobile_money_number", "Mobile Money Number", "e.g. 0244000000"],
-                ["payment_terms", "Payment Terms", "e.g. Net 7 days"],
               ].map(([key, label, placeholder]) => (
                 <div key={key}>
                   <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>{label}</label>
                   <input value={editVendorForm[key] || ""} onChange={e => setEditVendorForm(f => ({...f, [key]: e.target.value}))} placeholder={placeholder} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                 </div>
               ))}
+              <div>
+                <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Payment Terms</label>
+                <select value={editVendorForm.payment_terms || ""} onChange={e => setEditVendorForm(f => ({...f, payment_terms: e.target.value}))} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", appearance: "none", boxSizing: "border-box" }}>
+                  <option value="">Select payment terms...</option>
+                  {["Immediate", "Net 7 days", "Net 14 days", "Net 30 days", "50% upfront, balance on completion", "50% upfront paid, balance now", "100% upfront", "Custom"].map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
             </div>
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={async () => {

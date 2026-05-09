@@ -9737,8 +9737,12 @@ const QuoteComparisonView = ({ user }) => {
   const [awardModal, setAwardModal] = useState(null);
   const [awardNotes, setAwardNotes] = useState("");
   const [agreedAmount, setAgreedAmount] = useState("");
+  const [changeOrderModal, setChangeOrderModal] = useState(null);
+  const [changeOrderForm, setChangeOrderForm] = useState({ new_amount: "", reason: "", effective_date: "" });
+  const [savingCO, setSavingCO] = useState(false);
   const [saving, setSaving] = useState(false);
   const [awards, setAwards] = useState([]);
+  const [changeOrders, setChangeOrders] = useState([]);
   const [vendorProfiles, setVendorProfiles] = useState([]);
   const [vendorApps, setVendorApps] = useState([]);
   const [pastEvents, setPastEvents] = useState([]);
@@ -9747,6 +9751,7 @@ const QuoteComparisonView = ({ user }) => {
     const [{ data: ev }, { data: aw }, { data: vp }, { data: va }, { data: pe }] = await Promise.all([
       supabase.from("projects").select("*").order("name"),
       supabase.from("rff_awards").select("*"),
+      supabase.from("change_orders").select("*"),
       supabase.from("profiles").select("*").eq("role", "Vendor"),
       supabase.from("vendor_applications").select("*").eq("status", "login-created"),
       supabase.from("rff_vendor_assignments").select("*"),
@@ -10320,6 +10325,68 @@ const QuoteComparisonView = ({ user }) => {
           <div style={{ fontSize: 40, marginBottom: 16 }}>📊</div>
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>Select an Event and RFF</div>
           <div style={{ color: T.textMuted, fontSize: 13 }}>Choose an event and RFF above to compare vendor quotes.</div>
+        </div>
+      )}
+
+      {/* Change Order Modal */}
+      {changeOrderModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 700, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setChangeOrderModal(null)}>
+          <div style={{ background: T.surface, border: "1px solid " + T.amber+"40", borderRadius: 16, width: "100%", maxWidth: 480, padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Raise Change Order</div>
+            <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 20 }}>{changeOrderModal.vendor_name} — contract amendment</div>
+
+            <div style={{ background: T.bg, border: "1px solid " + T.border, borderRadius: 10, padding: "12px 16px", marginBottom: 16 }}>
+              <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>Current Agreed Amount</div>
+              <div style={{ color: T.gold, fontWeight: 900, fontSize: 20 }}>GHS {parseFloat(changeOrderModal.agreed_amount || changeOrderModal.quoted_amount || 0).toLocaleString()}</div>
+              <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Original quote: GHS {parseFloat(changeOrderModal.quoted_amount || 0).toLocaleString()}</div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
+              <div>
+                <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>New Agreed Amount (GHS)</label>
+                <input type="number" value={changeOrderForm.new_amount} onChange={e => setChangeOrderForm(f => ({...f, new_amount: e.target.value}))} placeholder="Enter new amount" style={{ width: "100%", padding: "10px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                {changeOrderForm.new_amount && (
+                  <div style={{ marginTop: 6, color: parseFloat(changeOrderForm.new_amount) > parseFloat(changeOrderModal.agreed_amount || changeOrderModal.quoted_amount) ? T.red : T.teal, fontSize: 12, fontWeight: 700 }}>
+                    {parseFloat(changeOrderForm.new_amount) > parseFloat(changeOrderModal.agreed_amount || changeOrderModal.quoted_amount) ? "▲" : "▼"} GHS {Math.abs(parseFloat(changeOrderForm.new_amount) - parseFloat(changeOrderModal.agreed_amount || changeOrderModal.quoted_amount)).toLocaleString()} {parseFloat(changeOrderForm.new_amount) > parseFloat(changeOrderModal.agreed_amount || changeOrderModal.quoted_amount) ? "increase" : "decrease"}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Reason for Change *</label>
+                <textarea value={changeOrderForm.reason} onChange={e => setChangeOrderForm(f => ({...f, reason: e.target.value}))} placeholder="e.g. Client increased usher count from 10 to 15, 3 days before event" rows={3} style={{ width: "100%", padding: "10px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", resize: "none", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Effective Date</label>
+                <input type="date" value={changeOrderForm.effective_date} onChange={e => setChangeOrderForm(f => ({...f, effective_date: e.target.value}))} style={{ width: "100%", padding: "10px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+              </div>
+            </div>
+
+            <div style={{ background: T.amber+"10", border: "1px solid " + T.amber+"30", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: T.amber }}>
+              This will update the agreed amount in Quote Comparison, Purchase Order and Payment Authorisation. VM and vendor will be notified.
+            </div>
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={handleChangeOrder} disabled={savingCO || !changeOrderForm.new_amount || !changeOrderForm.reason} style={{ flex: 1, background: "linear-gradient(135deg," + T.amber + ",#F59E0B)", border: "none", color: "#fff", padding: "11px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13, opacity: (!changeOrderForm.new_amount || !changeOrderForm.reason) ? 0.5 : 1 }}>{savingCO ? "Saving..." : "Confirm Change Order"}</button>
+              <button onClick={() => setChangeOrderModal(null)} style={{ background: "none", border: "1px solid " + T.border, color: T.textMuted, padding: "11px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            </div>
+
+            {/* Change order history */}
+            {changeOrders.filter(co => co.rff_award_id === changeOrderModal.id).length > 0 && (
+              <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid " + T.border }}>
+                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>Amendment History</div>
+                {changeOrders.filter(co => co.rff_award_id === changeOrderModal.id).map(co => (
+                  <div key={co.id} style={{ padding: "8px 0", borderBottom: "1px solid " + T.border+"22", fontSize: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: T.textPrimary, fontWeight: 600 }}>GHS {co.original_amount.toLocaleString()} → GHS {co.new_amount.toLocaleString()}</span>
+                      <span style={{ color: co.difference >= 0 ? T.red : T.teal, fontWeight: 700 }}>{co.difference >= 0 ? "+" : ""}GHS {co.difference.toLocaleString()}</span>
+                    </div>
+                    <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{co.reason}</div>
+                    <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{co.raised_by_name} · {new Date(co.created_at).toLocaleDateString("en-GB")}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -15691,6 +15758,7 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
       setAuths(au.data || []);
       setVendors(vp.data || []);
       setAwards(aw.data || []);
+    setChangeOrders(co?.data || []);
       setRffs(rf.data || []);
       setInvoices(inv.data || []);
       setVendorApps(va.data || []);

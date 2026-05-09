@@ -15055,18 +15055,20 @@ const PaymentAuthorisationView = ({ user }) => {
   const isCEO = user.role === "CEO";
 
   const load = async () => {
-    const [au, vp, aw, rf, inv] = await Promise.all([
-      supabase.from("payment_authorisations").select("*").order("created_at", { ascending: false }),
-      supabase.from("profiles").select("*").eq("role", "Vendor"),
-      supabase.from("rff_awards").select("*").eq("status", "confirmed"),
-      supabase.from("rffs").select("*"),
-      supabase.from("vendor_invoices").select("*"),
-    ]);
-    setAuths(au.data || []);
-    setVendors(vp.data || []);
-    setAwards(aw.data || []);
-    setRffs(rf.data || []);
-    setInvoices(inv.data || []);
+    try {
+      const [au, vp, aw, rf, inv] = await Promise.all([
+        supabase.from("payment_authorisations").select("*").order("created_at", { ascending: false }),
+        supabase.from("profiles").select("*").eq("role", "Vendor"),
+        supabase.from("rff_awards").select("*").eq("status", "confirmed"),
+        supabase.from("rffs").select("*"),
+        supabase.from("vendor_invoices").select("*"),
+      ]);
+      setAuths(au.data || []);
+      setVendors(vp.data || []);
+      setAwards(aw.data || []);
+      setRffs(rf.data || []);
+      setInvoices(inv.data || []);
+    } catch(e) { console.error("PaymentAuth load error:", e); }
   };
 
   useEffect(() => { load(); }, []);
@@ -15357,7 +15359,7 @@ const PaymentAuthorisationView = ({ user }) => {
               {/* Action Buttons */}
               {canSign && (
                 <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
-                  <button onClick={() => { setSignModal(auth); setSignature(""); setSignNotes(""); clearSignature && clearSignature(); }} style={{ background: "linear-gradient(135deg, " + T.teal + ", " + T.cyan + ")", border: "none", color: "#fff", padding: "9px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>✍ Sign & Approve</button>
+                  <button onClick={() => { setSignModal(auth); setSignature(""); setSignNotes(""); }} style={{ background: "linear-gradient(135deg, " + T.teal + ", " + T.cyan + ")", border: "none", color: "#fff", padding: "9px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>✍ Sign & Approve</button>
                   {canReject && <button onClick={() => setRejectModal(auth)} style={{ background: T.red+"12", border: "1px solid " + T.red+"30", color: T.red, padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>Reject</button>}
                 </div>
               )}

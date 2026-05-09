@@ -42,11 +42,63 @@ const generatePassword = (email) => {
   return `${part1}${special}${part2}${num}Sf`;
 };
 
-const emailHeader = (title) => `<div style="background:#060B14;padding:28px 32px;border-radius:8px 8px 0 0;"><div style="color:#00C8FF;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;margin-bottom:4px;">STRETCHFIELD</div><div style="color:#E8F0FF;font-size:20px;font-weight:800;">${title}</div></div>`;
-const emailFooter = () => `<div style="background:#060B14;padding:20px 32px;border-radius:0 0 8px 8px;text-align:center;"><div style="color:#3D5478;font-size:11px;font-style:italic;margin-bottom:6px;">We don't plan events. We engineer impact.</div><div style="color:#1A2E4A;font-size:10px;">© ${new Date().getFullYear()} Stretchfield · www.stretchfield.com</div></div>`;
-const emailBtn = (text, url) => `<a href="${url}" style="display:inline-block;background:linear-gradient(135deg,#00C8FF,#00E5C8);color:#060B14;padding:12px 28px;border-radius:8px;font-weight:800;font-size:13px;text-decoration:none;margin:16px 0;">${text}</a>`;
+const emailHeader = (title) => `
+<div style="background:linear-gradient(135deg,#060B14 0%,#0A1628 100%);padding:32px 40px 28px;border-radius:12px 12px 0 0;border-bottom:3px solid transparent;background-clip:padding-box;position:relative;">
+  <table style="width:100%;border-collapse:collapse;">
+    <tr>
+      <td style="vertical-align:middle;">
+        <img src="https://workroom.stretchfield.com/stretchfield-logo.png" alt="Stretchfield" style="height:40px;width:auto;display:block;" onerror="this.style.display='none'" />
+        <div style="margin-top:6px;">
+          <span style="color:#00C8FF;font-size:10px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;">STRETCHFIELD WORKROOM</span>
+        </div>
+      </td>
+      <td style="text-align:right;vertical-align:middle;">
+        <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#FF6B35,#FF3CAC,#784BA0,#2B86C5,#00C8FF);display:inline-block;"></div>
+      </td>
+    </tr>
+  </table>
+  <div style="margin-top:20px;padding-top:20px;border-top:1px solid #1A2E4A;">
+    <div style="color:#E8F0FF;font-size:22px;font-weight:800;letter-spacing:-0.02em;line-height:1.3;">${title}</div>
+  </div>
+</div>`;
+const emailFooter = () => `
+<div style="background:#060B14;padding:28px 40px;border-radius:0 0 12px 12px;border-top:1px solid #0A1628;">
+  <table style="width:100%;border-collapse:collapse;">
+    <tr>
+      <td style="vertical-align:top;padding-bottom:16px;">
+        <img src="https://workroom.stretchfield.com/stretchfield-logo.png" alt="Stretchfield" style="height:28px;width:auto;display:block;opacity:0.7;" onerror="this.style.display='none'" />
+        <div style="color:#3D5478;font-size:11px;font-style:italic;margin-top:8px;">We don't plan events. We engineer impact.</div>
+      </td>
+    </tr>
+    <tr>
+      <td style="border-top:1px solid #0D1F36;padding-top:16px;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td>
+              <div style="color:#1E3A5F;font-size:11px;line-height:1.8;">
+                <a href="https://www.stretchfield.com" style="color:#3D5478;text-decoration:none;">www.stretchfield.com</a> &nbsp;·&nbsp;
+                <a href="mailto:info@stretchfield.com" style="color:#3D5478;text-decoration:none;">info@stretchfield.com</a>
+              </div>
+              <div style="color:#1A2E4A;font-size:10px;margin-top:6px;">© ${new Date().getFullYear()} Stretchfield. All rights reserved. &nbsp;·&nbsp; Accra, Ghana</div>
+            </td>
+            <td style="text-align:right;vertical-align:bottom;">
+              <div style="display:inline-flex;gap:4px;">
+                <div style="width:6px;height:6px;border-radius:50%;background:#FF6B35;"></div>
+                <div style="width:6px;height:6px;border-radius:50%;background:#FF3CAC;"></div>
+                <div style="width:6px;height:6px;border-radius:50%;background:#784BA0;"></div>
+                <div style="width:6px;height:6px;border-radius:50%;background:#2B86C5;"></div>
+                <div style="width:6px;height:6px;border-radius:50%;background:#00C8FF;"></div>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</div>`;
+const emailBtn = (text, url) => `<a href="${url}" style="display:inline-block;background:linear-gradient(135deg,#00C8FF 0%,#00E5C8 100%);color:#060B14;padding:13px 32px;border-radius:8px;font-weight:800;font-size:13px;text-decoration:none;margin:20px 0;letter-spacing:0.02em;box-shadow:0 4px 14px rgba(0,200,255,0.3);">${text} →</a>`;
 const emailRow = (label, value) => `<tr><td style="padding:8px 0;color:#5A6E8A;font-size:12px;font-weight:700;text-transform:uppercase;width:140px;">${label}</td><td style="padding:8px 0;color:#0A1628;font-size:13px;font-weight:600;">${value}</td></tr>`;
-const emailWrap = (header, body) => `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;">${header}<div style="padding:28px 32px;background:#F0F2FA;">${body}</div>${emailFooter()}</div>`;
+const emailWrap = (header, body) => `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.12);">${header}<div style="padding:32px 40px;background:#F4F6FB;">${body}</div>${emailFooter()}</div>`;
 
 const welcomeEmailHtml = ({ name, email, password, role }) => emailWrap(
   emailHeader(`Welcome, ${name}!`),

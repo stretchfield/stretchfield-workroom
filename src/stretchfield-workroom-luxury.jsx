@@ -47,17 +47,20 @@ const emailHeader = (title) => `
   <table style="width:100%;border-collapse:collapse;">
     <tr>
       <td style="vertical-align:middle;">
-        <img src="https://workroom.stretchfield.com/stretchfield-logo.png" alt="Stretchfield" style="height:32px;width:auto;display:block;" onerror="this.style.display='none'" />
-        <div style="margin-top:5px;">
-          <span style="color:#00C8FF;font-size:10px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;">STRETCHFIELD WORKROOM</span>
-        </div>
-      </td>
-      <td style="text-align:right;vertical-align:middle;">
-        <img src="https://workroom.stretchfield.com/logo512.png" alt="Stretchfield" style="height:48px;width:48px;display:inline-block;" onerror="this.style.display='none'" />
+        <table style="border-collapse:collapse;">
+          <tr>
+            <td style="vertical-align:middle;padding-right:10px;">
+              <img src="https://workroom.stretchfield.com/logo512.png" alt="Stretchfield" style="height:32px;width:32px;display:block;" onerror="this.style.display='none'" />
+            </td>
+            <td style="vertical-align:middle;">
+              <span style="color:#00C8FF;font-size:13px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;line-height:32px;">STRETCHFIELD WORKROOM</span>
+            </td>
+          </tr>
+        </table>
       </td>
     </tr>
   </table>
-  <div style="margin-top:20px;padding-top:20px;border-top:1px solid #1A2E4A;">
+  <div style="margin-top:24px;padding-top:20px;border-top:1px solid #1A2E4A;">
     <div style="color:#E8F0FF;font-size:22px;font-weight:800;letter-spacing:-0.02em;line-height:1.3;">${title}</div>
   </div>
 </div>`;

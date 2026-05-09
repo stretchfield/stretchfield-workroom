@@ -12650,6 +12650,11 @@ const EventClientPortalPanel = ({ event, client, user, onClose }) => {
         </div>
       )}
 
+      {/* Intelligence Report */}
+      {activeSection === "report" && (
+        <EventIntelligenceReport event={event} user={user} onClose={() => setActiveSection("overview")} />
+      )}
+
       {/* Messages */}
       {activeSection === "messages" && (
         <div>
@@ -12713,6 +12718,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
   const [sendingMsg, setSendingMsg] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showDocForm, setShowDocForm] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const [docFile, setDocFile] = useState(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [expandedDoc, setExpandedDoc] = useState(null);
@@ -12923,6 +12929,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
           { id: "tasks", label: "Tasks (" + myTasks.length + ")" },
           { id: "documents", label: "Documents (" + documents.length + ")" },
           { id: "messages", label: "Messages" + (unreadMsgs > 0 ? " ●" : "") },
+          { id: "report", label: "Intelligence Report" },
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveSection(tab.id)} style={{ padding: "10px 18px", border: "none", background: "none", cursor: "pointer", color: activeSection === tab.id ? T.cyan : T.textMuted, fontWeight: activeSection === tab.id ? 800 : 400, fontSize: 13, borderBottom: activeSection === tab.id ? "2px solid " + T.cyan : "2px solid transparent", marginBottom: -1, transition: "all 0.15s" }}>{tab.label}</button>
         ))}
@@ -14505,6 +14512,503 @@ const ExpenseView = ({ user }) => {
 
 // ─── FINANCIAL REPORTS ────────────────────────────────────────────────────────
 
+
+const EventIntelligenceReport = ({ event, user, onClose }) => {
+  const [report, setReport] = useState(null);
+  const [activeSection, setActiveSection] = useState("overview");
+  const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [form, setForm] = useState({
+    run_of_show_adherence: "", high_impact_moments: "", low_impact_moments: "",
+    logistics_notes: "", estimated_attendance: "", expected_attendance: "",
+    audience_energy_arrival: "", audience_energy_mid: "", audience_energy_peak: "",
+    audience_energy_close: "", key_engagement_moments: "", audience_feedback_observations: "",
+    vendor_performance_summary: "", vendors_recommended: "", vendors_not_recommended: "",
+    technical_delivery_quality: "", strategic_intent_achieved: "", client_satisfaction: "",
+    business_development_signals: "", next_edition_recommendations: "",
+  });
+
+  const isCEO = user.role === "CEO";
+  const isStrategy = user.role === "Strategy & Events Lead";
+  const isVM = user.role === "Vendor Manager";
+
+  const load = async () => {
+    const { data } = await supabase.from("event_intelligence_reports").select("*").eq("project_id", event.id).single();
+    if (data) {
+      setReport(data);
+      setForm(f => ({ ...f, ...data }));
+    } else {
+      const { data: newReport } = await supabase.from("event_intelligence_reports").insert({ project_id: event.id, status: "draft" }).select().single();
+      setReport(newReport);
+    }
+  };
+
+  useEffect(() => { load(); }, [event.id]);
+
+  const saveSection = async (section) => {
+    if (!report) return;
+    setSaving(true);
+    const updates = { updated_at: new Date().toISOString() };
+
+    if (section === "operational") {
+      Object.assign(updates, {
+        run_of_show_adherence: form.run_of_show_adherence,
+        high_impact_moments: form.high_impact_moments,
+        low_impact_moments: form.low_impact_moments,
+        logistics_notes: form.logistics_notes,
+        operational_submitted_by: user.id,
+        operational_submitted_at: new Date().toISOString(),
+      });
+    } else if (section === "audience") {
+      Object.assign(updates, {
+        estimated_attendance: parseInt(form.estimated_attendance) || null,
+        expected_attendance: parseInt(form.expected_attendance) || null,
+        audience_energy_arrival: form.audience_energy_arrival,
+        audience_energy_mid: form.audience_energy_mid,
+        audience_energy_peak: form.audience_energy_peak,
+        audience_energy_close: form.audience_energy_close,
+        key_engagement_moments: form.key_engagement_moments,
+        audience_feedback_observations: form.audience_feedback_observations,
+        audience_submitted_by: user.id,
+        audience_submitted_at: new Date().toISOString(),
+      });
+    } else if (section === "vendor") {
+      Object.assign(updates, {
+        vendor_performance_summary: form.vendor_performance_summary,
+        vendors_recommended: form.vendors_recommended,
+        vendors_not_recommended: form.vendors_not_recommended,
+        technical_delivery_quality: form.technical_delivery_quality,
+        vendor_submitted_by: user.id,
+        vendor_submitted_at: new Date().toISOString(),
+      });
+    } else if (section === "strategic") {
+      Object.assign(updates, {
+        strategic_intent_achieved: form.strategic_intent_achieved,
+        client_satisfaction: form.client_satisfaction,
+        business_development_signals: form.business_development_signals,
+        next_edition_recommendations: form.next_edition_recommendations,
+        ceo_submitted_by: user.id,
+        ceo_submitted_at: new Date().toISOString(),
+        status: "ceo_complete",
+      });
+    }
+
+    await supabase.from("event_intelligence_reports").update(updates).eq("id", report.id);
+    // Notify CEO when sections submitted
+    if (section !== "strategic") {
+      const { data: ceos } = await supabase.from("profiles").select("id").eq("role", "CEO");
+      for (const c of ceos || []) {
+        await supabase.from("notifications").insert({ user_id: c.id, title: "Report Section Submitted — " + event.name, message: user.name + " submitted the " + section + " section of the Event Intelligence Report.", type: "task" });
+      }
+    }
+    setSaving(false);
+    load();
+  };
+
+  const generateAISummary = async () => {
+    if (!report) return;
+    setGenerating(true);
+    try {
+      const prompt = `You are Stretchfield's Event Intelligence Analyst. Generate a professional Event Intelligence Report Summary for the following event:
+
+EVENT: ${event.name}
+CLIENT: ${event.client || "N/A"}
+DATE: ${event.event_date ? new Date(event.event_date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "N/A"}
+CATEGORY: ${event.event_category || "N/A"}
+
+OPERATIONAL INTELLIGENCE:
+- Run of Show Adherence: ${form.run_of_show_adherence || "Not provided"}
+- High Impact Moments: ${form.high_impact_moments || "Not provided"}
+- Low Impact Moments: ${form.low_impact_moments || "Not provided"}
+- Logistics Notes: ${form.logistics_notes || "Not provided"}
+
+AUDIENCE & ENGAGEMENT INTELLIGENCE:
+- Expected Attendance: ${form.expected_attendance || "N/A"}
+- Actual Attendance: ${form.estimated_attendance || "N/A"}
+- Arrival Energy: ${form.audience_energy_arrival || "Not provided"}
+- Mid-Event Energy: ${form.audience_energy_mid || "Not provided"}
+- Peak Moment: ${form.audience_energy_peak || "Not provided"}
+- Closing Energy: ${form.audience_energy_close || "Not provided"}
+- Key Engagement Moments: ${form.key_engagement_moments || "Not provided"}
+- Audience Feedback: ${form.audience_feedback_observations || "Not provided"}
+
+VENDOR & PROCUREMENT REVIEW:
+- Performance Summary: ${form.vendor_performance_summary || "Not provided"}
+- Recommended Vendors: ${form.vendors_recommended || "Not provided"}
+- Not Recommended: ${form.vendors_not_recommended || "Not provided"}
+- Technical Delivery: ${form.technical_delivery_quality || "Not provided"}
+
+STRATEGIC OUTCOMES (CEO):
+- Strategic Intent Achieved: ${form.strategic_intent_achieved || "Not provided"}
+- Client Satisfaction: ${form.client_satisfaction || "Not provided"}
+- Business Development Signals: ${form.business_development_signals || "Not provided"}
+- Next Edition Recommendations: ${form.next_edition_recommendations || "Not provided"}
+
+Generate a 400-500 word professional Event Intelligence Summary in Stretchfield's voice. Structure it as:
+1. Executive Intelligence Summary (2-3 sentences)
+2. Audience & Engagement Intelligence (key findings)
+3. Operational Performance (what worked, what didn't)
+4. Vendor Intelligence (performance insights)
+5. Strategic Outcomes & Forward Intelligence (recommendations)
+
+Use professional, consultative language that positions Stretchfield as a strategic partner, not just an event company. Frame challenges as "optimisation opportunities."`;
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+      const data = await response.json();
+      const summary = data.content?.[0]?.text || "Unable to generate summary.";
+      await supabase.from("event_intelligence_reports").update({ ai_summary: summary, ai_generated_at: new Date().toISOString(), status: "complete" }).eq("id", report.id);
+      setGenerating(false);
+      load();
+    } catch (err) {
+      console.error(err);
+      setGenerating(false);
+    }
+  };
+
+  const inputStyle = { width: "100%", padding: "10px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
+  const textareaStyle = { ...inputStyle, resize: "vertical", minHeight: 80 };
+  const labelStyle = { color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 5 };
+
+  const SectionStatus = ({ submittedAt, submittedBy }) => submittedAt ? (
+    <span style={{ color: T.teal, fontSize: 10, fontWeight: 700, background: T.teal+"15", padding: "2px 8px", borderRadius: 20 }}>✓ Submitted</span>
+  ) : (
+    <span style={{ color: T.amber, fontSize: 10, fontWeight: 700, background: T.amber+"15", padding: "2px 8px", borderRadius: 20 }}>Pending</span>
+  );
+
+  const sections = [
+    { id: "overview", label: "Overview" },
+    { id: "operational", label: "Operational" + (report?.operational_submitted_at ? " ✓" : "") },
+    { id: "audience", label: "Audience" + (report?.audience_submitted_at ? " ✓" : "") },
+    { id: "vendor", label: "Vendor" + (report?.vendor_submitted_at ? " ✓" : "") },
+    { id: "strategic", label: "Strategic" + (report?.ceo_submitted_at ? " ✓" : "") },
+    { id: "intelligence", label: "Intelligence Summary" },
+  ];
+
+  return (
+    <div style={{ animation: "fadeUp 0.3s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 4 }}>Event Intelligence Report</div>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 20 }}>{event.name}</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{event.client} · {event.event_date ? new Date(event.event_date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "Date TBC"}</div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "1px solid " + T.border, color: T.textMuted, width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 18 }}>×</button>
+        </div>
+        {/* Progress indicators */}
+        <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+          {[
+            { label: "Operational", done: !!report?.operational_submitted_at },
+            { label: "Audience", done: !!report?.audience_submitted_at },
+            { label: "Vendor", done: !!report?.vendor_submitted_at },
+            { label: "Strategic", done: !!report?.ceo_submitted_at },
+            { label: "AI Summary", done: !!report?.ai_summary },
+          ].map(s => (
+            <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 10px", borderRadius: 20, background: s.done ? T.teal+"15" : T.surface, border: "1px solid " + (s.done ? T.teal+"40" : T.border) }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: s.done ? T.teal : T.textMuted }} />
+              <span style={{ color: s.done ? T.teal : T.textMuted, fontSize: 10, fontWeight: 700 }}>{s.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: 2, marginBottom: 20, borderBottom: "1px solid " + T.border, overflowX: "auto" }}>
+        {sections.map(tab => (
+          <button key={tab.id} onClick={() => setActiveSection(tab.id)} style={{ padding: "8px 14px", border: "none", background: "none", cursor: "pointer", color: activeSection === tab.id ? T.cyan : T.textMuted, fontWeight: activeSection === tab.id ? 800 : 400, fontSize: 12, borderBottom: activeSection === tab.id ? "2px solid " + T.cyan : "2px solid transparent", marginBottom: -1, whiteSpace: "nowrap" }}>{tab.label}</button>
+        ))}
+      </div>
+
+      {/* Overview */}
+      {activeSection === "overview" && (
+        <div>
+          <div style={{ background: "linear-gradient(135deg, " + T.bgDeep + ", " + T.surface + ")", border: "1px solid " + T.border, borderRadius: 14, padding: "20px 24px", marginBottom: 16 }}>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>Report Status</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px,1fr))", gap: 12 }}>
+              {[
+                { label: "Operational Section", done: !!report?.operational_submitted_at, by: "Strategy Lead" },
+                { label: "Audience Section", done: !!report?.audience_submitted_at, by: "Strategy Lead" },
+                { label: "Vendor Section", done: !!report?.vendor_submitted_at, by: "Vendor Manager" },
+                { label: "Strategic Section", done: !!report?.ceo_submitted_at, by: "CEO" },
+                { label: "AI Summary", done: !!report?.ai_summary, by: "Auto-generated" },
+              ].map(s => (
+                <div key={s.label} style={{ background: T.bg, border: "1px solid " + (s.done ? T.teal+"40" : T.border), borderRadius: 10, padding: "12px 14px" }}>
+                  <div style={{ color: s.done ? T.teal : T.amber, fontWeight: 800, fontSize: 12, marginBottom: 3 }}>{s.done ? "✓ Complete" : "Pending"}</div>
+                  <div style={{ color: T.textPrimary, fontSize: 12, fontWeight: 600 }}>{s.label}</div>
+                  <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{s.by}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ background: T.surface, border: "1px solid " + T.border, borderRadius: 12, padding: "16px 20px" }}>
+            <div style={{ color: T.textMuted, fontSize: 11 }}>
+              This Event Intelligence Report captures operational, audience, vendor and strategic insights from <strong style={{ color: T.textPrimary }}>{event.name}</strong>. Each team member contributes their section. The CEO reviews all sections and triggers the AI-powered Intelligence Summary — a branded, client-ready document in Stretchfield's voice.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Operational Section - Strategy Lead */}
+      {activeSection === "operational" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div>
+              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Operational Intelligence</div>
+              <div style={{ color: T.textMuted, fontSize: 12 }}>Completed by Strategy & Events Lead</div>
+            </div>
+            <SectionStatus submittedAt={report?.operational_submitted_at} />
+          </div>
+          {(isStrategy || isCEO) ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={labelStyle}>Run of Show Adherence</label>
+                <select value={form.run_of_show_adherence} onChange={e => setForm(f => ({...f, run_of_show_adherence: e.target.value}))} style={{ ...inputStyle, appearance: "none" }}>
+                  <option value="">Select...</option>
+                  {["Fully on schedule", "Minor delays (under 15 mins)", "Moderate delays (15-30 mins)", "Significant delays (over 30 mins)", "Major programme changes"].map(o => <option key={o}>{o}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>High Impact Moments</label>
+                <textarea value={form.high_impact_moments} onChange={e => setForm(f => ({...f, high_impact_moments: e.target.value}))} placeholder="Describe the moments that generated the strongest audience response, energy or engagement..." style={textareaStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Low Impact Moments / Challenges</label>
+                <textarea value={form.low_impact_moments} onChange={e => setForm(f => ({...f, low_impact_moments: e.target.value}))} placeholder="Describe moments where energy dropped, technical issues occurred, or programme flow was disrupted..." style={textareaStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Logistics & Coordination Notes</label>
+                <textarea value={form.logistics_notes} onChange={e => setForm(f => ({...f, logistics_notes: e.target.value}))} placeholder="Registration, venue setup, ushering, catering, AV, transport, venue management..." style={textareaStyle} />
+              </div>
+              <button onClick={() => saveSection("operational")} disabled={saving} style={{ background: "linear-gradient(135deg, " + T.cyan + ", " + T.teal + ")", border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13, alignSelf: "flex-start" }}>{saving ? "Saving..." : "Save & Submit Section"}</button>
+            </div>
+          ) : (
+            <div style={{ background: T.surface, border: "1px solid " + T.border, borderRadius: 12, padding: "20px" }}>
+              {report?.run_of_show_adherence ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {[["Run of Show", report.run_of_show_adherence], ["High Impact Moments", report.high_impact_moments], ["Low Impact Moments", report.low_impact_moments], ["Logistics Notes", report.logistics_notes]].map(([label, val]) => val ? (
+                    <div key={label}><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{label}</div><div style={{ color: T.textPrimary, fontSize: 13, lineHeight: 1.6 }}>{val}</div></div>
+                  ) : null)}
+                </div>
+              ) : <div style={{ color: T.textMuted, fontSize: 13 }}>Awaiting Strategy Lead submission.</div>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Audience Section - Strategy Lead */}
+      {activeSection === "audience" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div>
+              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Audience & Engagement Intelligence</div>
+              <div style={{ color: T.textMuted, fontSize: 12 }}>Completed by Strategy & Events Lead</div>
+            </div>
+            <SectionStatus submittedAt={report?.audience_submitted_at} />
+          </div>
+          {(isStrategy || isCEO) ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Expected Attendance</label>
+                  <input type="number" value={form.expected_attendance} onChange={e => setForm(f => ({...f, expected_attendance: e.target.value}))} placeholder="0" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Actual Attendance</label>
+                  <input type="number" value={form.estimated_attendance} onChange={e => setForm(f => ({...f, estimated_attendance: e.target.value}))} placeholder="0" style={inputStyle} />
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                {[
+                  ["audience_energy_arrival", "Arrival Energy"],
+                  ["audience_energy_mid", "Mid-Event Energy"],
+                  ["audience_energy_peak", "Peak Moment"],
+                  ["audience_energy_close", "Closing Energy"],
+                ].map(([key, label]) => (
+                  <div key={key}>
+                    <label style={labelStyle}>{label}</label>
+                    <select value={form[key]} onChange={e => setForm(f => ({...f, [key]: e.target.value}))} style={{ ...inputStyle, appearance: "none" }}>
+                      <option value="">Select...</option>
+                      {["Very High — electric, buzzing", "High — engaged and attentive", "Moderate — steady interest", "Low — distracted or disengaged", "Mixed — varied across audience"].map(o => <option key={o}>{o}</option>)}
+                    </select>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <label style={labelStyle}>Key Engagement Moments</label>
+                <textarea value={form.key_engagement_moments} onChange={e => setForm(f => ({...f, key_engagement_moments: e.target.value}))} placeholder="What moments drove the strongest audience participation, response or emotional connection?" style={textareaStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Audience Feedback Observations</label>
+                <textarea value={form.audience_feedback_observations} onChange={e => setForm(f => ({...f, audience_feedback_observations: e.target.value}))} placeholder="What did guests say? What were the recurring themes in informal feedback?" style={textareaStyle} />
+              </div>
+              <button onClick={() => saveSection("audience")} disabled={saving} style={{ background: "linear-gradient(135deg, " + T.cyan + ", " + T.teal + ")", border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13, alignSelf: "flex-start" }}>{saving ? "Saving..." : "Save & Submit Section"}</button>
+            </div>
+          ) : (
+            <div style={{ background: T.surface, border: "1px solid " + T.border, borderRadius: 12, padding: "20px" }}>
+              {report?.audience_submitted_at ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {report.estimated_attendance && report.expected_attendance && (
+                    <div style={{ display: "flex", gap: 16, marginBottom: 8 }}>
+                      <div style={{ background: T.bg, borderRadius: 8, padding: "10px 16px" }}><div style={{ color: T.cyan, fontWeight: 800, fontSize: 18 }}>{report.expected_attendance}</div><div style={{ color: T.textMuted, fontSize: 10, textTransform: "uppercase" }}>Expected</div></div>
+                      <div style={{ background: T.bg, borderRadius: 8, padding: "10px 16px" }}><div style={{ color: T.teal, fontWeight: 800, fontSize: 18 }}>{report.estimated_attendance}</div><div style={{ color: T.textMuted, fontSize: 10, textTransform: "uppercase" }}>Attended</div></div>
+                      <div style={{ background: T.bg, borderRadius: 8, padding: "10px 16px" }}><div style={{ color: T.amber, fontWeight: 800, fontSize: 18 }}>{Math.round((report.estimated_attendance/report.expected_attendance)*100)}%</div><div style={{ color: T.textMuted, fontSize: 10, textTransform: "uppercase" }}>Conversion</div></div>
+                    </div>
+                  )}
+                  {[["Audience Energy", [["Arrival", report.audience_energy_arrival], ["Mid-Event", report.audience_energy_mid], ["Peak", report.audience_energy_peak], ["Closing", report.audience_energy_close]]], ["Key Engagement Moments", report.key_engagement_moments], ["Audience Feedback", report.audience_feedback_observations]].map(([label, val]) => val ? (
+                    <div key={label}><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
+                    {Array.isArray(val) ? (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{val.map(([k,v]) => v ? <div key={k} style={{ background: T.bg, borderRadius: 6, padding: "4px 10px" }}><span style={{ color: T.textMuted, fontSize: 10 }}>{k}: </span><span style={{ color: T.textPrimary, fontSize: 11, fontWeight: 600 }}>{v.split("—")[0]}</span></div> : null)}</div>
+                    ) : <div style={{ color: T.textPrimary, fontSize: 13, lineHeight: 1.6 }}>{val}</div>}
+                    </div>
+                  ) : null)}
+                </div>
+              ) : <div style={{ color: T.textMuted, fontSize: 13 }}>Awaiting Strategy Lead submission.</div>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Vendor Section - VM */}
+      {activeSection === "vendor" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div>
+              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Vendor & Procurement Review</div>
+              <div style={{ color: T.textMuted, fontSize: 12 }}>Completed by Vendor Manager</div>
+            </div>
+            <SectionStatus submittedAt={report?.vendor_submitted_at} />
+          </div>
+          {(isVM || isCEO) ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={labelStyle}>Overall Vendor Performance Summary</label>
+                <textarea value={form.vendor_performance_summary} onChange={e => setForm(f => ({...f, vendor_performance_summary: e.target.value}))} placeholder="How did vendors perform overall? Were deliverables met on time and to standard?" style={textareaStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Technical Delivery Quality</label>
+                <select value={form.technical_delivery_quality} onChange={e => setForm(f => ({...f, technical_delivery_quality: e.target.value}))} style={{ ...inputStyle, appearance: "none" }}>
+                  <option value="">Select...</option>
+                  {["Excellent — seamless throughout", "Good — minor issues resolved quickly", "Satisfactory — some disruptions", "Below standard — significant issues", "Poor — major failures"].map(o => <option key={o}>{o}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Vendors Recommended for Future Events</label>
+                <textarea value={form.vendors_recommended} onChange={e => setForm(f => ({...f, vendors_recommended: e.target.value}))} placeholder="List vendors who exceeded expectations and should be prioritised for future engagements..." style={textareaStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Vendors Not Recommended / Areas for Improvement</label>
+                <textarea value={form.vendors_not_recommended} onChange={e => setForm(f => ({...f, vendors_not_recommended: e.target.value}))} placeholder="List vendors who underperformed and the specific issues observed..." style={textareaStyle} />
+              </div>
+              <button onClick={() => saveSection("vendor")} disabled={saving} style={{ background: "linear-gradient(135deg, " + T.cyan + ", " + T.teal + ")", border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13, alignSelf: "flex-start" }}>{saving ? "Saving..." : "Save & Submit Section"}</button>
+            </div>
+          ) : (
+            <div style={{ background: T.surface, border: "1px solid " + T.border, borderRadius: 12, padding: "20px" }}>
+              {report?.vendor_submitted_at ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {[["Performance Summary", report.vendor_performance_summary], ["Technical Delivery", report.technical_delivery_quality], ["Recommended Vendors", report.vendors_recommended], ["Not Recommended", report.vendors_not_recommended]].map(([label, val]) => val ? (
+                    <div key={label}><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{label}</div><div style={{ color: T.textPrimary, fontSize: 13, lineHeight: 1.6 }}>{val}</div></div>
+                  ) : null)}
+                </div>
+              ) : <div style={{ color: T.textMuted, fontSize: 13 }}>Awaiting Vendor Manager submission.</div>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Strategic Section - CEO */}
+      {activeSection === "strategic" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div>
+              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Strategic Outcomes & Intelligence</div>
+              <div style={{ color: T.textMuted, fontSize: 12 }}>Completed by CEO</div>
+            </div>
+            <SectionStatus submittedAt={report?.ceo_submitted_at} />
+          </div>
+          {isCEO ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={labelStyle}>Was the Strategic Intent Achieved?</label>
+                <textarea value={form.strategic_intent_achieved} onChange={e => setForm(f => ({...f, strategic_intent_achieved: e.target.value}))} placeholder="Did the event achieve its core strategic objectives for the client? What was the business outcome?" style={textareaStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Client Satisfaction Assessment</label>
+                <textarea value={form.client_satisfaction} onChange={e => setForm(f => ({...f, client_satisfaction: e.target.value}))} placeholder="How satisfied was the client? What did they highlight as strengths or concerns?" style={textareaStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Business Development Signals</label>
+                <textarea value={form.business_development_signals} onChange={e => setForm(f => ({...f, business_development_signals: e.target.value}))} placeholder="What opportunities emerged from this event? Repeat business, referrals, new contacts, upsell opportunities..." style={textareaStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Recommendations for Next Edition</label>
+                <textarea value={form.next_edition_recommendations} onChange={e => setForm(f => ({...f, next_edition_recommendations: e.target.value}))} placeholder="What would you do differently? What should be elevated, removed or improved?" style={textareaStyle} />
+              </div>
+              <button onClick={() => saveSection("strategic")} disabled={saving} style={{ background: "linear-gradient(135deg, " + T.cyan + ", " + T.teal + ")", border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13, alignSelf: "flex-start" }}>{saving ? "Saving..." : "Save & Submit Section"}</button>
+            </div>
+          ) : (
+            <div style={{ background: T.surface, border: "1px solid " + T.border, borderRadius: 12, padding: "20px" }}>
+              {report?.ceo_submitted_at ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {[["Strategic Intent", report.strategic_intent_achieved], ["Client Satisfaction", report.client_satisfaction], ["Business Development", report.business_development_signals], ["Next Edition", report.next_edition_recommendations]].map(([label, val]) => val ? (
+                    <div key={label}><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{label}</div><div style={{ color: T.textPrimary, fontSize: 13, lineHeight: 1.6 }}>{val}</div></div>
+                  ) : null)}
+                </div>
+              ) : <div style={{ color: T.textMuted, fontSize: 13 }}>Awaiting CEO submission.</div>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Intelligence Summary */}
+      {activeSection === "intelligence" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div>
+              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Stretchfield Intelligence Summary</div>
+              <div style={{ color: T.textMuted, fontSize: 12 }}>AI-generated from all submitted sections</div>
+            </div>
+            {isCEO && (
+              <button onClick={generateAISummary} disabled={generating} style={{ background: "linear-gradient(135deg, " + T.cyan + ", " + T.teal + ")", border: "none", color: "#fff", padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 12 }}>{generating ? "Generating..." : report?.ai_summary ? "Regenerate" : "Generate Intelligence Summary"}</button>
+            )}
+          </div>
+          {report?.ai_summary ? (
+            <div style={{ background: "linear-gradient(135deg, " + T.bgDeep + ", " + T.surface + ")", border: "1px solid " + T.teal+"30", borderRadius: 14, padding: "28px 32px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid " + T.border }}>
+                <div>
+                  <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18 }}>Event Intelligence Report</div>
+                  <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{event.name} · {event.client}</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ color: T.cyan, fontWeight: 900, fontSize: 13 }}>STRETCHFIELD</div>
+                  <div style={{ color: T.textMuted, fontSize: 10 }}>Generated {new Date(report.ai_generated_at).toLocaleDateString("en-GB")}</div>
+                </div>
+              </div>
+              <div style={{ color: T.textSecondary, fontSize: 14, lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{report.ai_summary}</div>
+              <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid " + T.border, color: T.textMuted, fontSize: 11, fontStyle: "italic" }}>
+                Generated by Stretchfield Intelligence Engine · Confidential & Proprietary
+              </div>
+            </div>
+          ) : (
+            <div style={{ textAlign: "center", padding: "40px 0", background: T.surface, borderRadius: 12, border: "1px solid " + T.border }}>
+              <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15, marginBottom: 8 }}>Intelligence Summary Not Generated</div>
+              <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 16 }}>Complete all sections and generate the AI-powered summary to create a client-ready Event Intelligence Report.</div>
+              {!isCEO && <div style={{ color: T.textMuted, fontSize: 12 }}>CEO will generate this summary after all sections are submitted.</div>}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const EventsView = ({ user, userRole }) => {
   const [events, setEvents] = useState([]);

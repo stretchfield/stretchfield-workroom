@@ -47,16 +47,10 @@ const emailHeader = (title) => `
   <table style="width:100%;border-collapse:collapse;">
     <tr>
       <td style="vertical-align:middle;">
-        <table style="border-collapse:collapse;">
-          <tr>
-            <td style="vertical-align:middle;padding-right:10px;">
-              <img src="https://workroom.stretchfield.com/logo512.png" alt="Stretchfield" style="height:32px;width:32px;display:block;" onerror="this.style.display='none'" />
-            </td>
-            <td style="vertical-align:middle;">
-              <span style="color:#00C8FF;font-size:13px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;line-height:32px;">STRETCHFIELD WORKROOM</span>
-            </td>
-          </tr>
-        </table>
+        <span style="color:#00C8FF;font-size:13px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;">STRETCHFIELD WORKROOM</span>
+      </td>
+      <td style="text-align:right;vertical-align:middle;">
+        <img src="https://workroom.stretchfield.com/logo512.png" alt="Stretchfield" style="height:36px;width:36px;display:inline-block;" onerror="this.style.display='none'" />
       </td>
     </tr>
   </table>
@@ -65,36 +59,19 @@ const emailHeader = (title) => `
   </div>
 </div>`;
 const emailFooter = () => `
-<div style="background:#060B14;padding:28px 40px;border-radius:0 0 12px 12px;border-top:1px solid #0A1628;">
+<div style="background:#060B14;padding:24px 40px;border-radius:0 0 12px 12px;border-top:1px solid #0D1F36;">
   <table style="width:100%;border-collapse:collapse;">
     <tr>
-      <td style="vertical-align:top;padding-bottom:16px;">
-        <img src="https://workroom.stretchfield.com/stretchfield-logo.png" alt="Stretchfield" style="height:28px;width:auto;display:block;opacity:0.7;" onerror="this.style.display='none'" />
-        <div style="color:#3D5478;font-size:11px;font-style:italic;margin-top:8px;">We don't plan events. We engineer impact.</div>
+      <td style="vertical-align:middle;">
+        <div style="color:#3D5478;font-size:11px;font-style:italic;">We don't plan events. We engineer impact.</div>
+        <div style="color:#1E3A5F;font-size:11px;margin-top:6px;line-height:1.8;">
+          <a href="https://www.stretchfield.com" style="color:#3D5478;text-decoration:none;">www.stretchfield.com</a> &nbsp;·&nbsp;
+          <a href="mailto:info@stretchfield.com" style="color:#3D5478;text-decoration:none;">info@stretchfield.com</a>
+        </div>
+        <div style="color:#1A2E4A;font-size:10px;margin-top:4px;">© ${new Date().getFullYear()} Stretchfield. All rights reserved. · Accra, Ghana</div>
       </td>
-    </tr>
-    <tr>
-      <td style="border-top:1px solid #0D1F36;padding-top:16px;">
-        <table style="width:100%;border-collapse:collapse;">
-          <tr>
-            <td>
-              <div style="color:#1E3A5F;font-size:11px;line-height:1.8;">
-                <a href="https://www.stretchfield.com" style="color:#3D5478;text-decoration:none;">www.stretchfield.com</a> &nbsp;·&nbsp;
-                <a href="mailto:info@stretchfield.com" style="color:#3D5478;text-decoration:none;">info@stretchfield.com</a>
-              </div>
-              <div style="color:#1A2E4A;font-size:10px;margin-top:6px;">© ${new Date().getFullYear()} Stretchfield. All rights reserved. &nbsp;·&nbsp; Accra, Ghana</div>
-            </td>
-            <td style="text-align:right;vertical-align:bottom;">
-              <div style="display:inline-flex;gap:4px;">
-                <div style="width:6px;height:6px;border-radius:50%;background:#FF6B35;"></div>
-                <div style="width:6px;height:6px;border-radius:50%;background:#FF3CAC;"></div>
-                <div style="width:6px;height:6px;border-radius:50%;background:#784BA0;"></div>
-                <div style="width:6px;height:6px;border-radius:50%;background:#2B86C5;"></div>
-                <div style="width:6px;height:6px;border-radius:50%;background:#00C8FF;"></div>
-              </div>
-            </td>
-          </tr>
-        </table>
+      <td style="text-align:right;vertical-align:middle;">
+        <img src="https://workroom.stretchfield.com/logo512.png" alt="Stretchfield" style="height:36px;width:36px;display:inline-block;opacity:0.85;" onerror="this.style.display='none'" />
       </td>
     </tr>
   </table>

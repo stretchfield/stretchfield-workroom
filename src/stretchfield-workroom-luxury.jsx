@@ -43,17 +43,17 @@ const generatePassword = (email) => {
 };
 
 const emailHeader = (title) => `
-<div style="background:linear-gradient(135deg,#060B14 0%,#0A1628 100%);padding:32px 40px 28px;border-radius:12px 12px 0 0;border-bottom:3px solid transparent;background-clip:padding-box;position:relative;">
+<div style="background:linear-gradient(135deg,#060B14 0%,#0A1628 100%);padding:32px 40px 28px;border-radius:12px 12px 0 0;">
   <table style="width:100%;border-collapse:collapse;">
     <tr>
       <td style="vertical-align:middle;">
-        <img src="https://workroom.stretchfield.com/stretchfield-logo.png" alt="Stretchfield" style="height:40px;width:auto;display:block;" onerror="this.style.display='none'" />
-        <div style="margin-top:6px;">
+        <img src="https://workroom.stretchfield.com/stretchfield-logo.png" alt="Stretchfield" style="height:32px;width:auto;display:block;" onerror="this.style.display='none'" />
+        <div style="margin-top:5px;">
           <span style="color:#00C8FF;font-size:10px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;">STRETCHFIELD WORKROOM</span>
         </div>
       </td>
       <td style="text-align:right;vertical-align:middle;">
-        <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#FF6B35,#FF3CAC,#784BA0,#2B86C5,#00C8FF);display:inline-block;"></div>
+        <img src="https://workroom.stretchfield.com/logo512.png" alt="Stretchfield" style="height:48px;width:48px;display:inline-block;" onerror="this.style.display='none'" />
       </td>
     </tr>
   </table>

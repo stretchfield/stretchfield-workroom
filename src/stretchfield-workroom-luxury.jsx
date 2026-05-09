@@ -11194,6 +11194,8 @@ const VendorAssignmentView = ({ user }) => {
     await supabase.from("rff_vendor_assignments").insert({ rff_id: rff.id, vendor_id: vendor.id, vendor_name: vendor.name, assigned_by: user.id });
     // Notify vendor
     await supabase.from("notifications").insert({ user_id: vendor.id, title: "New RFF Assignment", message: `You have been assigned to RFF: "${rff.title}" for ${rff.event_name}. Please submit your quote.`, type: "rff" });
+    const { data: vendorProf } = await supabase.from("profiles").select("email,name").eq("id", vendor.id).single();
+    if (vendorProf?.email) await sendEmail(vendorProf.email, `Request for Quote — ${rff.title}`, rffEmailHtml({ vendorName: vendor.name, rffTitle: rff.title || "Request for Quote", eventName: rff.event_name || "", deadline: rff.quote_deadline, category: rff.category || "", notes: rff.description || "" }));
     // Update RFF status to show vendors are being assigned
     await supabase.from("rffs").update({ status: "vendor-assigned" }).eq("id", rff.id);
     setSaving(false); load();
@@ -12917,6 +12919,8 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
           assignee_ids: assigneeIds,
         });
         await supabase.from("notifications").insert({ user_id: aid, title: "New Task — " + event.name, message: taskForm.name, type: "task" });
+        const { data: assigneeProfile } = await supabase.from("profiles").select("email,name").eq("id", aid).single();
+        if (assigneeProfile?.email) await sendEmail(assigneeProfile.email, "New Task Assigned — " + event.name, taskEmailHtml({ staffName: assigneeProfile.name, taskName: taskForm.name, eventName: event.name, deadline: taskForm.deadline || null, assignedBy: user.name, notes: taskForm.notes || null }));
       }
     } else if (assigneeIds.length === 1) {
       const assignee = members.find(m => m.id === assigneeIds[0]);
@@ -14747,6 +14751,8 @@ const EventIntelligenceReport = ({ event, user, onClose }) => {
       const { data: ceos } = await supabase.from("profiles").select("id").eq("role", "CEO");
       for (const c of ceos || []) {
         await supabase.from("notifications").insert({ user_id: c.id, title: "Report Section Submitted — " + event.name, message: user.name + " submitted the " + section + " section of the Event Intelligence Report.", type: "task" });
+      const { data: ceoProfile } = await supabase.from("profiles").select("email,name").eq("id", c.id).single();
+      if (ceoProfile?.email) await sendEmail(ceoProfile.email, "Intelligence Report Update — " + event.name, intelligenceReportEmailHtml({ ceoName: ceoProfile.name, eventName: event.name, clientName: event.client || "", submittedBy: user.name, section: section.charAt(0).toUpperCase() + section.slice(1) + " Intelligence" }));
       }
     }
     setSaving(false);
@@ -15282,6 +15288,8 @@ const PaymentAuthorisationView = ({ user }) => {
     const { data: fin } = await supabase.from("profiles").select("id").eq("role", "Finance Manager");
     for (const f of fin || []) {
       await supabase.from("notifications").insert({ user_id: f.id, title: "Payment Authorisation Request", message: "VM has submitted a payment request for " + (vendor?.name || "vendor") + " — GHS " + parseFloat(form.agreed_amount).toLocaleString() + ". Please review and sign.", type: "task" });
+      const { data: finProfile } = await supabase.from("profiles").select("email,name").eq("id", f.id).single();
+      if (finProfile?.email) await sendEmail(finProfile.email, "Payment Request — " + (vendor?.name || "vendor"), paymentRequestEmailHtml({ financeName: finProfile.name, vendorName: vendor?.name || "Vendor", amount: parseFloat(form.agreed_amount), eventName: rffs.find(r => r.id === form.rff_id)?.event_name || "", paymentMethod: form.payment_method, requestedBy: user.name, workConfirmed: form.work_confirmed, invoiceMatchesPO: form.invoice_matches_po }));
     }
     setForm({ vendor_id: "", rff_id: "", invoice_id: "", agreed_amount: "", payment_method: "bank_transfer", bank_name: "", account_number: "", account_name: "", mobile_money_number: "", payment_terms: "", notes: "", work_confirmed: false, invoice_matches_po: false });
     setShowForm(false);
@@ -15303,6 +15311,8 @@ const PaymentAuthorisationView = ({ user }) => {
       Object.assign(updates, { ceo_approved_by: user.id, ceo_approved_by_name: user.name, ceo_approved_at: new Date().toISOString(), ceo_signature: signature, ceo_notes: signNotes, status: "approved" });
       // Notify vendor + VM + Finance
       await supabase.from("notifications").insert({ user_id: auth.vendor_id, title: "Payment Authorised — " + auth.vendor_name, message: "Your payment of GHS " + (auth.agreed_amount||0).toLocaleString() + " has been fully authorised. Expect payment per agreed terms.", type: "task" });
+        const { data: vendorProfile } = await supabase.from("profiles").select("email,name").eq("id", auth.vendor_id).single();
+        if (vendorProfile?.email) await sendEmail(vendorProfile.email, "Payment Authorised — GHS " + (auth.agreed_amount||0).toLocaleString(), paymentAuthorisedEmailHtml({ vendorName: auth.vendor_name, amount: auth.agreed_amount, eventName: auth.event_name, paymentMethod: auth.payment_method, paymentTerms: auth.payment_terms, bankName: auth.bank_name, accountNumber: auth.account_number, accountName: auth.account_name, mobileNumber: auth.mobile_money_number }));
       const { data: vm } = await supabase.from("profiles").select("id").eq("role", "Vendor Manager");
       for (const v of vm || []) await supabase.from("notifications").insert({ user_id: v.id, title: "Payment Approved — " + auth.vendor_name, message: "CEO has signed off payment of GHS " + (auth.agreed_amount||0).toLocaleString() + " for " + auth.vendor_name + ".", type: "task" });
     }

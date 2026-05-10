@@ -1312,6 +1312,7 @@ const VendorManagerDashboard = ({ user }) => {
   const [notifs, setNotifs] = useState([]);
   const [rffs, setRffs] = useState([]);
   const [awards, setAwards] = useState([]);
+  const [internalPortalEvent, setInternalPortalEvent] = useState(null);
 
 
   const VENDOR_TYPES = ["Event Lighting","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
@@ -1492,6 +1493,7 @@ const VendorManagerDashboard = ({ user }) => {
 
 const StaffDashboard = ({ user }) => {
   const [tasks, setTasks] = useState([]);
+  const [internalPortalEvent, setInternalPortalEvent] = useState(null);
   const [events, setEvents] = useState([]);
   const [notifs, setNotifs] = useState([]);
 

@@ -846,7 +846,7 @@ const getNavItems = (role) => {
   }
   if (["Finance Manager","CEO"].includes(role)) {
     base.push({ id: "purchase-orders", label: "Purchase Orders", icon: "▪" });
-    base.push({ id: "vendor-invoices", label: "Vendor Invoices", icon: "▪" }, { id: "payment-authorisation", label: "Payment Authorisation", icon: "▪" });
+    base.push({ id: "purchase-orders", label: "Purchase Orders", icon: "▪" }, { id: "vendor-invoices", label: "Vendor Invoices", icon: "▪" }, { id: "payment-authorisation", label: "Payment Authorisation", icon: "▪" });
   }
   if (["CEO"].includes(role)) {
     base.push({ id: "client-financials", label: "Client Financials", icon: "▪" });
@@ -8352,7 +8352,7 @@ const ContractAwardApprovalView = ({ user }) => {
         message: `CEO confirmed ${award.vendor_name} for this gig. Please create a Purchase Order.`,
         type: "rff",
       });
-      if (fm.email) await sendEmail(fm.email, `Gig Confirmed — Create PO for ${award.vendor_name}`, notifEmailHtml({ name: fm.name, title: "Gig Confirmed — Action Required", message: `CEO has confirmed <strong>${award.vendor_name}</strong> for a gig. Please log in to create a Purchase Order.`, actionUrl: BASE_URL, actionLabel: "Create Purchase Order" }));
+      if (fm.email) await sendEmail(fm.email, `Gig Confirmed — Create PO for ${award.vendor_name}`, notifEmailHtml({ name: fm.name, title: "Gig Confirmed — Create Purchase Order", message: `CEO has confirmed <strong>${award.vendor_name}</strong> for <strong>${award.event_name||"a gig"}</strong>. Please log in to Finance → Purchase Orders to generate the Purchase Order.`, actionUrl: BASE_URL, actionLabel: "Go to Purchase Orders" }));
     }
     // Notify Vendor Manager
     const { data: vms } = await supabase.from("profiles").select("id, email, name").eq("role", "Vendor Manager");
@@ -8930,7 +8930,11 @@ const PurchaseOrderView = ({ user }) => {
     await supabase.from("rff_awards").update({ status: "po_created" }).eq("id", award.id);
     setSaving(false);
     setPoForm({ currency: "GHS", notes: "" });
-    await load();
+    // Force reload
+    const { data: freshPOs } = await supabase.from("purchase_orders").select("*").order("created_at", { ascending: false });
+    setPOs(freshPOs || []);
+    const { data: freshAwards } = await supabase.from("rff_awards").select("*").in("status", ["confirmed","po_created","invoiced","paid"]);
+    setAwards(freshAwards || []);
   };
 
   const publishPO = async (po) => {
@@ -8959,7 +8963,7 @@ const PurchaseOrderView = ({ user }) => {
       <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: "1px solid "+T.border }}>
         <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Finance</div>
         <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Purchase Orders</h2>
-        <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>{pendingAwards.length} confirmed awards awaiting PO · {pos.length} POs created</div>
+        <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>{pendingAwards.length} confirmed gig{pendingAwards.length!==1?"s":""} awaiting PO · {pos.length} PO{pos.length!==1?"s":""} created · Managed by Finance</div>
       </div>
 
       {zohoStatus && <div style={{ padding:"10px 14px", background:T.teal+"12", border:"1px solid "+T.teal+"30", borderRadius:8, color:T.teal, fontSize:13, marginBottom:16 }}>{zohoStatus}</div>}

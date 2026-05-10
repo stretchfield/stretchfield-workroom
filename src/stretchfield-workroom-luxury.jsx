@@ -1364,155 +1364,129 @@ const VendorManagerDashboard = ({ user }) => {
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>{dateStr}</div>
-        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: T.textPrimary, letterSpacing: "-0.02em" }}>{greeting}, {user.name.split(" ")[0]}</h1>
-        <div style={{ color: T.textMuted, fontSize: 13, marginTop: 4 }}>Vendor network overview and procurement status</div>
-      </div>
 
-      {/* KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 12, marginBottom: 24 }}>
-        {[
-          { label: "Total Vendors", value: vendors.length, color: T.cyan },
-          { label: "Active Events", value: events.length, color: T.teal },
-          { label: "Pending RFFs", value: pendingRffs.length, color: T.amber },
-          { label: "Confirmed Gigs", value: awards.length, color: "#10B981" },
-        ].map((k,i) => (
-          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
-            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
-            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+      {/* ── HERO GREETING ── */}
+      <div style={{ background: `linear-gradient(135deg, ${T.bgDeep} 0%, #0D1F36 60%, ${T.bgDeep} 100%)`, border: `1px solid ${T.border}`, borderRadius: 16, padding: "32px 36px", marginBottom: 24, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: -60, right: -60, width: 280, height: 280, background: `radial-gradient(circle, ${T.cyan}08, transparent 70%)`, pointerEvents: "none" }} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
+          <div>
+            <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>{dateStr}</div>
+            <h1 style={{ margin: "0 0 6px", fontSize: 28, fontWeight: 900, color: T.textPrimary, letterSpacing: "-0.03em" }}>{greeting}, {user.name.split(" ")[0]}.</h1>
+            <div style={{ color: T.textMuted, fontSize: 14 }}>Vendor network · {vendors.length} vendors · {events.length} active events</div>
           </div>
-        ))}
-      </div>
-
-      {/* Alerts */}
-      {notifs.length > 0 && (
-        <div style={{ marginBottom: 20 }}>
-          {notifs.slice(0,3).map(n => (
-            <div key={n.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: T.amber+"12", border: `1px solid ${T.amber}30`, borderRadius: 8, marginBottom: 6 }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.amber, flexShrink: 0 }} />
-              <div style={{ color: T.amber, fontSize: 12, fontWeight: 600, flex: 1 }}>{n.title}</div>
-              <div style={{ color: T.textMuted, fontSize: 11 }}>{n.message?.slice(0,60)}...</div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={() => {}} style={{ background: `linear-gradient(135deg,${T.cyan},${T.teal})`, border: "none", color: "#060B14", padding: "10px 20px", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>Vendor Assignment →</button>
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginTop: 24, paddingTop: 20, borderTop: `1px solid ${T.border}44` }}>
+          {[
+            { label: "Total Vendors", value: vendors.length, color: T.cyan },
+            { label: "Active Events", value: events.length, color: T.teal },
+            { label: "Pending RFFs", value: pendingRffs.length, color: T.amber },
+            { label: "Confirmed Gigs", value: awards.length, color: "#10B981" },
+            { label: "My Tasks", value: pending.length, color: pending.length > 3 ? T.amber : T.textMuted },
+            { label: "Notifications", value: notifs.length, color: notifs.length > 0 ? T.cyan : T.textMuted },
+          ].map(k => (
+            <div key={k.label} style={{ padding: "12px 14px", background: `${T.bg}80`, border: `1px solid ${T.border}44`, borderRadius: 10 }}>
+              <div style={{ color: k.color, fontSize: 18, fontWeight: 900 }}>{k.value}</div>
+              <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>{k.label}</div>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* ── TWO COLUMN ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+
+        {/* My Events */}
+        {events.length > 0 && (
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "20px 22px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div>
+                <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 3 }}>Operations</div>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Active Events</div>
+              </div>
+            </div>
+            {upcomingEvents.slice(0,4).map(e => {
+              const days = e.event_date ? Math.ceil((new Date(e.event_date) - now) / 86400000) : null;
+              const color = days !== null ? (days <= 7 ? T.red : days <= 30 ? T.amber : T.teal) : T.teal;
+              return (
+                <div key={e.id} onClick={() => setInternalPortalEvent(e)} style={{ display: "flex", gap: 12, padding: "10px 0", borderBottom: `1px solid ${T.border}33`, cursor: "pointer" }}>
+                  {days !== null && (
+                    <div style={{ width: 40, height: 40, borderRadius: 8, background: `${color}15`, border: `1px solid ${color}30`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <div style={{ color, fontSize: 13, fontWeight: 900, lineHeight: 1 }}>{days > 0 ? days : "T"}</div>
+                      <div style={{ color, fontSize: 7, textTransform: "uppercase", fontWeight: 700 }}>{days > 0 ? "days" : "oday"}</div>
+                    </div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.name}</div>
+                    <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{e.client} · {e.phase||"Planning"}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* RFFs & Awards */}
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "20px 22px" }}>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 3 }}>Procurement</div>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>RFFs & Awards</div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {rffs.slice(0,5).map(r => (
+              <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: T.bg, borderRadius: 8, border: `1px solid ${T.border}44` }}>
+                <div>
+                  <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{r.title}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11 }}>{r.event_name}</div>
+                </div>
+                <span style={{ color: r.approved ? T.teal : T.amber, fontSize: 10, fontWeight: 800, background: (r.approved ? T.teal : T.amber)+"15", padding: "2px 8px", borderRadius: 20 }}>{r.approved ? "Approved" : "Pending"}</span>
+              </div>
+            ))}
+            {rffs.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "16px 0" }}>No RFFs yet</div>}
+          </div>
+        </div>
+      </div>
+
+      {/* ── MY TASKS ── */}
+      {pending.length > 0 && (
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "20px 22px", marginBottom: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <div>
+              <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 3 }}>Tasks</div>
+              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>My Open Tasks</div>
+            </div>
+            <span style={{ color: T.amber, fontSize: 11, fontWeight: 700 }}>{pending.length} pending</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {pending.slice(0,5).map(t => (
+              <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: T.bg, borderRadius: 8, border: `1px solid ${T.border}44` }}>
+                <div>
+                  <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{t.name}</div>
+                  {t.deadline && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Due: {new Date(t.deadline).toLocaleDateString("en-GB")}</div>}
+                </div>
+                <Badge status={t.status} />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Two column layout */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 16, marginBottom: 24 }}>
-
-        {/* Upcoming Events */}
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px" }}>
-          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 14 }}>Upcoming Events</div>
-          {upcomingEvents.length > 0 ? upcomingEvents.slice(0,4).map((ev,i) => {
-            const days = Math.ceil((new Date(ev.event_date) - now)/(1000*60*60*24));
-            const color = days <= 7 ? T.red : days <= 30 ? T.amber : T.teal;
-            const archetype = EVENT_ARCHETYPES[ev.event_category];
-            return (
-              <div key={ev.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < 3 ? `1px solid ${T.border}33` : "none" }}>
-                <div>
-                  <div style={{ color: T.textPrimary, fontWeight: 600, fontSize: 12 }}>{ev.name}</div>
-                  {ev.event_category && <div style={{ color: archetype?.color||T.cyan, fontSize: 10, fontWeight: 700 }}>{ev.event_category}</div>}
-                </div>
-                <div style={{ color, fontWeight: 800, fontSize: 13 }}>{days}d</div>
-              </div>
-            );
-          }) : <div style={{ color: T.textMuted, fontSize: 12, textAlign: "center", padding: "16px 0" }}>No upcoming events</div>}
-        </div>
-
-        {/* My Tasks */}
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 20px" }}>
-          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 14 }}>My Tasks</div>
-          {pending.length > 0 ? pending.slice(0,4).map((t,i) => (
-            <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < Math.min(pending.length,4)-1 ? `1px solid ${T.border}33` : "none" }}>
-              <div style={{ color: T.textPrimary, fontSize: 12, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</div>
-              <div style={{ color: t.deadline && new Date(t.deadline) < now ? T.red : T.textMuted, fontSize: 10, flexShrink: 0, marginLeft: 8 }}>{t.deadline || "No date"}</div>
+      {/* Internal Event Portal Modal */}
+      {internalPortalEvent && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", overflowY: "auto" }} onClick={() => setInternalPortalEvent(null)}>
+          <div style={{ minHeight: "100vh", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 20px" }}>
+            <div style={{ background: T.bg, borderRadius: 16, width: "100%", maxWidth: 800, padding: 28 }} onClick={e => e.stopPropagation()}>
+              <InternalEventPortal event={internalPortalEvent} user={user} allTasks={tasks} onClose={() => setInternalPortalEvent(null)} />
             </div>
-          )) : <div style={{ color: T.textMuted, fontSize: 12, textAlign: "center", padding: "16px 0" }}>No pending tasks</div>}
-        </div>
-      </div>
-
-      {/* Vendor Directory by Category */}
-      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-        <div style={{ padding: "16px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Vendor Directory</div>
-            <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{vendors.length} vendors across {Object.keys(vendorsByCategory).length} categories</div>
           </div>
         </div>
-
-        <div style={{ padding: "16px 20px" }}>
-          {Object.entries(vendorsByCategory).map(([category, catVendors]) => (
-            <div key={category} style={{ marginBottom: 20 }}>
-              {/* Category Header */}
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, paddingBottom: 6, borderBottom: `1px solid ${T.border}` }}>
-                <div style={{ background: T.cyan+"18", border: `1px solid ${T.cyan}30`, borderRadius: 20, padding: "3px 12px", display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ color: T.cyan, fontWeight: 900, fontSize: 16 }}>{catVendors.length}</span>
-                  <span style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>vendor{catVendors.length !== 1 ? "s" : ""}</span>
-                </div>
-                <span style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{category}</span>
-              </div>
-
-              {/* Vendor List */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px,1fr))", gap: 8 }}>
-                {catVendors.map(v => {
-                  const tierColor = getTierColor(v.vendor_score, v.vendor_scorecard_count);
-                  const isPoor = v.vendor_scorecard_count > 0 && (v.vendor_score||0) < 50;
-                  return (
-                    <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: isPoor ? T.red+"08" : T.bg, border: `1px solid ${isPoor ? T.red+"30" : T.border}`, borderRadius: 8 }}>
-                      <div style={{ width: 30, height: 30, borderRadius: "50%", background: tierColor+"20", border: `1px solid ${tierColor}40`, display: "flex", alignItems: "center", justifyContent: "center", color: tierColor, fontWeight: 800, fontSize: 11, flexShrink: 0 }}>
-                        {(v.name||"?").slice(0,2).toUpperCase()}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.name}</div>
-                        <div style={{ color: T.textMuted, fontSize: 10, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.company_name || v.email || ""}</div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-                          {v.vendor_scorecard_count > 0 ? (
-                            <span style={{ color: tierColor, fontSize: 10, fontWeight: 700 }}>{v.vendor_score}% · {getTier(v.vendor_score).label}</span>
-                          ) : (
-                            <span style={{ color: T.textMuted, fontSize: 10 }}>Unrated</span>
-                          )}
-                          {isPoor && <span style={{ color: T.red, fontSize: 9, fontWeight: 700 }}>⛔ Blocked</span>}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-
-          {/* Uncategorised */}
-          {uncategorised.length > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, paddingBottom: 6, borderBottom: `1px solid ${T.border}` }}>
-                <div style={{ background: T.textMuted+"18", border: `1px solid ${T.border}`, borderRadius: 20, padding: "3px 12px", display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ color: T.textMuted, fontWeight: 900, fontSize: 16 }}>{uncategorised.length}</span>
-                  <span style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>vendor{uncategorised.length !== 1 ? "s" : ""}</span>
-                </div>
-                <span style={{ color: T.textMuted, fontWeight: 700, fontSize: 13 }}>Uncategorised</span>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px,1fr))", gap: 8 }}>
-                {uncategorised.map(v => (
-                  <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8 }}>
-                    <div style={{ width: 30, height: 30, borderRadius: "50%", background: T.border, display: "flex", alignItems: "center", justifyContent: "center", color: T.textMuted, fontWeight: 800, fontSize: 11, flexShrink: 0 }}>{(v.name||"?").slice(0,2).toUpperCase()}</div>
-                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>{v.name}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {vendors.length === 0 && (
-            <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted, fontSize: 13 }}>No vendors onboarded yet. Use the Add New Vendor tab to get started.</div>
-          )}
-        </div>
-      </div>
-
+      )}
     </div>
   );
 };
+
 
 
 
@@ -1546,314 +1520,117 @@ const StaffDashboard = ({ user }) => {
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>{dateStr}</div>
-        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: T.textPrimary, letterSpacing: "-0.02em" }}>{greeting}, {user.name.split(" ")[0]}</h1>
-        <div style={{ color: T.textMuted, fontSize: 13, marginTop: 4 }}>Here's your workload for today</div>
+
+      {/* ── HERO ── */}
+      <div style={{ background: `linear-gradient(135deg, ${T.bgDeep} 0%, #0D1F36 60%, ${T.bgDeep} 100%)`, border: `1px solid ${T.border}`, borderRadius: 16, padding: "32px 36px", marginBottom: 24, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: -60, right: -60, width: 240, height: 240, background: `radial-gradient(circle, ${T.teal}08, transparent 70%)`, pointerEvents: "none" }} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
+          <div>
+            <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>{now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
+            <h1 style={{ margin: "0 0 6px", fontSize: 28, fontWeight: 900, color: T.textPrimary, letterSpacing: "-0.03em" }}>{now.getHours() < 12 ? "Good Morning" : now.getHours() < 17 ? "Good Afternoon" : "Good Evening"}, {user.name.split(" ")[0]}.</h1>
+            <div style={{ color: T.textMuted, fontSize: 14 }}>{user.role} · {pending.length > 0 ? <span style={{ color: T.amber, fontWeight: 700 }}>{pending.length} open task{pending.length !== 1 ? "s" : ""}</span> : <span style={{ color: T.teal, fontWeight: 700 }}>All tasks complete</span>}</div>
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginTop: 24, paddingTop: 20, borderTop: `1px solid ${T.border}44` }}>
+          {[
+            { label: "My Events", value: events.length, color: T.cyan },
+            { label: "Open Tasks", value: pending.length, color: pending.length > 0 ? T.amber : T.teal },
+            { label: "Completed Tasks", value: tasks.filter(t => t.status === "completed").length, color: T.teal },
+            { label: "Notifications", value: notifs.filter(n => !n.read).length, color: T.cyan },
+          ].map(k => (
+            <div key={k.label} style={{ padding: "12px 14px", background: `${T.bg}80`, border: `1px solid ${T.border}44`, borderRadius: 10 }}>
+              <div style={{ color: k.color, fontSize: 18, fontWeight: 900 }}>{k.value}</div>
+              <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>{k.label}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginBottom: 24 }}>
-        {[
-          { label: "Active Events", value: events.length, color: T.cyan },
-          { label: "Pending Tasks", value: pending.length, sub: dueSoon.length > 0 ? dueSoon.length + " due soon" : null, color: T.amber },
-          { label: "Unread Alerts", value: notifs.length, color: T.blue },
-        ].map((k, i) => (
-          <div key={i} style={{ padding: "16px 18px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
-            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
-            <div style={{ color: T.textPrimary, fontSize: 11, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
-            {k.sub && <div style={{ color: T.amber, fontSize: 10, marginTop: 2 }}>{k.sub}</div>}
+      {/* ── MY EVENTS ── */}
+      {events.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 12 }}>My Events</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {events.filter(e => !e.event_date || new Date(e.event_date) >= new Date(Date.now() - 30*86400000)).sort((a,b) => new Date(a.event_date||"9999") - new Date(b.event_date||"9999")).slice(0,5).map(e => {
+              const daysLeft = e.event_date ? Math.ceil((new Date(e.event_date) - now) / 86400000) : null;
+              const dotColor = daysLeft !== null ? (daysLeft <= 7 ? T.red : daysLeft <= 30 ? T.amber : T.teal) : T.teal;
+              const myEventTasks = tasks.filter(t => t.project_id === e.id);
+              const pendingCount = myEventTasks.filter(t => t.status !== "completed").length;
+              return (
+                <div key={e.id} onClick={() => setInternalPortalEvent(e)} style={{ background: T.surface, border: `1px solid ${T.border}`, borderLeft: `3px solid ${dotColor}`, borderRadius: 10, padding: "14px 16px", cursor: "pointer", transition: "border-color 0.15s" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.name}</div>
+                      <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{e.client}{e.event_date ? " · " + new Date(e.event_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : ""}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0, marginLeft: 12 }}>
+                      {daysLeft !== null && <div style={{ background: `${dotColor}18`, border: `1px solid ${dotColor}30`, borderRadius: 8, padding: "4px 10px", textAlign: "center" }}><div style={{ color: dotColor, fontSize: 13, fontWeight: 900, lineHeight: 1 }}>{daysLeft > 0 ? daysLeft : "Today"}</div>{daysLeft > 0 && <div style={{ color: dotColor, fontSize: 8, textTransform: "uppercase" }}>days</div>}</div>}
+                      {pendingCount > 0 && <div style={{ background: `${T.amber}18`, border: `1px solid ${T.amber}30`, borderRadius: 8, padding: "4px 10px", textAlign: "center" }}><div style={{ color: T.amber, fontSize: 13, fontWeight: 900, lineHeight: 1 }}>{pendingCount}</div><div style={{ color: T.amber, fontSize: 8, textTransform: "uppercase" }}>tasks</div></div>}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+                    <span style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, background: T.bg, padding: "2px 8px", borderRadius: 20, textTransform: "uppercase" }}>{e.phase || "Planning"}</span>
+                    <span style={{ color: T.cyan, fontSize: 11, fontWeight: 700 }}>Open →</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── MY TASKS ── */}
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "20px 22px", marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <div>
+            <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 3 }}>Work</div>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>My Tasks</div>
+          </div>
+          <span style={{ color: T.textMuted, fontSize: 11 }}>{pending.length} open</span>
+        </div>
+        {tasks.length === 0 ? (
+          <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "24px 0" }}>No tasks assigned yet.</div>
+        ) : tasks.slice(0,6).map((t, i) => (
+          <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < Math.min(tasks.length,6)-1 ? `1px solid ${T.border}44` : "none" }}>
+            <div>
+              <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{t.name}</div>
+              {t.deadline && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Due: {new Date(t.deadline).toLocaleDateString("en-GB")}</div>}
+            </div>
+            <Badge status={t.status} />
           </div>
         ))}
       </div>
 
-      {/* Alerts */}
-      {notifs.length > 0 && (
-        <div style={{ marginBottom: 20 }}>
-          {notifs.slice(0, 3).map(n => (
-            <div key={n.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: T.amber + "12", border: `1px solid ${T.amber}30`, borderRadius: 8, marginBottom: 6 }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.amber, boxShadow: `0 0 6px ${T.amber}`, flexShrink: 0 }} />
-              <div style={{ color: T.amber, fontSize: 12, fontWeight: 600, flex: 1 }}>{n.title}</div>
-              <div style={{ color: T.textMuted, fontSize: 11 }}>{n.message}</div>
+      {/* ── NOTIFICATIONS ── */}
+      {notifs.filter(n=>!n.read).length > 0 && (
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "18px 20px" }}>
+          <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 12 }}>Alerts</div>
+          {notifs.filter(n=>!n.read).map(n => (
+            <div key={n.id} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: `1px solid ${T.border}33` }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.cyan, marginTop: 6, flexShrink: 0 }} />
+              <div>
+                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{n.title}</div>
+                {n.message && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{n.message}</div>}
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Upcoming Events */}
-      {(() => {
-        const upcoming = events
-          .filter(e => e.event_date && new Date(e.event_date) >= new Date())
-          .sort((a, b) => new Date(a.event_date) - new Date(b.event_date))
-          .slice(0, 5);
-        if (upcoming.length === 0) return null;
-        return (
-          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 22px", marginBottom: 20 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div>
-                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>Schedule</div>
-                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Upcoming Events</div>
-              </div>
-              <span style={{ background: T.cyan + "18", border: `1px solid ${T.cyan}30`, color: T.cyan, borderRadius: 20, padding: "3px 12px", fontSize: 11, fontWeight: 700 }}>{upcoming.length} upcoming</span>
+      {/* Internal Event Portal Modal */}
+      {internalPortalEvent && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", overflowY: "auto" }} onClick={() => setInternalPortalEvent(null)}>
+          <div style={{ minHeight: "100vh", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 20px" }}>
+            <div style={{ background: T.bg, borderRadius: 16, width: "100%", maxWidth: 800, padding: 28 }} onClick={e => e.stopPropagation()}>
+              <InternalEventPortal event={internalPortalEvent} user={user} allTasks={tasks} onClose={() => setInternalPortalEvent(null)} />
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {upcoming.map(e => {
-                const daysLeft = Math.ceil((new Date(e.event_date) - new Date()) / 86400000);
-                const isSoon = daysLeft <= 7;
-                const isNear = daysLeft <= 30;
-                const dotColor = isSoon ? T.red : isNear ? T.amber : T.teal;
-                const phaseBg = e.phase === "Execution" ? T.cyan : e.phase === "Review" ? T.teal : e.phase === "Design" ? T.magenta : T.amber;
-                return (
-                  <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 14px", background: T.bg, border: `1px solid ${T.border}44`, borderLeft: `3px solid ${dotColor}`, borderRadius: 8 }}>
-                    <div style={{ flexShrink: 0, width: 48, height: 48, borderRadius: "50%", background: dotColor + "18", border: `2px solid ${dotColor}40`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                      <div style={{ color: dotColor, fontSize: 14, fontWeight: 900, lineHeight: 1 }}>{daysLeft}</div>
-                      <div style={{ color: dotColor, fontSize: 8, fontWeight: 700, textTransform: "uppercase" }}>days</div>
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.name}</div>
-                      <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center" }}>
-                        <span style={{ color: T.textMuted, fontSize: 11 }}>{e.client}</span>
-                        <span style={{ color: T.textMuted, fontSize: 10 }}>·</span>
-                        <span style={{ color: T.textMuted, fontSize: 11 }}>📅 {new Date(e.event_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
-                      </div>
-                    </div>
-                    <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
-                      <span style={{ background: phaseBg + "18", color: phaseBg, border: `1px solid ${phaseBg}30`, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{e.phase || "Planning"}</span>
-                      <span style={{ color: T.textMuted, fontSize: 11 }}>{e.completion || 0}% done</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Tasks */}
-      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 22px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>My Tasks</div>
-          <div style={{ color: T.textMuted, fontSize: 11 }}>{pending.length} open</div>
-        </div>
-        {tasks.length === 0 ? (
-          <div style={{ color: T.textMuted, fontSize: 13, padding: "24px 0", textAlign: "center" }}>No tasks assigned yet.</div>
-        ) : tasks.slice(0, 5).map((t, i) => (
-          <div key={t.id} style={{ padding: "12px 0", borderBottom: i < Math.min(tasks.length, 5) - 1 ? `1px solid ${T.border}44` : "none" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{t.name}</div>
-              <Badge status={t.status} />
-            </div>
-            <div style={{ height: 3, background: T.border + "44", borderRadius: 2, marginBottom: 4 }}>
-              <div style={{ height: "100%", width: (t.progress || 0) + "%", background: t.status === "completed" ? T.teal : T.cyan, borderRadius: 2 }} />
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <div style={{ color: T.textMuted, fontSize: 10 }}>Due {t.deadline}</div>
-              <div style={{ color: T.textMuted, fontSize: 10 }}>{t.progress || 0}%</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const VendorAnalyticsView = ({ user }) => {
-  const [vendors, setVendors] = useState([]);
-  const [assignments, setAssignments] = useState([]);
-  const [awards, setAwards] = useState([]);
-  const [invoices, setInvoices] = useState([]);
-  const [scorecards, setScorecards] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [sortBy, setSortBy] = useState("name");
-  const [sortDir, setSortDir] = useState("asc");
-  const [search, setSearch] = useState("");
-
-  const load = async () => {
-    setLoading(true);
-    const [vp, asn, aw, inv, sc] = await Promise.all([
-      supabase.from("profiles").select("*").eq("role", "Vendor").order("name"),
-      supabase.from("rff_vendor_assignments").select("*"),
-      supabase.from("rff_awards").select("*"),
-      supabase.from("vendor_invoices").select("*"),
-      supabase.from("vendor_scorecards").select("*").order("created_at", { ascending: false }),
-    ]);
-    setVendors(vp.data || []);
-    setAssignments(asn.data || []);
-    setAwards(aw.data || []);
-    setInvoices(inv.data || []);
-    setScorecards(sc.data || []);
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const getVendorStats = (vendor) => {
-    const vAssignments = assignments.filter(a => a.vendor_id === vendor.id);
-    const vAwards = awards.filter(a => a.vendor_id === vendor.id);
-    const vInvoices = invoices.filter(i => i.vendor_id === vendor.id);
-    const vScorecards = scorecards.filter(s => s.vendor_id === vendor.id);
-    const latestScore = vScorecards.length > 0 ? vScorecards[0] : null;
-    const totalBusiness = vAwards.reduce((sum, a) => sum + (parseFloat(a.agreed_amount) || 0), 0);
-    const paidAmount = vInvoices.filter(i => i.status === "paid").reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
-    const pendingAmount = vInvoices.filter(i => i.status !== "paid").reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
-    return {
-      quotesSubmitted: vAssignments.filter(a => a.quote_amount).length,
-      quotesApproved: vAssignments.filter(a => a.status === "quote-approved" || a.status === "invoice-submitted").length,
-      jobsCompleted: vAwards.filter(a => a.status === "confirmed" || a.status === "po_created").length,
-      totalBusiness,
-      paidAmount,
-      pendingAmount,
-      rating: latestScore?.total_pct || 0,
-      tier: latestScore ? getTier(latestScore.total_pct) : null,
-      category: vendor.service_category || "—",
-    };
-  };
-
-  const handleSort = (col) => {
-    if (sortBy === col) setSortDir(d => d === "asc" ? "desc" : "asc");
-    else { setSortBy(col); setSortDir("asc"); }
-  };
-
-  const filteredVendors = vendors.filter(v => 
-    v.name?.toLowerCase().includes(search.toLowerCase()) ||
-    v.service_category?.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const sortedVendors = [...filteredVendors].sort((a, b) => {
-    const sa = getVendorStats(a);
-    const sb = getVendorStats(b);
-    let av, bv;
-    switch (sortBy) {
-      case "name": av = a.name; bv = b.name; break;
-      case "category": av = sa.category; bv = sb.category; break;
-      case "rating": av = sa.rating; bv = sb.rating; break;
-      case "jobs": av = sa.jobsCompleted; bv = sb.jobsCompleted; break;
-      case "business": av = sa.totalBusiness; bv = sb.totalBusiness; break;
-      case "pending": av = sa.pendingAmount; bv = sb.pendingAmount; break;
-      default: av = a.name; bv = b.name;
-    }
-    if (typeof av === "string") return sortDir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
-    return sortDir === "asc" ? av - bv : bv - av;
-  });
-
-  const totals = sortedVendors.reduce((acc, v) => {
-    const s = getVendorStats(v);
-    acc.business += s.totalBusiness;
-    acc.paid += s.paidAmount;
-    acc.pending += s.pendingAmount;
-    acc.jobs += s.jobsCompleted;
-    return acc;
-  }, { business: 0, paid: 0, pending: 0, jobs: 0 });
-
-  const SortHeader = ({ col, label }) => (
-    <th onClick={() => handleSort(col)} style={{ padding: "10px 14px", color: sortBy === col ? T.cyan : T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", textAlign: "left", cursor: "pointer", whiteSpace: "nowrap", borderBottom: `1px solid ${T.border}`, userSelect: "none" }}>
-      {label} {sortBy === col ? (sortDir === "asc" ? "↑" : "↓") : ""}
-    </th>
-  );
-
-  return (
-    <div style={{ animation: "fadeUp 0.35s ease" }}>
-      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Procurement</div>
-        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800 }}>Vendor Analytics</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Performance, business value and invoice summary for all vendors</div>
-      </div>
-
-      {/* Summary KPIs */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 12, marginBottom: 24 }}>
-        {[
-          { label: "Total Vendors", value: vendors.length, color: T.cyan },
-          { label: "Total Jobs", value: totals.jobs, color: T.teal },
-          { label: "Total Business", value: "GHS " + totals.business.toLocaleString(), color: T.gold },
-          { label: "Paid Out", value: "GHS " + totals.paid.toLocaleString(), color: T.teal },
-          { label: "Pending Payment", value: "GHS " + totals.pending.toLocaleString(), color: totals.pending > 0 ? T.amber : T.textMuted },
-        ].map((k, i) => (
-          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
-            <div style={{ color: k.color, fontSize: 16, fontWeight: 900 }}>{k.value}</div>
-            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, marginTop: 4, textTransform: "uppercase" }}>{k.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Search */}
-      <div style={{ marginBottom: 16 }}>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search vendors by name or category..." style={{ width: "100%", padding: "10px 14px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
-      </div>
-
-      {/* Table */}
-      {loading ? (
-        <div style={{ color: T.textMuted, textAlign: "center", padding: 40 }}>Loading...</div>
-      ) : (
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
-              <thead style={{ background: T.bgDeep }}>
-                <tr>
-                  <SortHeader col="name" label="Vendor" />
-                  <SortHeader col="category" label="Category" />
-                  <SortHeader col="rating" label="Rating" />
-                  <th style={{ padding: "10px 14px", color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", borderBottom: `1px solid ${T.border}`, textAlign: "center" }}>Quotes</th>
-                  <SortHeader col="jobs" label="Jobs Done" />
-                  <SortHeader col="business" label="Total Business" />
-                  <SortHeader col="pending" label="Pending Invoice" />
-                  <th style={{ padding: "10px 14px", color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", borderBottom: `1px solid ${T.border}`, textAlign: "center" }}>Paid Out</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedVendors.map((v, idx) => {
-                  const s = getVendorStats(v);
-                  const tier = s.tier;
-                  return (
-                    <tr key={v.id} style={{ background: idx % 2 === 0 ? "transparent" : T.bgDeep+"44", borderBottom: `1px solid ${T.border}22` }}>
-                      <td style={{ padding: "12px 14px" }}>
-                        <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{v.name}</div>
-                        <div style={{ color: T.textMuted, fontSize: 11 }}>{v.email}</div>
-                      </td>
-                      <td style={{ padding: "12px 14px", color: T.textMuted, fontSize: 12 }}>{s.category}</td>
-                      <td style={{ padding: "12px 14px" }}>
-                        {tier ? (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <span style={{ color: tier.color, fontWeight: 800, fontSize: 13 }}>{s.rating}%</span>
-                            <span style={{ color: tier.color, fontSize: 10, background: tier.color+"18", padding: "1px 6px", borderRadius: 20 }}>{tier.label}</span>
-                          </div>
-                        ) : <span style={{ color: T.textMuted, fontSize: 12 }}>Unrated</span>}
-                      </td>
-                      <td style={{ padding: "12px 14px", textAlign: "center" }}>
-                        <span style={{ color: T.textPrimary, fontSize: 12 }}>{s.quotesSubmitted} submitted</span>
-                        {s.quotesApproved > 0 && <span style={{ color: T.teal, fontSize: 11, display: "block" }}>{s.quotesApproved} approved</span>}
-                      </td>
-                      <td style={{ padding: "12px 14px", textAlign: "center" }}>
-                        <span style={{ color: s.jobsCompleted > 0 ? T.teal : T.textMuted, fontWeight: s.jobsCompleted > 0 ? 700 : 400, fontSize: 13 }}>{s.jobsCompleted}</span>
-                      </td>
-                      <td style={{ padding: "12px 14px" }}>
-                        <span style={{ color: s.totalBusiness > 0 ? T.gold : T.textMuted, fontWeight: 700, fontSize: 13 }}>{s.totalBusiness > 0 ? "GHS " + s.totalBusiness.toLocaleString() : "—"}</span>
-                      </td>
-                      <td style={{ padding: "12px 14px" }}>
-                        <span style={{ color: s.pendingAmount > 0 ? T.amber : T.textMuted, fontWeight: s.pendingAmount > 0 ? 700 : 400, fontSize: 13 }}>{s.pendingAmount > 0 ? "GHS " + s.pendingAmount.toLocaleString() : "—"}</span>
-                      </td>
-                      <td style={{ padding: "12px 14px" }}>
-                        <span style={{ color: s.paidAmount > 0 ? T.teal : T.textMuted, fontWeight: s.paidAmount > 0 ? 700 : 400, fontSize: 13 }}>{s.paidAmount > 0 ? "GHS " + s.paidAmount.toLocaleString() : "—"}</span>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {/* Totals row */}
-                <tr style={{ background: T.bgDeep, borderTop: `2px solid ${T.border}` }}>
-                  <td colSpan={4} style={{ padding: "12px 14px", color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>Totals ({sortedVendors.length} vendors)</td>
-                  <td style={{ padding: "12px 14px", textAlign: "center", color: T.teal, fontWeight: 800, fontSize: 13 }}>{totals.jobs}</td>
-                  <td style={{ padding: "12px 14px", color: T.gold, fontWeight: 800, fontSize: 13 }}>GHS {totals.business.toLocaleString()}</td>
-                  <td style={{ padding: "12px 14px", color: T.amber, fontWeight: 800, fontSize: 13 }}>{totals.pending > 0 ? "GHS " + totals.pending.toLocaleString() : "—"}</td>
-                  <td style={{ padding: "12px 14px", color: T.teal, fontWeight: 800, fontSize: 13 }}>{totals.paid > 0 ? "GHS " + totals.paid.toLocaleString() : "—"}</td>
-                </tr>
-              </tbody>
-            </table>
           </div>
         </div>
       )}
     </div>
   );
 };
+
 
 const VendorDashboard = ({ user }) => {
   const [assignments, setAssignments] = useState([]);
@@ -1899,154 +1676,114 @@ const VendorDashboard = ({ user }) => {
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>{now2.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}</div>
-        <h1 style={{ margin: "0 0 4px", fontSize: 24, fontWeight: 800, color: T.textPrimary }}>{greeting2}, {user.name.split(" ")[0]}</h1>
-        <div style={{ color: T.textMuted, fontSize: 13 }}>{profile?.service_category || "Vendor"} · {profile?.company_name || ""}</div>
-      </div>
 
-      {/* Rating + Tier Hero */}
-      <div style={{ background: `linear-gradient(135deg, ${T.bgDeep}, ${T.surface})`, border: `1px solid ${T.border}`, borderRadius: 14, padding: "20px 24px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
-        <div>
-          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 6 }}>Your Stretchfield Rating</div>
-          {tier ? (
-            <>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-                <div style={{ background: tier.color+"20", border: `1px solid ${tier.color}40`, borderRadius: 10, padding: "8px 16px" }}>
-                  <div style={{ color: tier.color, fontSize: 22, fontWeight: 900 }}>{latestScore.total_pct}%</div>
-                  <div style={{ color: tier.color, fontSize: 11, fontWeight: 700 }}>{tier.label}</div>
-                </div>
-                <div>
-                  <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
-                    {[1,2,3,4,5].map(n => <div key={n} style={{ width: 20, height: 20, borderRadius: "50%", background: n <= Math.round(latestScore.total_pct/20) ? tier.color : T.border+"44" }} />)}
-                  </div>
-                  <div style={{ color: T.textMuted, fontSize: 11 }}>Based on {scorecards.length} evaluation{scorecards.length !== 1 ? "s" : ""}</div>
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 12 }}>
-                {[["Quality", latestScore.quality_pct], ["Delivery", latestScore.delivery_pct], ["Communication", latestScore.communication_pct], ["Value", latestScore.value_pct]].map(([label, val]) => (
-                  <div key={label} style={{ textAlign: "center" }}>
-                    <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{val || 0}%</div>
-                    <div style={{ color: T.textMuted, fontSize: 9, textTransform: "uppercase" }}>{label}</div>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div style={{ color: T.textMuted, fontSize: 13 }}>No rating yet. Complete your first job to get rated.</div>
+      {/* ── HERO ── */}
+      <div style={{ background: `linear-gradient(135deg, ${T.bgDeep} 0%, #0D1F36 60%, ${T.bgDeep} 100%)`, border: `1px solid ${T.border}`, borderRadius: 16, padding: "32px 36px", marginBottom: 24, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: -60, right: -60, width: 240, height: 240, background: `radial-gradient(circle, ${T.teal}08, transparent 70%)`, pointerEvents: "none" }} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
+          <div>
+            <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>{now2.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
+            <h1 style={{ margin: "0 0 6px", fontSize: 28, fontWeight: 900, color: T.textPrimary, letterSpacing: "-0.03em" }}>{greeting2}, {user.name.split(" ")[0]}.</h1>
+            <div style={{ color: T.textMuted, fontSize: 14 }}>{profile?.service_category || "Vendor"} · {profile?.company_name || ""}</div>
+          </div>
+          {tier && (
+            <div style={{ background: `${tier.color}15`, border: `1px solid ${tier.color}40`, borderRadius: 12, padding: "12px 20px", textAlign: "center" }}>
+              <div style={{ color: tier.color, fontSize: 24, fontWeight: 900 }}>{latestScore.total_pct}%</div>
+              <div style={{ color: tier.color, fontSize: 11, fontWeight: 700 }}>{tier.label}</div>
+              <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>Stretchfield Rating</div>
+            </div>
           )}
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "flex-end" }}>
-          <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 18px", textAlign: "center" }}>
-            <div style={{ color: T.gold, fontWeight: 900, fontSize: 20 }}>GHS {totalBusiness.toLocaleString()}</div>
-            <div style={{ color: T.textMuted, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>Total Business Value</div>
-          </div>
-          <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "10px 18px", textAlign: "center" }}>
-            <div style={{ color: T.teal, fontWeight: 900, fontSize: 18 }}>{completedJobs}</div>
-            <div style={{ color: T.textMuted, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>Jobs with Stretchfield</div>
-          </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginTop: 24, paddingTop: 20, borderTop: `1px solid ${T.border}44` }}>
+          {[
+            { label: "Active RFFs", value: assignments.filter(a => a.status === "pending").length, color: T.cyan },
+            { label: "Quotes Submitted", value: assignments.filter(a => a.status === "quote-submitted").length, color: T.amber },
+            { label: "Jobs Done", value: completedJobs, color: T.teal },
+            { label: "Total Business", value: "GHS "+Math.round(totalBusiness/1000)+"k", color: T.gold },
+            { label: "Pending Invoices", value: pendingInvoices.length, color: pendingInvoices.length > 0 ? T.amber : T.textMuted },
+            { label: "Paid Invoices", value: paidInvoices.length, color: T.teal },
+          ].map(k => (
+            <div key={k.label} style={{ padding: "12px 14px", background: `${T.bg}80`, border: `1px solid ${T.border}44`, borderRadius: 10 }}>
+              <div style={{ color: k.color, fontSize: 18, fontWeight: 900 }}>{k.value}</div>
+              <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>{k.label}</div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* KPI Strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px,1fr))", gap: 12, marginBottom: 24 }}>
-        {[
-          { label: "Active RFFs", value: assignments.filter(a => a.status === "pending").length, color: T.cyan },
-          { label: "Quotes Submitted", value: assignments.filter(a => a.status === "quote-submitted").length, color: T.amber },
-          { label: "Pending Invoices", value: pendingInvoices.length, color: pendingInvoices.length > 0 ? T.red : T.textMuted },
-          { label: "Paid Invoices", value: paidInvoices.length, color: T.teal },
-          { label: "Pending Tasks", value: pendingTasks, color: pendingTasks > 0 ? T.amber : T.textMuted },
-        ].map((k, i) => (
-          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
-            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
-            <div style={{ color: T.textPrimary, fontSize: 10, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+      {/* ── TWO COLUMN ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+
+        {/* My RFFs */}
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "18px 20px" }}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 3 }}>Procurement</div>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>My RFFs</div>
           </div>
-        ))}
+          {assignments.length === 0 ? (
+            <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "16px 0" }}>No RFFs assigned yet</div>
+          ) : assignments.slice(0,5).map(a => {
+            const statusColors = { pending: T.textMuted, "quote-submitted": T.amber, "quote-approved": T.teal, "invoice-submitted": "#10B981" };
+            const statusLabels = { pending: "Awaiting Quote", "quote-submitted": "Submitted", "quote-approved": "Approved", "invoice-submitted": "Invoiced" };
+            const rff = a.rffs;
+            return (
+              <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "10px 0", borderBottom: `1px solid ${T.border}33` }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rff?.title || "RFF"}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{rff?.event_name}</div>
+                  {a.quote_amount && <div style={{ color: T.gold, fontWeight: 700, fontSize: 12, marginTop: 3 }}>GHS {parseFloat(a.quote_amount).toLocaleString()}</div>}
+                </div>
+                <span style={{ color: statusColors[a.status]||T.textMuted, fontSize: 10, fontWeight: 700, background: (statusColors[a.status]||T.textMuted)+"18", padding: "2px 8px", borderRadius: 20, marginLeft: 8, flexShrink: 0 }}>{statusLabels[a.status]||a.status}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Purchase Orders */}
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "18px 20px" }}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 3 }}>Contracts</div>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Purchase Orders</div>
+          </div>
+          {pos.length === 0 ? (
+            <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "16px 0" }}>No POs yet</div>
+          ) : pos.map(po => {
+            const statusColors = { draft: T.textMuted, sent: T.cyan, invoiced: T.amber, paid: T.teal };
+            return (
+              <div key={po.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "10px 0", borderBottom: `1px solid ${T.border}33` }}>
+                <div>
+                  <div style={{ color: T.cyan, fontWeight: 700, fontSize: 13 }}>{po.internal_po_number || "PO"}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{po.event_name}</div>
+                  <div style={{ color: T.gold, fontWeight: 700, fontSize: 12, marginTop: 3 }}>{po.currency||"GHS"} {parseFloat(po.amount||0).toLocaleString()}</div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+                  <span style={{ color: statusColors[po.status]||T.textMuted, fontSize: 10, fontWeight: 700, background: (statusColors[po.status]||T.textMuted)+"18", padding: "2px 8px", borderRadius: 20 }}>{po.status}</span>
+                  <button onClick={() => downloadPDF(generatePOPDF(po, {name:user.name, email:user.email}, {title:po.rff_title}, {name:po.event_name}), "PO-"+(po.internal_po_number||po.id)+".html")} style={{ background: "none", border: "none", color: T.cyan, fontSize: 10, fontWeight: 700, cursor: "pointer", padding: 0 }}>↓ PDF</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* My RFFs */}
-      {assignments.length > 0 && (
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px", marginBottom: 20 }}>
-          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 14 }}>My RFFs</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {assignments.slice(0,5).map(a => {
-              const statusColors = { pending: T.textMuted, "quote-submitted": T.amber, "quote-approved": T.teal, "invoice-submitted": "#10B981" };
-              const statusLabels = { pending: "Awaiting Quote", "quote-submitted": "Quote Submitted", "quote-approved": "Quote Approved", "invoice-submitted": "Invoice Submitted" };
-              const rff = a.rffs;
-              return (
-                <div key={a.id} style={{ background: T.bg, border: `1px solid ${T.border}`, borderLeft: `3px solid ${statusColors[a.status] || T.border}`, borderRadius: 8, padding: "12px 14px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div>
-                      <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{rff?.title || "RFF"}</div>
-                      <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{rff?.event_name}</div>
-                      {a.quote_amount && <div style={{ color: T.gold, fontWeight: 700, fontSize: 13, marginTop: 4 }}>GHS {parseFloat(a.quote_amount).toLocaleString()}</div>}
-                      {rff?.quote_deadline && new Date(rff.quote_deadline) > new Date() && (
-                        <div style={{ color: T.amber, fontSize: 11, fontWeight: 700, marginTop: 3 }}>⏰ Due: {new Date(rff.quote_deadline).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
-                      )}
-                    </div>
-                    <span style={{ color: statusColors[a.status] || T.textMuted, fontSize: 10, fontWeight: 700, background: (statusColors[a.status] || T.textMuted)+"18", padding: "3px 10px", borderRadius: 20 }}>{statusLabels[a.status] || a.status}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Purchase Orders */}
-      {pos.length > 0 && (
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px", marginBottom: 20 }}>
-          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 14 }}>Purchase Orders</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {pos.map(po => {
-              const statusColors = { draft: T.textMuted, sent: T.cyan, invoiced: T.amber, paid: T.teal };
-              const statusColor = statusColors[po.status] || T.textMuted;
-              return (
-                <div key={po.id} style={{ background: T.bg, border: "1px solid " + T.border, borderLeft: "3px solid " + statusColor, borderRadius: 10, padding: "14px 16px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                    <div>
-                      <div style={{ color: T.cyan, fontWeight: 800, fontSize: 14 }}>{po.internal_po_number || "PO-" + po.id?.slice(0,8)}</div>
-                      <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600, marginTop: 2 }}>{po.event_name}</div>
-                      {po.notes && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3, fontStyle: "italic" }}>{po.notes}</div>}
-                      <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>Issued: {new Date(po.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ color: T.gold, fontWeight: 900, fontSize: 18 }}>{po.currency || "GHS"} {parseFloat(po.amount||0).toLocaleString()}</div>
-                      <span style={{ color: statusColor, fontSize: 10, fontWeight: 800, background: statusColor+"18", padding: "2px 8px", borderRadius: 20, display: "inline-block", marginTop: 4, textTransform: "uppercase" }}>{po.status}</span>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                    <button onClick={() => {
-                      const poData = { ...po, vendor_name: user.name };
-                      downloadPDF(generatePOPDF(poData, { name: user.name, email: user.email }, { title: po.rff_title }, { name: po.event_name, event_date: null, client: "" }), "PO-" + (po.internal_po_number||po.id) + ".html");
-                    }} style={{ background: T.cyan+"15", border: "1px solid " + T.cyan+"30", color: T.cyan, padding: "6px 14px", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>↓ Download PO</button>
-                    {po.status !== "paid" && (
-                      <button onClick={() => {}} style={{ background: T.teal+"15", border: "1px solid " + T.teal+"30", color: T.teal, padding: "6px 14px", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Submit Invoice →</button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Invoices */}
+      {/* ── INVOICES ── */}
       {invoices.length > 0 && (
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px", marginBottom: 20 }}>
-          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 14 }}>Invoices</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {invoices.map(inv => {
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "18px 20px", marginBottom: 20 }}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 3 }}>Finance</div>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>My Invoices</div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            {invoices.map((inv, i) => {
               const isPaid = inv.status === "paid";
               return (
-                <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${T.border}22` }}>
+                <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < invoices.length-1 ? `1px solid ${T.border}33` : "none" }}>
                   <div>
                     <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{inv.title || "Invoice"}</div>
                     <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{new Date(inv.created_at).toLocaleDateString("en-GB")}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ color: isPaid ? T.teal : T.amber, fontWeight: 700, fontSize: 13 }}>GHS {parseFloat(inv.amount || 0).toLocaleString()}</div>
+                    <div style={{ color: isPaid ? T.teal : T.amber, fontWeight: 700, fontSize: 13 }}>GHS {parseFloat(inv.amount||0).toLocaleString()}</div>
                     <div style={{ color: isPaid ? T.teal : T.amber, fontSize: 10, fontWeight: 700 }}>{isPaid ? "✓ Paid" : "Pending"}</div>
                   </div>
                 </div>
@@ -2056,10 +1793,28 @@ const VendorDashboard = ({ user }) => {
         </div>
       )}
 
-      {/* Tasks */}
+      {/* ── RATING BREAKDOWN ── */}
+      {latestScore && (
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "18px 20px", marginBottom: 20 }}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 3 }}>Performance</div>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Rating Breakdown</div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px,1fr))", gap: 10 }}>
+            {[["Quality", latestScore.quality_pct], ["Delivery", latestScore.delivery_pct], ["Communication", latestScore.communication_pct], ["Value", latestScore.value_pct]].map(([label, val]) => (
+              <div key={label} style={{ background: T.bg, borderRadius: 8, padding: "12px", textAlign: "center" }}>
+                <div style={{ color: tier?.color||T.teal, fontWeight: 900, fontSize: 18 }}>{val||0}%</div>
+                <div style={{ color: T.textMuted, fontSize: 10, textTransform: "uppercase", fontWeight: 700, marginTop: 3 }}>{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── TASKS ── */}
       {tasks.length > 0 && (
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px" }}>
-          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 14 }}>My Tasks</div>
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "18px 20px" }}>
+          <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 12 }}>My Tasks</div>
           {tasks.slice(0,4).map(t => (
             <div key={t.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${T.border}22` }}>
               <div style={{ color: T.textPrimary, fontSize: 13 }}>{t.name}</div>
@@ -2071,6 +1826,7 @@ const VendorDashboard = ({ user }) => {
     </div>
   );
 };
+
 
 
 const VendorRFFsView = ({ user }) => {
@@ -6817,6 +6573,8 @@ const FinanceManagerDashboard = ({ user, onTab }) => {
   useEffect(() => { load(); }, []);
 
   const now = new Date();
+  const totalRevenue = clientInvoices.filter(i => i.status === "paid").reduce((s,i) => s+(i.amount||0), 0);
+  const outstanding = clientInvoices.filter(i => i.status !== "paid").reduce((s,i) => s+(i.amount||0), 0);
   const pendingVouchers = vouchers.filter(v => v.status === 'pending_approval');
   const approvedVouchers = vouchers.filter(v => v.status === 'approved');
   const paidVouchers = vouchers.filter(v => v.status === 'paid');
@@ -6831,169 +6589,55 @@ const FinanceManagerDashboard = ({ user, onTab }) => {
   const grossProfit = totalInflows - totalPaidOut;
 
   return (
-    <div style={{ animation: 'fadeUp 0.35s ease' }}>
-      {/* Header */}
-      <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 6 }}>Finance</div>
-        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800 }}>Good {now.getHours() < 12 ? 'Morning' : now.getHours() < 17 ? 'Afternoon' : 'Evening'}, {user?.name?.split(' ')[0]}</h2>
-        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>
-      </div>
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
 
-      {/* Action alerts */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
-        {approvedVouchers.length > 0 && (
-          <div onClick={() => onTab('finance')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', background: T.teal+'15', border: `1px solid ${T.teal}40`, borderRadius: 20, cursor: 'pointer' }}>
-            <div style={{ width: 7, height: 7, borderRadius: '50%', background: T.teal, boxShadow: `0 0 8px ${T.teal}` }} />
-            <span style={{ color: T.teal, fontSize: 11, fontWeight: 700 }}>{approvedVouchers.length} voucher{approvedVouchers.length>1?'s':''} approved — ready to pay →</span>
+      {/* ── HERO ── */}
+      <div style={{ background: `linear-gradient(135deg, ${T.bgDeep} 0%, #0D1F36 60%, ${T.bgDeep} 100%)`, border: `1px solid ${T.border}`, borderRadius: 16, padding: "32px 36px", marginBottom: 24, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: -60, right: -60, width: 240, height: 240, background: `radial-gradient(circle, ${T.amber}08, transparent 70%)`, pointerEvents: "none" }} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
+          <div>
+            <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>{now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
+            <h1 style={{ margin: "0 0 6px", fontSize: 28, fontWeight: 900, color: T.textPrimary, letterSpacing: "-0.03em" }}>{now.getHours() < 12 ? "Good Morning" : now.getHours() < 17 ? "Good Afternoon" : "Good Evening"}, {user.name.split(" ")[0]}.</h1>
+            <div style={{ color: T.textMuted, fontSize: 14 }}>Finance Manager · Financial operations overview</div>
           </div>
-        )}
-        {pendingVouchers.length > 0 && (
-          <div onClick={() => onTab('finance')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', background: T.amber+'15', border: `1px solid ${T.amber}40`, borderRadius: 20, cursor: 'pointer' }}>
-            <div style={{ width: 7, height: 7, borderRadius: '50%', background: T.amber, boxShadow: `0 0 8px ${T.amber}` }} />
-            <span style={{ color: T.amber, fontSize: 11, fontWeight: 700 }}>{pendingVouchers.length} voucher{pendingVouchers.length>1?'s':''} awaiting CEO approval →</span>
+          <div style={{ display: "flex", gap: 10 }}>
+            {pendingVouchers.length > 0 && <button onClick={() => onTab && onTab("finance")} style={{ background: `${T.amber}15`, border: `1px solid ${T.amber}40`, color: T.amber, padding: "10px 18px", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>⚡ {pendingVouchers.length} Voucher{pendingVouchers.length!==1?"s":""} Pending</button>}
           </div>
-        )}
-        {pendingVendorInvoices.length > 0 && (
-          <div onClick={() => onTab('vendor-invoices')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', background: T.cyan+'15', border: `1px solid ${T.cyan}40`, borderRadius: 20, cursor: 'pointer' }}>
-            <div style={{ width: 7, height: 7, borderRadius: '50%', background: T.cyan, boxShadow: `0 0 8px ${T.cyan}` }} />
-            <span style={{ color: T.cyan, fontSize: 11, fontWeight: 700 }}>{pendingVendorInvoices.length} vendor invoice{pendingVendorInvoices.length>1?'s':''} pending review →</span>
-          </div>
-        )}
-        {pcPct < 10 && (
-          <div onClick={() => onTab('finance')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', background: T.red+'15', border: `1px solid ${T.red}40`, borderRadius: 20, cursor: 'pointer' }}>
-            <div style={{ width: 7, height: 7, borderRadius: '50%', background: T.red }} />
-            <span style={{ color: T.red, fontSize: 11, fontWeight: 700 }}>Petty cash float below 10% — replenishment required →</span>
-          </div>
-        )}
-        {!todayBalance && (
-          <div onClick={() => onTab('finance')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', background: T.border+'80', border: `1px solid ${T.border}`, borderRadius: 20, cursor: 'pointer' }}>
-            <span style={{ color: T.textMuted, fontSize: 11, fontWeight: 700 }}>📊 Daily balance report not prepared yet →</span>
-          </div>
-        )}
-      </div>
-
-      {/* KPI strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 24 }}>
-        {[
-          { label: 'Total Inflows', value: `GHS ${totalInflows.toLocaleString()}`, sub: `${clientInvoices.length} client invoices`, color: '#10B981' },
-          { label: 'Total Paid Out', value: `GHS ${totalPaidOut.toLocaleString()}`, sub: `${paidVouchers.length} vouchers paid`, color: T.red },
-          { label: 'Gross Position', value: `GHS ${Math.abs(grossProfit).toLocaleString()}`, sub: grossProfit >= 0 ? 'Net positive' : 'Net negative', color: grossProfit >= 0 ? T.teal : T.red },
-          { label: 'Petty Cash Float', value: `GHS ${pcBalance.toLocaleString()}`, sub: `${pcPct}% remaining`, color: pcPct < 10 ? T.red : T.cyan },
-        ].map((k,i) => (
-          <div key={i} style={{ padding: '16px 18px', background: T.surface, border: `1px solid ${T.border}`, borderTop: `3px solid ${k.color}`, borderRadius: 12 }}>
-            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{k.label}</div>
-            <div style={{ color: k.color, fontSize: 22, fontWeight: 900 }}>{k.value}</div>
-            <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>{k.sub}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Two column layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-
-        {/* Voucher status */}
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: '16px 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>Payment Vouchers</div>
-            <button onClick={() => onTab('finance')} style={{ background: 'none', border: `1px solid ${T.border}`, color: T.textMuted, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>Manage →</button>
-          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px,1fr))", gap: 12, marginTop: 24, paddingTop: 20, borderTop: `1px solid ${T.border}44` }}>
           {[
-            ['Pending Approval', pendingVouchers.length, T.amber],
-            ['Approved — To Pay', approvedVouchers.length, T.teal],
-            ['Paid', paidVouchers.length, '#10B981'],
-            ['Total Vouchers', vouchers.length, T.cyan],
-          ].map(([label, count, color]) => (
-            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${T.border}33` }}>
-              <span style={{ color: T.textSecondary, fontSize: 12 }}>{label}</span>
-              <span style={{ color, fontWeight: 800, fontSize: 14 }}>{count}</span>
+            { label: "Total Revenue", value: "GHS "+Math.round(totalRevenue/1000)+"k", color: T.teal },
+            { label: "Outstanding", value: "GHS "+Math.round(outstanding/1000)+"k", color: outstanding > 0 ? T.amber : T.textMuted },
+            { label: "Vendor Invoices", value: vendorInvoices.length, color: T.cyan },
+            { label: "Pending Vouchers", value: pendingVouchers.length, color: pendingVouchers.length > 0 ? T.amber : T.textMuted },
+            { label: "Active Events", value: events.length, color: T.teal },
+          ].map(k => (
+            <div key={k.label} style={{ padding: "12px 14px", background: `${T.bg}80`, border: `1px solid ${T.border}44`, borderRadius: 10 }}>
+              <div style={{ color: k.color, fontSize: 18, fontWeight: 900 }}>{k.value}</div>
+              <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>{k.label}</div>
             </div>
           ))}
         </div>
-
-        {/* Purchase Orders */}
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: '16px 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>Purchase Orders</div>
-            <button onClick={() => onTab('purchase-orders')} style={{ background: 'none', border: `1px solid ${T.border}`, color: T.textMuted, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>View →</button>
-          </div>
-          {pos.slice(0,4).map((po,i) => (
-            <div key={po.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: i < 3 ? `1px solid ${T.border}33` : 'none' }}>
-              <div>
-                <div style={{ color: T.textPrimary, fontWeight: 600, fontSize: 12 }}>{po.internal_po_number || po.vendor_name}</div>
-                <div style={{ color: T.textMuted, fontSize: 10 }}>{po.event_name}</div>
-              </div>
-              <span style={{ color: T.cyan, fontWeight: 700, fontSize: 12 }}>GHS {(po.amount||0).toLocaleString()}</span>
-            </div>
-          ))}
-          {pos.length === 0 && <div style={{ color: T.textMuted, fontSize: 12, textAlign: 'center', padding: '16px 0' }}>No purchase orders yet</div>}
-        </div>
       </div>
 
-      {/* Today's balance + upcoming events */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-
-        {/* Daily balance */}
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: '16px 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>Today's Balance</div>
-            <button onClick={() => onTab('finance')} style={{ background: 'none', border: `1px solid ${T.border}`, color: T.textMuted, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>Report →</button>
-          </div>
-          {todayBalance ? (
-            [
-              ['Opening Balance', todayBalance.opening_balance, T.textMuted],
-              ['Actual Inflows', todayBalance.actual_inflows, '#10B981'],
-              ['Actual Payments', todayBalance.actual_payments, T.red],
-              ['Closing Balance', todayBalance.closing_balance, todayBalance.closing_balance >= 0 ? T.teal : T.red],
-            ].map(([label, val, color]) => (
-              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: label !== 'Closing Balance' ? `1px solid ${T.border}33` : 'none' }}>
-                <span style={{ color: T.textSecondary, fontSize: 12 }}>{label}</span>
-                <span style={{ color, fontWeight: label === 'Closing Balance' ? 900 : 600, fontSize: 13 }}>GHS {(val||0).toLocaleString()}</span>
-              </div>
-            ))
-          ) : (
-            <div style={{ textAlign: 'center', padding: '20px 0' }}>
-              <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 10 }}>No daily balance prepared today</div>
-              <button onClick={() => onTab('finance')} style={{ background: T.cyan+'15', border: `1px solid ${T.cyan}30`, color: T.cyan, padding: '6px 16px', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>Prepare Now →</button>
-            </div>
-          )}
-        </div>
-
-        {/* Upcoming events */}
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: '16px 20px' }}>
-          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 14 }}>Upcoming Events</div>
-          {upcomingEvents.length > 0 ? upcomingEvents.map((ev,i) => {
-            const days = Math.ceil((new Date(ev.event_date) - now) / (1000*60*60*24));
-            const color = days <= 7 ? T.red : days <= 30 ? T.amber : T.teal;
-            return (
-              <div key={ev.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: i < upcomingEvents.length-1 ? `1px solid ${T.border}33` : 'none' }}>
-                <div>
-                  <div style={{ color: T.textPrimary, fontWeight: 600, fontSize: 12 }}>{ev.name}</div>
-                  <div style={{ color: T.textMuted, fontSize: 10 }}>{ev.client}</div>
-                </div>
-                <div style={{ color, fontWeight: 800, fontSize: 12 }}>{days}d</div>
-              </div>
-            );
-          }) : <div style={{ color: T.textMuted, fontSize: 12, textAlign: 'center', padding: '16px 0' }}>No upcoming events</div>}
-        </div>
-      </div>
-
+      {/* ── MY EVENTS ── */}
       {events.filter(e => fmTasks.some(t => t.project_id === e.id)).length > 0 && (
         <div style={{ marginBottom: 20 }}>
           <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 12 }}>My Events</div>
           {events.filter(e => fmTasks.some(t => t.project_id === e.id)).slice(0,4).map(e => {
-            const daysLeft = e.event_date ? Math.ceil((new Date(e.event_date) - new Date()) / 86400000) : null;
+            const daysLeft = e.event_date ? Math.ceil((new Date(e.event_date) - now) / 86400000) : null;
             const dotColor = daysLeft !== null ? (daysLeft <= 7 ? T.red : daysLeft <= 30 ? T.amber : T.teal) : T.teal;
             const pendingCount = fmTasks.filter(t => t.project_id === e.id && t.status !== "completed").length;
             return (
-              <div key={e.id} onClick={() => setInternalPortalEvent(e)} style={{ background: T.surface, border: "1px solid " + T.border, borderLeft: "3px solid " + dotColor, borderRadius: 10, padding: "12px 16px", cursor: "pointer", marginBottom: 8 }}>
+              <div key={e.id} onClick={() => setInternalPortalEvent(e)} style={{ background: T.surface, border: `1px solid ${T.border}`, borderLeft: `3px solid ${dotColor}`, borderRadius: 10, padding: "12px 16px", cursor: "pointer", marginBottom: 8 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
                     <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{e.name}</div>
                     <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{e.client}{e.event_date ? " · " + new Date(e.event_date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : ""}</div>
                   </div>
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    {daysLeft !== null && <div style={{ background: dotColor+"18", borderRadius: 6, padding: "4px 8px", textAlign: "center" }}><div style={{ color: dotColor, fontSize: 12, fontWeight: 900 }}>{daysLeft > 0 ? daysLeft : "Today"}</div>{daysLeft > 0 && <div style={{ color: dotColor, fontSize: 8, textTransform: "uppercase" }}>days</div>}</div>}
-                    {pendingCount > 0 && <div style={{ background: T.amber+"18", borderRadius: 6, padding: "4px 8px", textAlign: "center" }}><div style={{ color: T.amber, fontSize: 12, fontWeight: 900 }}>{pendingCount}</div><div style={{ color: T.amber, fontSize: 8, textTransform: "uppercase" }}>tasks</div></div>}
+                    {daysLeft !== null && <div style={{ background: `${dotColor}18`, borderRadius: 6, padding: "4px 8px", textAlign: "center" }}><div style={{ color: dotColor, fontSize: 12, fontWeight: 900 }}>{daysLeft > 0 ? daysLeft : "Today"}</div>{daysLeft > 0 && <div style={{ color: dotColor, fontSize: 8, textTransform: "uppercase" }}>days</div>}</div>}
+                    {pendingCount > 0 && <div style={{ background: `${T.amber}18`, borderRadius: 6, padding: "4px 8px", textAlign: "center" }}><div style={{ color: T.amber, fontSize: 12, fontWeight: 900 }}>{pendingCount}</div><div style={{ color: T.amber, fontSize: 8, textTransform: "uppercase" }}>tasks</div></div>}
                     <span style={{ color: T.cyan, fontSize: 11, fontWeight: 700 }}>Open →</span>
                   </div>
                 </div>
@@ -7002,6 +6646,56 @@ const FinanceManagerDashboard = ({ user, onTab }) => {
           })}
         </div>
       )}
+
+      {/* ── TWO COLUMN ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+
+        {/* Recent Vouchers */}
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "18px 20px" }}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 3 }}>Payments</div>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Payment Vouchers</div>
+          </div>
+          {vouchers.slice(0,5).map(v => (
+            <div key={v.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${T.border}33` }}>
+              <div>
+                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{v.voucher_number}</div>
+                <div style={{ color: T.textMuted, fontSize: 11 }}>{v.payee}</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>GHS {(v.amount||0).toLocaleString()}</div>
+                <div style={{ color: v.status==="approved"?T.teal:v.status==="pending_approval"?T.amber:T.textMuted, fontSize: 10, fontWeight: 700 }}>{v.status}</div>
+              </div>
+            </div>
+          ))}
+          {vouchers.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "16px 0" }}>No vouchers yet</div>}
+          <button onClick={() => onTab && onTab("finance")} style={{ background: "none", border: "none", color: T.cyan, fontSize: 11, fontWeight: 700, cursor: "pointer", marginTop: 10, padding: 0 }}>View all →</button>
+        </div>
+
+        {/* Vendor Invoices */}
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "18px 20px" }}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 3 }}>Procurement</div>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Vendor Invoices</div>
+          </div>
+          {vendorInvoices.slice(0,5).map(inv => (
+            <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${T.border}33` }}>
+              <div>
+                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{inv.vendor_name || "Vendor"}</div>
+                <div style={{ color: T.textMuted, fontSize: 11 }}>{inv.event_name}</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>GHS {(inv.amount||0).toLocaleString()}</div>
+                <div style={{ color: inv.status==="paid"?T.teal:T.amber, fontSize: 10, fontWeight: 700 }}>{inv.status}</div>
+              </div>
+            </div>
+          ))}
+          {vendorInvoices.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "16px 0" }}>No invoices yet</div>}
+          <button onClick={() => onTab && onTab("vendor-invoices")} style={{ background: "none", border: "none", color: T.cyan, fontSize: 11, fontWeight: 700, cursor: "pointer", marginTop: 10, padding: 0 }}>View all →</button>
+        </div>
+      </div>
+
+      {/* Internal Event Portal Modal */}
       {internalPortalEvent && (
         <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", overflowY: "auto" }} onClick={() => setInternalPortalEvent(null)}>
           <div style={{ minHeight: "100vh", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 20px" }}>
@@ -7014,6 +6708,7 @@ const FinanceManagerDashboard = ({ user, onTab }) => {
     </div>
   );
 };
+
 
 
 const FinanceDashboard = ({ user, onTab }) => {
@@ -16586,6 +16281,254 @@ const BudgetVsActualsView = ({ user }) => {
           )}
         </>
       )}
+    </div>
+  );
+};
+
+const ClientDashboard = ({ user }) => {
+  const [events, setEvents] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [milestones, setMilestones] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      const { data: clientData } = await supabase.from("clients").select("id").eq("email", user.email).single();
+      if (clientData) {
+        const [ev, dc, mg, ms] = await Promise.all([
+          supabase.from("projects").select("*").eq("client_id", clientData.id).order("event_date", { ascending: true }),
+          supabase.from("event_documents").select("*").eq("is_internal", false).order("created_at", { ascending: false }),
+          supabase.from("client_messages").select("*").eq("client_id", clientData.id).order("created_at", { ascending: false }),
+          supabase.from("client_milestones").select("*").order("created_at", { ascending: false }),
+        ]);
+        setEvents(ev.data || []);
+        setDocuments(dc.data || []);
+        setMessages(mg.data || []);
+        setMilestones(ms.data || []);
+      }
+      setLoading(false);
+    };
+    load();
+  }, [user.id]);
+
+  const now = new Date();
+  const greeting = now.getHours() < 12 ? "Good Morning" : now.getHours() < 17 ? "Good Afternoon" : "Good Evening";
+  const upcomingEvents = events.filter(e => e.event_date && new Date(e.event_date) >= now);
+  const unreadMessages = messages.filter(m => !m.read_by_client);
+
+  if (loading) return <div style={{ padding: "60px 0", textAlign: "center", color: T.textMuted, fontSize: 13 }}>Loading...</div>;
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+
+      {/* ── HERO ── */}
+      <div style={{ background: `linear-gradient(135deg, ${T.bgDeep} 0%, #0D1F36 60%, ${T.bgDeep} 100%)`, border: `1px solid ${T.border}`, borderRadius: 16, padding: "32px 36px", marginBottom: 24, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: -60, right: -60, width: 240, height: 240, background: `radial-gradient(circle, ${T.cyan}08, transparent 70%)`, pointerEvents: "none" }} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
+          <div>
+            <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>{now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
+            <h1 style={{ margin: "0 0 6px", fontSize: 28, fontWeight: 900, color: T.textPrimary, letterSpacing: "-0.03em" }}>{greeting}, {user.name.split(" ")[0]}.</h1>
+            <div style={{ color: T.textMuted, fontSize: 14 }}>{upcomingEvents.length > 0 ? `${upcomingEvents.length} upcoming event${upcomingEvents.length!==1?"s":""}` : "No upcoming events"}{unreadMessages.length > 0 && <span style={{ color: T.cyan, fontWeight: 700 }}> · {unreadMessages.length} new message{unreadMessages.length!==1?"s":""}</span>}</div>
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginTop: 24, paddingTop: 20, borderTop: `1px solid ${T.border}44` }}>
+          {[
+            { label: "My Events", value: events.length, color: T.cyan },
+            { label: "Documents", value: documents.length, color: T.teal },
+            { label: "Messages", value: messages.length, color: T.amber },
+            { label: "Milestones", value: milestones.length, color: "#10B981" },
+          ].map(k => (
+            <div key={k.label} style={{ padding: "12px 14px", background: `${T.bg}80`, border: `1px solid ${T.border}44`, borderRadius: 10 }}>
+              <div style={{ color: k.color, fontSize: 18, fontWeight: 900 }}>{k.value}</div>
+              <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>{k.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── UPCOMING EVENTS ── */}
+      {upcomingEvents.length > 0 && (
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "20px 22px", marginBottom: 20 }}>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 3 }}>Your Events</div>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Upcoming Events</div>
+          </div>
+          {upcomingEvents.map(e => {
+            const days = Math.ceil((new Date(e.event_date) - now) / 86400000);
+            const color = days <= 7 ? T.red : days <= 30 ? T.amber : T.teal;
+            const PHASES = ["Brief","Planning","Pre-Production","Production","Live","Post-Production","Completed"];
+            const phaseIdx = PHASES.indexOf(e.phase||"Planning");
+            return (
+              <div key={e.id} style={{ display: "flex", gap: 14, padding: "14px 0", borderBottom: `1px solid ${T.border}33` }}>
+                <div style={{ width: 48, height: 48, borderRadius: 10, background: `${color}15`, border: `1px solid ${color}30`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <div style={{ color, fontSize: 16, fontWeight: 900, lineHeight: 1 }}>{days}</div>
+                  <div style={{ color, fontSize: 8, textTransform: "uppercase", fontWeight: 700 }}>days</div>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{e.name}</div>
+                  <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{new Date(e.event_date).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
+                  <div style={{ display: "flex", gap: 3, marginTop: 8 }}>
+                    {PHASES.map((ph,i) => <div key={ph} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= phaseIdx ? (i === phaseIdx ? T.cyan : T.teal+"80") : T.border+"44" }} />)}
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                    <span style={{ color: T.textMuted, fontSize: 9 }}>Brief</span>
+                    <span style={{ color: T.cyan, fontSize: 10, fontWeight: 700 }}>{e.phase||"Planning"}</span>
+                    <span style={{ color: T.textMuted, fontSize: 9 }}>Completed</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── TWO COLUMN ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+
+        {/* Recent Documents */}
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "18px 20px" }}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 3 }}>Shared Files</div>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Documents</div>
+          </div>
+          {documents.slice(0,5).map(d => (
+            <div key={d.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: `1px solid ${T.border}33` }}>
+              <div>
+                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{d.title}</div>
+                <div style={{ color: T.textMuted, fontSize: 11 }}>{d.document_type}</div>
+              </div>
+              {d.document_url && <a href={d.document_url} target="_blank" rel="noreferrer" style={{ color: T.cyan, fontSize: 11, fontWeight: 700, textDecoration: "none" }}>View →</a>}
+            </div>
+          ))}
+          {documents.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "16px 0" }}>No documents shared yet</div>}
+        </div>
+
+        {/* Recent Messages */}
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "18px 20px" }}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 3 }}>Communications</div>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Messages</div>
+          </div>
+          {messages.slice(0,5).map(m => (
+            <div key={m.id} style={{ padding: "8px 0", borderBottom: `1px solid ${T.border}33` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                <span style={{ color: T.cyan, fontSize: 11, fontWeight: 700 }}>{m.sender_name || "Stretchfield"}</span>
+                <span style={{ color: T.textMuted, fontSize: 10 }}>{new Date(m.created_at).toLocaleDateString("en-GB")}</span>
+              </div>
+              <div style={{ color: T.textSecondary, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.message}</div>
+            </div>
+          ))}
+          {messages.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "16px 0" }}>No messages yet</div>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const BoardDashboard = ({ user }) => {
+  const [events, setEvents] = useState([]);
+  const [opportunities, setOpportunitys] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      const [ev, op, inv] = await Promise.all([
+        supabase.from("projects").select("*").order("event_date", { ascending: true }),
+        supabase.from("opportunities").select("*").order("created_at", { ascending: false }),
+        supabase.from("invoices").select("*").order("created_at", { ascending: false }),
+      ]);
+      setEvents(ev.data || []);
+      setOpportunitys(op.data || []);
+      setInvoices(inv.data || []);
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  const now = new Date();
+  const greeting = now.getHours() < 12 ? "Good Morning" : now.getHours() < 17 ? "Good Afternoon" : "Good Evening";
+  const activeEvents = events.filter(e => !["Completed","Cancelled"].includes(e.phase||""));
+  const wonOpps = opportunities.filter(o => o.status === "won");
+  const revenueYTD = wonOpps.filter(o => o.closed_date && new Date(o.closed_date).getFullYear() === now.getFullYear()).reduce((s,o) => s+(o.value||0), 0);
+  const pipeline = opportunities.filter(o => !["won","lost"].includes(o.status));
+  const pipelineValue = pipeline.reduce((s,o) => s+(o.value||0), 0);
+
+  if (loading) return <div style={{ padding: "60px 0", textAlign: "center", color: T.textMuted, fontSize: 13 }}>Loading...</div>;
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+
+      {/* ── HERO ── */}
+      <div style={{ background: `linear-gradient(135deg, ${T.bgDeep} 0%, #0D1F36 60%, ${T.bgDeep} 100%)`, border: `1px solid ${T.border}`, borderRadius: 16, padding: "32px 36px", marginBottom: 24, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: -60, right: -60, width: 240, height: 240, background: `radial-gradient(circle, ${T.gold}08, transparent 70%)`, pointerEvents: "none" }} />
+        <div>
+          <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>{now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
+          <h1 style={{ margin: "0 0 6px", fontSize: 28, fontWeight: 900, color: T.textPrimary, letterSpacing: "-0.03em" }}>{greeting}, {user.name.split(" ")[0]}.</h1>
+          <div style={{ color: T.textMuted, fontSize: 14 }}>Board of Directors · Executive overview</div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px,1fr))", gap: 12, marginTop: 24, paddingTop: 20, borderTop: `1px solid ${T.border}44` }}>
+          {[
+            { label: "Active Events", value: activeEvents.length, color: T.cyan },
+            { label: "Revenue YTD", value: "GHS "+Math.round(revenueYTD/1000)+"k", color: T.teal },
+            { label: "Pipeline Value", value: "GHS "+Math.round(pipelineValue/1000)+"k", color: T.amber },
+            { label: "Total Events", value: events.length, color: "#10B981" },
+            { label: "Won Clients", value: wonOpps.length, color: T.gold },
+          ].map(k => (
+            <div key={k.label} style={{ padding: "12px 14px", background: `${T.bg}80`, border: `1px solid ${T.border}44`, borderRadius: 10 }}>
+              <div style={{ color: k.color, fontSize: 18, fontWeight: 900 }}>{k.value}</div>
+              <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>{k.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── TWO COLUMN ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+
+        {/* Active Events */}
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "18px 20px" }}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 3 }}>Operations</div>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Active Events</div>
+          </div>
+          {activeEvents.slice(0,5).map(e => {
+            const days = e.event_date ? Math.ceil((new Date(e.event_date) - now) / 86400000) : null;
+            const color = days !== null ? (days <= 7 ? T.red : days <= 30 ? T.amber : T.teal) : T.teal;
+            return (
+              <div key={e.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${T.border}33` }}>
+                <div>
+                  <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{e.name}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11 }}>{e.client} · {e.phase||"Planning"}</div>
+                </div>
+                {days !== null && <span style={{ color, fontSize: 12, fontWeight: 700 }}>{days}d</span>}
+              </div>
+            );
+          })}
+          {activeEvents.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "16px 0" }}>No active events</div>}
+        </div>
+
+        {/* Pipeline */}
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "18px 20px" }}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 3 }}>Business Development</div>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Pipeline</div>
+          </div>
+          {pipeline.slice(0,5).map(o => (
+            <div key={o.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${T.border}33` }}>
+              <div>
+                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{o.company}</div>
+                <div style={{ color: T.textMuted, fontSize: 11 }}>{o.stage}</div>
+              </div>
+              <span style={{ color: T.amber, fontSize: 12, fontWeight: 700 }}>GHS {(o.value||0).toLocaleString()}</span>
+            </div>
+          ))}
+          {pipeline.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "16px 0" }}>No active pipeline</div>}
+        </div>
+      </div>
     </div>
   );
 };

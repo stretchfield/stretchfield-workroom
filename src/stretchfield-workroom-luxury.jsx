@@ -8952,8 +8952,8 @@ const PurchaseOrderView = ({ user }) => {
     load();
   };
 
-  // Awards that don't have a PO yet
-  const pendingAwards = awards.filter(a => a.status === "confirmed" && !pos.find(p => p.rff_award_id === a.id));
+  // Awards that don't have a PO yet (confirmed OR po_created with no actual PO in DB)
+  const pendingAwards = awards.filter(a => ["confirmed","po_created"].includes(a.status) && !pos.find(p => p.rff_award_id === a.id));
 
   const inputStyle = { width:"100%", padding:"9px 12px", background:T.bg, border:"1px solid "+T.border, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" };
 

@@ -5722,12 +5722,11 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
               fontSize: 12,
               letterSpacing: "0.06em",
               background: `linear-gradient(90deg, ${T.textMuted}, ${T.textPrimary}, ${T.textMuted})`,
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
               display: "block",
+              color: T.textMuted,
             }}>We don't plan events. We engineer impact.</span>
           </div>
 

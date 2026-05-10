@@ -845,7 +845,6 @@ const getNavItems = (role) => {
     base.push({ id: "finance", label: "Finance", icon: "▪" });
   }
   if (["Finance Manager","CEO"].includes(role)) {
-    base.push({ id: "purchase-orders", label: "Purchase Orders", icon: "▪" });
     base.push({ id: "purchase-orders", label: "Purchase Orders", icon: "▪" }, { id: "vendor-invoices", label: "Vendor Invoices", icon: "▪" }, { id: "payment-authorisation", label: "Payment Authorisation", icon: "▪" });
   }
   if (["CEO"].includes(role)) {
@@ -8350,7 +8349,7 @@ const ContractAwardApprovalView = ({ user }) => {
         user_id: fm.id,
         title: "Gig Confirmed — Create PO",
         message: `CEO confirmed ${award.vendor_name} for this gig. Please create a Purchase Order.`,
-        type: "rff",
+        type: "finance",
       });
       if (fm.email) await sendEmail(fm.email, `Gig Confirmed — Create PO for ${award.vendor_name}`, notifEmailHtml({ name: fm.name, title: "Gig Confirmed — Create Purchase Order", message: `CEO has confirmed <strong>${award.vendor_name}</strong> for <strong>${award.event_name||"a gig"}</strong>. Please log in to Finance → Purchase Orders to generate the Purchase Order.`, actionUrl: BASE_URL, actionLabel: "Go to Purchase Orders" }));
     }

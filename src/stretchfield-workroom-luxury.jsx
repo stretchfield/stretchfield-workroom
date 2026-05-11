@@ -776,7 +776,7 @@ const getNavItems = (role) => {
     base.push({ id: "strategy-overview", label: "Client Overview", icon: "▪" }, { id: "feedback-summary", label: "Feedback", icon: "▪" });
   }
   if (["CEO","Country Manager"].includes(role)) {
-    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "rff-approvals", label: "RFF Approvals", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" });
+    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "rff-approvals", label: "RFF Approvals", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "purchase-orders", label: "Sign Purchase Orders", icon: "▪" });
   }
   if (role === "CEO") {
     base.push({ id: "vendor-onboarding", label: "Vendor Applications", icon: "▪" });
@@ -810,6 +810,7 @@ const getNavItems = (role) => {
         { id: "finance", label: "Finance Operations" },
         { id: "client-financials", label: "Client Financials" },
         { id: "purchase-orders", label: "Purchase Orders" },
+            { id: "po-signing", label: "Sign Purchase Orders" },
         { id: "vendor-invoices", label: "Vendor Invoices" },
             { id: "payment-authorisation", label: "Payment Authorisation" },
             { id: "budget-vs-actuals", label: "Budget vs Actuals" },
@@ -5492,6 +5493,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "contract-awards": return <ContractAwardApprovalView user={currentUser} />;
       case "gig-confirmation": return <GigConfirmationView user={currentUser} />;
       case "purchase-orders": return <PurchaseOrderView user={currentUser} />;
+      case "po-signing": return <PurchaseOrderView user={currentUser} />;
       case "vendor-invoices": return <FinanceInvoicesView user={currentUser} />;
       case "vendor-invoices-submit": return <VendorInvoiceView user={currentUser} />;
       case "notifications": return <NotificationsView user={currentUser} onNavigate={(tab, resourceId) => { setActiveTab(tab); if (resourceId) setPendingResourceId(resourceId); }} />;
@@ -8850,6 +8852,10 @@ const PurchaseOrderView = ({ user }) => {
   const [notesModal, setNotesModal] = useState(null);
   const [editNotes, setEditNotes] = useState("");
   const [poForm, setPoForm] = useState({ currency: "GHS", notes: "" });
+  const [signingPO, setSigningPO] = useState(null);
+  const sigCanvas = React.useRef(null);
+  const [sigDrawing, setSigDrawing] = useState(false);
+  const [sigData, setSigData] = useState("");
 
   const load = async () => {
     const [{ data: aw }, { data: po }, { data: rf }, { data: ev }, { data: vp }, { data: va }] = await Promise.all([
@@ -8868,7 +8874,14 @@ const PurchaseOrderView = ({ user }) => {
     setVendorApps(va.data || []);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    // Realtime subscription for signature updates
+    const sub = supabase.channel("po-sigs")
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "purchase_orders" }, () => load())
+      .subscribe();
+    return () => supabase.removeChannel(sub);
+  }, []);
 
   const handleCreatePO = async (award) => {
     console.log("handleCreatePO called", award);
@@ -8936,6 +8949,65 @@ const PurchaseOrderView = ({ user }) => {
     const { data: freshAwards } = await supabase.from("rff_awards").select("*").in("status", ["confirmed","po_created","invoiced","paid"]);
     setAwards(freshAwards || []);
     } catch(e) { console.error("PO creation error:", e); setSaving(false); alert("Error: " + e.message); }
+  };
+
+  const deletePO = async (po) => {
+    if (!window.confirm("Delete PO " + po.internal_po_number + "? This cannot be undone.")) return;
+    await supabase.from("purchase_orders").delete().eq("id", po.id);
+    // Reset award status back to confirmed
+    if (po.rff_award_id) await supabase.from("rff_awards").update({ status: "confirmed" }).eq("id", po.rff_award_id);
+    load();
+  };
+
+  const sendForSigning = async (po) => {
+    await supabase.from("purchase_orders").update({ status: "pending_signatures" }).eq("id", po.id);
+    // Notify VM
+    const { data: vms } = await supabase.from("profiles").select("id,email,name").eq("role", "Vendor Manager");
+    for (const vm of vms || []) {
+      await supabase.from("notifications").insert({ user_id: vm.id, title: "PO Signature Required — " + po.internal_po_number, message: "Finance has requested your signature on Purchase Order " + po.internal_po_number + " for " + (po.vendor_name||"vendor") + ".", type: "rff" });
+    }
+    // Notify CEO
+    const { data: ceos } = await supabase.from("profiles").select("id,email,name").eq("role", "CEO");
+    for (const ceo of ceos || []) {
+      await supabase.from("notifications").insert({ user_id: ceo.id, title: "PO Signature Required — " + po.internal_po_number, message: "Finance has requested your signature on Purchase Order " + po.internal_po_number + " for " + (po.vendor_name||"vendor") + ".", type: "rff" });
+    }
+    load();
+    alert("PO sent to VM and CEO for signing.");
+  };
+
+  const signPO = async (po, role) => {
+    if (!sigData) { alert("Please draw your signature first."); return; }
+    const updates = {};
+    if (role === "vm") {
+      updates.vm_signature = sigData;
+      updates.vm_signed_at = new Date().toISOString();
+      updates.vm_signed_by = user.id;
+      if (po.ceo_signed_at) updates.status = "fully_signed";
+      else updates.status = "vm_signed";
+    } else if (role === "ceo") {
+      updates.ceo_signature = sigData;
+      updates.ceo_signed_at = new Date().toISOString();
+      updates.ceo_signed_by = user.id;
+      if (po.vm_signed_at) updates.status = "fully_signed";
+      else updates.status = "ceo_signed";
+    }
+    await supabase.from("purchase_orders").update(updates).eq("id", po.id);
+    // If fully signed notify Finance
+    if ((role === "vm" && po.ceo_signed_at) || (role === "ceo" && po.vm_signed_at)) {
+      const { data: fms } = await supabase.from("profiles").select("id").eq("role", "Finance Manager");
+      for (const fm of fms || []) {
+        await supabase.from("notifications").insert({ user_id: fm.id, title: "PO Fully Signed — " + po.internal_po_number, message: "Both VM and CEO have signed PO " + po.internal_po_number + ". You can now publish to the vendor.", type: "finance" });
+      }
+    } else {
+      // Notify Finance of partial signing
+      const { data: fms } = await supabase.from("profiles").select("id").eq("role", "Finance Manager");
+      for (const fm of fms || []) {
+        await supabase.from("notifications").insert({ user_id: fm.id, title: (role==="vm"?"VM":"CEO") + " Signed PO — " + po.internal_po_number, message: (role==="vm"?"Vendor Manager":"CEO") + " has signed PO " + po.internal_po_number + ". Awaiting " + (role==="vm"?"CEO":"VM") + " signature.", type: "finance" });
+      }
+    }
+    setSigningPO(null);
+    setSigData("");
+    load();
   };
 
   const publishPO = async (po) => {
@@ -9055,16 +9127,36 @@ const PurchaseOrderView = ({ user }) => {
                         <span style={{ background:(statusColors[po.status]||T.textMuted)+"18", color:statusColors[po.status]||T.textMuted, borderRadius:20, padding:"2px 10px", fontSize:10, fontWeight:700, textTransform:"uppercase" }}>{po.status}</span>
                       </td>
                       <td style={{ padding:"10px 14px" }}>
-                        <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-                          {/* Preview button */}
+                        <div style={{ display:"flex", gap:6, flexWrap:"wrap", alignItems:"center" }}>
                           <button onClick={() => setPreviewPO({ po, vendor, rff, event })} style={{ background:T.cyan+"15", border:"1px solid "+T.cyan+"30", color:T.cyan, padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>Preview</button>
-                          {/* Download PDF */}
                           <button onClick={() => downloadPDF(generatePOPDF(po, vendor, rff, event), "PO-"+(po.internal_po_number||po.id)+".html")} style={{ background:T.surface, border:"1px solid "+T.border, color:T.textMuted, padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>↓ PDF</button>
-                          {/* Edit notes — draft only */}
                           {po.status === "draft" && <button onClick={() => { setNotesModal(po); setEditNotes(po.notes||""); }} style={{ background:T.amber+"15", border:"1px solid "+T.amber+"30", color:T.amber, padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>Notes</button>}
-                          {/* Publish — draft only */}
-                          {po.status === "draft" && <button onClick={() => publishPO(po)} style={{ background:T.teal+"15", border:"1px solid "+T.teal+"30", color:T.teal, padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>↑ Publish</button>}
+                          {po.status === "draft" && <button onClick={() => sendForSigning(po)} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#fff", padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>✍ Send for Signing</button>}
+                          {["pending_signatures","vm_signed","ceo_signed"].includes(po.status) && (
+                            <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
+                              <div style={{ display:"flex", gap:4, alignItems:"center" }}>
+                                <span style={{ width:8, height:8, borderRadius:"50%", background: po.vm_signed_at ? T.teal : T.amber, display:"inline-block" }} />
+                                <span style={{ color: po.vm_signed_at ? T.teal : T.amber, fontSize:10, fontWeight:700 }}>VM {po.vm_signed_at ? "✓ Signed" : "Pending"}</span>
+                              </div>
+                              <div style={{ display:"flex", gap:4, alignItems:"center" }}>
+                                <span style={{ width:8, height:8, borderRadius:"50%", background: po.ceo_signed_at ? T.teal : T.amber, display:"inline-block" }} />
+                                <span style={{ color: po.ceo_signed_at ? T.teal : T.amber, fontSize:10, fontWeight:700 }}>CEO {po.ceo_signed_at ? "✓ Signed" : "Pending"}</span>
+                              </div>
+                            </div>
+                          )}
+                          {po.status === "fully_signed" && <button onClick={() => publishPO(po)} style={{ background:"linear-gradient(135deg,"+T.teal+",#10B981)", border:"none", color:"#fff", padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>↑ Publish</button>}
                           {po.status === "sent" && <span style={{ color:T.teal, fontSize:10, fontWeight:700 }}>✓ Published</span>}
+                          {/* VM Sign button */}
+                          {["pending_signatures","ceo_signed"].includes(po.status) && user.role === "Vendor Manager" && !po.vm_signed_at && (
+                            <button onClick={() => setSigningPO({ po, role:"vm" })} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#fff", padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>✍ Sign</button>
+                          )}
+                          {/* CEO Sign button */}
+                          {["pending_signatures","vm_signed"].includes(po.status) && user.role === "CEO" && !po.ceo_signed_at && (
+                            <button onClick={() => setSigningPO({ po, role:"ceo" })} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#fff", padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>✍ Sign</button>
+                          )}
+                          {["draft","pending_signatures","vm_signed","ceo_signed","fully_signed"].includes(po.status) && po.status !== "sent" && user.role === "Finance Manager" && (
+                            <button onClick={() => deletePO(po)} style={{ background:T.red+"15", border:"1px solid "+T.red+"30", color:T.red, padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>🗑</button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -9096,6 +9188,44 @@ const PurchaseOrderView = ({ user }) => {
                 style={{ width:"100%", height:"80vh", border:"none" }}
                 title="PO Preview"
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PO Signing Modal — for VM and CEO */}
+      {signingPO && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setSigningPO(null)}>
+          <div style={{ background:T.surface, border:"1px solid "+T.cyan+"40", borderRadius:16, width:"100%", maxWidth:480, padding:28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>Sign Purchase Order</div>
+            <div style={{ color:T.textMuted, fontSize:13, marginBottom:20 }}>{signingPO.po.internal_po_number} — {signingPO.po.vendor_name}</div>
+            <div style={{ background:T.bg, border:"2px solid "+T.cyan+"40", borderRadius:10, padding:4, marginBottom:12, position:"relative" }}>
+              <canvas ref={sigCanvas} width={420} height={130}
+                style={{ display:"block", width:"100%", height:130, cursor:"crosshair", borderRadius:8, touchAction:"none" }}
+                onMouseDown={e => { setSigDrawing(true); const c=sigCanvas.current; const r=c.getBoundingClientRect(); const ctx=c.getContext("2d"); ctx.beginPath(); ctx.moveTo(e.clientX-r.left, e.clientY-r.top); }}
+                onMouseMove={e => { if(!sigDrawing) return; const c=sigCanvas.current; const r=c.getBoundingClientRect(); const ctx=c.getContext("2d"); ctx.strokeStyle="#00C8FF"; ctx.lineWidth=2; ctx.lineTo(e.clientX-r.left, e.clientY-r.top); ctx.stroke(); }}
+                onMouseUp={() => { setSigDrawing(false); setSigData(sigCanvas.current.toDataURL()); }}
+                onMouseLeave={() => { if(sigDrawing){setSigDrawing(false); setSigData(sigCanvas.current.toDataURL());} }}
+                onTouchStart={e => { e.preventDefault(); setSigDrawing(true); const c=sigCanvas.current; const r=c.getBoundingClientRect(); const t=e.touches[0]; const ctx=c.getContext("2d"); ctx.beginPath(); ctx.moveTo(t.clientX-r.left, t.clientY-r.top); }}
+                onTouchMove={e => { e.preventDefault(); if(!sigDrawing) return; const c=sigCanvas.current; const r=c.getBoundingClientRect(); const t=e.touches[0]; const ctx=c.getContext("2d"); ctx.strokeStyle="#00C8FF"; ctx.lineWidth=2; ctx.lineTo(t.clientX-r.left, t.clientY-r.top); ctx.stroke(); }}
+                onTouchEnd={() => { setSigDrawing(false); setSigData(sigCanvas.current.toDataURL()); }}
+              />
+              <div style={{ position:"absolute", bottom:8, right:10, color:T.textMuted, fontSize:10, pointerEvents:"none" }}>Sign above</div>
+              <button onClick={() => { const c=sigCanvas.current; c.getContext("2d").clearRect(0,0,c.width,c.height); setSigData(""); }} style={{ position:"absolute", top:6, right:6, background:T.surface, border:"1px solid "+T.border, color:T.textMuted, padding:"2px 8px", borderRadius:5, cursor:"pointer", fontSize:10 }}>Clear</button>
+            </div>
+            {/* Saved signature option */}
+            {user.saved_signature && !sigData && (
+              <div style={{ background:T.teal+"10", border:"1px solid "+T.teal+"30", borderRadius:8, padding:"10px 14px", marginBottom:12, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <div>
+                  <div style={{ color:T.teal, fontSize:11, fontWeight:700, marginBottom:4 }}>Use Saved Signature</div>
+                  <img src={user.saved_signature} style={{ height:36, maxWidth:180, objectFit:"contain" }} alt="saved" />
+                </div>
+                <button onClick={() => setSigData(user.saved_signature)} style={{ background:"linear-gradient(135deg,"+T.teal+","+T.cyan+")", border:"none", color:"#fff", padding:"7px 14px", borderRadius:7, cursor:"pointer", fontSize:12, fontWeight:700 }}>Use</button>
+              </div>
+            )}
+            <div style={{ display:"flex", gap:10, marginTop:8 }}>
+              <button onClick={() => signPO(signingPO.po, signingPO.role)} disabled={!sigData} style={{ flex:1, background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#fff", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13, opacity:!sigData?0.5:1 }}>Confirm Signature</button>
+              <button onClick={() => { setSigningPO(null); setSigData(""); }} style={{ background:"none", border:"1px solid "+T.border, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer", fontSize:13 }}>Cancel</button>
             </div>
           </div>
         </div>

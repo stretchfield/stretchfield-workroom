@@ -8063,10 +8063,14 @@ const VendorScorecardModal = ({ vendor, events, user, onClose, onSaved }) => {
   const initScores = {};
   SCORECARD_CATEGORIES.forEach(cat => cat.fields.forEach(f => { initScores[f.key] = 0; }));
   const [scores, setScores] = useState(initScores);
+  const [lineItemNotes, setLineItemNotes] = useState({});
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [expandedCat, setExpandedCat] = useState(null);
   const [selectedEventId, setSelectedEventId] = useState("");
+  const [reportModal, setReportModal] = useState(null);
+  const [reportText, setReportText] = useState("");
+  const [pushingReport, setPushingReport] = useState(false);
 
   const selectedEvent = events.find(e => e.id === selectedEventId) || null;
   const liveScore = calcScore(scores);
@@ -17197,19 +17201,45 @@ const EventReportsView = ({ user }) => {
 
   const openEvent = async (event) => {
     setSelectedEvent(event);
-    // Set default section based on role
     if (isStrategy) setActiveSection("operational");
     else if (isVM) setActiveSection("vendor");
     else if (isCEO) setActiveSection("overview");
+
     // Load or create report
     const { data: existing } = await supabase.from("event_intelligence_reports").select("*").eq("project_id", event.id).maybeSingle();
-    if (existing) {
-      setReport(existing);
-      setForm(f => ({ ...f, ...existing }));
-    } else {
+    let reportData = existing;
+    if (!existing) {
       const { data: created } = await supabase.from("event_intelligence_reports").insert({ project_id: event.id, status: "draft" }).select().single();
-      setReport(created || { project_id: event.id, status: "draft" });
+      reportData = created || { project_id: event.id, status: "draft" };
     }
+    setReport(reportData);
+
+    // Auto-populate vendor section from scorecard reports
+    if (isVM || isCEO) {
+      const { data: eventScorecards } = await supabase.from("vendor_scorecards").select("*").eq("project_id", event.id);
+      if (eventScorecards && eventScorecards.length > 0) {
+        const recommended = eventScorecards.filter(s => (s.total_pct||0) >= 70).map(s => s.vendor_name + " (" + s.total_pct + "%)").join(", ");
+        const notRecommended = eventScorecards.filter(s => (s.total_pct||0) < 50).map(s => s.vendor_name + " (" + s.total_pct + "%)").join(", ");
+        const avgScore = (eventScorecards.reduce((sum,s) => sum+(s.total_pct||0),0)/eventScorecards.length).toFixed(0);
+        const summaryLines = eventScorecards.map(s => {
+          const t = getTier(s.total_pct);
+          return s.vendor_name + ": " + s.total_pct + "% (" + t?.label + ")" + (s.scorecard_report ? " — Report pushed to vendor" : "");
+        });
+        const autoSummary = "Overall vendor average: " + avgScore + "%\n\n" + summaryLines.join("\n");
+        // Only auto-fill if vendor section not yet submitted
+        if (!reportData?.vendor_submitted_at) {
+          setForm(f => ({
+            ...f,
+            ...(reportData || {}),
+            vendor_performance_summary: reportData?.vendor_performance_summary || autoSummary,
+            vendors_recommended: reportData?.vendors_recommended || recommended,
+            vendors_not_recommended: reportData?.vendors_not_recommended || (notRecommended || "None"),
+          }));
+          return;
+        }
+      }
+    }
+    setForm(f => ({ ...f, ...(reportData || {}) }));
   };
 
   const saveSection = async (section) => {
@@ -17427,7 +17457,26 @@ Write a professional, insightful intelligence report in Stretchfield's consultat
       {activeSection === "vendor" && (isVM || isCEO) && (
         <div>
           <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:4 }}>Vendor Section</div>
-          <div style={{ color:T.textMuted, fontSize:12, marginBottom:16 }}>Filled by Vendor Manager</div>
+          <div style={{ color:T.textMuted, fontSize:12, marginBottom:16 }}>Filled by Vendor Manager · Auto-populated from scorecard data</div>
+          {scorecards.filter(s => s.project_id === selectedEvent.id).length > 0 && (
+            <div style={{ background:T.bg, border:`1px solid ${T.teal}30`, borderRadius:10, padding:"12px 14px", marginBottom:14 }}>
+              <div style={{ color:T.teal, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>✦ Auto-populated from Vendor Scorecards</div>
+              <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+                {scorecards.filter(s => s.project_id === selectedEvent.id).map(sc => {
+                  const t = getTier(sc.total_pct);
+                  return (
+                    <div key={sc.id} style={{ display:"flex", justifyContent:"space-between", fontSize:12 }}>
+                      <span style={{ color:T.textPrimary, fontWeight:600 }}>{sc.vendor_name}</span>
+                      <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                        <span style={{ color:t?.color||T.amber, fontWeight:700 }}>{sc.total_pct}% — {t?.label}</span>
+                        {sc.visible_to_vendor && <span style={{ color:T.teal, fontSize:10, fontWeight:700 }}>Report sent ✓</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <Field label="Overall Vendor Performance Summary" field="vendor_performance_summary" rows={4} placeholder="General assessment of all vendors..." />
           <Field label="Vendors to Recommend for Future Events" field="vendors_recommended" rows={3} placeholder="List vendors who performed excellently..." />
           <Field label="Vendors Not Recommended" field="vendors_not_recommended" rows={3} placeholder="List vendors with performance issues..." />
@@ -17464,6 +17513,26 @@ Write a professional, insightful intelligence report in Stretchfield's consultat
       {/* ── OVERVIEW & AI ── */}
       {activeSection === "overview" && (
         <div>
+          {/* Scorecard summary for CEO */}
+          {isCEO && scorecards.filter(s => s.project_id === selectedEvent?.id).length > 0 && (
+            <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:"16px 18px", marginBottom:16 }}>
+              <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:10 }}>Vendor Scorecards — From VM</div>
+              {scorecards.filter(s => s.project_id === selectedEvent?.id).map(sc => {
+                const t = getTier(sc.total_pct);
+                return (
+                  <div key={sc.id} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:`1px solid ${T.border}22` }}>
+                    <span style={{ color:T.textPrimary, fontSize:13, fontWeight:600 }}>{sc.vendor_name}</span>
+                    <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                      <span style={{ color:t?.color||T.amber, fontWeight:700, fontSize:13 }}>{sc.total_pct}%</span>
+                      <span style={{ color:t?.color||T.amber, fontSize:10, fontWeight:700, background:(t?.color||T.amber)+"15", padding:"1px 6px", borderRadius:10 }}>{t?.label}</span>
+                      {sc.visible_to_vendor && <span style={{ color:T.teal, fontSize:10 }}>✓ Sent</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* Section status */}
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:10, marginBottom:20 }}>
             {[

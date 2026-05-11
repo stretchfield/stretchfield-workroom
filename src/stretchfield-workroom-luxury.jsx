@@ -8203,7 +8203,7 @@ const VendorScorecardsView = ({ user }) => {
       supabase.from("profiles").select("*").eq("role", "Vendor"),
       supabase.from("projects").select("*"),
       supabase.from("vendor_scorecards").select("*").order("created_at", { ascending: false }),
-      supabase.from("rff_awards").select("*, rffs(project_id, event_name)").in("status", ["confirmed","po_created"]),
+      supabase.from("rff_awards").select("*, rffs(project_id, event_name)"),
     ]);
     setVendors(v.data || []);
     setEvents(e.data || []);
@@ -8343,11 +8343,12 @@ const VendorScorecardsView = ({ user }) => {
       {scoreModal && (
         <VendorScorecardModal
           vendor={scoreModal}
-          events={events.filter(e => {
+          events={(() => {
             const vendorAwards = awards.filter(a => a.vendor_id === scoreModal.id);
             const awardedEventIds = vendorAwards.map(a => a.rffs?.project_id).filter(Boolean);
-            return awardedEventIds.includes(e.id);
-          })}
+            const filtered = events.filter(e => awardedEventIds.includes(e.id));
+            return filtered.length > 0 ? filtered : events;
+          })()}
           user={user}
           onClose={() => setScoreModal(null)}
           onSaved={load}

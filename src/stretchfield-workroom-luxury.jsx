@@ -1488,32 +1488,54 @@ const VendorManagerDashboard = ({ user }) => {
         <div style={{ position:"fixed", inset:0, zIndex:600, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setPayReqModal(false)}>
           <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:460, padding:28 }} onClick={e=>e.stopPropagation()}>
             <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>New Payment Request</div>
-            <div style={{ color:T.textMuted, fontSize:13, marginBottom:20 }}>Submit a payment request to Finance for CEO approval</div>
+            <div style={{ color:T.textMuted, fontSize:13, marginBottom:20 }}>Select your event and payment type — amounts are pre-set by CEO/Finance</div>
             <div style={{ display:"flex", flexDirection:"column", gap:12, marginBottom:16 }}>
               <div>
-                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Request Type</label>
-                <select value={payReqForm.request_type} onChange={e=>setPayReqForm(f=>({...f,request_type:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
-                  <option value="project_fee">Project Fee</option>
-                  <option value="per_diem">Per Diem</option>
-                  <option value="reimbursement">Reimbursement</option>
-                  <option value="transport">Transport Allowance</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Related Event</label>
-                <select value={payReqForm.project_id} onChange={e=>setPayReqForm(f=>({...f,project_id:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
-                  <option value="">Select event (optional)...</option>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Related Event *</label>
+                <select value={payReqForm.project_id} onChange={async e => {
+                  const pid = e.target.value;
+                  setPayReqForm(f=>({...f, project_id:pid, amount:"", request_type:"project_fee"}));
+                  if (pid) {
+                    const { data: rates } = await supabase.from("staff_event_payments").select("*").eq("staff_id", user.id).eq("project_id", pid).single();
+                    setPayReqForm(f=>({...f, project_id:pid, _rates:rates||null, amount: rates?.project_fee ? String(rates.project_fee) : "", request_type:"project_fee"}));
+                  }
+                }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  <option value="">Select event...</option>
                   {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
                 </select>
               </div>
               <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Payment Type</label>
+                <select value={payReqForm.request_type} onChange={e => {
+                  const type = e.target.value;
+                  const rates = payReqForm._rates;
+                  let amt = "";
+                  if (type === "project_fee") amt = rates?.project_fee ? String(rates.project_fee) : "";
+                  else if (type === "per_diem") amt = rates?.per_diem ? String(rates.per_diem) : "";
+                  else if (type === "transport") amt = rates?.transport_allowance ? String(rates.transport_allowance) : "";
+                  setPayReqForm(f=>({...f, request_type:type, amount:amt}));
+                }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  <option value="project_fee">Project Fee</option>
+                  <option value="per_diem">Per Diem</option>
+                  <option value="transport">Transport Allowance</option>
+                  <option value="reimbursement">Reimbursement (custom amount)</option>
+                  <option value="other">Other (custom amount)</option>
+                </select>
+              </div>
+              <div>
                 <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Amount (GHS)</label>
-                <input type="number" value={payReqForm.amount} onChange={e=>setPayReqForm(f=>({...f,amount:e.target.value}))} placeholder="0.00" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                {["reimbursement","other"].includes(payReqForm.request_type) ? (
+                  <input type="number" value={payReqForm.amount} onChange={e=>setPayReqForm(f=>({...f,amount:e.target.value}))} placeholder="0.00" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                ) : (
+                  <div style={{ padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}44`, borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                    <span style={{ color: payReqForm.amount ? T.gold : T.textMuted, fontWeight: payReqForm.amount ? 800 : 400, fontSize:15 }}>{payReqForm.amount ? "GHS "+parseFloat(payReqForm.amount).toLocaleString() : "No rate set for this event yet"}</span>
+                    {payReqForm.amount && <span style={{ color:T.teal, fontSize:10, fontWeight:700 }}>🔒 Set by CEO/Finance</span>}
+                  </div>
+                )}
               </div>
               <div>
                 <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Description *</label>
-                <textarea value={payReqForm.description} onChange={e=>setPayReqForm(f=>({...f,description:e.target.value}))} rows={3} placeholder="What is this payment for?" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} />
+                <textarea value={payReqForm.description} onChange={e=>setPayReqForm(f=>({...f,description:e.target.value}))} rows={2} placeholder="Brief description..." style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} />
               </div>
             </div>
             <div style={{ display:"flex", gap:10 }}>
@@ -1726,32 +1748,54 @@ const StaffDashboard = ({ user }) => {
         <div style={{ position:"fixed", inset:0, zIndex:600, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setPayReqModal(false)}>
           <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:460, padding:28 }} onClick={e=>e.stopPropagation()}>
             <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>New Payment Request</div>
-            <div style={{ color:T.textMuted, fontSize:13, marginBottom:20 }}>Submit a payment request to Finance for CEO approval</div>
+            <div style={{ color:T.textMuted, fontSize:13, marginBottom:20 }}>Select your event and payment type — amounts are pre-set by CEO/Finance</div>
             <div style={{ display:"flex", flexDirection:"column", gap:12, marginBottom:16 }}>
               <div>
-                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Request Type</label>
-                <select value={payReqForm.request_type} onChange={e=>setPayReqForm(f=>({...f,request_type:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
-                  <option value="project_fee">Project Fee</option>
-                  <option value="per_diem">Per Diem</option>
-                  <option value="reimbursement">Reimbursement</option>
-                  <option value="transport">Transport Allowance</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Related Event</label>
-                <select value={payReqForm.project_id} onChange={e=>setPayReqForm(f=>({...f,project_id:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
-                  <option value="">Select event (optional)...</option>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Related Event *</label>
+                <select value={payReqForm.project_id} onChange={async e => {
+                  const pid = e.target.value;
+                  setPayReqForm(f=>({...f, project_id:pid, amount:"", request_type:"project_fee"}));
+                  if (pid) {
+                    const { data: rates } = await supabase.from("staff_event_payments").select("*").eq("staff_id", user.id).eq("project_id", pid).single();
+                    setPayReqForm(f=>({...f, project_id:pid, _rates:rates||null, amount: rates?.project_fee ? String(rates.project_fee) : "", request_type:"project_fee"}));
+                  }
+                }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  <option value="">Select event...</option>
                   {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
                 </select>
               </div>
               <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Payment Type</label>
+                <select value={payReqForm.request_type} onChange={e => {
+                  const type = e.target.value;
+                  const rates = payReqForm._rates;
+                  let amt = "";
+                  if (type === "project_fee") amt = rates?.project_fee ? String(rates.project_fee) : "";
+                  else if (type === "per_diem") amt = rates?.per_diem ? String(rates.per_diem) : "";
+                  else if (type === "transport") amt = rates?.transport_allowance ? String(rates.transport_allowance) : "";
+                  setPayReqForm(f=>({...f, request_type:type, amount:amt}));
+                }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  <option value="project_fee">Project Fee</option>
+                  <option value="per_diem">Per Diem</option>
+                  <option value="transport">Transport Allowance</option>
+                  <option value="reimbursement">Reimbursement (custom amount)</option>
+                  <option value="other">Other (custom amount)</option>
+                </select>
+              </div>
+              <div>
                 <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Amount (GHS)</label>
-                <input type="number" value={payReqForm.amount} onChange={e=>setPayReqForm(f=>({...f,amount:e.target.value}))} placeholder="0.00" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                {["reimbursement","other"].includes(payReqForm.request_type) ? (
+                  <input type="number" value={payReqForm.amount} onChange={e=>setPayReqForm(f=>({...f,amount:e.target.value}))} placeholder="0.00" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                ) : (
+                  <div style={{ padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}44`, borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                    <span style={{ color: payReqForm.amount ? T.gold : T.textMuted, fontWeight: payReqForm.amount ? 800 : 400, fontSize:15 }}>{payReqForm.amount ? "GHS "+parseFloat(payReqForm.amount).toLocaleString() : "No rate set for this event yet"}</span>
+                    {payReqForm.amount && <span style={{ color:T.teal, fontSize:10, fontWeight:700 }}>🔒 Set by CEO/Finance</span>}
+                  </div>
+                )}
               </div>
               <div>
                 <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Description *</label>
-                <textarea value={payReqForm.description} onChange={e=>setPayReqForm(f=>({...f,description:e.target.value}))} rows={3} placeholder="Describe what this payment is for..." style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} />
+                <textarea value={payReqForm.description} onChange={e=>setPayReqForm(f=>({...f,description:e.target.value}))} rows={2} placeholder="Brief description..." style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} />
               </div>
             </div>
             <div style={{ display:"flex", gap:10 }}>

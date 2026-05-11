@@ -1872,7 +1872,7 @@ const VendorDashboard = ({ user }) => {
   const [pos, setPOs] = useState([]);
 
   const load = async () => {
-    const [asn, tk, sc, inv, aw, pr, po] = await Promise.all([
+    const [asn, tk, sc, inv, aw, pr, po, vsc] = await Promise.all([
       supabase.from("rff_vendor_assignments").select("*, rffs(id,title,event_name,status,quote_deadline)").eq("vendor_id", user.id).order("created_at", { ascending: false }),
       supabase.from("tasks").select("*").eq("assignee_id", user.id).order("created_at", { ascending: false }),
       supabase.from("vendor_scorecards").select("*").eq("vendor_id", user.id).order("created_at", { ascending: false }),
@@ -1880,6 +1880,7 @@ const VendorDashboard = ({ user }) => {
       supabase.from("rff_awards").select("*").eq("vendor_id", user.id),
       supabase.from("profiles").select("*").eq("id", user.id).single(),
       supabase.from("purchase_orders").select("id,internal_po_number,event_name,amount,currency,status,notes,created_at,rff_id").eq("vendor_id", user.id).in("status", ["sent","invoiced","paid"]).order("created_at", { ascending: false }),
+      supabase.from("vendor_scorecards").select("*").eq("vendor_id", user.id).order("created_at", { ascending: false }),
     ]);
     setAssignments(asn.data || []);
     setRffs((asn.data || []).map(a => a.rffs).filter(Boolean));
@@ -1889,6 +1890,7 @@ const VendorDashboard = ({ user }) => {
     setAwards(aw.data || []);
     setProfile(pr.data || null);
     setPOs(po.data || []);
+    setScorecards(vsc.data || []);
   };
 
   useEffect(() => { load(); }, [user.id]);
@@ -8182,9 +8184,64 @@ const VendorScorecardModal = ({ vendor, events, user, onClose, onSaved }) => {
       </div>
 
       <div style={{ display: "flex", gap: 10 }}>
-        <Btn onClick={handleSave} disabled={saving}>{saving ? "Saving..." : "Save Scorecard"}</Btn>
+        <Btn onClick={async () => {
+          await handleSave();
+          if (!selectedEventId) return;
+          const workedItems = [];
+          const needsWorkItems = [];
+          SCORECARD_CATEGORIES.forEach(cat => {
+            cat.fields.forEach(f => {
+              const score = scores[f.key] || 0;
+              const note = lineItemNotes[f.key] || "";
+              if (score >= 4) workedItems.push("• " + f.label + ": " + score + "/5" + (note ? " — " + note : ""));
+              else if (score > 0) needsWorkItems.push("• " + f.label + ": " + score + "/5 — " + (note || "No reason provided"));
+            });
+          });
+          const selectedEvent = events.find(e => e.id === selectedEventId);
+          const reportLines = ["VENDOR PERFORMANCE REPORT", "Vendor: " + vendor.name, "Event: " + (selectedEvent?.name||""), "Score: " + liveScore + "% — " + tier.label, "Date: " + new Date().toLocaleDateString("en-GB", {day:"numeric",month:"long",year:"numeric"}), "", "WHAT WORKED WELL", ...(workedItems.length > 0 ? workedItems : ["• No items scored at full marks"]), "", "AREAS FOR IMPROVEMENT", ...(needsWorkItems.length > 0 ? needsWorkItems : ["• All areas met expectations"]), "", "OVERALL ASSESSMENT", vendor.name + " delivered a " + tier.label.toLowerCase() + " performance on " + (selectedEvent?.name||"this event") + " with an overall score of " + liveScore + "%. " + (liveScore >= 85 ? "We strongly recommend this vendor for future engagements." : liveScore >= 70 ? "We recommend this vendor with minor improvements noted above." : liveScore >= 50 ? "This vendor may be considered for future events subject to addressing the areas noted above." : "We do not recommend this vendor for future engagements without significant improvement.")];
+          const report = reportLines.join("\n");
+          setReportText(report);
+          setReportModal({ vendor, event: selectedEvent, score: liveScore, tier });
+        }} disabled={saving}>{saving ? "Saving..." : "Submit & Generate Report"}</Btn>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
       </div>
+
+      {/* Report Preview Modal */}
+      {reportModal && (
+        <div style={{ position:"fixed", inset:0, zIndex:800, background:"rgba(0,0,0,0.9)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setReportModal(null)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:600, maxHeight:"85vh", overflow:"hidden", display:"flex", flexDirection:"column" }} onClick={e=>e.stopPropagation()}>
+            <div style={{ padding:"18px 22px", borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div>
+                <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16 }}>Vendor Performance Report</div>
+                <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{reportModal.vendor.name} · {reportModal.score}% · {reportModal.tier.label}</div>
+              </div>
+              <button onClick={() => setReportModal(null)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"5px 10px", borderRadius:6, cursor:"pointer", fontSize:13 }}>✕</button>
+            </div>
+            <div style={{ flex:1, overflowY:"auto", padding:"18px 22px" }}>
+              <div style={{ color:T.textMuted, fontSize:11, marginBottom:8 }}>Review and edit before pushing to vendor:</div>
+              <textarea value={reportText} onChange={e=>setReportText(e.target.value)} rows={18}
+                style={{ width:"100%", padding:"12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:12, fontFamily:"monospace", outline:"none", resize:"vertical", boxSizing:"border-box", lineHeight:1.6 }} />
+            </div>
+            <div style={{ padding:"14px 22px", borderTop:`1px solid ${T.border}`, display:"flex", gap:10 }}>
+              <button onClick={async () => {
+                setPushingReport(true);
+                const { data: sc } = await supabase.from("vendor_scorecards").select("id").eq("vendor_id", vendor.id).eq("project_id", selectedEventId).order("created_at", { ascending:false }).limit(1).single();
+                if (sc) {
+                  await supabase.from("vendor_scorecards").update({ scorecard_report:reportText, report_generated_at:new Date().toISOString(), report_pushed_at:new Date().toISOString(), visible_to_vendor:true, line_item_notes:lineItemNotes }).eq("id", sc.id);
+                }
+                await supabase.from("notifications").insert({ user_id:vendor.id, title:"Performance Report — " + (reportModal.event?.name||""), message:"Stretchfield has published your performance report. Log in to view your scorecard.", type:"rff" });
+                const emailHtml = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;"><div style="height:6px;background:linear-gradient(90deg,#FF6B35,#FF3CAC,#784BA0,#2B86C5,#00C8FF);"></div><div style="background:#060B14;padding:28px 32px;"><table style="width:100%;"><tr><td><span style="color:#00C8FF;font-size:12px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;">STRETCHFIELD WORKROOM</span></td><td style="text-align:right;"><img src="https://workroom.stretchfield.com/logo512.png" style="height:32px;" /></td></tr></table><div style="color:#E8F0FF;font-size:20px;font-weight:800;margin-top:16px;padding-top:16px;border-top:1px solid #1A2E4A;">Your Performance Report is Ready</div></div><div style="padding:28px 32px;background:#F4F6FB;"><p style="color:#0A1628;font-size:14px;">Hi <strong>${vendor.name}</strong>,</p><p style="color:#0A1628;font-size:14px;">Your performance report for <strong>${reportModal.event?.name||""}</strong> has been published.</p><p style="color:#0A1628;font-size:14px;"><strong style="color:#00C8FF;">${reportModal.score}% — ${reportModal.tier.label}</strong></p><a href="https://workroom.stretchfield.com" style="display:inline-block;background:linear-gradient(135deg,#00C8FF,#00E5C8);color:#060B14;padding:12px 28px;border-radius:8px;font-weight:800;font-size:13px;text-decoration:none;margin:16px 0;">View in WorkRoom →</a><p style="color:#5A6E8A;font-size:12px;">Log in at workroom.stretchfield.com to view your full report.</p></div></div>`;
+                await fetch("/api/send-email", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ to:vendor.email, subject:"Your Performance Report — " + (reportModal.event?.name||"") + " — Stretchfield", html:emailHtml }) });
+                setPushingReport(false);
+                setReportModal(null);
+                onSaved();
+                onClose();
+              }} disabled={pushingReport} style={{ flex:1, background:`linear-gradient(135deg,${T.teal},#10B981)`, border:"none", color:"#fff", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{pushingReport?"Pushing...":"Push to Vendor →"}</button>
+              <button onClick={() => setReportModal(null)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 18px", borderRadius:8, cursor:"pointer", fontSize:13 }}>Edit Later</button>
+            </div>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 };

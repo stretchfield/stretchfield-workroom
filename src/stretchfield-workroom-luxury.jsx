@@ -776,7 +776,7 @@ const getNavItems = (role) => {
     base.push({ id: "strategy-overview", label: "Client Overview", icon: "▪" }, { id: "feedback-summary", label: "Feedback", icon: "▪" }, { id: "event-reports", label: "Event Reports", icon: "▪" });
   }
   if (["CEO","Country Manager"].includes(role)) {
-    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "rff-approvals", label: "RFF Approvals", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "purchase-orders", label: "Sign Purchase Orders", icon: "▪" });
+    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "▪" }, { id: "rff-approvals", label: "RFF Approvals", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quotes-received", label: "Quotes Received", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" }, { id: "vendor-analytics", label: "Vendor Analytics", icon: "▪" }, { id: "purchase-orders", label: "Sign Purchase Orders", icon: "▪" }, { id: "event-reports", label: "Event Reports", icon: "▪" });
   }
   if (role === "CEO") {
     base.push({ id: "vendor-onboarding", label: "Vendor Applications", icon: "▪" });

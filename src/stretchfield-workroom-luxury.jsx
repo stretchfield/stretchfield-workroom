@@ -8858,25 +8858,28 @@ const PurchaseOrderView = ({ user }) => {
       supabase.from("rffs").select("*"),
       supabase.from("projects").select("*"),
       supabase.from("profiles").select("id,name,email,phone,company_name,service_category").eq("role","Vendor"),
-      supabase.from("vendor_apps").select("*"),
+      supabase.from("vendor_applications").select("*").eq("status","login-created"),
     ]);
     setAwards(aw || []);
     setPOs(po || []);
     setRffs(rf || []);
     setEvents(ev || []);
     setVendorProfiles(vp || []);
-    setVendorApps(va || []);
+    setVendorApps(va.data || []);
   };
 
   useEffect(() => { load(); }, []);
 
   const handleCreatePO = async (award) => {
+    console.log("handleCreatePO called", award);
     setSaving(true);
     setZohoStatus("");
+    try {
     const rff = rffs.find(r => r.id === award.rff_id);
     const event = events.find(e => e.id === rff?.project_id);
     const vendor = vendorProfiles.find(v => v.id === award.vendor_id);
-    const vApp = vendorApps.find(a => a.vendor_id === award.vendor_id || a.linked_vendor_id === award.vendor_id);
+    const vApp = vendorApps.find(a => a.profile_id === award.vendor_id || a.submitted_by === award.vendor_id);
+    console.log("rff:", rff, "event:", event, "vendor:", vendor);
 
     // Generate PO number
     let internalPoNumber = "";
@@ -8905,8 +8908,8 @@ const PurchaseOrderView = ({ user }) => {
       internal_po_number: internalPoNumber,
       payment_terms: vApp?.payment_terms || "",
       bank_name: vApp?.bank_name || "",
-      account_name: vApp?.account_name || vendor?.name || "",
-      account_number: vApp?.account_number || "",
+      account_name: vApp?.bank_account_name || vendor?.name || "",
+      account_number: vApp?.account_no || "",
     }).select().single();
 
     // Sync to Zoho
@@ -8934,6 +8937,7 @@ const PurchaseOrderView = ({ user }) => {
     setPOs(freshPOs || []);
     const { data: freshAwards } = await supabase.from("rff_awards").select("*").in("status", ["confirmed","po_created","invoiced","paid"]);
     setAwards(freshAwards || []);
+    } catch(e) { console.error("PO creation error:", e); setSaving(false); alert("Error: " + e.message); }
   };
 
   const publishPO = async (po) => {
@@ -8996,7 +9000,7 @@ const PurchaseOrderView = ({ user }) => {
                       ["Vendor", award.vendor_name],
                       ["Category", rff?.category || vendor?.service_category || "—"],
                       ["Bank", vApp?.bank_name || "—"],
-                      ["Account", vApp?.account_number || "—"],
+                      ["Account", vApp?.account_no || "—"],
                       ["Payment Terms", vApp?.payment_terms || "—"],
                     ].map(([label, val]) => (
                       <div key={label} style={{ background:T.bg, borderRadius:6, padding:"8px 10px" }}>

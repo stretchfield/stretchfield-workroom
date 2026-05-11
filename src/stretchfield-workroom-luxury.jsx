@@ -835,7 +835,7 @@ const getNavItems = (role) => {
     ];
   }
   if (role === "Vendor Manager") {
-    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quotes-received", label: "Quotes Received", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" }, { id: "vendor-analytics", label: "Vendor Analytics", icon: "▪" }, { id: "payment-authorisation", label: "Payment Authorisation", icon: "▪" }, { id: "budget-vs-actuals", label: "Budget vs Actuals", icon: "▪" });
+    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quotes-received", label: "Quotes Received", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" }, { id: "vendor-analytics", label: "Vendor Analytics", icon: "▪" }, { id: "budget-vs-actuals", label: "Budget vs Actuals", icon: "▪" });
   }
   if (["CEO","Country Manager","Vendor Manager","Finance Manager"].includes(role)) {
     base.push({ id: "invoices", label: "Invoices", icon: "▪" });
@@ -1538,11 +1538,25 @@ const VendorManagerDashboard = ({ user }) => {
                 <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Description *</label>
                 <textarea value={payReqForm.description} onChange={e=>setPayReqForm(f=>({...f,description:e.target.value}))} rows={2} placeholder="Brief description..." style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} />
               </div>
+              {["reimbursement","other"].includes(payReqForm.request_type) && (
+                <div>
+                  <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Upload Receipt</label>
+                  <input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={e=>setPayReqForm(f=>({...f,_receipt:e.target.files[0]}))} style={{ width:"100%", padding:"8px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:12, cursor:"pointer", boxSizing:"border-box" }} />
+                  {payReqForm._receipt && <div style={{ color:T.teal, fontSize:11, marginTop:4 }}>✓ {payReqForm._receipt.name}</div>}
+                </div>
+              )}
             </div>
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={async () => {
                 if (!payReqForm.amount || !payReqForm.description) { alert("Please fill in amount and description."); return; }
                 setSavingPayReq(true);
+                let receipt_url = "";
+                if (payReqForm._receipt) {
+                  const ext = payReqForm._receipt.name.split(".").pop();
+                  const path = "receipts/"+user.id+"_"+Date.now()+"."+ext;
+                  const { error: upErr } = await supabase.storage.from("rffs").upload(path, payReqForm._receipt, { upsert:true });
+                  if (!upErr) { const { data: urlData } = supabase.storage.from("rffs").getPublicUrl(path); receipt_url = urlData.publicUrl; }
+                }
                 const ev = events.find(e => e.id === payReqForm.project_id);
                 await supabase.from("staff_payment_requests").insert({ staff_id:user.id, staff_name:user.name, project_id:payReqForm.project_id||null, project_name:ev?.name||"", amount:parseFloat(payReqForm.amount), description:payReqForm.description, request_type:payReqForm.request_type, status:"pending" });
                 const { data: fms } = await supabase.from("profiles").select("id").eq("role","Finance Manager");
@@ -1798,11 +1812,25 @@ const StaffDashboard = ({ user }) => {
                 <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Description *</label>
                 <textarea value={payReqForm.description} onChange={e=>setPayReqForm(f=>({...f,description:e.target.value}))} rows={2} placeholder="Brief description..." style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} />
               </div>
+              {["reimbursement","other"].includes(payReqForm.request_type) && (
+                <div>
+                  <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Upload Receipt</label>
+                  <input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={e=>setPayReqForm(f=>({...f,_receipt:e.target.files[0]}))} style={{ width:"100%", padding:"8px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:12, cursor:"pointer", boxSizing:"border-box" }} />
+                  {payReqForm._receipt && <div style={{ color:T.teal, fontSize:11, marginTop:4 }}>✓ {payReqForm._receipt.name}</div>}
+                </div>
+              )}
             </div>
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={async () => {
                 if (!payReqForm.amount || !payReqForm.description) { alert("Please fill in amount and description."); return; }
                 setSavingPayReq(true);
+                let receipt_url = "";
+                if (payReqForm._receipt) {
+                  const ext = payReqForm._receipt.name.split(".").pop();
+                  const path = "receipts/"+user.id+"_"+Date.now()+"."+ext;
+                  const { error: upErr } = await supabase.storage.from("rffs").upload(path, payReqForm._receipt, { upsert:true });
+                  if (!upErr) { const { data: urlData } = supabase.storage.from("rffs").getPublicUrl(path); receipt_url = urlData.publicUrl; }
+                }
                 const ev = events.find(e => e.id === payReqForm.project_id);
                 await supabase.from("staff_payment_requests").insert({
                   staff_id: user.id, staff_name: user.name,
@@ -10373,7 +10401,20 @@ const QuoteComparisonView = ({ user }) => {
                     <div style={{ width: 120, color: T.cyan, fontSize: 12, fontWeight: 700, flexShrink: 0 }}>GHS {activeBudget.toLocaleString()}</div>
                   </div>
                 )}
-                {filteredAssignments.map((a, idx) => {
+                {/* Group by vendor category */}
+                {(() => {
+                  const grouped = {};
+                  filteredAssignments.forEach(a => {
+                    const vp = vendorProfiles.find(v => v.id === a.vendor_id);
+                    const va2 = vendorApps.find(v => v.vendor_name === a.vendor_name);
+                    const cat = vp?.service_category || va2?.vendor_type || "Other";
+                    if (!grouped[cat]) grouped[cat] = [];
+                    grouped[cat].push(a);
+                  });
+                  return Object.entries(grouped).map(([cat, catAssignments]) => (
+                    <div key={cat} style={{ marginBottom:16 }}>
+                      <div style={{ color:T.textMuted, fontSize:10, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:8, paddingLeft:152, borderBottom:`1px solid ${T.border}44`, paddingBottom:4 }}>{cat}</div>
+                      {catAssignments.map((a, idx) => {
                   const pct = activeBudget > 0 ? Math.min((a.quote_amount / activeBudget) * 100, 150) : 50;
                   const barColor = a.quote_amount <= activeBudget ? T.teal : T.red;
                   const isSelected = compareVendors.includes(a.id);
@@ -10424,7 +10465,10 @@ const QuoteComparisonView = ({ user }) => {
                       </div>
                     </div>
                   );
-                })}
+                      })}
+                    </div>
+                  ));
+                })()}
               </div>
             </div>
           )}

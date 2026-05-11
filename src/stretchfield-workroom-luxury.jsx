@@ -1494,6 +1494,10 @@ const VendorManagerDashboard = ({ user }) => {
 const StaffDashboard = ({ user }) => {
   const [tasks, setTasks] = useState([]);
   const [internalPortalEvent, setInternalPortalEvent] = useState(null);
+  const [paymentRequests, setPaymentRequests] = useState([]);
+  const [payReqModal, setPayReqModal] = useState(false);
+  const [payReqForm, setPayReqForm] = useState({ project_id:"", amount:"", description:"", request_type:"project_fee", supporting_doc_url:"" });
+  const [savingPayReq, setSavingPayReq] = useState(false);
   const [events, setEvents] = useState([]);
   const [notifs, setNotifs] = useState([]);
 
@@ -1602,6 +1606,98 @@ const StaffDashboard = ({ user }) => {
           </div>
         ))}
       </div>
+
+      {/* ── PAYMENT REQUESTS ── */}
+      <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:14, padding:"18px 20px", marginBottom:20 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+          <div>
+            <div style={{ color:T.textMuted, fontSize:9, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.12em", marginBottom:3 }}>Finance</div>
+            <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15 }}>My Payment Requests</div>
+          </div>
+          <button onClick={() => setPayReqModal(true)} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"8px 16px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:12 }}>+ New Request</button>
+        </div>
+        {paymentRequests.length === 0 ? (
+          <div style={{ color:T.textMuted, fontSize:13, textAlign:"center", padding:"16px 0" }}>No payment requests submitted yet</div>
+        ) : paymentRequests.slice(0,5).map(pr => {
+          const statusColors = { pending:T.amber, approved:T.teal, rejected:T.red, paid:"#10B981" };
+          return (
+            <div key={pr.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0", borderBottom:`1px solid ${T.border}33` }}>
+              <div>
+                <div style={{ color:T.textPrimary, fontSize:13, fontWeight:600 }}>{pr.description}</div>
+                <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>{pr.request_type?.replace("_"," ")} · {new Date(pr.submitted_at).toLocaleDateString("en-GB")}</div>
+              </div>
+              <div style={{ textAlign:"right" }}>
+                <div style={{ color:T.amber, fontWeight:700, fontSize:13 }}>GHS {parseFloat(pr.amount||0).toLocaleString()}</div>
+                <span style={{ color:statusColors[pr.status]||T.textMuted, fontSize:10, fontWeight:700 }}>{pr.status}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Payment Request Modal */}
+      {payReqModal && (
+        <div style={{ position:"fixed", inset:0, zIndex:600, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setPayReqModal(false)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:460, padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>New Payment Request</div>
+            <div style={{ color:T.textMuted, fontSize:13, marginBottom:20 }}>Submit a payment request to Finance for CEO approval</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12, marginBottom:16 }}>
+              <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Request Type</label>
+                <select value={payReqForm.request_type} onChange={e=>setPayReqForm(f=>({...f,request_type:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  <option value="project_fee">Project Fee</option>
+                  <option value="per_diem">Per Diem</option>
+                  <option value="reimbursement">Reimbursement</option>
+                  <option value="transport">Transport Allowance</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Related Event</label>
+                <select value={payReqForm.project_id} onChange={e=>setPayReqForm(f=>({...f,project_id:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  <option value="">Select event (optional)...</option>
+                  {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Amount (GHS)</label>
+                <input type="number" value={payReqForm.amount} onChange={e=>setPayReqForm(f=>({...f,amount:e.target.value}))} placeholder="0.00" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+              </div>
+              <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Description *</label>
+                <textarea value={payReqForm.description} onChange={e=>setPayReqForm(f=>({...f,description:e.target.value}))} rows={3} placeholder="Describe what this payment is for..." style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} />
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={async () => {
+                if (!payReqForm.amount || !payReqForm.description) { alert("Please fill in amount and description."); return; }
+                setSavingPayReq(true);
+                const ev = events.find(e => e.id === payReqForm.project_id);
+                await supabase.from("staff_payment_requests").insert({
+                  staff_id: user.id, staff_name: user.name,
+                  project_id: payReqForm.project_id || null,
+                  project_name: ev?.name || "",
+                  amount: parseFloat(payReqForm.amount),
+                  description: payReqForm.description,
+                  request_type: payReqForm.request_type,
+                  status: "pending",
+                });
+                // Notify Finance
+                const { data: fms } = await supabase.from("profiles").select("id").eq("role","Finance Manager");
+                for (const fm of fms||[]) {
+                  await supabase.from("notifications").insert({ user_id: fm.id, title: "Staff Payment Request — " + user.name, message: user.name + " has submitted a payment request of GHS " + parseFloat(payReqForm.amount).toLocaleString() + " for " + payReqForm.description, type: "finance" });
+                }
+                setSavingPayReq(false);
+                setPayReqModal(false);
+                setPayReqForm({ project_id:"", amount:"", description:"", request_type:"project_fee" });
+                const { data: pr } = await supabase.from("staff_payment_requests").select("*").eq("staff_id", user.id).order("submitted_at", { ascending: false });
+                setPaymentRequests(pr || []);
+              }} disabled={savingPayReq||!payReqForm.amount||!payReqForm.description} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13, opacity:(!payReqForm.amount||!payReqForm.description)?0.5:1 }}>{savingPayReq?"Submitting...":"Submit Request"}</button>
+              <button onClick={() => setPayReqModal(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer", fontSize:13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── NOTIFICATIONS ── */}
       {notifs.filter(n=>!n.read).length > 0 && (
@@ -6716,6 +6812,7 @@ const FinanceManagerDashboard = ({ user, onTab }) => {
 
 const FinanceDashboard = ({ user, onTab }) => {
   const [financeTab, setFinanceTab] = useState("overview");
+  const [staffRequests, setStaffRequests] = useState([]);
   const [vouchers, setVouchers] = useState([]);
   const [estimates, setEstimates] = useState([]);
   const [pettyCash, setPettyCash] = useState(null);
@@ -6772,6 +6869,12 @@ const FinanceDashboard = ({ user, onTab }) => {
     setPOs(po.data || []);
     setClientInvoices(ci.data || []);
     setVendorInvoices(vi.data || []);
+    const { data: sr } = await supabase.from("staff_payment_requests").select("*").order("submitted_at", { ascending: false });
+    setStaffRequests(sr || []);
+    const { data: sl } = await supabase.from("profiles").select("id,name,role").in("role",["Finance Manager","Vendor Manager","Strategy & Events Lead","CEO","Board of Directors","Sales & Marketing"]);
+    setStaffList(sl || []);
+    const { data: vl } = await supabase.from("profiles").select("id,name").eq("role","Vendor");
+    setVendors(vl || []);
     setFinanceLoading(false);
   };
 
@@ -7134,6 +7237,26 @@ const FinanceDashboard = ({ user, onTab }) => {
                           const { data: fm } = await supabase.from('profiles').select('name').eq('role','Finance Manager').single();
                           downloadPDF(generateVoucherPDF(v, ceo, fm), `Voucher-${v.voucher_number}.html`);
                         }} style={{ background: T.teal+'15', border: `1px solid ${T.teal}30`, color: T.teal, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>↓ PDF</button>
+                        {/* Bank Advice Upload */}
+                        {isFinance && (
+                          v.bank_advice_url ? (
+                            <a href={v.bank_advice_url} target="_blank" rel="noreferrer" style={{ color:T.teal, fontSize:10, fontWeight:700, textDecoration:"none" }}>📎 Advice</a>
+                          ) : (
+                            <label style={{ cursor:"pointer" }}>
+                              <span style={{ background:T.cyan+"15", border:`1px solid ${T.cyan}30`, color:T.cyan, padding:"3px 8px", borderRadius:6, fontSize:10, fontWeight:700 }}>↑ Advice</span>
+                              <input type="file" accept=".pdf,.png,.jpg,.jpeg" style={{ display:"none" }} onChange={async e => {
+                                const file = e.target.files[0]; if (!file) return;
+                                const ext = file.name.split(".").pop();
+                                const path = "bank_advice/"+v.id+"_"+Date.now()+"."+ext;
+                                const { error } = await supabase.storage.from("rffs").upload(path, file, { upsert:true });
+                                if (error) { alert("Upload failed: "+error.message); return; }
+                                const { data: urlData } = supabase.storage.from("rffs").getPublicUrl(path);
+                                await supabase.from("payment_vouchers").update({ bank_advice_url:urlData.publicUrl, bank_advice_uploaded_at:new Date().toISOString(), bank_advice_uploaded_by:user.id }).eq("id", v.id);
+                                load();
+                              }} />
+                            </label>
+                          )
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -7214,6 +7337,55 @@ const FinanceDashboard = ({ user, onTab }) => {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* ── STAFF REQUESTS TAB ── */}
+      {financeTab === 'staff-requests' && (
+        <div>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+            <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16 }}>Staff Payment Requests</div>
+            <span style={{ color:T.amber, fontSize:12, fontWeight:700 }}>{(staffRequests||[]).filter(r=>r.status==="pending").length} pending</span>
+          </div>
+          {(staffRequests||[]).length === 0 ? (
+            <div style={{ color:T.textMuted, fontSize:13, textAlign:"center", padding:"40px 0" }}>No staff payment requests yet</div>
+          ) : (staffRequests||[]).map(req => {
+            const statusColors = { pending:T.amber, approved:T.teal, rejected:T.red, paid:"#10B981" };
+            return (
+              <div key={req.id} style={{ background:T.surface, border:`1px solid ${req.status==="pending"?T.amber+"30":T.border}`, borderLeft:`4px solid ${statusColors[req.status]||T.border}`, borderRadius:12, padding:"16px 20px", marginBottom:10 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
+                  <div>
+                    <div style={{ color:T.textPrimary, fontWeight:800, fontSize:14 }}>{req.staff_name}</div>
+                    <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{(req.request_type||"").replace(/_/g," ")} {req.project_name ? "· "+req.project_name : ""}</div>
+                    <div style={{ color:T.textSecondary, fontSize:13, marginTop:4 }}>{req.description}</div>
+                    <div style={{ color:T.textMuted, fontSize:11, marginTop:3 }}>{new Date(req.submitted_at).toLocaleDateString("en-GB", { day:"numeric", month:"short", year:"numeric" })}</div>
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ color:T.gold, fontWeight:900, fontSize:18 }}>GHS {parseFloat(req.amount||0).toLocaleString()}</div>
+                    <span style={{ color:statusColors[req.status]||T.textMuted, fontSize:10, fontWeight:800, background:(statusColors[req.status]||T.textMuted)+"15", padding:"2px 8px", borderRadius:20 }}>{req.status}</span>
+                  </div>
+                </div>
+                {req.status === "pending" && isFinance && (
+                  <div style={{ display:"flex", gap:8 }}>
+                    <button onClick={async () => {
+                      await supabase.from("staff_payment_requests").update({ status:"approved", reviewed_by:user.id, reviewed_at:new Date().toISOString() }).eq("id", req.id);
+                      await supabase.from("notifications").insert({ user_id:req.staff_id, title:"Payment Request Approved", message:"Your payment request of GHS "+parseFloat(req.amount).toLocaleString()+" has been approved.", type:"finance" });
+                      const { data: sr } = await supabase.from("staff_payment_requests").select("*").order("submitted_at", { ascending:false });
+                      setStaffRequests(sr||[]);
+                    }} style={{ background:`linear-gradient(135deg,${T.teal},#10B981)`, border:"none", color:"#fff", padding:"7px 16px", borderRadius:7, cursor:"pointer", fontWeight:800, fontSize:12 }}>✓ Approve</button>
+                    <button onClick={async () => {
+                      const reason = window.prompt("Reason for rejection:");
+                      if (!reason) return;
+                      await supabase.from("staff_payment_requests").update({ status:"rejected", notes:reason, reviewed_by:user.id, reviewed_at:new Date().toISOString() }).eq("id", req.id);
+                      await supabase.from("notifications").insert({ user_id:req.staff_id, title:"Payment Request Rejected", message:"Your payment request of GHS "+parseFloat(req.amount).toLocaleString()+" was rejected. Reason: "+reason, type:"finance" });
+                      const { data: sr } = await supabase.from("staff_payment_requests").select("*").order("submitted_at", { ascending:false });
+                      setStaffRequests(sr||[]);
+                    }} style={{ background:T.red+"15", border:`1px solid ${T.red}30`, color:T.red, padding:"7px 14px", borderRadius:7, cursor:"pointer", fontSize:12, fontWeight:700 }}>✕ Reject</button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -15568,14 +15740,11 @@ Use professional, consultative language that positions Stretchfield as a strateg
 const PaymentAuthorisationView = ({ user, onNavigate }) => {
   const [auths, setAuths] = useState([]);
   const [vendors, setVendors] = useState([]);
+  const [staffProfiles, setStaffProfiles] = useState([]);
   const [awards, setAwards] = useState([]);
   const [rffs, setRffs] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [vendorApps, setVendorApps] = useState([]);
-  const [vendorWarning, setVendorWarning] = useState("");
-  const [editVendorModal, setEditVendorModal] = useState(null);
-  const [editVendorForm, setEditVendorForm] = useState({});
-  const [savingVendor, setSavingVendor] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [signModal, setSignModal] = useState(null);
   const [signature, setSignature] = useState("");
@@ -15584,33 +15753,34 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
   const [rejectReason, setRejectReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
-    vendor_id: "", rff_id: "", invoice_id: "", agreed_amount: "",
-    payment_method: "bank_transfer", bank_name: "", account_number: "",
-    account_name: "", mobile_money_number: "", payment_terms: "", notes: "",
+    payee_id: "", payee_type: "vendor", rff_id: "", invoice_id: "",
+    agreed_amount: "", payment_method: "bank_transfer",
+    bank_name: "", account_number: "", account_name: "",
+    mobile_money_number: "", payment_terms: "", notes: "",
     work_confirmed: false, invoice_matches_po: false,
   });
   const canvasRef = React.useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [lastPos, setLastPos] = useState(null);
 
-  const isVM = user.role === "Vendor Manager";
   const isFinance = user.role === "Finance Manager";
   const isCEO = user.role === "CEO";
 
   const load = async () => {
     try {
-      const [au, vp, aw, rf, inv, va] = await Promise.all([
+      const [au, vp, sp, aw, rf, inv, va] = await Promise.all([
         supabase.from("payment_authorisations").select("*").order("created_at", { ascending: false }),
         supabase.from("profiles").select("*").eq("role", "Vendor"),
-        supabase.from("rff_awards").select("*").eq("status", "confirmed"),
+        supabase.from("profiles").select("*").in("role", ["Finance Manager","Vendor Manager","Strategy & Events Lead","CEO","Board of Directors","Sales & Marketing","Country Manager"]),
+        supabase.from("rff_awards").select("*"),
         supabase.from("rffs").select("*"),
         supabase.from("vendor_invoices").select("*"),
-        supabase.from("vendor_apps").select("*"),
+        supabase.from("vendor_applications").select("*").eq("status","login-created"),
       ]);
       setAuths(au.data || []);
       setVendors(vp.data || []);
+      setStaffProfiles(sp.data || []);
       setAwards(aw.data || []);
-    setChangeOrders(co?.data || []);
       setRffs(rf.data || []);
       setInvoices(inv.data || []);
       setVendorApps(va.data || []);
@@ -15619,511 +15789,361 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
 
   useEffect(() => { load(); }, []);
 
-  // Signature pad functions
-  const getPos = (e, canvas) => {
-    const rect = canvas.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return { x: clientX - rect.left, y: clientY - rect.top };
-  };
-
-  const startDraw = (e) => {
-    e.preventDefault();
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    setIsDrawing(true);
-    setLastPos(getPos(e, canvas));
-  };
-
-  const draw = (e) => {
-    e.preventDefault();
-    if (!isDrawing || !canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    const pos = getPos(e, canvas);
-    ctx.beginPath();
-    ctx.moveTo(lastPos.x, lastPos.y);
-    ctx.lineTo(pos.x, pos.y);
-    ctx.strokeStyle = "#0ea5e9";
-    ctx.lineWidth = 2;
-    ctx.lineCap = "round";
-    ctx.stroke();
-    setLastPos(pos);
-  };
-
-  const stopDraw = (e) => {
-    e.preventDefault();
-    setIsDrawing(false);
-    if (canvasRef.current) {
-      setSignature(canvasRef.current.toDataURL());
+  // Get payee details based on selection
+  const getPayeeDetails = (payeeId, payeeType) => {
+    if (payeeType === "vendor") {
+      const v = vendors.find(v => v.id === payeeId);
+      const app = vendorApps.find(a => a.profile_id === payeeId || a.submitted_by === payeeId);
+      return { name: v?.name || "", bank: app?.bank_name || "", account: app?.account_no || "", accountName: app?.bank_account_name || v?.name || "" };
+    } else {
+      const s = staffProfiles.find(s => s.id === payeeId);
+      return { name: s?.name || "", bank: s?.bank_name || "", account: s?.account_number || "", accountName: s?.name || "" };
     }
   };
 
-  const clearSignature = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    setSignature("");
+  // Drawing
+  const getPos = (e, canvas) => {
+    const r = canvas.getBoundingClientRect();
+    if (e.touches) return { x: e.touches[0].clientX - r.left, y: e.touches[0].clientY - r.top };
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
+  const startDraw = (e) => { e.preventDefault(); setIsDrawing(true); setLastPos(getPos(e, canvasRef.current)); };
+  const draw = (e) => {
+    if (!isDrawing || !canvasRef.current) return;
+    e.preventDefault();
+    const ctx = canvasRef.current.getContext("2d");
+    const pos = getPos(e, canvasRef.current);
+    ctx.beginPath(); ctx.moveTo(lastPos.x, lastPos.y); ctx.lineTo(pos.x, pos.y);
+    ctx.strokeStyle = "#00C8FF"; ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.stroke();
+    setLastPos(pos);
+  };
+  const stopDraw = () => { setIsDrawing(false); if (canvasRef.current) setSignature(canvasRef.current.toDataURL()); };
+  const clearSignature = () => { if (canvasRef.current) { canvasRef.current.getContext("2d").clearRect(0,0,canvasRef.current.width,canvasRef.current.height); setSignature(""); }};
 
-  const submitRequest = async () => {
-    if (!form.vendor_id || !form.agreed_amount) { alert("Vendor and amount required"); return; }
+  const handleSubmit = async () => {
+    if (!form.payee_id || !form.agreed_amount) { alert("Please select a payee and enter amount."); return; }
     setSaving(true);
-    const vendor = vendors.find(v => v.id === form.vendor_id);
-    const rff = rffs.find(r => r.id === form.rff_id);
-    await supabase.from("payment_authorisations").insert({
-      vendor_id: form.vendor_id,
-      vendor_name: vendor?.name || "",
+    const payee = getPayeeDetails(form.payee_id, form.payee_type);
+    const { data: auth } = await supabase.from("payment_authorisations").insert({
+      vendor_id: form.payee_type === "vendor" ? form.payee_id : null,
+      vendor_name: payee.name,
+      payee_type: form.payee_type,
       rff_id: form.rff_id || null,
-      rff_title: rff?.title || "",
-      event_name: rff?.event_name || "",
+      invoice_id: form.invoice_id || null,
       agreed_amount: parseFloat(form.agreed_amount),
       payment_method: form.payment_method,
-      bank_name: form.bank_name,
-      account_number: form.account_number,
-      account_name: form.account_name,
+      bank_name: form.bank_name || payee.bank,
+      account_number: form.account_number || payee.account,
+      account_name: form.account_name || payee.accountName,
       mobile_money_number: form.mobile_money_number,
       payment_terms: form.payment_terms,
       notes: form.notes,
       work_confirmed: form.work_confirmed,
       invoice_matches_po: form.invoice_matches_po,
-      requested_by: user.id,
-      requested_by_name: user.name,
-      requested_at: new Date().toISOString(),
-      status: "pending_finance",
-    });
-    // Notify Finance
-    const { data: fin } = await supabase.from("profiles").select("id").eq("role", "Finance Manager");
-    for (const f of fin || []) {
-      await supabase.from("notifications").insert({ user_id: f.id, title: "Payment Authorisation Request", message: "VM has submitted a payment request for " + (vendor?.name || "vendor") + " — GHS " + parseFloat(form.agreed_amount).toLocaleString() + ". Please review and sign.", type: "task" });
-      const { data: finProfile } = await supabase.from("profiles").select("email,name").eq("id", f.id).single();
-      if (finProfile?.email) await sendEmail(finProfile.email, "Payment Request — " + (vendor?.name || "vendor"), paymentRequestEmailHtml({ financeName: finProfile.name, vendorName: vendor?.name || "Vendor", amount: parseFloat(form.agreed_amount), eventName: rffs.find(r => r.id === form.rff_id)?.event_name || "", paymentMethod: form.payment_method, requestedBy: user.name, workConfirmed: form.work_confirmed, invoiceMatchesPO: form.invoice_matches_po }));
+      status: "pending_ceo",
+      ceo_only: true,
+      created_by: user.id,
+    }).select().single();
+
+    // Notify CEO
+    const { data: ceos } = await supabase.from("profiles").select("id,email,name").eq("role","CEO");
+    for (const ceo of ceos||[]) {
+      await supabase.from("notifications").insert({ user_id: ceo.id, title: "Payment Authorisation Request — " + payee.name, message: "Finance has submitted a payment request for " + payee.name + " — GHS " + parseFloat(form.agreed_amount).toLocaleString() + ". Please review and sign.", type: "finance" });
     }
-    setForm({ vendor_id: "", rff_id: "", invoice_id: "", agreed_amount: "", payment_method: "bank_transfer", bank_name: "", account_number: "", account_name: "", mobile_money_number: "", payment_terms: "", notes: "", work_confirmed: false, invoice_matches_po: false });
-    setShowForm(false);
+
     setSaving(false);
+    setShowForm(false);
+    setForm({ payee_id:"", payee_type:"vendor", rff_id:"", invoice_id:"", agreed_amount:"", payment_method:"bank_transfer", bank_name:"", account_number:"", account_name:"", mobile_money_number:"", payment_terms:"", notes:"", work_confirmed:false, invoice_matches_po:false });
     load();
   };
 
-  const signApprove = async (auth) => {
-    if (!signature) { alert("Please sign before approving"); return; }
+  const handleCEOSign = async () => {
+    if (!signature) { alert("Please sign first."); return; }
     setSaving(true);
-    const updates = {};
-    if (isFinance) {
-      Object.assign(updates, { finance_approved_by: user.id, finance_approved_by_name: user.name, finance_approved_at: new Date().toISOString(), finance_signature: signature, finance_notes: signNotes, status: "pending_ceo" });
-      const { data: ceos } = await supabase.from("profiles").select("id").eq("role", "CEO");
-      for (const c of ceos || []) {
-        await supabase.from("notifications").insert({ user_id: c.id, title: "Payment Awaiting CEO Approval", message: "Finance has approved payment for " + auth.vendor_name + " — GHS " + (auth.agreed_amount||0).toLocaleString() + ". Your signature is required.", type: "task" });
-      }
-    } else if (isCEO) {
-      Object.assign(updates, { ceo_approved_by: user.id, ceo_approved_by_name: user.name, ceo_approved_at: new Date().toISOString(), ceo_signature: signature, ceo_notes: signNotes, status: "approved" });
-      // Notify vendor + VM + Finance
-      await supabase.from("notifications").insert({ user_id: auth.vendor_id, title: "Payment Authorised — " + auth.vendor_name, message: "Your payment of GHS " + (auth.agreed_amount||0).toLocaleString() + " has been fully authorised. Expect payment per agreed terms.", type: "task" });
-        const { data: vendorProfile } = await supabase.from("profiles").select("email,name").eq("id", auth.vendor_id).single();
-        if (vendorProfile?.email) await sendEmail(vendorProfile.email, "Payment Authorised — GHS " + (auth.agreed_amount||0).toLocaleString(), paymentAuthorisedEmailHtml({ vendorName: auth.vendor_name, amount: auth.agreed_amount, eventName: auth.event_name, paymentMethod: auth.payment_method, paymentTerms: auth.payment_terms, bankName: auth.bank_name, accountNumber: auth.account_number, accountName: auth.account_name, mobileNumber: auth.mobile_money_number }));
-      const { data: vm } = await supabase.from("profiles").select("id").eq("role", "Vendor Manager");
-      for (const v of vm || []) await supabase.from("notifications").insert({ user_id: v.id, title: "Payment Approved — " + auth.vendor_name, message: "CEO has signed off payment of GHS " + (auth.agreed_amount||0).toLocaleString() + " for " + auth.vendor_name + ".", type: "task" });
+    await supabase.from("payment_authorisations").update({
+      ceo_signature: signature,
+      ceo_signed_at: new Date().toISOString(),
+      status: "approved",
+      ceo_notes: signNotes,
+    }).eq("id", signModal.id);
+    // Notify Finance
+    const { data: fms } = await supabase.from("profiles").select("id").eq("role","Finance Manager");
+    for (const fm of fms||[]) {
+      await supabase.from("notifications").insert({ user_id: fm.id, title: "Payment Approved — " + signModal.vendor_name, message: "CEO has approved the payment of GHS " + (signModal.agreed_amount||0).toLocaleString() + " for " + signModal.vendor_name + ". You can now generate a payment voucher.", type: "finance" });
     }
-    await supabase.from("payment_authorisations").update(updates).eq("id", auth.id);
+    setSaving(false);
     setSignModal(null);
     setSignature("");
     setSignNotes("");
-    setSaving(false);
     load();
   };
 
-  const reject = async (auth) => {
-    if (!rejectReason) { alert("Please provide rejection reason"); return; }
-    await supabase.from("payment_authorisations").update({ status: "rejected", rejected_by: user.id, rejected_reason: rejectReason, rejected_at: new Date().toISOString() }).eq("id", auth.id);
-    const { data: vm } = await supabase.from("profiles").select("id").eq("role", "Vendor Manager");
-    for (const v of vm || []) await supabase.from("notifications").insert({ user_id: v.id, title: "Payment Request Rejected", message: auth.vendor_name + " payment rejected: " + rejectReason, type: "task" });
+  const handleReject = async () => {
+    if (!rejectReason) { alert("Please provide a reason."); return; }
+    await supabase.from("payment_authorisations").update({ status: "rejected", rejection_reason: rejectReason }).eq("id", rejectModal.id);
+    const { data: fms } = await supabase.from("profiles").select("id").eq("role","Finance Manager");
+    for (const fm of fms||[]) {
+      await supabase.from("notifications").insert({ user_id: fm.id, title: "Payment Rejected — " + rejectModal.vendor_name, message: "CEO rejected the payment for " + rejectModal.vendor_name + ". Reason: " + rejectReason, type: "finance" });
+    }
     setRejectModal(null);
     setRejectReason("");
     load();
   };
 
-  const statusColors = { pending_finance: T.amber, pending_ceo: T.cyan, approved: T.teal, rejected: T.red };
-  const statusLabels = { pending_finance: "Awaiting Finance", pending_ceo: "Awaiting CEO", approved: "✓ Approved", rejected: "✗ Rejected" };
-  const inputStyle = { width: "100%", padding: "9px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
+  const pendingCEO = auths.filter(a => a.status === "pending_ceo");
+  const approved = auths.filter(a => a.status === "approved");
+  const rejected = auths.filter(a => a.status === "rejected");
 
-  const myAuths = isCEO ? auths : isFinance ? auths.filter(a => ["pending_finance","pending_ceo","approved","rejected"].includes(a.status)) : auths.filter(a => a.requested_by === user.id);
-  const pendingCount = auths.filter(a => (isFinance && a.status === "pending_finance") || (isCEO && a.status === "pending_ceo")).length;
+  const inputStyle = { width:"100%", padding:"9px 12px", background:T.bg, border:"1px solid "+T.border, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" };
+  const selectStyle = { ...inputStyle };
 
   return (
-    <div style={{ animation: "fadeUp 0.35s ease" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: "1px solid " + T.border, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:"1px solid "+T.border, display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
         <div>
-          <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
-          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800 }}>Payment Authorisation</h2>
-          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Three-step payment approval: VM Request → Finance Sign-off → CEO Approval</div>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Finance</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Payment Authorisation</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>{pendingCEO.length} awaiting CEO approval · {approved.length} approved</div>
         </div>
-        {isVM && <button onClick={() => setShowForm(!showForm)} style={{ background: "linear-gradient(135deg, " + T.cyan + ", " + T.teal + ")", border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>+ New Request</button>}
+        {isFinance && <button onClick={() => setShowForm(!showForm)} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#060B14", padding:"10px 20px", borderRadius:10, cursor:"pointer", fontWeight:800, fontSize:13 }}>+ New Payment Request</button>}
       </div>
 
-      {/* Pending alert */}
-      {pendingCount > 0 && (
-        <div style={{ background: T.amber+"12", border: "1px solid " + T.amber+"30", borderRadius: 10, padding: "12px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", background: T.amber }} />
-          <span style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>{pendingCount} payment request{pendingCount !== 1 ? "s" : ""} awaiting your signature</span>
+      {/* ── NEW PAYMENT REQUEST FORM ── */}
+      {showForm && isFinance && (
+        <div style={{ background:T.surface, border:"1px solid "+T.cyan+"30", borderRadius:14, padding:"24px 28px", marginBottom:24 }}>
+          <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16, marginBottom:16 }}>New Payment Request</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:14 }}>
+            {/* Payee Type */}
+            <div>
+              <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Payee Type</label>
+              <select value={form.payee_type} onChange={e => setForm(f=>({...f, payee_type:e.target.value, payee_id:"", bank_name:"", account_number:"", account_name:""}))} style={selectStyle}>
+                <option value="vendor">Vendor / Supplier</option>
+                <option value="staff">Staff Member</option>
+              </select>
+            </div>
+            {/* Payee Name — categorised dropdown */}
+            <div>
+              <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Payee Name</label>
+              <select value={form.payee_id} onChange={e => {
+                const id = e.target.value;
+                const details = getPayeeDetails(id, form.payee_type);
+                setForm(f=>({...f, payee_id:id, bank_name:details.bank, account_number:details.account, account_name:details.accountName}));
+              }} style={selectStyle}>
+                <option value="">Select {form.payee_type === "vendor" ? "Vendor" : "Staff Member"}...</option>
+                {form.payee_type === "vendor" ? (
+                  vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)
+                ) : (
+                  staffProfiles.map(s => <option key={s.id} value={s.id}>{s.name} ({s.role})</option>)
+                )}
+              </select>
+            </div>
+            {/* Amount */}
+            <div>
+              <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Amount (GHS)</label>
+              <input type="number" value={form.agreed_amount} onChange={e=>setForm(f=>({...f,agreed_amount:e.target.value}))} placeholder="0.00" style={inputStyle} />
+            </div>
+            {/* Payment Method */}
+            <div>
+              <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Payment Method</label>
+              <select value={form.payment_method} onChange={e=>setForm(f=>({...f,payment_method:e.target.value}))} style={selectStyle}>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="mobile_money">Mobile Money</option>
+                <option value="cheque">Cheque</option>
+                <option value="cash">Cash</option>
+              </select>
+            </div>
+            {/* Bank Name */}
+            <div>
+              <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Bank Name</label>
+              <input value={form.bank_name} onChange={e=>setForm(f=>({...f,bank_name:e.target.value}))} placeholder="Bank name" style={inputStyle} />
+            </div>
+            {/* Account Number */}
+            <div>
+              <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Account Number</label>
+              <input value={form.account_number} onChange={e=>setForm(f=>({...f,account_number:e.target.value}))} placeholder="Account number" style={inputStyle} />
+            </div>
+            {/* Account Name */}
+            <div>
+              <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Account Name</label>
+              <input value={form.account_name} onChange={e=>setForm(f=>({...f,account_name:e.target.value}))} placeholder="Account name" style={inputStyle} />
+            </div>
+            {/* Payment Terms */}
+            <div>
+              <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Payment Terms</label>
+              <select value={form.payment_terms} onChange={e=>setForm(f=>({...f,payment_terms:e.target.value}))} style={selectStyle}>
+                <option value="">Select terms...</option>
+                <option value="immediate">Immediate</option>
+                <option value="net_7">Net 7 days</option>
+                <option value="net_14">Net 14 days</option>
+                <option value="net_30">Net 30 days</option>
+                <option value="on_completion">On Completion</option>
+              </select>
+            </div>
+          </div>
+          {/* Notes */}
+          <div style={{ marginBottom:14 }}>
+            <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Notes / Description</label>
+            <textarea value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} rows={3} placeholder="Purpose of payment, invoice references, etc." style={{ ...inputStyle, resize:"none" }} />
+          </div>
+          {/* Checklist */}
+          <div style={{ display:"flex", gap:20, marginBottom:16 }}>
+            {[["work_confirmed","Work/Service Confirmed"],["invoice_matches_po","Invoice Matches PO"]].map(([key,label]) => (
+              <label key={key} style={{ display:"flex", alignItems:"center", gap:6, cursor:"pointer", color:T.textSecondary, fontSize:13 }}>
+                <input type="checkbox" checked={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.checked}))} />
+                {label}
+              </label>
+            ))}
+          </div>
+          <div style={{ display:"flex", gap:10 }}>
+            <button onClick={handleSubmit} disabled={saving||!form.payee_id||!form.agreed_amount} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#060B14", padding:"11px 28px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13, opacity:(!form.payee_id||!form.agreed_amount)?0.5:1 }}>{saving?"Submitting...":"Submit for CEO Approval"}</button>
+            <button onClick={() => setShowForm(false)} style={{ background:"none", border:"1px solid "+T.border, color:T.textMuted, padding:"11px 18px", borderRadius:8, cursor:"pointer", fontSize:13 }}>Cancel</button>
+          </div>
         </div>
       )}
 
-      {/* New Request Form */}
-      {showForm && isVM && (
-        <div style={{ background: T.surface, border: "1px solid " + T.cyan+"30", borderRadius: 14, padding: "22px 24px", marginBottom: 24 }}>
-          <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 16, marginBottom: 16 }}>New Payment Request</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
-            <div>
-              <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Vendor</label>
-              <select value={form.vendor_id} onChange={e => {
-                const vid = e.target.value;
-                const vApp = vendorApps.find(a => a.vendor_id === vid || a.linked_vendor_id === vid);
-                const vProfile = vendors.find(v => v.id === vid);
-                const hasBank = vApp?.bank_name && vApp?.account_number && vApp?.account_name;
-                const hasMomo = vApp?.mobile_money_number || vApp?.momo_number;
-                if (!hasBank && !hasMomo) {
-                  setVendorWarning("⚠ This vendor's payment details are incomplete. Please update their onboarding profile before proceeding.");
-                } else {
-                  setVendorWarning("");
-                }
-                setForm(f => ({
-                  ...f,
-                  vendor_id: vid,
-                  bank_name: vApp?.bank_name || "",
-                  account_number: vApp?.account_number || "",
-                  account_name: vApp?.account_name || vApp?.company_name || vProfile?.name || "",
-                  mobile_money_number: vApp?.mobile_money_number || vApp?.momo_number || "",
-                  payment_method: hasBank ? "bank_transfer" : hasMomo ? "mobile_money" : f.payment_method,
-                }));
-              }} style={{ ...inputStyle, appearance: "none" }}>
-                <option value="">Select vendor...</option>
-                {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-              </select>
-            </div>
-            {vendorWarning && (
-              <div style={{ gridColumn: "1/-1", background: T.amber+"12", border: "1px solid " + T.amber+"40", borderRadius: 8, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-                <span style={{ color: T.amber, fontSize: 13, fontWeight: 600 }}>{vendorWarning}</span>
-                <button onClick={() => {
-                  const vApp = vendorApps.find(a => a.vendor_id === form.vendor_id || a.linked_vendor_id === form.vendor_id);
-                  const vProfile = vendors.find(v => v.id === form.vendor_id);
-                  setEditVendorForm({
-                    id: vApp?.id || null,
-                    vendor_id: form.vendor_id,
-                    bank_name: vApp?.bank_name || "",
-                    account_number: vApp?.account_number || "",
-                    account_name: vApp?.account_name || vProfile?.name || "",
-                    mobile_money_number: vApp?.mobile_money_number || vApp?.momo_number || "",
-                    payment_terms: vApp?.payment_terms || "",
-                  });
-                  setEditVendorModal(vProfile || vApp);
-                }} style={{ background: T.amber, border: "none", color: "#fff", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>Edit Vendor Profile →</button>
-              </div>
-            )}
-            <div>
-              <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Related RFF</label>
-              <select value={form.rff_id} onChange={e => setForm(f => ({...f, rff_id: e.target.value}))} style={{ ...inputStyle, appearance: "none" }}>
-                <option value="">Select RFF...</option>
-                {rffs.map(r => <option key={r.id} value={r.id}>{r.title} — {r.event_name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Agreed Amount (GHS)</label>
-              <input type="number" value={form.agreed_amount} onChange={e => setForm(f => ({...f, agreed_amount: e.target.value}))} placeholder="0.00" style={inputStyle} />
-            </div>
-            <div>
-              <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Payment Method</label>
-              <select value={form.payment_method} onChange={e => setForm(f => ({...f, payment_method: e.target.value}))} style={{ ...inputStyle, appearance: "none" }}>
-                {["bank_transfer", "mobile_money", "cheque", "cash"].map(m => <option key={m} value={m}>{m.replace("_", " ").toUpperCase()}</option>)}
-              </select>
-            </div>
-            {form.payment_method === "bank_transfer" && <>
-              <div>
-                <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Bank Name</label>
-                <input value={form.bank_name} onChange={e => setForm(f => ({...f, bank_name: e.target.value}))} placeholder="e.g. Absa Ghana" style={inputStyle} />
-              </div>
-              <div>
-                <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Account Number</label>
-                <input value={form.account_number} onChange={e => setForm(f => ({...f, account_number: e.target.value}))} placeholder="Account number" style={inputStyle} />
-              </div>
-              <div style={{ gridColumn: "1/-1" }}>
-                <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Account Name</label>
-                <input value={form.account_name} onChange={e => setForm(f => ({...f, account_name: e.target.value}))} placeholder="Account holder name" style={inputStyle} />
-              </div>
-            </>}
-            {form.payment_method === "mobile_money" && (
-              <div style={{ gridColumn: "1/-1" }}>
-                <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Mobile Money Number</label>
-                <input value={form.mobile_money_number} onChange={e => setForm(f => ({...f, mobile_money_number: e.target.value}))} placeholder="e.g. 0244000000" style={inputStyle} />
-              </div>
-            )}
-            <div>
-              <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Payment Terms</label>
-              <select value={form.payment_terms} onChange={e => setForm(f => ({...f, payment_terms: e.target.value}))} style={{ ...inputStyle, appearance: "none" }}>
-                <option value="">Select terms...</option>
-                {["Immediate", "Net 7 days", "Net 14 days", "Net 30 days", "50% upfront, balance on completion", "50% upfront paid, balance now", "100% upfront", "Custom"].map(t => <option key={t}>{t}</option>)}
-              </select>
-            </div>
-            <div style={{ gridColumn: "1/-1" }}>
-              <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Notes</label>
-              <textarea value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} rows={2} placeholder="Any additional notes for Finance and CEO..." style={{ ...inputStyle, resize: "none" }} />
-            </div>
-          </div>
-          {/* Confirmations */}
-          <div style={{ background: T.bg, border: "1px solid " + T.border, borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
-            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", marginBottom: 10 }}>Confirmation Checklist</div>
-            {[["work_confirmed", "I confirm that the work/service has been delivered to Stretchfield's satisfaction"], ["invoice_matches_po", "I confirm that the invoice amount matches the approved Purchase Order"]].map(([key, label]) => (
-              <div key={key} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                <input type="checkbox" checked={form[key]} onChange={e => setForm(f => ({...f, [key]: e.target.checked}))} id={key} style={{ width: 16, height: 16, cursor: "pointer" }} />
-                <label htmlFor={key} style={{ color: form[key] ? T.teal : T.textMuted, fontSize: 13, cursor: "pointer", fontWeight: form[key] ? 600 : 400 }}>{label}</label>
+      {/* ── PENDING CEO APPROVAL ── */}
+      {pendingCEO.length > 0 && (
+        <div style={{ marginBottom:24 }}>
+          <div style={{ color:T.amber, fontSize:11, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:12 }}>⏳ Awaiting CEO Approval ({pendingCEO.length})</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {pendingCEO.map(auth => (
+              <div key={auth.id} style={{ background:T.surface, border:"1px solid "+T.amber+"30", borderLeft:"4px solid "+T.amber, borderRadius:12, padding:"16px 20px" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
+                  <div>
+                    <div style={{ color:T.textPrimary, fontWeight:900, fontSize:15 }}>{auth.vendor_name}</div>
+                    <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>{auth.payee_type === "staff" ? "Staff Payment" : "Vendor Payment"} · {new Date(auth.created_at).toLocaleDateString("en-GB")}</div>
+                    {auth.notes && <div style={{ color:T.textSecondary, fontSize:12, marginTop:4, fontStyle:"italic" }}>{auth.notes}</div>}
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ color:T.gold, fontWeight:900, fontSize:20 }}>GHS {parseFloat(auth.agreed_amount||0).toLocaleString()}</div>
+                    <span style={{ color:T.amber, fontSize:10, fontWeight:800, background:T.amber+"15", padding:"2px 8px", borderRadius:20 }}>Pending CEO</span>
+                  </div>
+                </div>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))", gap:8, marginBottom:12 }}>
+                  {[["Bank",auth.bank_name],["Account",auth.account_number],["Method",auth.payment_method?.replace("_"," ")]].map(([l,v]) => (
+                    <div key={l} style={{ background:T.bg, borderRadius:6, padding:"6px 10px" }}>
+                      <div style={{ color:T.textMuted, fontSize:9, fontWeight:700, textTransform:"uppercase" }}>{l}</div>
+                      <div style={{ color:T.textPrimary, fontSize:12, fontWeight:600 }}>{v||"—"}</div>
+                    </div>
+                  ))}
+                </div>
+                {isCEO && (
+                  <div style={{ display:"flex", gap:8 }}>
+                    <button onClick={() => setSignModal(auth)} style={{ background:"linear-gradient(135deg,"+T.teal+",#10B981)", border:"none", color:"#fff", padding:"8px 18px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:12 }}>✍ Approve & Sign</button>
+                    <button onClick={() => setRejectModal(auth)} style={{ background:T.red+"15", border:"1px solid "+T.red+"30", color:T.red, padding:"8px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700 }}>✕ Reject</button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={submitRequest} disabled={saving || !form.vendor_id || !form.agreed_amount || !form.work_confirmed || !form.invoice_matches_po} style={{ background: "linear-gradient(135deg, " + T.cyan + ", " + T.teal + ")", border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13, opacity: (!form.vendor_id || !form.agreed_amount || !form.work_confirmed || !form.invoice_matches_po) ? 0.5 : 1 }}>{saving ? "Submitting..." : "Submit to Finance"}</button>
-            <button onClick={() => setShowForm(false)} style={{ background: "none", border: "1px solid " + T.border, color: T.textMuted, padding: "10px 16px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+        </div>
+      )}
+
+      {/* ── APPROVED ── */}
+      {approved.length > 0 && (
+        <div style={{ marginBottom:24 }}>
+          <div style={{ color:T.teal, fontSize:11, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:12 }}>✓ Approved ({approved.length})</div>
+          <div style={{ background:T.surface, border:"1px solid "+T.border, borderRadius:12, overflow:"hidden" }}>
+            <table style={{ width:"100%", borderCollapse:"collapse" }}>
+              <thead>
+                <tr style={{ background:T.bg, borderBottom:"1px solid "+T.border }}>
+                  {["Payee","Type","Amount","Method","CEO Signed","Status"].map(h => (
+                    <th key={h} style={{ padding:"10px 14px", textAlign:"left", color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {approved.map((auth,i) => (
+                  <tr key={auth.id} style={{ borderBottom:i<approved.length-1?"1px solid "+T.border+"44":"none" }}>
+                    <td style={{ padding:"10px 14px", color:T.textPrimary, fontWeight:600, fontSize:13 }}>{auth.vendor_name}</td>
+                    <td style={{ padding:"10px 14px" }}><span style={{ color:auth.payee_type==="staff"?T.teal:T.cyan, fontSize:11, fontWeight:700, background:(auth.payee_type==="staff"?T.teal:T.cyan)+"15", padding:"2px 8px", borderRadius:20 }}>{auth.payee_type==="staff"?"Staff":"Vendor"}</span></td>
+                    <td style={{ padding:"10px 14px", color:T.amber, fontWeight:700, fontSize:13 }}>GHS {parseFloat(auth.agreed_amount||0).toLocaleString()}</td>
+                    <td style={{ padding:"10px 14px", color:T.textMuted, fontSize:12 }}>{auth.payment_method?.replace("_"," ")}</td>
+                    <td style={{ padding:"10px 14px", color:T.teal, fontSize:12 }}>{auth.ceo_signed_at ? new Date(auth.ceo_signed_at).toLocaleDateString("en-GB") : "—"}</td>
+                    <td style={{ padding:"10px 14px" }}><span style={{ color:T.teal, fontSize:10, fontWeight:800, background:T.teal+"18", padding:"2px 8px", borderRadius:20 }}>Approved</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
-      {/* Authorisation List */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        {myAuths.length === 0 && <div style={{ textAlign: "center", padding: "40px 0", color: T.textMuted, background: T.surface, borderRadius: 12, border: "1px solid " + T.border, fontSize: 13 }}>No payment requests yet.</div>}
-        {myAuths.map(auth => {
-          const statusColor = statusColors[auth.status] || T.textMuted;
-          const canSign = (isFinance && auth.status === "pending_finance") || (isCEO && auth.status === "pending_ceo");
-          const canReject = (isFinance && auth.status === "pending_finance") || (isCEO && auth.status === "pending_ceo");
-          return (
-            <div key={auth.id} style={{ background: T.surface, border: "1px solid " + (canSign ? statusColor+"50" : T.border), borderLeft: "4px solid " + statusColor, borderRadius: 12, padding: "20px 22px" }}>
-              {/* Header */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+      {/* ── REJECTED ── */}
+      {rejected.length > 0 && (
+        <div style={{ marginBottom:24 }}>
+          <div style={{ color:T.red, fontSize:11, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:12 }}>✕ Rejected ({rejected.length})</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            {rejected.map(auth => (
+              <div key={auth.id} style={{ background:T.surface, border:"1px solid "+T.red+"20", borderLeft:"3px solid "+T.red, borderRadius:10, padding:"12px 16px", display:"flex", justifyContent:"space-between" }}>
                 <div>
-                  <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 16 }}>{auth.vendor_name}</div>
-                  <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{auth.rff_title} {auth.event_name ? "· " + auth.event_name : ""}</div>
-                  <div style={{ color: T.gold, fontWeight: 900, fontSize: 18, marginTop: 6 }}>GHS {(auth.agreed_amount||0).toLocaleString()}</div>
-                  {auth.payment_terms && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Terms: {auth.payment_terms}</div>}
+                  <div style={{ color:T.textPrimary, fontWeight:700, fontSize:13 }}>{auth.vendor_name}</div>
+                  <div style={{ color:T.red, fontSize:11, marginTop:2 }}>Reason: {auth.rejection_reason}</div>
                 </div>
-                <span style={{ color: statusColor, fontSize: 11, fontWeight: 800, background: statusColor+"15", padding: "4px 12px", borderRadius: 20 }}>{statusLabels[auth.status] || auth.status}</span>
+                <div style={{ color:T.amber, fontWeight:700 }}>GHS {parseFloat(auth.agreed_amount||0).toLocaleString()}</div>
               </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-              {/* Payment Details */}
-              {(auth.bank_name || auth.mobile_money_number) && (
-                <div style={{ background: T.bg, border: "1px solid " + T.border, borderRadius: 8, padding: "10px 14px", marginBottom: 12 }}>
-                  <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", marginBottom: 6 }}>Payment Details</div>
-                  {auth.bank_name && <div style={{ color: T.textPrimary, fontSize: 12 }}>🏦 {auth.bank_name} · {auth.account_name} · {auth.account_number}</div>}
-                  {auth.mobile_money_number && <div style={{ color: T.textPrimary, fontSize: 12 }}>📱 Mobile Money: {auth.mobile_money_number}</div>}
-                </div>
-              )}
-
-              {/* Approval Chain */}
-              <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
-                {[
-                  { label: "VM Request", name: auth.requested_by_name, date: auth.requested_at, done: !!auth.requested_at, color: T.cyan },
-                  { label: "Finance Sign-off", name: auth.finance_approved_by_name, date: auth.finance_approved_at, done: !!auth.finance_approved_at, sig: auth.finance_signature, color: T.amber },
-                  { label: "CEO Approval", name: auth.ceo_approved_by_name, date: auth.ceo_approved_at, done: !!auth.ceo_approved_at, sig: auth.ceo_signature, color: T.teal },
-                ].map((step, i) => (
-                  <div key={i} style={{ flex: 1, minWidth: 140, background: step.done ? step.color+"12" : T.bg, border: "1px solid " + (step.done ? step.color+"40" : T.border), borderRadius: 8, padding: "10px 12px" }}>
-                    <div style={{ color: step.done ? step.color : T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", marginBottom: 4 }}>{step.done ? "✓ " : ""}{step.label}</div>
-                    {step.done ? (
-                      <>
-                        <div style={{ color: T.textPrimary, fontSize: 11, fontWeight: 600 }}>{step.name}</div>
-                        <div style={{ color: T.textMuted, fontSize: 10 }}>{new Date(step.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
-                        {step.sig && <img src={step.sig} alt="signature" style={{ width: "100%", height: 40, objectFit: "contain", marginTop: 6, filter: "invert(0.7) hue-rotate(180deg)" }} />}
-                      </>
-                    ) : (
-                      <div style={{ color: T.textMuted, fontSize: 11 }}>Pending</div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {auth.rejected_reason && (
-                <div style={{ background: T.red+"10", border: "1px solid " + T.red+"30", borderRadius: 8, padding: "10px 14px", marginBottom: 12 }}>
-                  <div style={{ color: T.red, fontWeight: 700, fontSize: 12, marginBottom: 3 }}>Rejected</div>
-                  <div style={{ color: T.textSecondary, fontSize: 12 }}>{auth.rejected_reason}</div>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              {canSign && (
-                <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
-                  <button onClick={() => { setSignModal(auth); setSignature(""); setSignNotes(""); }} style={{ background: "linear-gradient(135deg, " + T.teal + ", " + T.cyan + ")", border: "none", color: "#fff", padding: "9px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>✍ Sign & Approve</button>
-                  {canReject && <button onClick={() => setRejectModal(auth)} style={{ background: T.red+"12", border: "1px solid " + T.red+"30", color: T.red, padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>Reject</button>}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Vendor Edit Modal */}
-      {editVendorModal && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 800, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setEditVendorModal(null)}>
-          <div style={{ background: T.surface, border: "1px solid " + T.amber+"40", borderRadius: 16, width: "100%", maxWidth: 480, padding: 28 }} onClick={e => e.stopPropagation()}>
-            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Update Payment Details</div>
-            <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 20 }}>{editVendorModal.name || editVendorModal.company_name} — add bank or mobile money details</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
-              {[
-                ["bank_name", "Bank Name", "e.g. Absa Ghana"],
-                ["account_name", "Account Name", "Account holder name"],
-                ["account_number", "Account Number", "Account number"],
-                ["mobile_money_number", "Mobile Money Number", "e.g. 0244000000"],
-              ].map(([key, label, placeholder]) => (
-                <div key={key}>
-                  <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>{label}</label>
-                  <input value={editVendorForm[key] || ""} onChange={e => setEditVendorForm(f => ({...f, [key]: e.target.value}))} placeholder={placeholder} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+      {/* ── CEO SIGN MODAL ── */}
+      {signModal && isCEO && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setSignModal(null)}>
+          <div style={{ background:T.surface, border:"1px solid "+T.teal+"40", borderRadius:16, width:"100%", maxWidth:500, padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>Approve Payment</div>
+            <div style={{ color:T.textMuted, fontSize:13, marginBottom:16 }}>{signModal.vendor_name} — GHS {parseFloat(signModal.agreed_amount||0).toLocaleString()}</div>
+            <div style={{ background:T.bg, borderRadius:10, padding:"12px 14px", marginBottom:16 }}>
+              {[["Payee",signModal.vendor_name],["Amount","GHS "+parseFloat(signModal.agreed_amount||0).toLocaleString()],["Bank",signModal.bank_name||"—"],["Account",signModal.account_number||"—"],["Method",(signModal.payment_method||"").replace("_"," ")]].map(([l,v]) => (
+                <div key={l} style={{ display:"flex", justifyContent:"space-between", padding:"4px 0", borderBottom:"1px solid "+T.border+"33" }}>
+                  <span style={{ color:T.textMuted, fontSize:12 }}>{l}</span>
+                  <span style={{ color:T.textPrimary, fontSize:12, fontWeight:600 }}>{v}</span>
                 </div>
               ))}
-              <div>
-                <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Payment Terms</label>
-                <select value={editVendorForm.payment_terms || ""} onChange={e => setEditVendorForm(f => ({...f, payment_terms: e.target.value}))} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", appearance: "none", boxSizing: "border-box" }}>
-                  <option value="">Select payment terms...</option>
-                  {["Immediate", "Net 7 days", "Net 14 days", "Net 30 days", "50% upfront, balance on completion", "50% upfront paid, balance now", "100% upfront", "Custom"].map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
             </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={async () => {
-                setSavingVendor(true);
-                // Update vendor_apps if record exists, otherwise update profiles
-                if (editVendorForm.id) {
-                  await supabase.from("vendor_apps").update({
-                    bank_name: editVendorForm.bank_name,
-                    account_name: editVendorForm.account_name,
-                    account_number: editVendorForm.account_number,
-                    mobile_money_number: editVendorForm.mobile_money_number,
-                    payment_terms: editVendorForm.payment_terms,
-                  }).eq("id", editVendorForm.id);
-                } else {
-                  // Update profiles table
-                  await supabase.from("profiles").update({
-                    bank_name: editVendorForm.bank_name,
-                    account_name: editVendorForm.account_name,
-                    account_number: editVendorForm.account_number,
-                    mobile_money_number: editVendorForm.mobile_money_number,
-                  }).eq("id", editVendorForm.vendor_id);
-                }
-                // Auto-fill the payment form
-                const hasBank = editVendorForm.bank_name && editVendorForm.account_number && editVendorForm.account_name;
-                const hasMomo = editVendorForm.mobile_money_number;
-                setForm(f => ({
-                  ...f,
-                  bank_name: editVendorForm.bank_name || "",
-                  account_number: editVendorForm.account_number || "",
-                  account_name: editVendorForm.account_name || "",
-                  mobile_money_number: editVendorForm.mobile_money_number || "",
-                  payment_terms: editVendorForm.payment_terms || "",
-                  payment_method: hasBank ? "bank_transfer" : hasMomo ? "mobile_money" : f.payment_method,
-                }));
-                setVendorWarning("");
-                setSavingVendor(false);
-                setEditVendorModal(null);
-                load(); // Refresh vendor apps
-              }} disabled={savingVendor} style={{ flex: 1, background: "linear-gradient(135deg, " + T.cyan + ", " + T.teal + ")", border: "none", color: "#fff", padding: "11px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{savingVendor ? "Saving..." : "Save & Apply"}</button>
-              <button onClick={() => setEditVendorModal(null)} style={{ background: "none", border: "1px solid " + T.border, color: T.textMuted, padding: "11px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            <div style={{ marginBottom:12 }}>
+              <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>CEO Notes (optional)</label>
+              <textarea value={signNotes} onChange={e=>setSignNotes(e.target.value)} rows={2} placeholder="Any conditions or notes..." style={{ ...inputStyle, resize:"none" }} />
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Signature Modal */}
-      {signModal && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 700, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setSignModal(null)}>
-          <div style={{ background: T.surface, border: "1px solid " + T.teal+"40", borderRadius: 16, width: "100%", maxWidth: 500, padding: 28 }} onClick={e => e.stopPropagation()}>
-            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Sign & Approve Payment</div>
-            <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 20 }}>{signModal.vendor_name} · GHS {(signModal.agreed_amount||0).toLocaleString()}</div>
-
-            {/* Signature Pad */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", marginBottom: 8 }}>Your Signature</div>
-              {/* Saved signature option */}
+            {/* Signature pad */}
+            <div style={{ marginBottom:12 }}>
+              <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>CEO Signature</label>
               {user.saved_signature && !signature && (
-                <div style={{ background: T.teal+"10", border: "1px solid "+T.teal+"30", borderRadius: 10, padding: "12px 14px", marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ background:T.teal+"10", border:"1px solid "+T.teal+"30", borderRadius:8, padding:"10px 14px", marginBottom:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                   <div>
-                    <div style={{ color: T.teal, fontSize: 11, fontWeight: 700, marginBottom: 4 }}>Saved Signature Available</div>
-                    <img src={user.saved_signature} style={{ height: 40, maxWidth: 200, objectFit: "contain" }} alt="saved sig" />
+                    <div style={{ color:T.teal, fontSize:11, fontWeight:700, marginBottom:3 }}>Saved Signature</div>
+                    <img src={user.saved_signature} style={{ height:32, maxWidth:160, objectFit:"contain" }} alt="saved" />
                   </div>
-                  <button onClick={() => setSignature(user.saved_signature)} style={{ background: "linear-gradient(135deg,"+T.teal+","+T.cyan+")", border: "none", color: "#fff", padding: "8px 16px", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Use This</button>
+                  <button onClick={() => setSignature(user.saved_signature)} style={{ background:"linear-gradient(135deg,"+T.teal+","+T.cyan+")", border:"none", color:"#fff", padding:"6px 12px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>Use</button>
                 </div>
               )}
-              {signature && signature === user.saved_signature ? (
-                <div style={{ background: T.teal+"10", border: "1px solid "+T.teal+"30", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
-                  <div style={{ color: T.teal, fontSize: 11, fontWeight: 700, marginBottom: 4 }}>✓ Using saved signature</div>
-                  <img src={signature} style={{ height: 50, maxWidth: 250, objectFit: "contain" }} alt="signature" />
-                  <button onClick={() => setSignature("")} style={{ display: "block", marginTop: 8, background: "none", border: "1px solid "+T.border, color: T.textMuted, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11 }}>Draw instead</button>
-                </div>
-              ) : (
-                <div style={{ background: T.bg, border: "2px solid " + T.cyan+"40", borderRadius: 10, padding: 4, position: "relative" }}>
-                  <canvas
-                    ref={canvasRef}
-                    width={440}
-                    height={140}
-                    style={{ display: "block", width: "100%", height: 140, cursor: "crosshair", borderRadius: 8, touchAction: "none" }}
-                    onMouseDown={startDraw}
-                    onMouseMove={draw}
-                    onMouseUp={stopDraw}
-                    onMouseLeave={stopDraw}
-                    onTouchStart={startDraw}
-                    onTouchMove={draw}
-                    onTouchEnd={stopDraw}
-                  />
-                  <div style={{ position: "absolute", bottom: 10, right: 12, color: T.textMuted, fontSize: 10, pointerEvents: "none" }}>Sign above</div>
-                  <button onClick={clearSignature} style={{ position: "absolute", top: 8, right: 8, background: T.surface, border: "1px solid " + T.border, color: T.textMuted, padding: "3px 8px", borderRadius: 5, cursor: "pointer", fontSize: 10 }}>Clear</button>
-                </div>
-              )}
-              {signature && signature !== user.saved_signature && (
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
-                  <div style={{ color: T.teal, fontSize: 11, fontWeight: 700 }}>✓ Signature captured</div>
-                  <button onClick={async () => {
-                    await supabase.from("profiles").update({ saved_signature: signature }).eq("id", user.id);
-                    user.saved_signature = signature;
-                    alert("Signature saved to your profile!");
-                  }} style={{ background: T.teal+"15", border: "1px solid "+T.teal+"30", color: T.teal, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>Save for future use</button>
-                </div>
-              )}
-              {/* Upload signature option */}
-              <div style={{ marginTop: 10 }}>
-                <label style={{ color: T.textMuted, fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ background: T.surface, border: "1px solid "+T.border, padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700 }}>↑ Upload Signature Image</span>
-                  <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = ev => setSignature(ev.target.result);
-                    reader.readAsDataURL(file);
-                  }} />
-                </label>
+              <div style={{ background:T.bg, border:"2px solid "+T.cyan+"40", borderRadius:10, padding:4, position:"relative" }}>
+                <canvas ref={canvasRef} width={440} height={120}
+                  style={{ display:"block", width:"100%", height:120, cursor:"crosshair", borderRadius:8, touchAction:"none" }}
+                  onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
+                  onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw} />
+                <div style={{ position:"absolute", bottom:8, right:10, color:T.textMuted, fontSize:10, pointerEvents:"none" }}>Sign above</div>
+                <button onClick={clearSignature} style={{ position:"absolute", top:6, right:6, background:T.surface, border:"1px solid "+T.border, color:T.textMuted, padding:"2px 8px", borderRadius:5, cursor:"pointer", fontSize:10 }}>Clear</button>
               </div>
             </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 5 }}>Notes (optional)</label>
-              <textarea value={signNotes} onChange={e => setSignNotes(e.target.value)} rows={2} placeholder="Any conditions, notes or instructions..." style={{ width: "100%", padding: "9px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", resize: "none", boxSizing: "border-box" }} />
-            </div>
-
-            <div style={{ background: T.amber+"10", border: "1px solid " + T.amber+"30", borderRadius: 8, padding: "10px 14px", marginBottom: 18, fontSize: 12, color: T.amber }}>
-              By signing, you confirm you have reviewed and authorise this payment of GHS {(signModal.agreed_amount||0).toLocaleString()} to {signModal.vendor_name}.
-            </div>
-
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => signApprove(signModal)} disabled={saving || !signature} style={{ flex: 1, background: "linear-gradient(135deg, " + T.teal + ", " + T.cyan + ")", border: "none", color: "#fff", padding: "12px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 14, opacity: !signature ? 0.5 : 1 }}>{saving ? "Processing..." : "Confirm & Sign"}</button>
-              <button onClick={() => setSignModal(null)} style={{ background: "none", border: "1px solid " + T.border, color: T.textMuted, padding: "12px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={handleCEOSign} disabled={saving||!signature} style={{ flex:1, background:"linear-gradient(135deg,"+T.teal+",#10B981)", border:"none", color:"#fff", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13, opacity:!signature?0.5:1 }}>{saving?"Approving...":"✓ Approve & Sign"}</button>
+              <button onClick={() => { setSignModal(null); setSignature(""); }} style={{ background:"none", border:"1px solid "+T.border, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer", fontSize:13 }}>Cancel</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Reject Modal */}
-      {rejectModal && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 700, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setRejectModal(null)}>
-          <div style={{ background: T.surface, border: "1px solid " + T.red+"30", borderRadius: 16, width: "100%", maxWidth: 440, padding: 28 }} onClick={e => e.stopPropagation()}>
-            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Reject Payment Request</div>
-            <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 20 }}>{rejectModal.vendor_name} · GHS {(rejectModal.agreed_amount||0).toLocaleString()}</div>
-            <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} rows={3} placeholder="Reason for rejection..." style={{ width: "100%", padding: "10px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", resize: "none", boxSizing: "border-box", marginBottom: 16 }} />
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => reject(rejectModal)} disabled={!rejectReason} style={{ flex: 1, background: T.red, border: "none", color: "#fff", padding: "10px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>Confirm Rejection</button>
-              <button onClick={() => setRejectModal(null)} style={{ background: "none", border: "1px solid " + T.border, color: T.textMuted, padding: "10px 16px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+      {/* ── REJECT MODAL ── */}
+      {rejectModal && isCEO && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.8)", backdropFilter:"blur(6px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setRejectModal(null)}>
+          <div style={{ background:T.surface, border:"1px solid "+T.red+"40", borderRadius:14, width:"100%", maxWidth:420, padding:24 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16, marginBottom:12 }}>Reject Payment Request</div>
+            <div style={{ color:T.textMuted, fontSize:13, marginBottom:14 }}>{rejectModal.vendor_name} — GHS {parseFloat(rejectModal.agreed_amount||0).toLocaleString()}</div>
+            <textarea value={rejectReason} onChange={e=>setRejectReason(e.target.value)} rows={3} placeholder="Reason for rejection..." style={{ ...inputStyle, resize:"none", marginBottom:14 }} />
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={handleReject} disabled={!rejectReason} style={{ flex:1, background:T.red+"15", border:"1px solid "+T.red+"30", color:T.red, padding:"10px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>Reject</button>
+              <button onClick={() => setRejectModal(null)} style={{ background:"none", border:"1px solid "+T.border, color:T.textMuted, padding:"10px 16px", borderRadius:8, cursor:"pointer", fontSize:13 }}>Cancel</button>
             </div>
           </div>
         </div>
@@ -16131,6 +16151,7 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
     </div>
   );
 };
+
 
 const EmailTestPanel = ({ user }) => {
   const [sending, setSending] = useState({});

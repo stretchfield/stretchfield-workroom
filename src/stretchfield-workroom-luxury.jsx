@@ -1313,6 +1313,10 @@ const VendorManagerDashboard = ({ user }) => {
   const [rffs, setRffs] = useState([]);
   const [awards, setAwards] = useState([]);
   const [internalPortalEvent, setInternalPortalEvent] = useState(null);
+  const [paymentRequests, setPaymentRequests] = useState([]);
+  const [payReqModal, setPayReqModal] = useState(false);
+  const [payReqForm, setPayReqForm] = useState({ project_id:"", amount:"", description:"", request_type:"project_fee" });
+  const [savingPayReq, setSavingPayReq] = useState(false);
 
 
   const VENDOR_TYPES = ["Event Lighting","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
@@ -1332,6 +1336,7 @@ const VendorManagerDashboard = ({ user }) => {
       setNotifs(n.data || []);
       setRffs(r.data || []);
       setAwards(aw.data || []);
+      supabase.from("staff_payment_requests").select("*").eq("staff_id", user.id).order("submitted_at", { ascending: false }).then(({ data: pr }) => setPaymentRequests(pr || []));
     });
   };
 
@@ -1449,6 +1454,87 @@ const VendorManagerDashboard = ({ user }) => {
           </div>
         </div>
       </div>
+
+      {/* ── PAYMENT REQUESTS ── */}
+      <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:14, padding:"18px 20px", marginBottom:20 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+          <div>
+            <div style={{ color:T.textMuted, fontSize:9, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.12em", marginBottom:3 }}>Finance</div>
+            <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15 }}>My Payment Requests</div>
+          </div>
+          <button onClick={() => setPayReqModal(true)} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"7px 14px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:12 }}>+ New Request</button>
+        </div>
+        {paymentRequests.length === 0 ? (
+          <div style={{ color:T.textMuted, fontSize:13, textAlign:"center", padding:"12px 0" }}>No payment requests yet</div>
+        ) : paymentRequests.slice(0,4).map(pr => {
+          const statusColors = { pending:T.amber, approved:T.teal, rejected:T.red, paid:"#10B981" };
+          return (
+            <div key={pr.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderBottom:`1px solid ${T.border}33` }}>
+              <div>
+                <div style={{ color:T.textPrimary, fontSize:13, fontWeight:600 }}>{pr.description}</div>
+                <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>{(pr.request_type||"").replace(/_/g," ")} · {new Date(pr.submitted_at).toLocaleDateString("en-GB")}</div>
+              </div>
+              <div style={{ textAlign:"right" }}>
+                <div style={{ color:T.amber, fontWeight:700, fontSize:13 }}>GHS {parseFloat(pr.amount||0).toLocaleString()}</div>
+                <span style={{ color:statusColors[pr.status]||T.textMuted, fontSize:10, fontWeight:700 }}>{pr.status}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Payment Request Modal */}
+      {payReqModal && (
+        <div style={{ position:"fixed", inset:0, zIndex:600, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setPayReqModal(false)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:460, padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>New Payment Request</div>
+            <div style={{ color:T.textMuted, fontSize:13, marginBottom:20 }}>Submit a payment request to Finance for CEO approval</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12, marginBottom:16 }}>
+              <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Request Type</label>
+                <select value={payReqForm.request_type} onChange={e=>setPayReqForm(f=>({...f,request_type:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  <option value="project_fee">Project Fee</option>
+                  <option value="per_diem">Per Diem</option>
+                  <option value="reimbursement">Reimbursement</option>
+                  <option value="transport">Transport Allowance</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Related Event</label>
+                <select value={payReqForm.project_id} onChange={e=>setPayReqForm(f=>({...f,project_id:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  <option value="">Select event (optional)...</option>
+                  {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Amount (GHS)</label>
+                <input type="number" value={payReqForm.amount} onChange={e=>setPayReqForm(f=>({...f,amount:e.target.value}))} placeholder="0.00" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+              </div>
+              <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Description *</label>
+                <textarea value={payReqForm.description} onChange={e=>setPayReqForm(f=>({...f,description:e.target.value}))} rows={3} placeholder="What is this payment for?" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} />
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={async () => {
+                if (!payReqForm.amount || !payReqForm.description) { alert("Please fill in amount and description."); return; }
+                setSavingPayReq(true);
+                const ev = events.find(e => e.id === payReqForm.project_id);
+                await supabase.from("staff_payment_requests").insert({ staff_id:user.id, staff_name:user.name, project_id:payReqForm.project_id||null, project_name:ev?.name||"", amount:parseFloat(payReqForm.amount), description:payReqForm.description, request_type:payReqForm.request_type, status:"pending" });
+                const { data: fms } = await supabase.from("profiles").select("id").eq("role","Finance Manager");
+                for (const fm of fms||[]) { await supabase.from("notifications").insert({ user_id:fm.id, title:"Staff Payment Request — "+user.name, message:user.name+" submitted a payment request of GHS "+parseFloat(payReqForm.amount).toLocaleString()+" for "+payReqForm.description, type:"finance" }); }
+                setSavingPayReq(false);
+                setPayReqModal(false);
+                setPayReqForm({ project_id:"", amount:"", description:"", request_type:"project_fee" });
+                const { data: pr } = await supabase.from("staff_payment_requests").select("*").eq("staff_id", user.id).order("submitted_at", { ascending:false });
+                setPaymentRequests(pr||[]);
+              }} disabled={savingPayReq||!payReqForm.amount||!payReqForm.description} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13, opacity:(!payReqForm.amount||!payReqForm.description)?0.5:1 }}>{savingPayReq?"Submitting...":"Submit Request"}</button>
+              <button onClick={() => setPayReqModal(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer", fontSize:13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── MY TASKS ── */}
       {pending.length > 0 && (
@@ -6645,6 +6731,10 @@ const FinanceManagerDashboard = ({ user, onTab }) => {
   const [events, setEvents] = useState([]);
   const [fmTasks, setFmTasks] = useState([]);
   const [internalPortalEvent, setInternalPortalEvent] = useState(null);
+  const [paymentRequests, setPaymentRequests] = useState([]);
+  const [payReqModal, setPayReqModal] = useState(false);
+  const [payReqForm, setPayReqForm] = useState({ project_id:"", amount:"", description:"", request_type:"project_fee" });
+  const [savingPayReq, setSavingPayReq] = useState(false);
 
   const load = async () => {
     const [v, est, pc, db, ci, vi, po, ev] = await Promise.all([

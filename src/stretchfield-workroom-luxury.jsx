@@ -8675,19 +8675,22 @@ const generatePOPDF = (po, vendor, rff, event) => {
   <div class="section-title">Authorisation</div>
   <div class="signatures">
     <div class="sig-box">
-      <div style="height:40px;"></div>
-      <div class="name">Vendor Manager</div>
-      <div class="role">Prepared by</div>
-    </div>
-    <div class="sig-box">
-      <div style="height:40px;"></div>
+      ${po.finance_signature ? '<img src="' + po.finance_signature + '" style="height:48px;max-width:160px;object-fit:contain;" />' : '<div style="height:48px;border-bottom:1px solid #C2C9DC;"></div>'}
       <div class="name">Finance Manager</div>
       <div class="role">Reviewed by</div>
+      ${po.finance_signed_at ? '<div style="font-size:9px;color:#5A6E8A;margin-top:2px;">' + new Date(po.finance_signed_at).toLocaleDateString("en-GB") + '</div>' : ''}
     </div>
     <div class="sig-box">
-      <div style="height:40px;"></div>
+      ${po.vm_signature ? '<img src="' + po.vm_signature + '" style="height:48px;max-width:160px;object-fit:contain;" />' : '<div style="height:48px;border-bottom:1px solid #C2C9DC;"></div>'}
+      <div class="name">Vendor Manager</div>
+      <div class="role">Prepared by</div>
+      ${po.vm_signed_at ? '<div style="font-size:9px;color:#5A6E8A;margin-top:2px;">' + new Date(po.vm_signed_at).toLocaleDateString("en-GB") + '</div>' : ''}
+    </div>
+    <div class="sig-box">
+      ${po.ceo_signature ? '<img src="' + po.ceo_signature + '" style="height:48px;max-width:160px;object-fit:contain;" />' : '<div style="height:48px;border-bottom:1px solid #C2C9DC;"></div>'}
       <div class="name">CEO</div>
       <div class="role">Authorised by · Stretchfield</div>
+      ${po.ceo_signed_at ? '<div style="font-size:9px;color:#5A6E8A;margin-top:2px;">' + new Date(po.ceo_signed_at).toLocaleDateString("en-GB") + '</div>' : ''}
     </div>
   </div>
 
@@ -8963,6 +8966,11 @@ const PurchaseOrderView = ({ user }) => {
   };
 
   const sendForSigning = async (po) => {
+    // Finance must sign first
+    setSigningPO({ po, role: "finance" });
+  };
+
+  const sendForSigningAfterFinance = async (po) => {
     await supabase.from("purchase_orders").update({ status: "pending_signatures" }).eq("id", po.id);
     // Notify VM
     const { data: vms } = await supabase.from("profiles").select("id,email,name").eq("role", "Vendor Manager");
@@ -8981,28 +8989,46 @@ const PurchaseOrderView = ({ user }) => {
   const signPO = async (po, role) => {
     if (!sigData) { alert("Please draw your signature first."); return; }
     const updates = {};
-    if (role === "vm") {
+    const now = new Date().toISOString();
+
+    if (role === "finance") {
+      updates.finance_signature = sigData;
+      updates.finance_signed_at = now;
+      updates.finance_signed_by = user.id;
+      updates.status = "draft"; // still draft until sent for signing
+      await supabase.from("purchase_orders").update(updates).eq("id", po.id);
+      setSigningPO(null); setSigData(""); load();
+      // Now send for VM and CEO signing
+      const updatedPo = { ...po, ...updates };
+      await sendForSigningAfterFinance(updatedPo);
+      return;
+    } else if (role === "vm") {
       updates.vm_signature = sigData;
-      updates.vm_signed_at = new Date().toISOString();
+      updates.vm_signed_at = now;
       updates.vm_signed_by = user.id;
-      if (po.ceo_signed_at) updates.status = "fully_signed";
-      else updates.status = "vm_signed";
+      const ceoSigned = po.ceo_signed_at;
+      const financeSigned = po.finance_signed_at || updates.finance_signed_at;
+      updates.status = (ceoSigned && financeSigned) ? "fully_signed" : "vm_signed";
     } else if (role === "ceo") {
       updates.ceo_signature = sigData;
-      updates.ceo_signed_at = new Date().toISOString();
+      updates.ceo_signed_at = now;
       updates.ceo_signed_by = user.id;
-      if (po.vm_signed_at) updates.status = "fully_signed";
-      else updates.status = "ceo_signed";
+      const vmSigned = po.vm_signed_at;
+      const financeSigned = po.finance_signed_at;
+      updates.status = (vmSigned && financeSigned) ? "fully_signed" : "ceo_signed";
     }
+
     await supabase.from("purchase_orders").update(updates).eq("id", po.id);
-    // If fully signed notify Finance
-    if ((role === "vm" && po.ceo_signed_at) || (role === "ceo" && po.vm_signed_at)) {
+
+    // Check if fully signed
+    const isFullySigned = updates.status === "fully_signed";
+
+    if (isFullySigned) {
       const { data: fms } = await supabase.from("profiles").select("id").eq("role", "Finance Manager");
       for (const fm of fms || []) {
-        await supabase.from("notifications").insert({ user_id: fm.id, title: "PO Fully Signed — " + po.internal_po_number, message: "Both VM and CEO have signed PO " + po.internal_po_number + ". You can now publish to the vendor.", type: "finance" });
+        await supabase.from("notifications").insert({ user_id: fm.id, title: "PO Fully Signed — " + po.internal_po_number, message: "All parties have signed PO " + po.internal_po_number + ". You can now publish to the vendor.", type: "finance" });
       }
     } else {
-      // Notify Finance of partial signing
       const { data: fms } = await supabase.from("profiles").select("id").eq("role", "Finance Manager");
       for (const fm of fms || []) {
         await supabase.from("notifications").insert({ user_id: fm.id, title: (role==="vm"?"VM":"CEO") + " Signed PO — " + po.internal_po_number, message: (role==="vm"?"Vendor Manager":"CEO") + " has signed PO " + po.internal_po_number + ". Awaiting " + (role==="vm"?"CEO":"VM") + " signature.", type: "finance" });
@@ -9134,16 +9160,21 @@ const PurchaseOrderView = ({ user }) => {
                           <button onClick={() => setPreviewPO({ po, vendor, rff, event })} style={{ background:T.cyan+"15", border:"1px solid "+T.cyan+"30", color:T.cyan, padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>Preview</button>
                           <button onClick={() => downloadPDF(generatePOPDF(po, vendor, rff, event), "PO-"+(po.internal_po_number||po.id)+".html")} style={{ background:T.surface, border:"1px solid "+T.border, color:T.textMuted, padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>↓ PDF</button>
                           {po.status === "draft" && <button onClick={() => { setNotesModal(po); setEditNotes(po.notes||""); }} style={{ background:T.amber+"15", border:"1px solid "+T.amber+"30", color:T.amber, padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>Notes</button>}
-                          {po.status === "draft" && <button onClick={() => sendForSigning(po)} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#fff", padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>✍ Send for Signing</button>}
-                          {["pending_signatures","vm_signed","ceo_signed"].includes(po.status) && (
+                          {po.status === "draft" && !po.finance_signed_at && user.role === "Finance Manager" && <button onClick={() => sendForSigning(po)} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#fff", padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>✍ Sign & Send</button>}
+                          {po.status === "draft" && po.finance_signed_at && user.role === "Finance Manager" && <button onClick={() => sendForSigningAfterFinance(po)} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#fff", padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>→ Send to VM & CEO</button>}
+                          {["pending_signatures","vm_signed","ceo_signed","fully_signed"].includes(po.status) && (
                             <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
                               <div style={{ display:"flex", gap:4, alignItems:"center" }}>
+                                <span style={{ width:8, height:8, borderRadius:"50%", background: po.finance_signed_at ? T.teal : T.amber, display:"inline-block" }} />
+                                <span style={{ color: po.finance_signed_at ? T.teal : T.amber, fontSize:10, fontWeight:700 }}>Finance {po.finance_signed_at ? "✓" : "Pending"}</span>
+                              </div>
+                              <div style={{ display:"flex", gap:4, alignItems:"center" }}>
                                 <span style={{ width:8, height:8, borderRadius:"50%", background: po.vm_signed_at ? T.teal : T.amber, display:"inline-block" }} />
-                                <span style={{ color: po.vm_signed_at ? T.teal : T.amber, fontSize:10, fontWeight:700 }}>VM {po.vm_signed_at ? "✓ Signed" : "Pending"}</span>
+                                <span style={{ color: po.vm_signed_at ? T.teal : T.amber, fontSize:10, fontWeight:700 }}>VM {po.vm_signed_at ? "✓" : "Pending"}</span>
                               </div>
                               <div style={{ display:"flex", gap:4, alignItems:"center" }}>
                                 <span style={{ width:8, height:8, borderRadius:"50%", background: po.ceo_signed_at ? T.teal : T.amber, display:"inline-block" }} />
-                                <span style={{ color: po.ceo_signed_at ? T.teal : T.amber, fontSize:10, fontWeight:700 }}>CEO {po.ceo_signed_at ? "✓ Signed" : "Pending"}</span>
+                                <span style={{ color: po.ceo_signed_at ? T.teal : T.amber, fontSize:10, fontWeight:700 }}>CEO {po.ceo_signed_at ? "✓" : "Pending"}</span>
                               </div>
                             </div>
                           )}

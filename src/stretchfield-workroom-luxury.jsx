@@ -8893,7 +8893,7 @@ const PurchaseOrderView = ({ user }) => {
       internalPoNumber = "PO/" + year + "/" + String((allPos?.length||0)+1).padStart(3,"0");
     }
 
-    const { data: po } = await supabase.from("purchase_orders").insert({
+    const { data: po, error: poErr } = await supabase.from("purchase_orders").insert({
       rff_id: award.rff_id,
       rff_award_id: award.id,
       vendor_id: award.vendor_id,
@@ -8906,11 +8906,9 @@ const PurchaseOrderView = ({ user }) => {
       status: "draft",
       created_by: user.id,
       internal_po_number: internalPoNumber,
-      payment_terms: vApp?.payment_terms || "",
-      bank_name: vApp?.bank_name || "",
-      account_name: vApp?.bank_account_name || vendor?.name || "",
-      account_number: vApp?.account_no || "",
     }).select().single();
+    console.log("PO insert result:", po, poErr);
+    if (poErr) { console.error("PO insert error:", poErr); setSaving(false); alert("Failed to create PO: " + poErr.message); return; }
 
     // Sync to Zoho
     try {
@@ -9016,7 +9014,7 @@ const PurchaseOrderView = ({ user }) => {
                     <textarea value={poForm.notes} onChange={e => setPoForm(f=>({...f,notes:e.target.value}))} placeholder="Any special instructions or notes for this PO..." rows={2} style={{ ...inputStyle, resize:"none" }} />
                   </div>
 
-                  <button onClick={() => handleCreatePO(award)} disabled={saving} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#fff", padding:"10px 24px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving ? "Generating..." : "Generate Purchase Order"}</button>
+                  <button onClick={() => handleCreatePO(award)} disabled={saving} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#fff", padding:"10px 24px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13, opacity: saving ? 0.6 : 1 }}>{saving ? "Generating..." : "Generate Purchase Order"}</button>
                 </div>
               );
             })}

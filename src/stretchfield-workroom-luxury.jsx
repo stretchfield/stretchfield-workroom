@@ -773,7 +773,7 @@ const getNavItems = (role) => {
     base.push({ id: "crm", label: "CRM / Leads", icon: "▪" }, { id: "crm-insights", label: "CRM Insights", icon: "▪" }, { id: "sm-tasks", label: "S&M Tasks", icon: "▪" });
   }
   if (["Strategy & Events Lead"].includes(role)) {
-    base.push({ id: "strategy-overview", label: "Client Overview", icon: "▪" }, { id: "feedback-summary", label: "Feedback", icon: "▪" });
+    base.push({ id: "strategy-overview", label: "Client Overview", icon: "▪" }, { id: "feedback-summary", label: "Feedback", icon: "▪" }, { id: "event-reports", label: "Event Reports", icon: "▪" });
   }
   if (["CEO","Country Manager"].includes(role)) {
     base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "rff-approvals", label: "RFF Approvals", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "purchase-orders", label: "Sign Purchase Orders", icon: "▪" });
@@ -828,6 +828,7 @@ const getNavItems = (role) => {
         { id: "event-analysis", label: "Event Analysis" },
         { id: "strategy-map", label: "Strategy Map" },
         { id: "impact-intelligence", label: "Impact Intelligence" },
+        { id: "event-reports", label: "Event Reports" },
       ]},
       { id: "notifications", label: "Notifications", group: true },
       { id: "calendar", label: "Calendar", group: true },
@@ -5706,6 +5707,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "budgets": return <BudgetView user={currentUser} />;
       case "expenses": return <ExpenseView user={currentUser} />;
       case "finance-reports": return <FinanceReportsView user={currentUser} />;
+      case "event-reports": return <EventReportsView user={currentUser} />;
       case "feedback": return <FeedbackView userRole={currentUser.role} />;
       case "calendar": return <CalendarView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
       case "zoho-books": return <ZohoBooksView user={currentUser} />;
@@ -17100,6 +17102,351 @@ const VendorAnalyticsView = ({ user }) => {
 };
 
 
+
+const EventReportsView = ({ user }) => {
+  const [events, setEvents] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [scorecards, setScorecards] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [activeSection, setActiveSection] = useState("operational");
+  const [report, setReport] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [form, setForm] = useState({
+    run_of_show_adherence:"", high_impact_moments:"", low_impact_moments:"", logistics_notes:"",
+    estimated_attendance:"", expected_attendance:"",
+    audience_energy_arrival:"", audience_energy_mid:"", audience_energy_peak:"", audience_energy_close:"",
+    key_engagement_moments:"", audience_feedback_observations:"",
+    vendor_performance_summary:"", vendors_recommended:"", vendors_not_recommended:"", technical_delivery_quality:"",
+    strategic_intent_achieved:"", client_satisfaction:"", business_development_signals:"", next_edition_recommendations:"",
+  });
+
+  const isStrategy = user.role === "Strategy & Events Lead";
+  const isVM = user.role === "Vendor Manager";
+  const isCEO = user.role === "CEO";
+
+  const load = async () => {
+    const [{ data: ev }, { data: rp }, { data: sc }] = await Promise.all([
+      supabase.from("projects").select("*").order("event_date", { ascending: false }),
+      supabase.from("event_intelligence_reports").select("*"),
+      supabase.from("vendor_scorecards").select("*").order("created_at", { ascending: false }),
+    ]);
+    setEvents(ev || []);
+    setReports(rp || []);
+    setScorecards(sc || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const openEvent = async (event) => {
+    setSelectedEvent(event);
+    // Set default section based on role
+    if (isStrategy) setActiveSection("operational");
+    else if (isVM) setActiveSection("vendor");
+    else if (isCEO) setActiveSection("overview");
+    // Load or create report
+    const { data: existing } = await supabase.from("event_intelligence_reports").select("*").eq("project_id", event.id).maybeSingle();
+    if (existing) {
+      setReport(existing);
+      setForm(f => ({ ...f, ...existing }));
+    } else {
+      const { data: created } = await supabase.from("event_intelligence_reports").insert({ project_id: event.id, status: "draft" }).select().single();
+      setReport(created || { project_id: event.id, status: "draft" });
+    }
+  };
+
+  const saveSection = async (section) => {
+    if (!report) return;
+    setSaving(true);
+    const updates = { updated_at: new Date().toISOString() };
+    if (section === "operational") {
+      Object.assign(updates, { run_of_show_adherence:form.run_of_show_adherence, high_impact_moments:form.high_impact_moments, low_impact_moments:form.low_impact_moments, logistics_notes:form.logistics_notes, operational_submitted_by:user.id, operational_submitted_at:new Date().toISOString() });
+    } else if (section === "audience") {
+      Object.assign(updates, { estimated_attendance:parseInt(form.estimated_attendance)||null, expected_attendance:parseInt(form.expected_attendance)||null, audience_energy_arrival:form.audience_energy_arrival, audience_energy_mid:form.audience_energy_mid, audience_energy_peak:form.audience_energy_peak, audience_energy_close:form.audience_energy_close, key_engagement_moments:form.key_engagement_moments, audience_feedback_observations:form.audience_feedback_observations, audience_submitted_by:user.id, audience_submitted_at:new Date().toISOString() });
+    } else if (section === "vendor") {
+      Object.assign(updates, { vendor_performance_summary:form.vendor_performance_summary, vendors_recommended:form.vendors_recommended, vendors_not_recommended:form.vendors_not_recommended, technical_delivery_quality:form.technical_delivery_quality, vendor_submitted_by:user.id, vendor_submitted_at:new Date().toISOString() });
+    } else if (section === "strategic") {
+      Object.assign(updates, { strategic_intent_achieved:form.strategic_intent_achieved, client_satisfaction:form.client_satisfaction, business_development_signals:form.business_development_signals, next_edition_recommendations:form.next_edition_recommendations, ceo_submitted_by:user.id, ceo_submitted_at:new Date().toISOString() });
+    }
+    if (report.id) {
+      await supabase.from("event_intelligence_reports").update(updates).eq("id", report.id);
+    }
+    const { data: updated } = await supabase.from("event_intelligence_reports").select("*").eq("project_id", selectedEvent.id).single();
+    setReport(updated);
+    setSaving(false);
+    // Notify CEO when strategy/VM submits
+    if (!isCEO) {
+      const { data: ceos } = await supabase.from("profiles").select("id").eq("role","CEO");
+      for (const ceo of ceos||[]) {
+        await supabase.from("notifications").insert({ user_id:ceo.id, title:"Report Section Submitted — "+selectedEvent.name, message:user.name+" has submitted the "+section+" section of the intelligence report for "+selectedEvent.name+".", type:"rff" });
+      }
+    }
+  };
+
+  const generateAI = async () => {
+    if (!report) return;
+    setGenerating(true);
+    // Get vendor scorecards for this event
+    const eventScorecards = scorecards.filter(s => s.project_id === selectedEvent?.id);
+    const prompt = `You are a strategic event intelligence analyst for Stretchfield — a premium African event management company whose tagline is "We don't plan events. We engineer impact."
+
+Generate a comprehensive post-event intelligence report for the following event:
+
+EVENT: ${selectedEvent?.name}
+CLIENT: ${selectedEvent?.client}
+DATE: ${selectedEvent?.event_date}
+
+OPERATIONAL INTELLIGENCE:
+- Run of Show Adherence: ${report.run_of_show_adherence || "Not submitted"}
+- High Impact Moments: ${report.high_impact_moments || "Not submitted"}
+- Low Impact Moments: ${report.low_impact_moments || "Not submitted"}
+- Logistics Notes: ${report.logistics_notes || "Not submitted"}
+
+AUDIENCE INTELLIGENCE:
+- Estimated Attendance: ${report.estimated_attendance || "N/A"} (Expected: ${report.expected_attendance || "N/A"})
+- Audience Energy: Arrival: ${report.audience_energy_arrival || "N/A"}, Mid: ${report.audience_energy_mid || "N/A"}, Peak: ${report.audience_energy_peak || "N/A"}, Close: ${report.audience_energy_close || "N/A"}
+- Key Engagement Moments: ${report.key_engagement_moments || "Not submitted"}
+- Audience Feedback: ${report.audience_feedback_observations || "Not submitted"}
+
+VENDOR INTELLIGENCE:
+- Performance Summary: ${report.vendor_performance_summary || "Not submitted"}
+- Recommended Vendors: ${report.vendors_recommended || "Not submitted"}
+- Not Recommended: ${report.vendors_not_recommended || "Not submitted"}
+- Technical Quality: ${report.technical_delivery_quality || "Not submitted"}
+${eventScorecards.length > 0 ? "- Vendor Scorecards: " + eventScorecards.map(s => s.vendor_name + ": " + s.total_pct + "%").join(", ") : ""}
+
+STRATEGIC INTELLIGENCE:
+- Strategic Intent Achieved: ${report.strategic_intent_achieved || "Not submitted"}
+- Client Satisfaction: ${report.client_satisfaction || "Not submitted"}
+- Business Development Signals: ${report.business_development_signals || "Not submitted"}
+- Next Edition Recommendations: ${report.next_edition_recommendations || "Not submitted"}
+
+Write a professional, insightful intelligence report in Stretchfield's consultative voice. Structure it with clear sections: Executive Summary, Operational Assessment, Audience Experience Analysis, Vendor Performance Review, Strategic Impact Assessment, and Recommendations. Use confident, data-driven language that reflects Stretchfield's premium positioning. Maximum 600 words.`;
+
+    try {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, messages: [{ role: "user", content: prompt }] })
+      });
+      const data = await response.json();
+      const summary = data.content?.[0]?.text || "Unable to generate summary.";
+      await supabase.from("event_intelligence_reports").update({ ai_summary: summary, ai_generated_at: new Date().toISOString() }).eq("id", report.id);
+      setReport(r => ({ ...r, ai_summary: summary }));
+    } catch(e) {
+      alert("AI generation failed: " + e.message);
+    }
+    setGenerating(false);
+  };
+
+  const inputStyle = { width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" };
+  const taStyle = { ...inputStyle, resize:"none" };
+  const Field = ({ label, field, rows=3, placeholder="" }) => (
+    <div style={{ marginBottom:14 }}>
+      <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>{label}</label>
+      {rows === 1 ? <input value={form[field]||""} onChange={e=>setForm(f=>({...f,[field]:e.target.value}))} placeholder={placeholder} style={inputStyle} /> : <textarea value={form[field]||""} onChange={e=>setForm(f=>({...f,[field]:e.target.value}))} rows={rows} placeholder={placeholder} style={taStyle} />}
+    </div>
+  );
+
+  // ── EVENT LIST VIEW ──
+  if (!selectedEvent) {
+    const getReportStatus = (eventId) => {
+      const r = reports.find(r => r.project_id === eventId);
+      if (!r) return { label:"Not Started", color:T.textMuted };
+      const sections = [r.operational_submitted_at, r.audience_submitted_at, r.vendor_submitted_at, r.ceo_submitted_at];
+      const done = sections.filter(Boolean).length;
+      if (r.ai_summary) return { label:"Complete ✓", color:T.teal };
+      if (done === 4) return { label:"Ready for AI", color:"#10B981" };
+      return { label:`${done}/4 sections`, color:T.amber };
+    };
+
+    return (
+      <div style={{ animation:"fadeUp 0.35s ease" }}>
+        <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}` }}>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Intelligence</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Event Reports</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Post-event intelligence reports — collaborative, AI-synthesised</div>
+        </div>
+        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+          {events.map(event => {
+            const status = getReportStatus(event.id);
+            const r = reports.find(r => r.project_id === event.id);
+            return (
+              <div key={event.id} onClick={() => openEvent(event)}
+                style={{ background:T.surface, border:`1px solid ${T.border}`, borderLeft:`4px solid ${status.color}`, borderRadius:12, padding:"16px 20px", cursor:"pointer", transition:"border-color 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = T.cyan}
+                onMouseLeave={e => e.currentTarget.style.borderLeft = `4px solid ${status.color}`}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                  <div>
+                    <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15 }}>{event.name}</div>
+                    <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{event.client} · {event.event_date ? new Date(event.event_date).toLocaleDateString("en-GB", { day:"numeric", month:"short", year:"numeric" }) : "No date"}</div>
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <span style={{ color:status.color, fontSize:11, fontWeight:700, background:status.color+"18", padding:"3px 10px", borderRadius:20 }}>{status.label}</span>
+                    {r && (
+                      <div style={{ display:"flex", gap:6, marginTop:6, justifyContent:"flex-end" }}>
+                        {[["Op",r.operational_submitted_at],["Aud",r.audience_submitted_at],["Vnd",r.vendor_submitted_at],["Str",r.ceo_submitted_at]].map(([lbl,val]) => (
+                          <span key={lbl} style={{ color:val?T.teal:T.border, fontSize:9, fontWeight:700, background:val?T.teal+"15":T.bg, padding:"1px 5px", borderRadius:10, border:`1px solid ${val?T.teal+"30":T.border}` }}>{lbl}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // ── REPORT FORM VIEW ──
+  const sections = [
+    ...(isStrategy || isCEO ? [{ id:"operational", label:"Operational" }, { id:"audience", label:"Audience" }] : []),
+    ...(isVM || isCEO ? [{ id:"vendor", label:"Vendor" }] : []),
+    ...(isCEO ? [{ id:"strategic", label:"Strategic" }] : []),
+    { id:"overview", label:"Overview & AI" },
+  ];
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      {/* Back + Header */}
+      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20 }}>
+        <button onClick={() => { setSelectedEvent(null); setReport(null); }} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"6px 12px", borderRadius:8, cursor:"pointer", fontSize:12 }}>← Back</button>
+        <div>
+          <div style={{ color:T.textPrimary, fontWeight:800, fontSize:18 }}>{selectedEvent.name}</div>
+          <div style={{ color:T.textMuted, fontSize:12 }}>{selectedEvent.client} · Intelligence Report</div>
+        </div>
+      </div>
+
+      {/* Section Tabs */}
+      <div style={{ display:"flex", gap:2, marginBottom:20, borderBottom:`1px solid ${T.border}`, overflowX:"auto" }}>
+        {sections.map(s => (
+          <button key={s.id} onClick={() => setActiveSection(s.id)} style={{ padding:"8px 16px", border:"none", background:"none", cursor:"pointer", color:activeSection===s.id?T.cyan:T.textMuted, fontWeight:activeSection===s.id?800:400, fontSize:13, borderBottom:activeSection===s.id?`2px solid ${T.cyan}`:"2px solid transparent", marginBottom:-1, whiteSpace:"nowrap" }}>
+            {s.label}
+            {s.id === "operational" && report?.operational_submitted_at && " ✓"}
+            {s.id === "audience" && report?.audience_submitted_at && " ✓"}
+            {s.id === "vendor" && report?.vendor_submitted_at && " ✓"}
+            {s.id === "strategic" && report?.ceo_submitted_at && " ✓"}
+          </button>
+        ))}
+      </div>
+
+      {/* ── OPERATIONAL SECTION ── */}
+      {activeSection === "operational" && (isStrategy || isCEO) && (
+        <div>
+          <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:4 }}>Operational Section</div>
+          <div style={{ color:T.textMuted, fontSize:12, marginBottom:16 }}>Filled by Strategy & Events Lead</div>
+          <Field label="Run of Show Adherence" field="run_of_show_adherence" rows={3} placeholder="How closely was the run of show followed? Any deviations?" />
+          <Field label="High Impact Moments" field="high_impact_moments" rows={3} placeholder="What moments created the most impact?" />
+          <Field label="Low Impact Moments" field="low_impact_moments" rows={3} placeholder="What moments underperformed?" />
+          <Field label="Logistics Notes" field="logistics_notes" rows={3} placeholder="Setup, breakdown, venue, transport observations..." />
+          {(isStrategy || isCEO) && <button onClick={() => saveSection("operational")} disabled={saving} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 24px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Save Operational Section"}</button>}
+        </div>
+      )}
+
+      {/* ── AUDIENCE SECTION ── */}
+      {activeSection === "audience" && (isStrategy || isCEO) && (
+        <div>
+          <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:4 }}>Audience Section</div>
+          <div style={{ color:T.textMuted, fontSize:12, marginBottom:16 }}>Filled by Strategy & Events Lead</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:14 }}>
+            <Field label="Estimated Attendance" field="estimated_attendance" rows={1} placeholder="Actual number" />
+            <Field label="Expected Attendance" field="expected_attendance" rows={1} placeholder="Planned number" />
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:14 }}>
+            <Field label="Audience Energy — Arrival" field="audience_energy_arrival" rows={1} placeholder="Low/Medium/High" />
+            <Field label="Audience Energy — Mid" field="audience_energy_mid" rows={1} placeholder="Low/Medium/High" />
+            <Field label="Audience Energy — Peak" field="audience_energy_peak" rows={1} placeholder="Low/Medium/High" />
+            <Field label="Audience Energy — Close" field="audience_energy_close" rows={1} placeholder="Low/Medium/High" />
+          </div>
+          <Field label="Key Engagement Moments" field="key_engagement_moments" rows={3} placeholder="What drove the most engagement?" />
+          <Field label="Audience Feedback Observations" field="audience_feedback_observations" rows={3} placeholder="Overheard feedback, reactions, mood..." />
+          {(isStrategy || isCEO) && <button onClick={() => saveSection("audience")} disabled={saving} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 24px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Save Audience Section"}</button>}
+        </div>
+      )}
+
+      {/* ── VENDOR SECTION ── */}
+      {activeSection === "vendor" && (isVM || isCEO) && (
+        <div>
+          <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:4 }}>Vendor Section</div>
+          <div style={{ color:T.textMuted, fontSize:12, marginBottom:16 }}>Filled by Vendor Manager</div>
+          <Field label="Overall Vendor Performance Summary" field="vendor_performance_summary" rows={4} placeholder="General assessment of all vendors..." />
+          <Field label="Vendors to Recommend for Future Events" field="vendors_recommended" rows={3} placeholder="List vendors who performed excellently..." />
+          <Field label="Vendors Not Recommended" field="vendors_not_recommended" rows={3} placeholder="List vendors with performance issues..." />
+          <Field label="Technical Delivery Quality" field="technical_delivery_quality" rows={3} placeholder="AV, production, equipment quality..." />
+          {/* Vendor Scorecards for this event */}
+          {scorecards.filter(s => s.project_id === selectedEvent.id).length > 0 && (
+            <div style={{ background:T.bg, border:`1px solid ${T.border}`, borderRadius:10, padding:"14px 16px", marginBottom:14 }}>
+              <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:10 }}>Vendor Scorecards — {selectedEvent.name}</div>
+              {scorecards.filter(s => s.project_id === selectedEvent.id).map(sc => (
+                <div key={sc.id} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:`1px solid ${T.border}33` }}>
+                  <span style={{ color:T.textPrimary, fontSize:13, fontWeight:600 }}>{sc.vendor_name}</span>
+                  <span style={{ color:getTier(sc.total_pct)?.color||T.amber, fontWeight:700, fontSize:13 }}>{sc.total_pct}% — {getTier(sc.total_pct)?.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {(isVM || isCEO) && <button onClick={() => saveSection("vendor")} disabled={saving} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 24px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Save Vendor Section"}</button>}
+        </div>
+      )}
+
+      {/* ── STRATEGIC SECTION ── */}
+      {activeSection === "strategic" && isCEO && (
+        <div>
+          <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:4 }}>Strategic Section</div>
+          <div style={{ color:T.textMuted, fontSize:12, marginBottom:16 }}>Filled by CEO</div>
+          <Field label="Was Strategic Intent Achieved?" field="strategic_intent_achieved" rows={3} placeholder="Did the event achieve its strategic objectives?" />
+          <Field label="Client Satisfaction Assessment" field="client_satisfaction" rows={3} placeholder="Client feedback, satisfaction level, relationship status..." />
+          <Field label="Business Development Signals" field="business_development_signals" rows={3} placeholder="New leads, repeat business signals, referrals..." />
+          <Field label="Recommendations for Next Edition" field="next_edition_recommendations" rows={4} placeholder="What should we do differently next time?" />
+          <button onClick={() => saveSection("strategic")} disabled={saving} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 24px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Save Strategic Section"}</button>
+        </div>
+      )}
+
+      {/* ── OVERVIEW & AI ── */}
+      {activeSection === "overview" && (
+        <div>
+          {/* Section status */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:10, marginBottom:20 }}>
+            {[
+              { label:"Operational", done:report?.operational_submitted_at, by:"Strategy Lead" },
+              { label:"Audience", done:report?.audience_submitted_at, by:"Strategy Lead" },
+              { label:"Vendor", done:report?.vendor_submitted_at, by:"Vendor Manager" },
+              { label:"Strategic", done:report?.ceo_submitted_at, by:"CEO" },
+            ].map(s => (
+              <div key={s.label} style={{ background:T.bg, border:`1px solid ${s.done?T.teal+"40":T.border}`, borderRadius:10, padding:"12px 14px" }}>
+                <div style={{ color:s.done?T.teal:T.amber, fontWeight:800, fontSize:12 }}>{s.done?"✓ Done":"Pending"}</div>
+                <div style={{ color:T.textPrimary, fontSize:12, fontWeight:600, marginTop:2 }}>{s.label}</div>
+                <div style={{ color:T.textMuted, fontSize:10, marginTop:2 }}>{s.by}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* AI Summary */}
+          {report?.ai_summary ? (
+            <div style={{ background:T.surface, border:`1px solid ${T.teal}30`, borderRadius:12, padding:"20px 24px", marginBottom:16 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+                <div style={{ color:T.teal, fontWeight:800, fontSize:14 }}>✦ AI Intelligence Report</div>
+                {isCEO && <button onClick={generateAI} disabled={generating} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"4px 12px", borderRadius:6, cursor:"pointer", fontSize:11 }}>Regenerate</button>}
+              </div>
+              <div style={{ color:T.textSecondary, fontSize:13, lineHeight:1.7, whiteSpace:"pre-wrap" }}>{report.ai_summary}</div>
+            </div>
+          ) : (
+            <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:"28px", textAlign:"center", marginBottom:16 }}>
+              <div style={{ fontSize:32, marginBottom:12 }}>✦</div>
+              <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16, marginBottom:8 }}>AI Report Not Yet Generated</div>
+              <div style={{ color:T.textMuted, fontSize:13, marginBottom:20 }}>{isCEO ? "Fill in the strategic section and generate the comprehensive AI intelligence report." : "The CEO will generate the AI report once all sections are complete."}</div>
+              {isCEO && (
+                <button onClick={generateAI} disabled={generating} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"12px 28px", borderRadius:10, cursor:"pointer", fontWeight:800, fontSize:14 }}>{generating?"Generating...":"✦ Generate AI Report"}</button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const EventsView = ({ user, userRole }) => {
   const [events, setEvents] = useState([]);

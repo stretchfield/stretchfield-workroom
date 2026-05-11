@@ -1078,7 +1078,7 @@ const CEODashboard = ({ onTab, user }) => {
             { label: "Revenue YTD", value: "GHS "+Math.round(revenueYTD/1000)+"k", color: "#10B981", tab: "opportunities" },
             { label: "Open Tasks", value: pendingTasks.length, color: pendingTasks.length > 5 ? T.amber : T.textMuted, tab: "events" },
             { label: "Vendor Rating", value: avgRating+"%", color: parseInt(avgRating) >= 70 ? T.teal : T.amber, tab: "scorecards" },
-            { label: "Total Business", value: "GHS "+Math.round(totalBusiness/1000)+"k", color: T.gold, tab: "vendors" },
+            { label: "Total Business", value: "GHS "+Math.round(totalBusiness/1000)+"k", color: T.amber, tab: "vendors" },
           ].map(k => (
             <div key={k.label} onClick={() => onTab(k.tab)} style={{ cursor: "pointer", padding: "12px 14px", background: T.bg+"80", border: "1px solid "+T.border+"44", borderRadius: 10, transition: "border-color 0.15s" }}
               onMouseEnter={e => e.currentTarget.style.borderColor = k.color+"60"}
@@ -1276,7 +1276,7 @@ const CEODashboard = ({ onTab, user }) => {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px,1fr))", gap: 12 }}>
           {[
-            { label: "Total Vendor Spend", value: "GHS "+totalBusiness.toLocaleString(), color: T.gold, tab: "vendor-analytics" },
+            { label: "Total Vendor Spend", value: "GHS "+totalBusiness.toLocaleString(), color: T.amber, tab: "vendor-analytics" },
             { label: "Pending Payments", value: "GHS "+(paymentAuths.filter(p=>p.status==="pending_ceo").reduce((s,p)=>s+(p.agreed_amount||0),0)).toLocaleString(), color: T.amber, tab: "payment-authorisation" },
             { label: "Approved Payments", value: "GHS "+(paymentAuths.filter(p=>p.status==="approved").reduce((s,p)=>s+(p.agreed_amount||0),0)).toLocaleString(), color: T.teal, tab: "payment-authorisation" },
             { label: "Vouchers Pending", value: vouchers.filter(v=>v.status==="pending_approval").length, color: T.cyan, tab: "finance" },
@@ -1529,7 +1529,7 @@ const VendorManagerDashboard = ({ user }) => {
                   <input type="number" value={payReqForm.amount} onChange={e=>setPayReqForm(f=>({...f,amount:e.target.value}))} placeholder="0.00" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
                 ) : (
                   <div style={{ padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}44`, borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                    <span style={{ color: payReqForm.amount ? T.gold : T.textMuted, fontWeight: payReqForm.amount ? 800 : 400, fontSize:15 }}>{payReqForm.amount ? "GHS "+parseFloat(payReqForm.amount).toLocaleString() : "No rate set for this event yet"}</span>
+                    <span style={{ color: payReqForm.amount ? T.amber : T.textMuted, fontWeight: payReqForm.amount ? 800 : 400, fontSize:15 }}>{payReqForm.amount ? "GHS "+parseFloat(payReqForm.amount).toLocaleString() : "No rate set for this event yet"}</span>
                     {payReqForm.amount && <span style={{ color:T.teal, fontSize:10, fontWeight:700 }}>🔒 Set by CEO/Finance</span>}
                   </div>
                 )}
@@ -1789,7 +1789,7 @@ const StaffDashboard = ({ user }) => {
                   <input type="number" value={payReqForm.amount} onChange={e=>setPayReqForm(f=>({...f,amount:e.target.value}))} placeholder="0.00" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
                 ) : (
                   <div style={{ padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}44`, borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                    <span style={{ color: payReqForm.amount ? T.gold : T.textMuted, fontWeight: payReqForm.amount ? 800 : 400, fontSize:15 }}>{payReqForm.amount ? "GHS "+parseFloat(payReqForm.amount).toLocaleString() : "No rate set for this event yet"}</span>
+                    <span style={{ color: payReqForm.amount ? T.amber : T.textMuted, fontWeight: payReqForm.amount ? 800 : 400, fontSize:15 }}>{payReqForm.amount ? "GHS "+parseFloat(payReqForm.amount).toLocaleString() : "No rate set for this event yet"}</span>
                     {payReqForm.amount && <span style={{ color:T.teal, fontSize:10, fontWeight:700 }}>🔒 Set by CEO/Finance</span>}
                   </div>
                 )}
@@ -1928,7 +1928,7 @@ const VendorDashboard = ({ user }) => {
             { label: "Active RFFs", value: assignments.filter(a => a.status === "pending").length, color: T.cyan },
             { label: "Quotes Submitted", value: assignments.filter(a => a.status === "quote-submitted").length, color: T.amber },
             { label: "Jobs Done", value: completedJobs, color: T.teal },
-            { label: "Total Business", value: "GHS "+Math.round(totalBusiness/1000)+"k", color: T.gold },
+            { label: "Total Business", value: "GHS "+Math.round(totalBusiness/1000)+"k", color: T.amber },
             { label: "Pending Invoices", value: pendingInvoices.length, color: pendingInvoices.length > 0 ? T.amber : T.textMuted },
             { label: "Paid Invoices", value: paidInvoices.length, color: T.teal },
           ].map(k => (
@@ -1960,7 +1960,7 @@ const VendorDashboard = ({ user }) => {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ color: T.textPrimary, fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rff?.title || "RFF"}</div>
                   <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{rff?.event_name}</div>
-                  {a.quote_amount && <div style={{ color: T.gold, fontWeight: 700, fontSize: 12, marginTop: 3 }}>GHS {parseFloat(a.quote_amount).toLocaleString()}</div>}
+                  {a.quote_amount && <div style={{ color: T.amber, fontWeight: 700, fontSize: 12, marginTop: 3 }}>GHS {parseFloat(a.quote_amount).toLocaleString()}</div>}
                 </div>
                 <span style={{ color: statusColors[a.status]||T.textMuted, fontSize: 10, fontWeight: 700, background: (statusColors[a.status]||T.textMuted)+"18", padding: "2px 8px", borderRadius: 20, marginLeft: 8, flexShrink: 0 }}>{statusLabels[a.status]||a.status}</span>
               </div>
@@ -1983,7 +1983,7 @@ const VendorDashboard = ({ user }) => {
                 <div>
                   <div style={{ color: T.cyan, fontWeight: 700, fontSize: 13 }}>{po.internal_po_number || "PO"}</div>
                   <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{po.event_name}</div>
-                  <div style={{ color: T.gold, fontWeight: 700, fontSize: 12, marginTop: 3 }}>{po.currency||"GHS"} {parseFloat(po.amount||0).toLocaleString()}</div>
+                  <div style={{ color: T.amber, fontWeight: 700, fontSize: 12, marginTop: 3 }}>{po.currency||"GHS"} {parseFloat(po.amount||0).toLocaleString()}</div>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
                   <span style={{ color: statusColors[po.status]||T.textMuted, fontSize: 10, fontWeight: 700, background: (statusColors[po.status]||T.textMuted)+"18", padding: "2px 8px", borderRadius: 20 }}>{po.status}</span>
@@ -2359,7 +2359,7 @@ const UsersView = ({ user }) => {
       {/* KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px,1fr))", gap: 12, marginBottom: 24 }}>
         {[...new Set(users.map(u => u.role))].map((role, i) => {
-          const roleColors = { "CEO": T.cyan, "Country Manager": T.teal, "Vendor Manager": T.amber, "Strategy & Events Lead": T.magenta, "Finance Manager": T.gold, "Sales & Marketing": T.blue, "Vendor": T.textSecondary, "Client": "#10B981", "Board of Directors": "#8B5CF6" };
+          const roleColors = { "CEO": T.cyan, "Country Manager": T.teal, "Vendor Manager": T.amber, "Strategy & Events Lead": T.magenta, "Finance Manager": T.amber, "Sales & Marketing": T.blue, "Vendor": T.textSecondary, "Client": "#10B981", "Board of Directors": "#8B5CF6" };
           const color = roleColors[role] || T.textMuted;
           return (
             <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${color}`, borderRadius: 10 }}>
@@ -3091,7 +3091,7 @@ const LeadCard = ({ lead, selectedLead, setSelectedLead, activities, onReactivat
         {lead.status === "won" && !lead.approved && <span style={{ background: T.amber+"20", color: T.amber, fontSize: 9, fontWeight: 800, borderRadius: 20, padding: "2px 7px", flexShrink: 0, marginLeft: 6 }}>CEO</span>}
         {lead.status === "won" && lead.approved && <span style={{ background: "#10B98120", color: "#10B981", fontSize: 9, fontWeight: 800, borderRadius: 20, padding: "2px 7px", flexShrink: 0, marginLeft: 6 }}>✓</span>}
       </div>
-      <div style={{ color: T.gold, fontWeight: 900, fontSize: 15, marginBottom: 8 }}>GHS {(lead.value||0).toLocaleString()}</div>
+      <div style={{ color: T.amber, fontWeight: 900, fontSize: 15, marginBottom: 8 }}>GHS {(lead.value||0).toLocaleString()}</div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <span style={{ color: T.textMuted, fontSize: 10 }}>{daysSince}d</span>
@@ -3206,7 +3206,7 @@ const LeadPanel = ({ lead, activities, canEdit, canApprove, addActivity, updateS
         )}
 
         <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
-          <span style={{ color: T.gold, fontWeight: 900, fontSize: 18 }}>GHS {(lead.value||0).toLocaleString()}</span>
+          <span style={{ color: T.amber, fontWeight: 900, fontSize: 18 }}>GHS {(lead.value||0).toLocaleString()}</span>
           <span style={{ background: stage.color+"20", color: stage.color, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{lead.status}</span>
         </div>
         {canEdit && (
@@ -3518,7 +3518,7 @@ const CRMView = ({ user }) => {
                           {lead.email && <div style={{ color: T.textMuted, fontSize: 11 }}>{lead.email}</div>}
                         </td>
                         <td style={{ padding: "10px 14px", color: T.textSecondary, fontSize: 12 }}>{lead.contact_name||"—"}<br/><span style={{ color: T.textMuted, fontSize: 11 }}>{lead.phone||""}</span></td>
-                        <td style={{ padding: "10px 14px", color: T.gold, fontWeight: 800, fontSize: 13 }}>GHS {(lead.value||0).toLocaleString()}</td>
+                        <td style={{ padding: "10px 14px", color: T.amber, fontWeight: 800, fontSize: 13 }}>GHS {(lead.value||0).toLocaleString()}</td>
                         <td style={{ padding: "10px 14px" }}><span style={{ background: stage.color+"18", color: stage.color, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{stage.label}</span></td>
                         <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 12 }}>{lead.source||"—"}</td>
                         <td style={{ padding: "10px 14px", color: T.cyan, fontSize: 12 }}>{lead.assigned_name||"—"}</td>
@@ -6334,7 +6334,7 @@ const CRMDashboardCEO = ({ user }) => {
               <div key={rep.id} style={{ marginBottom: 18, paddingBottom: 18, borderBottom: `1px solid ${T.border}44` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <div>
-                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>{i === 0 && <span style={{ color: T.gold }}>★ </span>}{rep.name}</div>
+                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>{i === 0 && <span style={{ color: T.amber }}>★ </span>}{rep.name}</div>
                     <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{rep.repWon.length} won · {rep.closingPct}% close · {rep.repCycle}d</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
@@ -6362,7 +6362,7 @@ const CRMDashboardCEO = ({ user }) => {
             <div key={company} style={{ marginBottom: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                 <div style={{ color: T.textPrimary, fontSize: 12, fontWeight: 600 }}>{company}</div>
-                <div style={{ color: T.gold, fontWeight: 800, fontSize: 12 }}>GHS {amount.toLocaleString()}</div>
+                <div style={{ color: T.amber, fontWeight: 800, fontSize: 12 }}>GHS {amount.toLocaleString()}</div>
               </div>
               <div style={{ height: 3, background: T.border + "44", borderRadius: 2 }}>
                 <div style={{ height: "100%", width: Math.round((amount / totalRevenue) * 100) + "%", background: `linear-gradient(90deg, ${T.cyan}, ${T.teal})`, borderRadius: 2 }} />
@@ -6393,7 +6393,7 @@ const CRMDashboardCEO = ({ user }) => {
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ color: T.gold, fontWeight: 800, fontSize: 13 }}>GHS {t.target_amount.toLocaleString()}</div>
+                <div style={{ color: T.amber, fontWeight: 800, fontSize: 13 }}>GHS {t.target_amount.toLocaleString()}</div>
                 <div style={{ color: pct >= 100 ? T.teal : T.textMuted, fontSize: 10, marginTop: 2 }}>{pct}% achieved</div>
               </div>
             </div>
@@ -6750,7 +6750,7 @@ const CRMDashboardSM = ({ user }) => {
                 <div style={{ color: T.textPrimary, fontSize: 12, fontWeight: 600 }}>{company}</div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <div style={{ color: T.textMuted, fontSize: 10 }}>{totalRevenue ? Math.round((amount / totalRevenue) * 100) : 0}%</div>
-                  <div style={{ color: T.gold, fontWeight: 800, fontSize: 12 }}>GHS {amount.toLocaleString()}</div>
+                  <div style={{ color: T.amber, fontWeight: 800, fontSize: 12 }}>GHS {amount.toLocaleString()}</div>
                 </div>
               </div>
               <div style={{ height: 3, background: T.border + "44", borderRadius: 2 }}>
@@ -7497,7 +7497,7 @@ const FinanceDashboard = ({ user, onTab }) => {
                     <div style={{ color:T.textMuted, fontSize:11, marginTop:3 }}>{new Date(req.submitted_at).toLocaleDateString("en-GB", { day:"numeric", month:"short", year:"numeric" })}</div>
                   </div>
                   <div style={{ textAlign:"right" }}>
-                    <div style={{ color:T.gold, fontWeight:900, fontSize:18 }}>GHS {parseFloat(req.amount||0).toLocaleString()}</div>
+                    <div style={{ color:T.amber, fontWeight:900, fontSize:18 }}>GHS {parseFloat(req.amount||0).toLocaleString()}</div>
                     <span style={{ color:statusColors[req.status]||T.textMuted, fontSize:10, fontWeight:800, background:(statusColors[req.status]||T.textMuted)+"15", padding:"2px 8px", borderRadius:20 }}>{req.status}</span>
                   </div>
                 </div>
@@ -9396,7 +9396,7 @@ const PurchaseOrderView = ({ user }) => {
                     <div>
                       <div style={{ color:T.textPrimary, fontWeight:900, fontSize:16 }}>{award.vendor_name}</div>
                       <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{rff?.title} {event?.name ? "· "+event.name : ""}</div>
-                      <div style={{ color:T.gold, fontWeight:900, fontSize:18, marginTop:6 }}>GHS {parseFloat(amount||0).toLocaleString()}</div>
+                      <div style={{ color:T.amber, fontWeight:900, fontSize:18, marginTop:6 }}>GHS {parseFloat(amount||0).toLocaleString()}</div>
                       <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>Approved quote — locked and non-editable</div>
                     </div>
                     <span style={{ color:T.cyan, fontSize:10, fontWeight:800, background:T.cyan+"15", padding:"3px 10px", borderRadius:20 }}>CONFIRMED</span>
@@ -10350,7 +10350,7 @@ const QuoteComparisonView = ({ user }) => {
                           {expCount > 0 && <span style={{ background: T.blue+"15", color: T.blue, borderRadius: 20, padding: "1px 7px", fontSize: 9, fontWeight: 700 }}>📋 {expCount} event{expCount>1?"s":""}</span>}
                           {daysToRespond !== null && <span style={{ background: daysToRespond <= 2 ? T.teal+"15" : T.amber+"15", color: daysToRespond <= 2 ? T.teal : T.amber, borderRadius: 20, padding: "1px 7px", fontSize: 9, fontWeight: 700 }}>⚡ {daysToRespond}d response</span>}
                           {a.quote_document_url ? <span style={{ background: T.teal+"15", color: T.teal, borderRadius: 20, padding: "1px 7px", fontSize: 9, fontWeight: 700 }}>📄 Doc ✓</span> : <span style={{ background: T.red+"15", color: T.red, borderRadius: 20, padding: "1px 7px", fontSize: 9, fontWeight: 700 }}>No doc</span>}
-                          {vApp?.payment_terms && <span style={{ background: T.gold+"15", color: T.gold, borderRadius: 20, padding: "1px 7px", fontSize: 9, fontWeight: 700 }}>💳 {vApp.payment_terms.slice(0,15)}</span>}
+                          {vApp?.payment_terms && <span style={{ background: T.amber+"15", color: T.amber, borderRadius: 20, padding: "1px 7px", fontSize: 9, fontWeight: 700 }}>💳 {vApp.payment_terms.slice(0,15)}</span>}
                         </div>
                         <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                           <button onClick={() => toggleCompare(a.id)} style={{ background: isSelected ? T.amber+"20" : T.surface, border: `1px solid ${isSelected ? T.amber : T.border}`, color: isSelected ? T.amber : T.textMuted, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>{isSelected ? "✓ Selected" : "Compare"}</button>
@@ -10387,7 +10387,7 @@ const QuoteComparisonView = ({ user }) => {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 20, flexWrap: "wrap" }}>
                   <div>
                     <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18 }}>{a.vendor_name}</div>
-                    <div style={{ color: T.gold, fontWeight: 900, fontSize: 22, marginTop: 4 }}>GHS {a.quote_amount.toLocaleString()}</div>
+                    <div style={{ color: T.amber, fontWeight: 900, fontSize: 22, marginTop: 4 }}>GHS {a.quote_amount.toLocaleString()}</div>
                     <div style={{ color: isOver ? T.red : T.teal, fontWeight: 700, fontSize: 13, marginTop: 4 }}>
                       {isOver ? `⚠ GHS ${Math.abs(diff).toLocaleString()} over budget (${pct}%)` : `✓ GHS ${Math.abs(diff).toLocaleString()} under budget (${Math.abs(pct)}%)`}
                     </div>
@@ -10493,7 +10493,7 @@ const QuoteComparisonView = ({ user }) => {
                       {/* Quote Amount */}
                       <div style={{ marginBottom: 14, padding: "10px 12px", background: T.bg, borderRadius: 8 }}>
                         <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>Quote Amount</div>
-                        <div style={{ color: T.gold, fontWeight: 900, fontSize: 17 }}>GHS {(a.quote_amount||0).toLocaleString()}</div>
+                        <div style={{ color: T.amber, fontWeight: 900, fontSize: 17 }}>GHS {(a.quote_amount||0).toLocaleString()}</div>
                         {activeBudget > 0 && (
                           <div style={{ color: a.quote_amount <= activeBudget ? T.teal : "#F43F5E", fontSize: 11, fontWeight: 700, marginTop: 3 }}>
                             {a.quote_amount <= activeBudget ? `✓ ${((1 - a.quote_amount/activeBudget)*100).toFixed(1)}% under budget` : `⚠ ${(((a.quote_amount-activeBudget)/activeBudget)*100).toFixed(1)}% over budget`}
@@ -10597,7 +10597,7 @@ const QuoteComparisonView = ({ user }) => {
 
             <div style={{ background: T.bg, border: "1px solid " + T.border, borderRadius: 10, padding: "12px 16px", marginBottom: 16 }}>
               <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>Current Agreed Amount</div>
-              <div style={{ color: T.gold, fontWeight: 900, fontSize: 20 }}>GHS {parseFloat(changeOrderModal.agreed_amount || changeOrderModal.quoted_amount || 0).toLocaleString()}</div>
+              <div style={{ color: T.amber, fontWeight: 900, fontSize: 20 }}>GHS {parseFloat(changeOrderModal.agreed_amount || changeOrderModal.quoted_amount || 0).toLocaleString()}</div>
               <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Original quote: GHS {parseFloat(changeOrderModal.quoted_amount || 0).toLocaleString()}</div>
             </div>
 
@@ -11500,7 +11500,7 @@ const EditVendorAppModal = ({ app, user, onClose, onResubmitted }) => {
         </div>
 
         <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
-          <button onClick={handleResubmit} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.amber}, ${T.gold})`, border: "none", color: "#fff", padding: "11px 28px", borderRadius: 8, cursor: saving ? "not-allowed" : "pointer", fontWeight: 800, fontSize: 13, opacity: saving ? 0.7 : 1 }}>{saving ? "Resubmitting..." : "Resubmit for Approval"}</button>
+          <button onClick={handleResubmit} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.amber}, ${T.amber})`, border: "none", color: "#fff", padding: "11px 28px", borderRadius: 8, cursor: saving ? "not-allowed" : "pointer", fontWeight: 800, fontSize: 13, opacity: saving ? 0.7 : 1 }}>{saving ? "Resubmitting..." : "Resubmit for Approval"}</button>
           <button onClick={onClose} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "11px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
         </div>
       </div>
@@ -11626,7 +11626,7 @@ const VendorAssignmentPanel = ({ rffId, quoteDeadline }) => {
               <div style={{ color: T.textMuted, fontSize: 10 }}>{v.profiles?.service_category || v.profiles?.email}</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {v.quote_amount && <span style={{ color: T.gold, fontSize: 12, fontWeight: 700 }}>GHS {parseFloat(v.quote_amount).toLocaleString()}</span>}
+              {v.quote_amount && <span style={{ color: T.amber, fontSize: 12, fontWeight: 700 }}>GHS {parseFloat(v.quote_amount).toLocaleString()}</span>}
               <span style={{ color: statusColors[v.status] || T.textMuted, fontSize: 10, fontWeight: 700, background: (statusColors[v.status] || T.textMuted)+"15", padding: "2px 8px", borderRadius: 20 }}>{statusLabels[v.status] || v.status}</span>
             </div>
           </div>
@@ -12114,7 +12114,7 @@ const VendorAssignmentView = ({ user }) => {
                                 <div>
                                   <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{a.vendor_name}</div>
                                   {vp && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 1 }}>{vp.service_category || vp.email}</div>}
-                                  {a.quote_amount && <div style={{ color: T.gold, fontWeight: 700, fontSize: 13, marginTop: 4 }}>GHS {parseFloat(a.quote_amount).toLocaleString()}</div>}
+                                  {a.quote_amount && <div style={{ color: T.amber, fontWeight: 700, fontSize: 13, marginTop: 4 }}>GHS {parseFloat(a.quote_amount).toLocaleString()}</div>}
                                 </div>
                                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                                   <span style={{ color: statusColors[a.status] || T.textMuted, fontSize: 10, fontWeight: 700, background: (statusColors[a.status] || T.textMuted)+"15", padding: "2px 8px", borderRadius: 20 }}>{statusLabels[a.status] || a.status}</span>
@@ -14102,7 +14102,7 @@ const InvoicesView = () => {
                 </div>
                 <Badge status={inv.status} />
               </div>
-              <div style={{ color: T.gold, fontSize: 20, fontWeight: 900, marginBottom: 12 }}>GHS {(inv.amount || 0).toLocaleString()}</div>
+              <div style={{ color: T.amber, fontSize: 20, fontWeight: 900, marginBottom: 12 }}>GHS {(inv.amount || 0).toLocaleString()}</div>
               {inv.status === "pending" && (
                 <Btn small onClick={() => handleApprove(inv.id)}>✓ Approve</Btn>
               )}
@@ -16194,7 +16194,7 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
                     {auth.notes && <div style={{ color:T.textSecondary, fontSize:12, marginTop:4, fontStyle:"italic" }}>{auth.notes}</div>}
                   </div>
                   <div style={{ textAlign:"right" }}>
-                    <div style={{ color:T.gold, fontWeight:900, fontSize:20 }}>GHS {parseFloat(auth.agreed_amount||0).toLocaleString()}</div>
+                    <div style={{ color:T.amber, fontWeight:900, fontSize:20 }}>GHS {parseFloat(auth.agreed_amount||0).toLocaleString()}</div>
                     <span style={{ color:T.amber, fontSize:10, fontWeight:800, background:T.amber+"15", padding:"2px 8px", borderRadius:20 }}>Pending CEO</span>
                   </div>
                 </div>
@@ -16835,7 +16835,7 @@ const BoardDashboard = ({ user }) => {
 
       {/* ── HERO ── */}
       <div style={{ background: `linear-gradient(135deg, ${T.bgDeep} 0%, #0D1F36 60%, ${T.bgDeep} 100%)`, border: `1px solid ${T.border}`, borderRadius: 16, padding: "32px 36px", marginBottom: 24, position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", top: -60, right: -60, width: 240, height: 240, background: `radial-gradient(circle, ${T.gold}08, transparent 70%)`, pointerEvents: "none" }} />
+        <div style={{ position: "absolute", top: -60, right: -60, width: 240, height: 240, background: `radial-gradient(circle, ${T.amber}08, transparent 70%)`, pointerEvents: "none" }} />
         <div>
           <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>{now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
           <h1 style={{ margin: "0 0 6px", fontSize: 28, fontWeight: 900, color: T.textPrimary, letterSpacing: "-0.03em" }}>{greeting}, {user.name.split(" ")[0]}.</h1>
@@ -16847,7 +16847,7 @@ const BoardDashboard = ({ user }) => {
             { label: "Revenue YTD", value: "GHS "+Math.round(revenueYTD/1000)+"k", color: T.teal },
             { label: "Pipeline Value", value: "GHS "+Math.round(pipelineValue/1000)+"k", color: T.amber },
             { label: "Total Events", value: events.length, color: "#10B981" },
-            { label: "Won Clients", value: wonOpps.length, color: T.gold },
+            { label: "Won Clients", value: wonOpps.length, color: T.amber },
           ].map(k => (
             <div key={k.label} style={{ padding: "12px 14px", background: `${T.bg}80`, border: `1px solid ${T.border}44`, borderRadius: 10 }}>
               <div style={{ color: k.color, fontSize: 18, fontWeight: 900 }}>{k.value}</div>
@@ -17011,7 +17011,7 @@ const VendorAnalyticsView = ({ user }) => {
         {[
           { label: "Total Vendors", value: vendors.length, color: T.cyan },
           { label: "Total Jobs", value: totals.jobs, color: T.teal },
-          { label: "Total Business", value: "GHS " + totals.business.toLocaleString(), color: T.gold },
+          { label: "Total Business", value: "GHS " + totals.business.toLocaleString(), color: T.amber },
           { label: "Paid Out", value: "GHS " + totals.paid.toLocaleString(), color: T.teal },
           { label: "Pending Payment", value: "GHS " + totals.pending.toLocaleString(), color: totals.pending > 0 ? T.amber : T.textMuted },
         ].map((k, i) => (
@@ -17073,7 +17073,7 @@ const VendorAnalyticsView = ({ user }) => {
                         <span style={{ color: s.jobsCompleted > 0 ? T.teal : T.textMuted, fontWeight: s.jobsCompleted > 0 ? 700 : 400, fontSize: 13 }}>{s.jobsCompleted}</span>
                       </td>
                       <td style={{ padding: "12px 14px" }}>
-                        <span style={{ color: s.totalBusiness > 0 ? T.gold : T.textMuted, fontWeight: 700, fontSize: 13 }}>{s.totalBusiness > 0 ? "GHS " + s.totalBusiness.toLocaleString() : "—"}</span>
+                        <span style={{ color: s.totalBusiness > 0 ? T.amber : T.textMuted, fontWeight: 700, fontSize: 13 }}>{s.totalBusiness > 0 ? "GHS " + s.totalBusiness.toLocaleString() : "—"}</span>
                       </td>
                       <td style={{ padding: "12px 14px" }}>
                         <span style={{ color: s.pendingAmount > 0 ? T.amber : T.textMuted, fontWeight: s.pendingAmount > 0 ? 700 : 400, fontSize: 13 }}>{s.pendingAmount > 0 ? "GHS " + s.pendingAmount.toLocaleString() : "—"}</span>
@@ -17088,7 +17088,7 @@ const VendorAnalyticsView = ({ user }) => {
                 <tr style={{ background: T.bgDeep, borderTop: `2px solid ${T.border}` }}>
                   <td colSpan={4} style={{ padding: "12px 14px", color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>Totals ({sortedVendors.length} vendors)</td>
                   <td style={{ padding: "12px 14px", textAlign: "center", color: T.teal, fontWeight: 800, fontSize: 13 }}>{totals.jobs}</td>
-                  <td style={{ padding: "12px 14px", color: T.gold, fontWeight: 800, fontSize: 13 }}>GHS {totals.business.toLocaleString()}</td>
+                  <td style={{ padding: "12px 14px", color: T.amber, fontWeight: 800, fontSize: 13 }}>GHS {totals.business.toLocaleString()}</td>
                   <td style={{ padding: "12px 14px", color: T.amber, fontWeight: 800, fontSize: 13 }}>{totals.pending > 0 ? "GHS " + totals.pending.toLocaleString() : "—"}</td>
                   <td style={{ padding: "12px 14px", color: T.teal, fontWeight: 800, fontSize: 13 }}>{totals.paid > 0 ? "GHS " + totals.paid.toLocaleString() : "—"}</td>
                 </tr>

@@ -13401,102 +13401,138 @@ const EventClientPortalPanel = ({ event, client, user, onClose }) => {
       {/* Documents */}
       {activeSection === "documents" && (
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-            <div style={{ color: T.textMuted, fontSize: 12 }}>Share files with client</div>
-            <button onClick={() => setShowDocForm(!showDocForm)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>+ Share Document</button>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <div style={{ color: T.textMuted, fontSize: 12 }}>Internal event documents</div>
+            <button onClick={() => setShowDocForm(!showDocForm)} style={{ background: "linear-gradient(135deg, " + T.cyan + ", " + T.teal + ")", border: "none", color: "#fff", padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>+ Upload</button>
           </div>
           {showDocForm && (
-            <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 10, padding: "16px", marginBottom: 14 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-                <div style={{ gridColumn: "1/-1" }}>
+            <div style={{ background: T.surface, border: "1px solid " + T.cyan+"30", borderRadius: 12, padding: "16px 18px", marginBottom: 16 }}>
+              <div style={{ display: "grid", gap: 10, marginBottom: 10 }}>
+                <div>
                   <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Title</label>
-                  <input value={docForm.title} onChange={e => setDocForm(f => ({...f, title: e.target.value}))} placeholder="e.g. Event Brief v1" style={inputStyle} />
+                  <input value={docForm.title} onChange={e => setDocForm(f => ({...f, title: e.target.value}))} placeholder="Document title" style={{ width: "100%", padding: "8px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 7, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                 </div>
                 <div>
                   <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Type</label>
-                  <select value={docForm.document_type} onChange={e => setDocForm(f => ({...f, document_type: e.target.value}))} style={{ ...inputStyle, appearance: "none" }}>
-                    {["Event Brief","Run of Show","Proposal","Contract","Programme","Other"].map(t => <option key={t}>{t}</option>)}
+                  <select value={docForm.document_type} onChange={e => setDocForm(f => ({...f, document_type: e.target.value}))} style={{ width: "100%", padding: "8px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 7, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                    {["Event Brief","Run of Show","Proposal","Contract","Programme","Invoice","Other"].map(t => <option key={t}>{t}</option>)}
                   </select>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 18 }}>
-                  <input type="checkbox" checked={docForm.requires_approval} onChange={e => setDocForm(f => ({...f, requires_approval: e.target.checked}))} id="doc_appr2" />
-                  <label htmlFor="doc_appr2" style={{ color: T.textMuted, fontSize: 12 }}>Requires client approval</label>
-                </div>
               </div>
-              <input type="file" onChange={e => setDocFile(e.target.files[0])} style={{ ...inputStyle, marginBottom: 10, cursor: "pointer" }} />
+              <input type="file" onChange={e => setDocFile(e.target.files[0])} style={{ width: "100%", padding: "8px", marginBottom: 10, cursor: "pointer" }} />
               {docFile && <div style={{ color: T.cyan, fontSize: 11, marginBottom: 10 }}>✓ {docFile.name}</div>}
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={shareDocument} disabled={saving || !docForm.title} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "7px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>{saving ? "Sharing..." : "Share"}</button>
-                <button onClick={() => setShowDocForm(false)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>Cancel</button>
+                <button onClick={shareDocument} disabled={uploadingDoc || !docForm.title} style={{ background: "linear-gradient(135deg, " + T.cyan + ", " + T.teal + ")", border: "none", color: "#fff", padding: "7px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>{uploadingDoc ? "Uploading..." : "Upload"}</button>
+                <button onClick={() => setShowDocForm(false)} style={{ background: "none", border: "1px solid " + T.border, color: T.textMuted, padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>Cancel</button>
               </div>
             </div>
           )}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {documents.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "30px 0" }}>No documents shared yet.</div>}
-            {documents.map(d => {
-              const [docComments, setDocComments] = React.useState([]);
-              const [expanded, setExpanded] = React.useState(false);
-              const [docMsg, setDocMsg] = React.useState("");
-              const loadComments = async () => {
-                const { data } = await supabase.from("document_comments").select("*").eq("document_id", d.id).order("created_at", { ascending: true });
-                setDocComments(data || []);
-              };
-              const sendComment = async () => {
-                if (!docMsg.trim()) return;
-                await supabase.from("document_comments").insert({ document_id: d.id, sender_id: user.id, sender_name: user.name, sender_role: user.role, message: docMsg.trim() });
-                const { data: cp } = await supabase.from("profiles").select("id").eq("email", client.email).single();
-                if (cp) await supabase.from("notifications").insert({ user_id: cp.id, title: "Comment on " + d.title, message: user.name + ": " + docMsg.trim().slice(0,60), type: "task" });
-                setDocMsg("");
-                loadComments();
-              };
+            {documents.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "30px 0" }}>No documents yet.</div>}
+            {documents.map(d => (
+              <div key={d.id} style={{ background: T.surface, border: "1px solid " + T.border, borderRadius: 10, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{d.title}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{d.document_type} · {new Date(d.created_at).toLocaleDateString("en-GB")}</div>
+                  {d.requires_approval && <div style={{ color: d.approved_by_client ? T.teal : T.amber, fontSize: 10, fontWeight: 700, marginTop: 2 }}>{d.approved_by_client ? "✓ Client approved" : "Awaiting approval"}</div>}
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {d.document_url && <a href={d.document_url} target="_blank" rel="noreferrer" style={{ color: T.cyan, fontSize: 11, fontWeight: 700, textDecoration: "none", padding: "4px 8px", border: "1px solid " + T.cyan+"30", borderRadius: 5 }}>↓ View</a>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+            {/* Intelligence Report */}
+      {activeSection === "report" && (
+        <EventIntelligenceReport event={event} user={user} onClose={() => setActiveSection("overview")} />
+      )}
+
+      {activeSection === "payment-rates" && canSetRates && (
+        <div>
+          <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:4 }}>Staff Payment Rates</div>
+          <div style={{ color:T.textMuted, fontSize:12, marginBottom:16 }}>Set project fee, per diem and transport allowance per staff. Amounts are locked for staff when submitting payment requests.</div>
+          {staffProfiles.map(staff => {
+            const existing = paymentRates.find(r => r.staff_id === staff.id);
+            return (
+              <div key={staff.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:10, padding:"14px 16px", marginBottom:10 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:10 }}>
+                  <div><div style={{ color:T.textPrimary, fontWeight:700, fontSize:13 }}>{staff.name}</div><div style={{ color:T.textMuted, fontSize:11 }}>{staff.role}</div></div>
+                  {existing && <span style={{ color:T.teal, fontSize:10, fontWeight:700, background:T.teal+"15", padding:"2px 8px", borderRadius:20 }}>✓ Set</span>}
+                </div>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:10 }}>
+                  {[["Project Fee","project_fee"],["Per Diem","per_diem"],["Transport","transport_allowance"]].map(([label,field]) => (
+                    <div key={field}>
+                      <label style={{ color:T.textMuted, fontSize:9, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:3 }}>{label} (GHS)</label>
+                      <input type="number" id={"rate-"+staff.id+"-"+field} defaultValue={existing?.[field]||""} placeholder="0.00" style={{ width:"100%", padding:"7px 10px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:6, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                    </div>
+                  ))}
+                </div>
+                <button onClick={async () => {
+                  setSavingRates(true);
+                  const pf = parseFloat(document.getElementById("rate-"+staff.id+"-project_fee")?.value||0);
+                  const pd = parseFloat(document.getElementById("rate-"+staff.id+"-per_diem")?.value||0);
+                  const ta = parseFloat(document.getElementById("rate-"+staff.id+"-transport_allowance")?.value||0);
+                  const payload = { staff_id:staff.id, staff_name:staff.name, project_id:event.id, project_name:event.name, project_fee:pf, per_diem:pd, transport_allowance:ta, set_by:user.id, updated_at:new Date().toISOString() };
+                  if (existing) { await supabase.from("staff_event_payments").update(payload).eq("id", existing.id); }
+                  else { await supabase.from("staff_event_payments").insert(payload); }
+                  await supabase.from("notifications").insert({ user_id:staff.id, title:"Payment Rates Set — "+event.name, message:"Your payment rates for "+event.name+" have been configured.", type:"finance" });
+                  const { data: updatedRates } = await supabase.from("staff_event_payments").select("*").eq("project_id", event.id);
+                  setPaymentRates(updatedRates||[]);
+                  setSavingRates(false);
+                }} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"7px 16px", borderRadius:7, cursor:"pointer", fontWeight:800, fontSize:12 }}>{savingRates?"Saving...":existing?"Update":"Set Rates"}</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {activeSection === "payment-rates" && ["CEO","Finance Manager"].includes(user.role) && (
+        <div>
+          <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:4 }}>Staff Payment Rates</div>
+          <div style={{ color:T.textMuted, fontSize:12, marginBottom:16 }}>Set project fee, per diem and transport allowance per staff member. Amounts are locked for staff when they submit payment requests.</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {staffProfiles.length === 0 && <div style={{ color:T.textMuted, fontSize:13, textAlign:"center", padding:"24px 0" }}>Loading staff...</div>}
+            {staffProfiles.map(staff => {
+              const existing = paymentRates.find(r => r.staff_id === staff.id);
               return (
-                <div key={d.id} style={{ background: T.surface, border: `1px solid ${expanded ? T.cyan : T.border}`, borderRadius: 10, overflow: "hidden" }}>
-                  <div style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div key={staff.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:10, padding:"14px 16px" }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
                     <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{d.title}</div>
-                        {d.uploaded_by_client && <span style={{ color: T.amber, fontSize: 9, fontWeight: 800, background: T.amber+"15", padding: "2px 6px", borderRadius: 10 }}>Client Upload</span>}
-                      </div>
-                      <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{d.document_type} · {new Date(d.created_at).toLocaleDateString("en-GB")}</div>
-                      {d.requires_approval && <div style={{ color: d.approved_by_client ? T.teal : T.amber, fontSize: 10, fontWeight: 700, marginTop: 2 }}>{d.approved_by_client ? "✓ Client approved" : "Awaiting approval"}</div>}
+                      <div style={{ color:T.textPrimary, fontWeight:700, fontSize:13 }}>{staff.name}</div>
+                      <div style={{ color:T.textMuted, fontSize:11 }}>{staff.role}</div>
                     </div>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      {d.document_url && <a href={d.document_url} target="_blank" rel="noreferrer" style={{ color: T.cyan, fontSize: 11, fontWeight: 700, textDecoration: "none", padding: "4px 8px", border: `1px solid ${T.cyan}30`, borderRadius: 5 }}>View</a>}
-                      <button onClick={() => { setExpanded(!expanded); if (!expanded) loadComments(); }} style={{ background: expanded ? T.cyan+"15" : "none", border: `1px solid ${expanded ? T.cyan : T.border}`, color: expanded ? T.cyan : T.textMuted, padding: "4px 8px", borderRadius: 5, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>{expanded ? "Close" : "Comment"}</button>
-                    </div>
+                    {existing && <span style={{ color:T.teal, fontSize:10, fontWeight:700, background:T.teal+"15", padding:"2px 8px", borderRadius:20 }}>✓ Rates Set</span>}
                   </div>
-                  {expanded && (
-                    <div style={{ borderTop: `1px solid ${T.border}`, padding: "12px 16px", background: T.bg }}>
-                      <div style={{ maxHeight: 180, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
-                        {docComments.length === 0 && <div style={{ color: T.textMuted, fontSize: 12 }}>No comments yet.</div>}
-                        {docComments.map(c => {
-                          const isMe = c.sender_id === user.id;
-                          return (
-                            <div key={c.id} style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" }}>
-                              <div style={{ maxWidth: "80%", background: isMe ? T.teal+"18" : T.surface, border: `1px solid ${isMe ? T.teal+"30" : T.border}`, borderRadius: isMe ? "12px 12px 2px 12px" : "12px 12px 12px 2px", padding: "8px 12px" }}>
-                                <div style={{ color: T.textPrimary, fontSize: 12 }}>{c.message}</div>
-                              </div>
-                              <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{c.sender_name} · {new Date(c.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
-                            </div>
-                          );
-                        })}
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:10 }}>
+                    {[["Project Fee","project_fee"],["Per Diem","per_diem"],["Transport","transport_allowance"]].map(([label,field]) => (
+                      <div key={field}>
+                        <label style={{ color:T.textMuted, fontSize:9, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:3 }}>{label} (GHS)</label>
+                        <input type="number" id={"rate-"+staff.id+"-"+field} defaultValue={existing?.[field]||""} placeholder="0.00"
+                          style={{ width:"100%", padding:"7px 10px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:6, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
                       </div>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <input value={docMsg} onChange={e => setDocMsg(e.target.value)} onKeyDown={e => { if (e.key === "Enter") sendComment(); }} placeholder="Comment on this document..." style={{ flex: 1, padding: "7px 10px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 7, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
-                        <button onClick={sendComment} disabled={!docMsg.trim()} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: "none", color: "#fff", padding: "7px 14px", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Send</button>
-                      </div>
-                    </div>
-                  )}
+                    ))}
+                  </div>
+                  <button onClick={async () => {
+                    setSavingRates(true);
+                    const pf = parseFloat(document.getElementById("rate-"+staff.id+"-project_fee")?.value||0);
+                    const pd = parseFloat(document.getElementById("rate-"+staff.id+"-per_diem")?.value||0);
+                    const ta = parseFloat(document.getElementById("rate-"+staff.id+"-transport_allowance")?.value||0);
+                    const payload = { staff_id:staff.id, staff_name:staff.name, project_id:event.id, project_name:event.name, project_fee:pf, per_diem:pd, transport_allowance:ta, set_by:user.id, updated_at:new Date().toISOString() };
+                    if (existing) { await supabase.from("staff_event_payments").update(payload).eq("id", existing.id); }
+                    else { await supabase.from("staff_event_payments").insert(payload); }
+                    await supabase.from("notifications").insert({ user_id:staff.id, title:"Payment Rates Set — "+event.name, message:"Your payment rates for "+event.name+" have been configured. You can now submit payment requests.", type:"finance" });
+                    const { data: pr } = await supabase.from("staff_event_payments").select("*").eq("project_id", event.id);
+                    setPaymentRates(pr||[]);
+                    setSavingRates(false);
+                  }} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"7px 16px", borderRadius:7, cursor:"pointer", fontWeight:800, fontSize:12 }}>{savingRates?"Saving...":existing?"Update Rates":"Set Rates"}</button>
                 </div>
               );
             })}
           </div>
         </div>
-      )}
-
-      {/* Intelligence Report */}
-      {activeSection === "report" && (
-        <EventIntelligenceReport event={event} user={user} onClose={() => setActiveSection("overview")} />
       )}
 
       {/* Messages */}
@@ -13572,8 +13608,12 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
   const [docForm, setDocForm] = useState({ title: "", document_type: "Event Brief", share_with_client: false });
   const [savingTask, setSavingTask] = useState(false);
 
+  const [paymentRates, setPaymentRates] = useState([]);
+  const [staffProfiles, setStaffProfiles] = useState([]);
+  const [savingRates, setSavingRates] = useState(false);
   const isCEO = user.role === "CEO";
   const canManage = ["CEO", "Country Manager", "Strategy & Events Lead"].includes(user.role);
+  const canSetRates = ["CEO", "Finance Manager"].includes(user.role);
   const PHASES = ["Brief", "Planning", "Pre-Production", "Production", "Live", "Post-Production", "Completed"];
   const phaseIdx = PHASES.indexOf(event.phase || "Planning");
   const daysToEvent = event.event_date ? Math.ceil((new Date(event.event_date) - new Date()) / (1000*60*60*24)) : null;
@@ -13775,6 +13815,8 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
           { id: "tasks", label: "Tasks (" + myTasks.length + ")" },
           { id: "documents", label: "Documents (" + documents.length + ")" },
           { id: "messages", label: "Messages" + (unreadMsgs > 0 ? " ●" : "") },
+          ...( ["CEO","Finance Manager"].includes(user.role) ? [{ id: "payment-rates", label: "💰 Staff Payment Rates" }] : []),
+          ...( ["CEO","Finance Manager"].includes(user.role) ? [{ id: "payment-rates", label: "Staff Payment Rates" }] : []),
           { id: "report", label: "Intelligence Report" },
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveSection(tab.id)} style={{ padding: "10px 18px", border: "none", background: "none", cursor: "pointer", color: activeSection === tab.id ? T.cyan : T.textMuted, fontWeight: activeSection === tab.id ? 800 : 400, fontSize: 13, borderBottom: activeSection === tab.id ? "2px solid " + T.cyan : "2px solid transparent", marginBottom: -1, transition: "all 0.15s" }}>{tab.label}</button>
@@ -16858,6 +16900,205 @@ const BoardDashboard = ({ user }) => {
     </div>
   );
 };
+
+const VendorAnalyticsView = ({ user }) => {
+  const [vendors, setVendors] = useState([]);
+  const [assignments, setAssignments] = useState([]);
+  const [awards, setAwards] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [scorecards, setScorecards] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [sortBy, setSortBy] = useState("name");
+  const [sortDir, setSortDir] = useState("asc");
+  const [search, setSearch] = useState("");
+
+  const load = async () => {
+    setLoading(true);
+    const [vp, asn, aw, inv, sc] = await Promise.all([
+      supabase.from("profiles").select("*").eq("role", "Vendor").order("name"),
+      supabase.from("rff_vendor_assignments").select("*"),
+      supabase.from("rff_awards").select("*"),
+      supabase.from("vendor_invoices").select("*"),
+      supabase.from("vendor_scorecards").select("*").order("created_at", { ascending: false }),
+    ]);
+    setVendors(vp.data || []);
+    setAssignments(asn.data || []);
+    setAwards(aw.data || []);
+    setInvoices(inv.data || []);
+    setScorecards(sc.data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const getVendorStats = (vendor) => {
+    const vAssignments = assignments.filter(a => a.vendor_id === vendor.id);
+    const vAwards = awards.filter(a => a.vendor_id === vendor.id);
+    const vInvoices = invoices.filter(i => i.vendor_id === vendor.id);
+    const vScorecards = scorecards.filter(s => s.vendor_id === vendor.id);
+    const latestScore = vScorecards.length > 0 ? vScorecards[0] : null;
+    const totalBusiness = vAwards.reduce((sum, a) => sum + (parseFloat(a.agreed_amount) || 0), 0);
+    const paidAmount = vInvoices.filter(i => i.status === "paid").reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
+    const pendingAmount = vInvoices.filter(i => i.status !== "paid").reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
+    return {
+      quotesSubmitted: vAssignments.filter(a => a.quote_amount).length,
+      quotesApproved: vAssignments.filter(a => a.status === "quote-approved" || a.status === "invoice-submitted").length,
+      jobsCompleted: vAwards.filter(a => a.status === "confirmed" || a.status === "po_created").length,
+      totalBusiness,
+      paidAmount,
+      pendingAmount,
+      rating: latestScore?.total_pct || 0,
+      tier: latestScore ? getTier(latestScore.total_pct) : null,
+      category: vendor.service_category || "—",
+    };
+  };
+
+  const handleSort = (col) => {
+    if (sortBy === col) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortBy(col); setSortDir("asc"); }
+  };
+
+  const filteredVendors = vendors.filter(v => 
+    v.name?.toLowerCase().includes(search.toLowerCase()) ||
+    v.service_category?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const sortedVendors = [...filteredVendors].sort((a, b) => {
+    const sa = getVendorStats(a);
+    const sb = getVendorStats(b);
+    let av, bv;
+    switch (sortBy) {
+      case "name": av = a.name; bv = b.name; break;
+      case "category": av = sa.category; bv = sb.category; break;
+      case "rating": av = sa.rating; bv = sb.rating; break;
+      case "jobs": av = sa.jobsCompleted; bv = sb.jobsCompleted; break;
+      case "business": av = sa.totalBusiness; bv = sb.totalBusiness; break;
+      case "pending": av = sa.pendingAmount; bv = sb.pendingAmount; break;
+      default: av = a.name; bv = b.name;
+    }
+    if (typeof av === "string") return sortDir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+    return sortDir === "asc" ? av - bv : bv - av;
+  });
+
+  const totals = sortedVendors.reduce((acc, v) => {
+    const s = getVendorStats(v);
+    acc.business += s.totalBusiness;
+    acc.paid += s.paidAmount;
+    acc.pending += s.pendingAmount;
+    acc.jobs += s.jobsCompleted;
+    return acc;
+  }, { business: 0, paid: 0, pending: 0, jobs: 0 });
+
+  const SortHeader = ({ col, label }) => (
+    <th onClick={() => handleSort(col)} style={{ padding: "10px 14px", color: sortBy === col ? T.cyan : T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", textAlign: "left", cursor: "pointer", whiteSpace: "nowrap", borderBottom: `1px solid ${T.border}`, userSelect: "none" }}>
+      {label} {sortBy === col ? (sortDir === "asc" ? "↑" : "↓") : ""}
+    </th>
+  );
+
+  return (
+    <div style={{ animation: "fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Procurement</div>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800 }}>Vendor Analytics</h2>
+        <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Performance, business value and invoice summary for all vendors</div>
+      </div>
+
+      {/* Summary KPIs */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Total Vendors", value: vendors.length, color: T.cyan },
+          { label: "Total Jobs", value: totals.jobs, color: T.teal },
+          { label: "Total Business", value: "GHS " + totals.business.toLocaleString(), color: T.gold },
+          { label: "Paid Out", value: "GHS " + totals.paid.toLocaleString(), color: T.teal },
+          { label: "Pending Payment", value: "GHS " + totals.pending.toLocaleString(), color: totals.pending > 0 ? T.amber : T.textMuted },
+        ].map((k, i) => (
+          <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
+            <div style={{ color: k.color, fontSize: 16, fontWeight: 900 }}>{k.value}</div>
+            <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, marginTop: 4, textTransform: "uppercase" }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Search */}
+      <div style={{ marginBottom: 16 }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search vendors by name or category..." style={{ width: "100%", padding: "10px 14px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+      </div>
+
+      {/* Table */}
+      {loading ? (
+        <div style={{ color: T.textMuted, textAlign: "center", padding: 40 }}>Loading...</div>
+      ) : (
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
+              <thead style={{ background: T.bgDeep }}>
+                <tr>
+                  <SortHeader col="name" label="Vendor" />
+                  <SortHeader col="category" label="Category" />
+                  <SortHeader col="rating" label="Rating" />
+                  <th style={{ padding: "10px 14px", color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", borderBottom: `1px solid ${T.border}`, textAlign: "center" }}>Quotes</th>
+                  <SortHeader col="jobs" label="Jobs Done" />
+                  <SortHeader col="business" label="Total Business" />
+                  <SortHeader col="pending" label="Pending Invoice" />
+                  <th style={{ padding: "10px 14px", color: T.textMuted, fontSize: 10, fontWeight: 800, textTransform: "uppercase", borderBottom: `1px solid ${T.border}`, textAlign: "center" }}>Paid Out</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedVendors.map((v, idx) => {
+                  const s = getVendorStats(v);
+                  const tier = s.tier;
+                  return (
+                    <tr key={v.id} style={{ background: idx % 2 === 0 ? "transparent" : T.bgDeep+"44", borderBottom: `1px solid ${T.border}22` }}>
+                      <td style={{ padding: "12px 14px" }}>
+                        <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{v.name}</div>
+                        <div style={{ color: T.textMuted, fontSize: 11 }}>{v.email}</div>
+                      </td>
+                      <td style={{ padding: "12px 14px", color: T.textMuted, fontSize: 12 }}>{s.category}</td>
+                      <td style={{ padding: "12px 14px" }}>
+                        {tier ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ color: tier.color, fontWeight: 800, fontSize: 13 }}>{s.rating}%</span>
+                            <span style={{ color: tier.color, fontSize: 10, background: tier.color+"18", padding: "1px 6px", borderRadius: 20 }}>{tier.label}</span>
+                          </div>
+                        ) : <span style={{ color: T.textMuted, fontSize: 12 }}>Unrated</span>}
+                      </td>
+                      <td style={{ padding: "12px 14px", textAlign: "center" }}>
+                        <span style={{ color: T.textPrimary, fontSize: 12 }}>{s.quotesSubmitted} submitted</span>
+                        {s.quotesApproved > 0 && <span style={{ color: T.teal, fontSize: 11, display: "block" }}>{s.quotesApproved} approved</span>}
+                      </td>
+                      <td style={{ padding: "12px 14px", textAlign: "center" }}>
+                        <span style={{ color: s.jobsCompleted > 0 ? T.teal : T.textMuted, fontWeight: s.jobsCompleted > 0 ? 700 : 400, fontSize: 13 }}>{s.jobsCompleted}</span>
+                      </td>
+                      <td style={{ padding: "12px 14px" }}>
+                        <span style={{ color: s.totalBusiness > 0 ? T.gold : T.textMuted, fontWeight: 700, fontSize: 13 }}>{s.totalBusiness > 0 ? "GHS " + s.totalBusiness.toLocaleString() : "—"}</span>
+                      </td>
+                      <td style={{ padding: "12px 14px" }}>
+                        <span style={{ color: s.pendingAmount > 0 ? T.amber : T.textMuted, fontWeight: s.pendingAmount > 0 ? 700 : 400, fontSize: 13 }}>{s.pendingAmount > 0 ? "GHS " + s.pendingAmount.toLocaleString() : "—"}</span>
+                      </td>
+                      <td style={{ padding: "12px 14px" }}>
+                        <span style={{ color: s.paidAmount > 0 ? T.teal : T.textMuted, fontWeight: s.paidAmount > 0 ? 700 : 400, fontSize: 13 }}>{s.paidAmount > 0 ? "GHS " + s.paidAmount.toLocaleString() : "—"}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {/* Totals row */}
+                <tr style={{ background: T.bgDeep, borderTop: `2px solid ${T.border}` }}>
+                  <td colSpan={4} style={{ padding: "12px 14px", color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>Totals ({sortedVendors.length} vendors)</td>
+                  <td style={{ padding: "12px 14px", textAlign: "center", color: T.teal, fontWeight: 800, fontSize: 13 }}>{totals.jobs}</td>
+                  <td style={{ padding: "12px 14px", color: T.gold, fontWeight: 800, fontSize: 13 }}>GHS {totals.business.toLocaleString()}</td>
+                  <td style={{ padding: "12px 14px", color: T.amber, fontWeight: 800, fontSize: 13 }}>{totals.pending > 0 ? "GHS " + totals.pending.toLocaleString() : "—"}</td>
+                  <td style={{ padding: "12px 14px", color: T.teal, fontWeight: 800, fontSize: 13 }}>{totals.paid > 0 ? "GHS " + totals.paid.toLocaleString() : "—"}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 
 const EventsView = ({ user, userRole }) => {
   const [events, setEvents] = useState([]);

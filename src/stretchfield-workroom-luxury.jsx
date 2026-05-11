@@ -8599,7 +8599,10 @@ const generatePOPDF = (po, vendor, rff, event) => {
   <!-- Header -->
   <div class="header">
     <div class="logo-area">
-      <div class="company">STRETCHFIELD</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+        <img src="https://workroom.stretchfield.com/logo512.png" alt="Stretchfield" style="height:48px;width:48px;display:block;" onerror="this.style.display='none'" />
+        <div class="company">STRETCHFIELD</div>
+      </div>
       <div class="tagline">We don't plan events. We engineer impact.</div>
       <div class="contact">
         info@stretchfield.com · www.stretchfield.com<br>

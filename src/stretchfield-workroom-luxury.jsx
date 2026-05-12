@@ -12036,7 +12036,42 @@ const ApprovedVendorsTab = ({ apps, user, load }) => {
   const [loginPwd, setLoginPwd] = React.useState("");
   const [loginSaving, setLoginSaving] = React.useState(false);
   const [loginSuccess, setLoginSuccess] = React.useState("");
+  const [editModal, setEditModal] = React.useState(null);
+  const [editForm, setEditForm] = React.useState({});
+  const [savingEdit, setSavingEdit] = React.useState(false);
   const approvedApps = apps.filter(a => ["approved","login-created"].includes(a.status));
+  const VTYPES = ["Event Lighting","Events Ushering","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
+
+  const saveEdit = async () => {
+    if (!editModal) return;
+    setSavingEdit(true);
+    // Update vendor_applications
+    await supabase.from("vendor_applications").update({
+      vendor_name: editForm.vendor_name,
+      vendor_type: editForm.vendor_type,
+      phone: editForm.phone,
+      contact_person: editForm.contact_person,
+      contact_email: editForm.contact_email,
+      bank_name: editForm.bank_name,
+      bank_account_name: editForm.bank_account_name,
+      account_number: editForm.account_number,
+      payment_terms: editForm.payment_terms,
+      address: editForm.address,
+    }).eq("id", editModal.id);
+    // Also update profiles table
+    const { data: profile } = await supabase.from("profiles").select("id").eq("email", editModal.contact_email).maybeSingle();
+    if (profile) {
+      await supabase.from("profiles").update({
+        name: editForm.vendor_name,
+        company_name: editForm.vendor_name,
+        phone: editForm.phone,
+        service_category: editForm.vendor_type,
+      }).eq("id", profile.id);
+    }
+    setSavingEdit(false);
+    setEditModal(null);
+    if (load) load();
+  };
 
   return (
     <div>
@@ -12052,7 +12087,8 @@ const ApprovedVendorsTab = ({ apps, user, load }) => {
                 <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{app.vendor_type} · {app.contact_email}</div>
                 <div style={{ color: T.textMuted, fontSize: 11, marginTop: 1 }}>{app.contact_person} · {app.phone}</div>
               </div>
-              <div>
+              <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                <button onClick={() => { setEditModal(app); setEditForm({ vendor_name: app.vendor_name, vendor_type: app.vendor_type, phone: app.phone, contact_person: app.contact_person, contact_email: app.contact_email, bank_name: app.bank_name||"", bank_account_name: app.bank_account_name||"", account_number: app.account_number||"", payment_terms: app.payment_terms||"", address: app.address||"" }); }} style={{ background: T.amber+"15", border: `1px solid ${T.amber}30`, color: T.amber, borderRadius: 8, padding: "5px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>✎ Edit</button>
                 {app.status === "login-created" ? (
                   <button onClick={() => { setLoginModal(app); setLoginPwd(generatePassword(app.contact_email || "")); setLoginSuccess("view"); }} style={{ background: T.teal+"18", border: `1px solid ${T.teal}40`, color: T.teal, borderRadius: 20, padding: "3px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>✓ Portal Active — View Login</button>
                 ) : (
@@ -12063,6 +12099,35 @@ const ApprovedVendorsTab = ({ apps, user, load }) => {
           </div>
         ))}
       </div>
+
+      {editModal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.75)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setEditModal(null)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.amber}30`, borderRadius:16, width:"100%", maxWidth:520, maxHeight:"85vh", overflowY:"auto", padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>Edit Vendor — {editModal.vendor_name}</div>
+            <div style={{ color:T.textMuted, fontSize:12, marginBottom:20 }}>{editModal.contact_email}</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              {[["Vendor Name","vendor_name"],["Phone","phone"],["Contact Person","contact_person"],["Contact Email","contact_email"],["Bank Name","bank_name"],["Account Name","bank_account_name"],["Account Number","account_number"],["Payment Terms","payment_terms"],["Address","address"]].map(([label,key]) => (
+                <div key={key}>
+                  <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>{label}</div>
+                  <input value={editForm[key]||""} onChange={e=>setEditForm(f=>({...f,[key]:e.target.value}))}
+                    style={{ width:"100%", padding:"8px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                </div>
+              ))}
+              <div>
+                <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>Service Category</div>
+                <select value={editForm.vendor_type||""} onChange={e=>setEditForm(f=>({...f,vendor_type:e.target.value}))}
+                  style={{ width:"100%", padding:"8px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  {VTYPES.map(t => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <button onClick={saveEdit} disabled={savingEdit} style={{ background:`linear-gradient(135deg,${T.amber},#F59E0B)`, border:"none", color:"#060B14", padding:"10px 24px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{savingEdit?"Saving...":"Save Changes"}</button>
+              <button onClick={() => setEditModal(null)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"10px 20px", borderRadius:8, cursor:"pointer", fontSize:13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loginModal && (
         <div style={{ position: "fixed", inset: 0, zIndex: 700, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setLoginModal(null)}>

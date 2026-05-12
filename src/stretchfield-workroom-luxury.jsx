@@ -3636,6 +3636,122 @@ const CRMView = ({ user }) => {
           </div>
         </div>
       )}
+
+      {/* ── APPROVE — CREATE CLIENT & PORTAL MODAL ── */}
+      {approvalModal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setApprovalModal(null)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.teal}40`, borderRadius:16, width:"100%", maxWidth:520, padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:20, marginBottom:4 }}>Create Client & Portal</div>
+            <div style={{ color:T.textMuted, fontSize:13, marginBottom:20 }}>Approve <strong>{approvalModal.company}</strong> and create their client account</div>
+
+            {/* Client details */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16 }}>
+              {[
+                ["Client/Company Name","name", approvalModal.company||""],
+                ["Contact Person","contact_name", approvalModal.contact_name||""],
+                ["Email","email", approvalModal.email||""],
+                ["Phone","phone", approvalModal.phone||""],
+              ].map(([label, field, def]) => (
+                <div key={field}>
+                  <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>{label}</label>
+                  <input value={clientForm[field]||(clientForm[field]===undefined?def:"")} onChange={e=>setClientForm(f=>({...f,[field]:e.target.value}))} placeholder={def}
+                    style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                </div>
+              ))}
+            </div>
+
+            {/* Event details */}
+            <div style={{ background:T.bg, border:`1px solid ${T.border}`, borderRadius:10, padding:"14px 16px", marginBottom:16 }}>
+              <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:10 }}>Create Event (Optional)</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                <div style={{ gridColumn:"1/-1" }}>
+                  <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Event Name</label>
+                  <input value={eventForm.name} onChange={e=>setEventForm(f=>({...f,name:e.target.value}))} placeholder={approvalModal.event_name||"e.g. Annual Conference 2026"}
+                    style={{ width:"100%", padding:"9px 12px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                </div>
+                <div>
+                  <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Event Date</label>
+                  <input type="date" value={eventForm.deadline} onChange={e=>setEventForm(f=>({...f,deadline:e.target.value}))}
+                    style={{ width:"100%", padding:"9px 12px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                </div>
+                <div>
+                  <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Phase</label>
+                  <select value={eventForm.phase} onChange={e=>setEventForm(f=>({...f,phase:e.target.value}))}
+                    style={{ width:"100%", padding:"9px 12px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                    {["Planning","Pre-Production","Production","Live","Post-Production"].map(p=><option key={p}>{p}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Create login toggle */}
+            <label style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer", marginBottom:16 }}>
+              <input type="checkbox" checked={createLogin} onChange={e=>setCreateLogin(e.target.checked)} />
+              <span style={{ color:T.textSecondary, fontSize:13 }}>Create WorkRoom login for client</span>
+            </label>
+            {createLogin && (
+              <div style={{ marginBottom:16 }}>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Temporary Password</label>
+                <input value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} placeholder="Set a password for client login"
+                  style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+              </div>
+            )}
+
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={async () => {
+                setSaving(true);
+                const name = clientForm.name || approvalModal.company;
+                const email = clientForm.email || approvalModal.email;
+                const phone = clientForm.phone || approvalModal.phone;
+                const contact = clientForm.contact_name || approvalModal.contact_name;
+
+                // 1. Create client in clients table
+                const { data: newClient } = await supabase.from("clients").insert({
+                  name: contact || name, company: name, email, phone,
+                }).select().single();
+
+                // 2. Create event if name provided
+                if (eventForm.name && newClient) {
+                  await supabase.from("projects").insert({
+                    name: eventForm.name, client: name, client_id: newClient.id,
+                    event_date: eventForm.deadline || null, phase: eventForm.phase || "Planning",
+                    status: "active", event_category: approvalModal.event_type || "Conference/Seminar",
+                  });
+                }
+
+                // 3. Create login if requested
+                if (createLogin && email) {
+                  try {
+                    const { data: authUser } = await supabase.auth.admin.createUser({ email, password: loginPassword || "Stretch@2026", email_confirm: true });
+                    if (authUser?.user) {
+                      await supabase.from("profiles").insert({ id: authUser.user.id, name, email, phone, role: "Client", company_name: name });
+                    }
+                  } catch(e) { console.error("Login creation error:", e); }
+                }
+
+                // 4. Mark opportunity as approved
+                await supabase.from("opportunities").update({ approved: true, status: "won" }).eq("id", approvalModal.id);
+
+                // Notify team
+                const { data: vms } = await supabase.from("profiles").select("id").in("role",["Vendor Manager","Strategy & Events Lead"]);
+                for (const vm of vms||[]) {
+                  await supabase.from("notifications").insert({ user_id:vm.id, title:"New Client — "+name, message:"CEO approved "+name+" as a client. "+( eventForm.name ? "Event '"+eventForm.name+"' created." : ""), type:"rff" });
+                }
+
+                setSaving(false);
+                setApprovalModal(null);
+                setClientForm({ name:"", company:"", email:"", phone:"" });
+                setEventForm({ name:"", deadline:"", phase:"Planning" });
+                setCreateLogin(false);
+                setLoginPassword("");
+                load();
+                alert("✓ Client created" + (eventForm.name ? " and event added" : "") + (createLogin ? " with login access" : "") + "!");
+              }} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${T.teal},#10B981)`, border:"none", color:"#fff", padding:"12px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:14 }}>{saving?"Creating...":"✓ Create Client & Portal"}</button>
+              <button onClick={() => setApprovalModal(null)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"12px 18px", borderRadius:8, cursor:"pointer", fontSize:13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

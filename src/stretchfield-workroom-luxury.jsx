@@ -14075,6 +14075,425 @@ const EventClientPortalPanel = ({ event, client, user, onClose }) => {
 
 
 
+
+// ─── RUN OF SHOW ──────────────────────────────────────────────────────────────
+const RunOfShowSection = ({ event, user, members }) => {
+  const [rows, setRows] = useState([]);
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ time_slot:"", duration_mins:"", segment_title:"", responsible_person:"", notes:"" });
+  const [saving, setSaving] = useState(false);
+  const canEdit = ["CEO","Strategy & Events Lead","Country Manager"].includes(user.role);
+
+  const load = async () => {
+    const { data } = await supabase.from("run_of_show").select("*").eq("project_id", event.id).order("order_index");
+    setRows(data || []);
+  };
+  useEffect(() => { load(); }, [event.id]);
+
+  const addRow = async () => {
+    if (!form.segment_title) return;
+    setSaving(true);
+    await supabase.from("run_of_show").insert({ project_id: event.id, ...form, duration_mins: parseInt(form.duration_mins)||0, order_index: rows.length, created_by: user.id });
+    setForm({ time_slot:"", duration_mins:"", segment_title:"", responsible_person:"", notes:"" });
+    setAdding(false); setSaving(false); load();
+  };
+
+  const deleteRow = async (id) => {
+    await supabase.from("run_of_show").delete().eq("id", id);
+    load();
+  };
+
+  const totalMins = rows.reduce((s,r) => s + (r.duration_mins||0), 0);
+
+  return (
+    <div>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+        <div>
+          <div style={{ color:T.textPrimary, fontWeight:900, fontSize:16 }}>Run of Show</div>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>Programme timeline — {rows.length} segments · {Math.floor(totalMins/60)}h {totalMins%60}m total</div>
+        </div>
+        {canEdit && <button onClick={() => setAdding(true)} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"8px 18px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>+ Add Segment</button>}
+      </div>
+
+      {adding && canEdit && (
+        <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:12, padding:16, marginBottom:16 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 2fr 1fr", gap:10, marginBottom:10 }}>
+            <div>
+              <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>Time</div>
+              <input value={form.time_slot} onChange={e=>setForm(f=>({...f,time_slot:e.target.value}))} placeholder="e.g. 09:00" style={{ width:"100%", padding:"8px 10px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:7, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+            </div>
+            <div>
+              <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>Duration (mins)</div>
+              <input type="number" value={form.duration_mins} onChange={e=>setForm(f=>({...f,duration_mins:e.target.value}))} placeholder="30" style={{ width:"100%", padding:"8px 10px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:7, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+            </div>
+            <div>
+              <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>Segment Title *</div>
+              <input value={form.segment_title} onChange={e=>setForm(f=>({...f,segment_title:e.target.value}))} placeholder="e.g. Welcome Address" style={{ width:"100%", padding:"8px 10px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:7, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+            </div>
+            <div>
+              <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>Responsible</div>
+              <input value={form.responsible_person} onChange={e=>setForm(f=>({...f,responsible_person:e.target.value}))} placeholder="Name or role" style={{ width:"100%", padding:"8px 10px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:7, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+            </div>
+          </div>
+          <div style={{ marginBottom:10 }}>
+            <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>Notes</div>
+            <input value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="Additional notes..." style={{ width:"100%", padding:"8px 10px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:7, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+            <button onClick={addRow} disabled={saving||!form.segment_title} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"8px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Add"}</button>
+            <button onClick={() => setAdding(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"8px 16px", borderRadius:8, cursor:"pointer", fontSize:13 }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {rows.length === 0 ? (
+        <div style={{ color:T.textMuted, fontSize:13, textAlign:"center", padding:"32px 0", background:T.surface, borderRadius:12, border:`1px solid ${T.border}` }}>No segments added yet{canEdit ? " — click + Add Segment to start building the run of show" : ""}</div>
+      ) : (
+        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, overflow:"hidden" }}>
+          <table style={{ width:"100%", borderCollapse:"collapse" }}>
+            <thead>
+              <tr style={{ background:T.bg }}>
+                {["Time","Duration","Segment","Responsible","Notes",""].map(h => (
+                  <th key={h} style={{ padding:"10px 14px", color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", textAlign:"left", borderBottom:`1px solid ${T.border}` }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={r.id} style={{ borderBottom: i<rows.length-1?`1px solid ${T.border}44`:"none", background:i%2===0?"transparent":T.bg+"30" }}>
+                  <td style={{ padding:"10px 14px", color:T.cyan, fontWeight:700, fontSize:13, whiteSpace:"nowrap" }}>{r.time_slot||"—"}</td>
+                  <td style={{ padding:"10px 14px", color:T.textMuted, fontSize:12 }}>{r.duration_mins?r.duration_mins+"m":"—"}</td>
+                  <td style={{ padding:"10px 14px", color:T.textPrimary, fontWeight:600, fontSize:13 }}>{r.segment_title}</td>
+                  <td style={{ padding:"10px 14px", color:T.textSecondary, fontSize:12 }}>{r.responsible_person||"—"}</td>
+                  <td style={{ padding:"10px 14px", color:T.textMuted, fontSize:12 }}>{r.notes||"—"}</td>
+                  <td style={{ padding:"10px 14px" }}>{canEdit && <button onClick={() => deleteRow(r.id)} style={{ background:"none", border:"none", color:T.textMuted, cursor:"pointer", fontSize:14, padding:"2px 6px" }}>×</button>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── PRE-EVENT CHECKLIST ──────────────────────────────────────────────────────
+const CHECKLIST_CATEGORIES = ["Venue","Suppliers","Client","Logistics","Technical","Protocol","Vendor"];
+const DEFAULT_CHECKLIST = [
+  { category:"Venue", item:"Venue confirmed and contract signed", responsible_role:"Strategy & Events Lead" },
+  { category:"Venue", item:"Site visit completed", responsible_role:"Strategy & Events Lead" },
+  { category:"Venue", item:"Seating layout approved", responsible_role:"Strategy & Events Lead" },
+  { category:"Suppliers", item:"All suppliers briefed", responsible_role:"Strategy & Events Lead" },
+  { category:"Client", item:"Client programme approved", responsible_role:"Strategy & Events Lead" },
+  { category:"Client", item:"Client final headcount confirmed", responsible_role:"Strategy & Events Lead" },
+  { category:"Logistics", item:"Transport arrangements confirmed", responsible_role:"Strategy & Events Lead" },
+  { category:"Logistics", item:"Catering orders placed", responsible_role:"Strategy & Events Lead" },
+  { category:"Technical", item:"AV equipment tested", responsible_role:"Strategy & Events Lead" },
+  { category:"Technical", item:"Microphones and sound checked", responsible_role:"Strategy & Events Lead" },
+  { category:"Protocol", item:"MC briefed on run of show", responsible_role:"Strategy & Events Lead" },
+  { category:"Protocol", item:"Guest list finalised", responsible_role:"Strategy & Events Lead" },
+  { category:"Vendor", item:"All vendors confirmed attendance", responsible_role:"Vendor Manager" },
+  { category:"Vendor", item:"Vendor equipment delivery confirmed", responsible_role:"Vendor Manager" },
+  { category:"Vendor", item:"Vendor setup time communicated", responsible_role:"Vendor Manager" },
+];
+
+const EventChecklistSection = ({ event, user, members }) => {
+  const [items, setItems] = useState([]);
+  const [adding, setAdding] = useState(false);
+  const [newItem, setNewItem] = useState({ category:"Venue", item:"", responsible_role:"" });
+  const [saving, setSaving] = useState(false);
+  const isVM = user.role === "Vendor Manager";
+  const canEdit = ["CEO","Strategy & Events Lead","Country Manager"].includes(user.role);
+  const canCheck = canEdit || isVM;
+
+  const load = async () => {
+    const { data } = await supabase.from("event_checklist").select("*").eq("project_id", event.id).order("category").order("order_index");
+    setItems(data || []);
+  };
+
+  useEffect(() => { load(); }, [event.id]);
+
+  const initChecklist = async () => {
+    setSaving(true);
+    for (let i = 0; i < DEFAULT_CHECKLIST.items?.length || DEFAULT_CHECKLIST.length; i++) {
+      const d = DEFAULT_CHECKLIST[i];
+      await supabase.from("event_checklist").insert({ project_id: event.id, category: d.category, item: d.item, responsible_role: d.responsible_role, order_index: i, created_by: user.id });
+    }
+    setSaving(false); load();
+  };
+
+  const toggle = async (item) => {
+    if (isVM && item.responsible_role !== "Vendor Manager") return;
+    const completed = !item.completed;
+    await supabase.from("event_checklist").update({ completed, completed_by: completed ? user.id : null, completed_at: completed ? new Date().toISOString() : null }).eq("id", item.id);
+    load();
+  };
+
+  const addItem = async () => {
+    if (!newItem.item) return;
+    setSaving(true);
+    await supabase.from("event_checklist").insert({ project_id: event.id, ...newItem, order_index: items.length, created_by: user.id });
+    setNewItem({ category:"Venue", item:"", responsible_role:"" });
+    setAdding(false); setSaving(false); load();
+  };
+
+  const deleteItem = async (id) => {
+    await supabase.from("event_checklist").delete().eq("id", id);
+    load();
+  };
+
+  const done = items.filter(i => i.completed).length;
+  const pct = items.length > 0 ? Math.round((done/items.length)*100) : 0;
+  const byCategory = CHECKLIST_CATEGORIES.reduce((acc, cat) => { acc[cat] = items.filter(i => i.category === cat); return acc; }, {});
+
+  return (
+    <div>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+        <div>
+          <div style={{ color:T.textPrimary, fontWeight:900, fontSize:16 }}>Pre-Event Checklist</div>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{done}/{items.length} complete · {pct}%</div>
+        </div>
+        <div style={{ display:"flex", gap:8 }}>
+          {items.length === 0 && canEdit && <button onClick={initChecklist} disabled={saving} style={{ background:T.surface, border:`1px solid ${T.border}`, color:T.textMuted, padding:"8px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700 }}>{saving?"Loading...":"Load Default Checklist"}</button>}
+          {canEdit && <button onClick={() => setAdding(true)} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"8px 18px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>+ Add Item</button>}
+        </div>
+      </div>
+
+      {items.length > 0 && (
+        <div style={{ height:6, background:T.border, borderRadius:3, marginBottom:20, overflow:"hidden" }}>
+          <div style={{ height:"100%", width:pct+"%", background:`linear-gradient(90deg,${T.cyan},${T.teal})`, borderRadius:3, transition:"width 0.3s" }} />
+        </div>
+      )}
+
+      {adding && canEdit && (
+        <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:12, padding:16, marginBottom:16 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 2fr 1fr", gap:10, marginBottom:10 }}>
+            <div>
+              <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>Category</div>
+              <select value={newItem.category} onChange={e=>setNewItem(f=>({...f,category:e.target.value}))} style={{ width:"100%", padding:"8px 10px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:7, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                {CHECKLIST_CATEGORIES.map(c => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>Item *</div>
+              <input value={newItem.item} onChange={e=>setNewItem(f=>({...f,item:e.target.value}))} placeholder="Checklist item..." style={{ width:"100%", padding:"8px 10px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:7, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+            </div>
+            <div>
+              <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>Responsible Role</div>
+              <input value={newItem.responsible_role} onChange={e=>setNewItem(f=>({...f,responsible_role:e.target.value}))} placeholder="Role..." style={{ width:"100%", padding:"8px 10px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:7, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+            <button onClick={addItem} disabled={saving||!newItem.item} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"8px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>Add</button>
+            <button onClick={() => setAdding(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"8px 16px", borderRadius:8, cursor:"pointer", fontSize:13 }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {items.length === 0 ? (
+        <div style={{ color:T.textMuted, fontSize:13, textAlign:"center", padding:"32px 0", background:T.surface, borderRadius:12, border:`1px solid ${T.border}` }}>No checklist items yet{canEdit ? " — load the default checklist or add items manually" : ""}</div>
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+          {CHECKLIST_CATEGORIES.filter(cat => byCategory[cat]?.length > 0).map(cat => (
+            <div key={cat}>
+              <div style={{ color:T.textMuted, fontSize:10, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:8 }}>{cat}</div>
+              <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:10, overflow:"hidden" }}>
+                {byCategory[cat].map((item, i) => {
+                  const canToggle = canCheck && (canEdit || (isVM && item.responsible_role === "Vendor Manager"));
+                  return (
+                    <div key={item.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", borderBottom: i<byCategory[cat].length-1?`1px solid ${T.border}33`:"none", background: item.completed ? T.teal+"08" : "transparent" }}>
+                      <div onClick={() => canToggle && toggle(item)} style={{ width:20, height:20, borderRadius:5, border:`2px solid ${item.completed?T.teal:T.border}`, background:item.completed?T.teal:"transparent", display:"flex", alignItems:"center", justifyContent:"center", cursor:canToggle?"pointer":"default", flexShrink:0 }}>
+                        {item.completed && <span style={{ color:"#fff", fontSize:11, fontWeight:900 }}>✓</span>}
+                      </div>
+                      <div style={{ flex:1 }}>
+                        <div style={{ color:item.completed?T.textMuted:T.textPrimary, fontSize:13, fontWeight:600, textDecoration:item.completed?"line-through":"none" }}>{item.item}</div>
+                        {item.responsible_role && <div style={{ color:T.textMuted, fontSize:10, marginTop:1 }}>{item.responsible_role}</div>}
+                      </div>
+                      {item.completed_at && <div style={{ color:T.teal, fontSize:10, fontWeight:600 }}>{new Date(item.completed_at).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}</div>}
+                      {canEdit && <button onClick={() => deleteItem(item.id)} style={{ background:"none", border:"none", color:T.textMuted, cursor:"pointer", fontSize:14, padding:"2px 6px", flexShrink:0 }}>×</button>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── CLIENT COMMS LOG ─────────────────────────────────────────────────────────
+const ClientCommsSection = ({ event, user }) => {
+  const [logs, setLogs] = useState([]);
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ log_date: new Date().toISOString().slice(0,10), type:"call", contact_name:"", summary:"", outcome:"", follow_up_required:false, follow_up_notes:"" });
+  const [saving, setSaving] = useState(false);
+  const canEdit = ["CEO","Strategy & Events Lead","Country Manager"].includes(user.role);
+
+  const load = async () => {
+    const { data } = await supabase.from("client_comms_log").select("*").eq("project_id", event.id).order("log_date", { ascending:false });
+    setLogs(data || []);
+  };
+  useEffect(() => { load(); }, [event.id]);
+
+  const addLog = async () => {
+    if (!form.summary) return;
+    setSaving(true);
+    await supabase.from("client_comms_log").insert({ project_id: event.id, ...form, logged_by: user.id, logged_by_name: user.name });
+    setForm({ log_date: new Date().toISOString().slice(0,10), type:"call", contact_name:"", summary:"", outcome:"", follow_up_required:false, follow_up_notes:"" });
+    setAdding(false); setSaving(false); load();
+  };
+
+  const typeColors = { call:T.cyan, meeting:T.teal, email:T.amber, whatsapp:"#25D366", "site-visit":"#8B5CF6" };
+  const typeIcons = { call:"📞", meeting:"🤝", email:"✉️", whatsapp:"💬", "site-visit":"📍" };
+
+  return (
+    <div>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+        <div>
+          <div style={{ color:T.textPrimary, fontWeight:900, fontSize:16 }}>Client Communication Log</div>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{logs.length} entries · {event.client}</div>
+        </div>
+        {canEdit && <button onClick={() => setAdding(true)} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"8px 18px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>+ Log Communication</button>}
+      </div>
+
+      {adding && canEdit && (
+        <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:12, padding:16, marginBottom:16 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:10 }}>
+            <div>
+              <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>Date</div>
+              <input type="date" value={form.log_date} onChange={e=>setForm(f=>({...f,log_date:e.target.value}))} style={{ width:"100%", padding:"8px 10px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:7, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+            </div>
+            <div>
+              <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>Type</div>
+              <select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))} style={{ width:"100%", padding:"8px 10px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:7, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                <option value="call">Phone Call</option>
+                <option value="meeting">Meeting</option>
+                <option value="email">Email</option>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="site-visit">Site Visit</option>
+              </select>
+            </div>
+            <div>
+              <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>Contact Name</div>
+              <input value={form.contact_name} onChange={e=>setForm(f=>({...f,contact_name:e.target.value}))} placeholder="Who did you speak to?" style={{ width:"100%", padding:"8px 10px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:7, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+            </div>
+          </div>
+          <div style={{ marginBottom:10 }}>
+            <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>Summary *</div>
+            <textarea value={form.summary} onChange={e=>setForm(f=>({...f,summary:e.target.value}))} rows={3} placeholder="What was discussed?" style={{ width:"100%", padding:"8px 10px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:7, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"vertical", boxSizing:"border-box" }} />
+          </div>
+          <div style={{ marginBottom:10 }}>
+            <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>Outcome / Decision</div>
+            <input value={form.outcome} onChange={e=>setForm(f=>({...f,outcome:e.target.value}))} placeholder="What was agreed or decided?" style={{ width:"100%", padding:"8px 10px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:7, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+          </div>
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
+            <input type="checkbox" id="followup" checked={form.follow_up_required} onChange={e=>setForm(f=>({...f,follow_up_required:e.target.checked}))} />
+            <label htmlFor="followup" style={{ color:T.textSecondary, fontSize:13 }}>Follow-up required</label>
+          </div>
+          {form.follow_up_required && (
+            <div style={{ marginBottom:10 }}>
+              <input value={form.follow_up_notes} onChange={e=>setForm(f=>({...f,follow_up_notes:e.target.value}))} placeholder="Follow-up notes..." style={{ width:"100%", padding:"8px 10px", background:T.bg, border:`1px solid ${T.amber}44`, borderRadius:7, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+            </div>
+          )}
+          <div style={{ display:"flex", gap:8 }}>
+            <button onClick={addLog} disabled={saving||!form.summary} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"8px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>Save Log</button>
+            <button onClick={() => setAdding(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"8px 16px", borderRadius:8, cursor:"pointer", fontSize:13 }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {logs.length === 0 ? (
+        <div style={{ color:T.textMuted, fontSize:13, textAlign:"center", padding:"32px 0", background:T.surface, borderRadius:12, border:`1px solid ${T.border}` }}>No communications logged yet</div>
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+          {logs.map(log => (
+            <div key={log.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderLeft:`4px solid ${typeColors[log.type]||T.cyan}`, borderRadius:10, padding:"14px 16px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <span style={{ fontSize:16 }}>{typeIcons[log.type]||"📋"}</span>
+                  <div>
+                    <span style={{ color:typeColors[log.type]||T.cyan, fontSize:11, fontWeight:700, textTransform:"uppercase" }}>{log.type}</span>
+                    {log.contact_name && <span style={{ color:T.textMuted, fontSize:11 }}> · {log.contact_name}</span>}
+                  </div>
+                </div>
+                <div style={{ color:T.textMuted, fontSize:11 }}>{new Date(log.log_date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})} · {log.logged_by_name}</div>
+              </div>
+              <div style={{ color:T.textPrimary, fontSize:13, marginBottom: log.outcome ? 6 : 0 }}>{log.summary}</div>
+              {log.outcome && <div style={{ color:T.teal, fontSize:12, fontWeight:600, marginBottom:4 }}>→ {log.outcome}</div>}
+              {log.follow_up_required && <div style={{ color:T.amber, fontSize:11, fontWeight:700, background:T.amber+"15", padding:"3px 10px", borderRadius:20, display:"inline-block" }}>⚠ Follow-up: {log.follow_up_notes||"required"}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── POST-EVENT DEBRIEF ───────────────────────────────────────────────────────
+const EventDebriefSection = ({ event, user }) => {
+  const [debrief, setDebrief] = useState(null);
+  const [form, setForm] = useState({ what_went_well:"", what_to_do_differently:"", client_informal_feedback:"", surprises:"", recommendations:"" });
+  const [saving, setSaving] = useState(false);
+  const canEdit = ["CEO","Strategy & Events Lead","Country Manager"].includes(user.role);
+
+  const load = async () => {
+    const { data } = await supabase.from("event_debrief").select("*").eq("project_id", event.id).order("submitted_at", { ascending:false });
+    if (data && data.length > 0) {
+      // Merge all submissions
+      const merged = { what_went_well:"", what_to_do_differently:"", client_informal_feedback:"", surprises:"", recommendations:"" };
+      data.forEach(d => {
+        Object.keys(merged).forEach(k => { if (d[k]) merged[k] = merged[k] ? merged[k]+"
+
+"+d[k] : d[k]; });
+      });
+      setDebrief(data[0]);
+      setForm(merged);
+    }
+  };
+  useEffect(() => { load(); }, [event.id]);
+
+  const save = async () => {
+    if (!form.what_went_well && !form.what_to_do_differently) return;
+    setSaving(true);
+    const existing = await supabase.from("event_debrief").select("id").eq("project_id", event.id).eq("submitted_by", user.id).maybeSingle();
+    if (existing.data) {
+      await supabase.from("event_debrief").update({ ...form, updated_at: new Date().toISOString() }).eq("id", existing.data.id);
+    } else {
+      await supabase.from("event_debrief").insert({ project_id: event.id, ...form, submitted_by: user.id, submitted_by_name: user.name });
+    }
+    setSaving(false); load();
+    alert("Debrief saved.");
+  };
+
+  const Field = ({ label, field, placeholder }) => (
+    <div style={{ marginBottom:16 }}>
+      <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:6 }}>{label}</div>
+      <textarea value={form[field]} onChange={e=>setForm(f=>({...f,[field]:e.target.value}))} rows={3} placeholder={placeholder}
+        disabled={!canEdit}
+        style={{ width:"100%", padding:"10px 12px", background:canEdit?T.bg:T.surface, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"vertical", boxSizing:"border-box" }} />
+    </div>
+  );
+
+  return (
+    <div>
+      <div style={{ marginBottom:20 }}>
+        <div style={{ color:T.textPrimary, fontWeight:900, fontSize:16 }}>Post-Event Debrief</div>
+        <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>Capture learnings after the event — feeds into the Event Intelligence Report</div>
+      </div>
+      <Field label="What Went Well" field="what_went_well" placeholder="Moments, decisions and elements that delivered..." />
+      <Field label="What to Do Differently Next Time" field="what_to_do_differently" placeholder="Changes you would make, gaps identified..." />
+      <Field label="Client Informal Feedback" field="client_informal_feedback" placeholder="What the client said informally — reactions, mood, comments..." />
+      <Field label="Surprises / Unexpected Moments" field="surprises" placeholder="Things that caught you off guard — positive or negative..." />
+      <Field label="Recommendations for Next Edition" field="recommendations" placeholder="What Stretchfield should do differently or build on..." />
+      {canEdit && (
+        <button onClick={save} disabled={saving} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px 28px", borderRadius:10, cursor:"pointer", fontWeight:800, fontSize:14 }}>{saving?"Saving...":"Save Debrief"}</button>
+      )}
+    </div>
+  );
+};
+
 const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
   const [activeSection, setActiveSection] = useState("overview");
   const [tasks, setTasks] = useState([]);
@@ -14306,9 +14725,12 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
           { id: "tasks", label: "Tasks (" + myTasks.length + ")" },
           { id: "documents", label: "Documents (" + documents.length + ")" },
           { id: "messages", label: "Messages" + (unreadMsgs > 0 ? " ●" : "") },
-
+          ...( ["CEO","Strategy & Events Lead","Vendor Manager","Country Manager"].includes(user.role) ? [{ id: "run-of-show", label: "Run of Show" }] : []),
+          ...( ["CEO","Strategy & Events Lead","Vendor Manager","Country Manager"].includes(user.role) ? [{ id: "checklist", label: "Checklist" }] : []),
+          ...( ["CEO","Strategy & Events Lead","Country Manager"].includes(user.role) ? [{ id: "comms-log", label: "Client Comms" }] : []),
+          ...( ["CEO","Strategy & Events Lead","Country Manager"].includes(user.role) ? [{ id: "debrief", label: "Debrief" }] : []),
         ].map(tab => (
-          <button key={tab.id} onClick={() => setActiveSection(tab.id)} style={{ padding: "10px 18px", border: "none", background: "none", cursor: "pointer", color: activeSection === tab.id ? T.cyan : T.textMuted, fontWeight: activeSection === tab.id ? 800 : 400, fontSize: 13, borderBottom: activeSection === tab.id ? "2px solid " + T.cyan : "2px solid transparent", marginBottom: -1, transition: "all 0.15s" }}>{tab.label}</button>
+          <button key={tab.id} onClick={() => setActiveSection(tab.id)} style={{ padding: "10px 18px", border: "none", background: "none", cursor: "pointer", color: activeSection === tab.id ? T.cyan : T.textMuted, fontWeight: activeSection === tab.id ? 800 : 400, fontSize: 13, borderBottom: activeSection === tab.id ? "2px solid " + T.cyan : "2px solid transparent", marginBottom: -1, transition: "all 0.15s", whiteSpace:"nowrap" }}>{tab.label}</button>
         ))}
       </div>
 
@@ -14513,6 +14935,27 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
           </div>
         </div>
       )}
+
+      {/* ── RUN OF SHOW ── */}
+      {activeSection === "run-of-show" && (
+        <RunOfShowSection event={event} user={user} members={members} />
+      )}
+
+      {/* ── PRE-EVENT CHECKLIST ── */}
+      {activeSection === "checklist" && (
+        <EventChecklistSection event={event} user={user} members={members} />
+      )}
+
+      {/* ── CLIENT COMMS LOG ── */}
+      {activeSection === "comms-log" && (
+        <ClientCommsSection event={event} user={user} />
+      )}
+
+      {/* ── POST-EVENT DEBRIEF ── */}
+      {activeSection === "debrief" && (
+        <EventDebriefSection event={event} user={user} />
+      )}
+
     </div>
   );
 };

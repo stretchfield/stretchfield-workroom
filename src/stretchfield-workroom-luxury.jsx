@@ -848,7 +848,7 @@ const getNavItems = (role) => {
     base.push({ id: "finance", label: "Finance", icon: "▪" });
   }
   if (["Finance Manager","CEO"].includes(role)) {
-    base.push({ id: "purchase-orders", label: "Purchase Orders", icon: "▪" }, { id: "vendor-invoices", label: "Vendor Invoices", icon: "▪" }, { id: "payment-authorisation", label: "Payment Authorisation", icon: "▪" });
+    base.push({ id: "purchase-orders", label: "Purchase Orders", icon: "▪" }, { id: "vendor-invoices", label: "Vendor Invoices", icon: "▪" }, { id: "payment-authorisation", label: "Payment Authorisation", icon: "▪" }, { id: "staff-payment-rates", label: "Staff Payment Rates", icon: "▪" });
   }
   if (["CEO"].includes(role)) {
     base.push({ id: "client-financials", label: "Client Financials", icon: "▪" });

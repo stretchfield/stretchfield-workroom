@@ -1320,7 +1320,7 @@ const VendorManagerDashboard = ({ user }) => {
   const [savingPayReq, setSavingPayReq] = useState(false);
 
 
-  const VENDOR_TYPES = ["Event Lighting","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
+  const VENDOR_TYPES = ["Event Lighting","Events Ushering","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
 
   const loadVM = () => {
     Promise.all([
@@ -11189,7 +11189,7 @@ const RFFApprovalsView = ({ user }) => {
               <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 32px", gap: 8, marginBottom: 8 }}>
                 <select value={line.category} onChange={e => { const l = [...budgetLines]; l[idx].category = e.target.value; setBudgetLines(l); }} style={{ padding: "7px 10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: line.category ? T.textPrimary : T.textMuted, fontSize: 12, fontFamily: "inherit", outline: "none" }}>
                   <option value="">Select category...</option>
-                  {["Event Lighting","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"].map(c => <option key={c} value={c}>{c}</option>)}
+                  {["Event Lighting","Events Ushering","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"].map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
                 <input type="number" value={line.proposed_amount} onChange={e => { const l = [...budgetLines]; l[idx].proposed_amount = e.target.value; setBudgetLines(l); }} placeholder="0.00" style={{ padding: "7px 10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
                 <input value={line.notes || ""} onChange={e => { const l = [...budgetLines]; l[idx].notes = e.target.value; setBudgetLines(l); }} placeholder="Notes..." style={{ padding: "7px 10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
@@ -11244,7 +11244,7 @@ const RFFApprovalsView = ({ user }) => {
                   <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 32px", gap: 8, marginBottom: 8 }}>
                     <select value={line.category} onChange={e => { const l = [...budgetLines]; l[idx].category = e.target.value; setBudgetLines(l); }} style={{ padding: "7px 10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: line.category ? T.textPrimary : T.textMuted, fontSize: 12, fontFamily: "inherit", outline: "none" }}>
                       <option value="">Select category...</option>
-                      {["Event Lighting","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"].map(c => <option key={c} value={c}>{c}</option>)}
+                      {["Event Lighting","Events Ushering","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"].map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                     <input type="number" value={line.proposed_amount} onChange={e => { const l = [...budgetLines]; l[idx].proposed_amount = e.target.value; setBudgetLines(l); }} placeholder="0.00" style={{ padding: "7px 10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
                     <input value={line.notes} onChange={e => { const l = [...budgetLines]; l[idx].notes = e.target.value; setBudgetLines(l); }} placeholder="Notes..." style={{ padding: "7px 10px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
@@ -11292,7 +11292,7 @@ const VendorApplicationModal = ({ user, onClose, onSubmitted }) => {
   const busRegRef = React.useRef();
   const vatRef = React.useRef();
 
-  const vendorTypes = ["Event Lighting","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
+  const vendorTypes = ["Event Lighting","Events Ushering","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
 
   const inputStyle = { width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
   const labelStyle = { color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 };
@@ -11709,7 +11709,7 @@ const EditVendorAppModal = ({ app, user, onClose, onResubmitted }) => {
   });
   const [saving, setSaving] = useState(false);
 
-  const vendorTypes = ["Event Lighting","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
+  const vendorTypes = ["Event Lighting","Events Ushering","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
   const inputStyle = { width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
   const labelStyle = { color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 };
   const sectionStyle = { color: T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12, marginTop: 20, paddingBottom: 6, borderBottom: `1px solid ${T.cyan}30` };
@@ -11959,7 +11959,7 @@ const VendorOnboardingView = ({ user }) => {
   const [editVendorModal, setEditVendorModal] = useState(null);
   const [editVendorForm, setEditVendorForm] = useState({});
   const [savingVendor, setSavingVendor] = useState(false);
-  const VTYPES = ["Event Lighting","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
+  const VTYPES = ["Event Lighting","Events Ushering","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>

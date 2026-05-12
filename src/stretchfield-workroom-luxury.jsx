@@ -5805,6 +5805,126 @@ const HRView = ({ user }) => {
 };
 
 
+
+const StaffPaymentRatesView = ({ user }) => {
+  const [events, setEvents] = useState([]);
+  const [staffProfiles, setStaffProfiles] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [paymentRates, setPaymentRates] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const isCEO = user.role === "CEO";
+
+  useEffect(() => {
+    supabase.from("projects").select("*").order("event_date", { ascending: false }).then(({ data }) => setEvents(data || []));
+    supabase.from("profiles").select("id,name,role").not("role", "in", "(Client,Vendor,Board of Directors,CEO)").then(({ data }) => setStaffProfiles(data || []));
+  }, []);
+
+  const loadRates = async (eventId) => {
+    const { data } = await supabase.from("staff_payment_rates").select("*").eq("project_id", eventId);
+    setPaymentRates(data || []);
+  };
+
+  const handleEventSelect = (eventId) => {
+    const ev = events.find(e => e.id === eventId);
+    setSelectedEvent(ev || null);
+    if (eventId) loadRates(eventId);
+    else setPaymentRates([]);
+  };
+
+  const updateRate = (staffId, field, value) => {
+    setPaymentRates(prev => {
+      const existing = prev.find(r => r.staff_id === staffId);
+      if (existing) return prev.map(r => r.staff_id === staffId ? { ...r, [field]: value } : r);
+      return [...prev, { staff_id: staffId, project_id: selectedEvent?.id, [field]: value }];
+    });
+  };
+
+  const getRate = (staffId, field) => paymentRates.find(r => r.staff_id === staffId)?.[field] || "";
+
+  const saveRates = async () => {
+    if (!selectedEvent) return;
+    setSaving(true);
+    for (const staff of staffProfiles) {
+      const rate = paymentRates.find(r => r.staff_id === staff.id);
+      if (!rate) continue;
+      const { data: existing } = await supabase.from("staff_payment_rates").select("id").eq("project_id", selectedEvent.id).eq("staff_id", staff.id).maybeSingle();
+      if (existing) {
+        await supabase.from("staff_payment_rates").update({ project_fee: parseFloat(rate.project_fee)||0, per_diem: parseFloat(rate.per_diem)||0, transport: parseFloat(rate.transport)||0 }).eq("id", existing.id);
+      } else if (rate.project_fee || rate.per_diem || rate.transport) {
+        await supabase.from("staff_payment_rates").insert({ project_id: selectedEvent.id, staff_id: staff.id, staff_name: staff.name, project_fee: parseFloat(rate.project_fee)||0, per_diem: parseFloat(rate.per_diem)||0, transport: parseFloat(rate.transport)||0 });
+      }
+    }
+    const { data: fms } = await supabase.from("profiles").select("id").eq("role","Finance Manager");
+    for (const fm of fms||[]) {
+      await supabase.from("notifications").insert({ user_id: fm.id, title: "Staff Payment Rates Set — " + selectedEvent.name, message: "CEO has set staff payment rates for " + selectedEvent.name + ". Staff can now submit payment requests.", type: "finance" });
+    }
+    setSaving(false);
+    alert("Rates saved.");
+    loadRates(selectedEvent.id);
+  };
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}` }}>
+        <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Finance</div>
+        <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Staff Payment Rates</h2>
+        <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Set project fee, per diem and transport per staff per event. Staff see locked amounts when submitting requests.</div>
+      </div>
+      <select value={selectedEvent?.id||""} onChange={e => handleEventSelect(e.target.value)}
+        style={{ width:"100%", maxWidth:480, padding:"10px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:10, color:T.textPrimary, fontSize:14, fontFamily:"inherit", marginBottom:20 }}>
+        <option value="">Select an event...</option>
+        {events.map(e => <option key={e.id} value={e.id}>{e.name}{e.client ? " — "+e.client : ""}</option>)}
+      </select>
+      {selectedEvent && (
+        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:14, overflow:"hidden" }}>
+          <div style={{ padding:"14px 20px", borderBottom:`1px solid ${T.border}`, background:T.bg }}>
+            <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15 }}>{selectedEvent.name}</div>
+            <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>Rates set here are locked for staff payment requests on this event</div>
+          </div>
+          <div style={{ overflowX:"auto" }}>
+            <table style={{ width:"100%", borderCollapse:"collapse" }}>
+              <thead>
+                <tr style={{ background:T.bg }}>
+                  {["Staff Member","Role","Project Fee (GHS)","Per Diem (GHS)","Transport (GHS)","Total"].map(h => (
+                    <th key={h} style={{ padding:"10px 16px", color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", textAlign:"left", borderBottom:`1px solid ${T.border}` }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {staffProfiles.map((staff, i) => {
+                  const fee = parseFloat(getRate(staff.id,"project_fee")||0);
+                  const diem = parseFloat(getRate(staff.id,"per_diem")||0);
+                  const transport = parseFloat(getRate(staff.id,"transport")||0);
+                  const total = fee + diem + transport;
+                  return (
+                    <tr key={staff.id} style={{ borderBottom:`1px solid ${T.border}44`, background:i%2===0?"transparent":T.bg+"40" }}>
+                      <td style={{ padding:"12px 16px", color:T.textPrimary, fontWeight:700, fontSize:13 }}>{staff.name}</td>
+                      <td style={{ padding:"12px 16px", color:T.textMuted, fontSize:12 }}>{staff.role}</td>
+                      {["project_fee","per_diem","transport"].map(field => (
+                        <td key={field} style={{ padding:"8px 16px" }}>
+                          <input type="number" value={getRate(staff.id,field)} onChange={e => updateRate(staff.id,field,e.target.value)}
+                            placeholder="0" disabled={!isCEO}
+                            style={{ width:110, padding:"6px 10px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:7, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }} />
+                        </td>
+                      ))}
+                      <td style={{ padding:"12px 16px", color:total>0?T.teal:T.textMuted, fontWeight:800, fontSize:13 }}>{total>0?"GHS "+total.toLocaleString():"—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {isCEO && (
+            <div style={{ padding:"16px 20px", borderTop:`1px solid ${T.border}` }}>
+              <button onClick={saveRates} disabled={saving} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px 28px", borderRadius:10, cursor:"pointer", fontWeight:800, fontSize:14 }}>{saving?"Saving...":"Save Payment Rates"}</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function StretchfieldWorkRoom({ user: propUser, profile: propProfile, onLogout }) {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);

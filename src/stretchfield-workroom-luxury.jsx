@@ -1498,7 +1498,7 @@ const VendorManagerDashboard = ({ user }) => {
                   const pid = e.target.value;
                   setPayReqForm(f=>({...f, project_id:pid, amount:"", request_type:"project_fee"}));
                   if (pid) {
-                    const { data: rates } = await supabase.from("staff_event_payments").select("*").eq("staff_id", user.id).eq("project_id", pid).single();
+                    const { data: rates } = await supabase.from("staff_payment_rates").select("*").eq("staff_id", user.id).eq("project_id", pid).maybeSingle();
                     setPayReqForm(f=>({...f, project_id:pid, _rates:rates||null, amount: rates?.project_fee ? String(rates.project_fee) : "", request_type:"project_fee"}));
                   }
                 }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
@@ -1514,7 +1514,7 @@ const VendorManagerDashboard = ({ user }) => {
                   let amt = "";
                   if (type === "project_fee") amt = rates?.project_fee ? String(rates.project_fee) : "";
                   else if (type === "per_diem") amt = rates?.per_diem ? String(rates.per_diem) : "";
-                  else if (type === "transport") amt = rates?.transport_allowance ? String(rates.transport_allowance) : "";
+                  else if (type === "transport") amt = rates?.transport ? String(rates.transport) : "";
                   setPayReqForm(f=>({...f, request_type:type, amount:amt}));
                 }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
                   <option value="project_fee">Project Fee</option>
@@ -1772,7 +1772,7 @@ const StaffDashboard = ({ user }) => {
                   const pid = e.target.value;
                   setPayReqForm(f=>({...f, project_id:pid, amount:"", request_type:"project_fee"}));
                   if (pid) {
-                    const { data: rates } = await supabase.from("staff_event_payments").select("*").eq("staff_id", user.id).eq("project_id", pid).single();
+                    const { data: rates } = await supabase.from("staff_payment_rates").select("*").eq("staff_id", user.id).eq("project_id", pid).maybeSingle();
                     setPayReqForm(f=>({...f, project_id:pid, _rates:rates||null, amount: rates?.project_fee ? String(rates.project_fee) : "", request_type:"project_fee"}));
                   }
                 }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
@@ -1788,7 +1788,7 @@ const StaffDashboard = ({ user }) => {
                   let amt = "";
                   if (type === "project_fee") amt = rates?.project_fee ? String(rates.project_fee) : "";
                   else if (type === "per_diem") amt = rates?.per_diem ? String(rates.per_diem) : "";
-                  else if (type === "transport") amt = rates?.transport_allowance ? String(rates.transport_allowance) : "";
+                  else if (type === "transport") amt = rates?.transport ? String(rates.transport) : "";
                   setPayReqForm(f=>({...f, request_type:type, amount:amt}));
                 }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
                   <option value="project_fee">Project Fee</option>

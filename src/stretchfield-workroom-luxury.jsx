@@ -818,6 +818,7 @@ const getNavItems = (role, user) => {
             { id: "payment-authorisation", label: "Payment Authorisation" },
             { id: "staff-payment-rates", label: "Staff Payment Rates" },
             { id: "budget-vs-actuals", label: "Budget vs Actuals" },
+        { id: "client-payments", label: "Client Payments" },
         { id: "zoho-books", label: "Zoho Books" },
       ]},
       { id: "grp-clients", label: "Clients", group: true, children: [
@@ -851,7 +852,7 @@ const getNavItems = (role, user) => {
     base.push({ id: "finance", label: "Finance", icon: "▪" });
   }
   if (["Finance Manager","CEO"].includes(role)) {
-    base.push({ id: "purchase-orders", label: "Purchase Orders", icon: "▪" }, { id: "vendor-invoices", label: "Vendor Invoices", icon: "▪" }, { id: "payment-authorisation", label: "Payment Authorisation", icon: "▪" }, { id: "staff-payment-rates", label: "Staff Payment Rates", icon: "▪" });
+    base.push({ id: "purchase-orders", label: "Purchase Orders", icon: "▪" }, { id: "vendor-invoices", label: "Vendor Invoices", icon: "▪" }, { id: "payment-authorisation", label: "Payment Authorisation", icon: "▪" }, { id: "staff-payment-rates", label: "Staff Payment Rates", icon: "▪" }, { id: "client-payments", label: "Client Payments", icon: "▪" });
   }
   if (["CEO"].includes(role)) {
     base.push({ id: "client-financials", label: "Client Financials", icon: "▪" });
@@ -982,13 +983,14 @@ const CEODashboard = ({ onTab, user }) => {
   const [paymentAuths, setPaymentAuths] = useState([]);
   const [vouchers, setVouchers] = useState([]);
   const [awards, setAwards] = useState([]);
+  const [clientPayments, setClientPayments] = useState([]);
   const [loading, setLoading] = React.useState(true);
   const [internalPortalEvent, setInternalPortalEvent] = useState(null);
 
   useEffect(() => {
     const loadAll = async () => {
       setLoading(true);
-      const [ev, inv, tk, cl, fb, op, tg, rf, vp, sc, pa, vo, aw] = await Promise.all([
+      const [ev, inv, tk, cl, fb, op, tg, rf, vp, sc, pa, vo, aw, cp] = await Promise.all([
         supabase.from('projects').select('*').order('event_date', { ascending: true }),
         supabase.from('invoices').select('*').order('created_at', { ascending: false }),
         supabase.from('tasks').select('*').order('created_at', { ascending: false }),
@@ -1002,6 +1004,7 @@ const CEODashboard = ({ onTab, user }) => {
         supabase.from('payment_authorisations').select('*').order('created_at', { ascending: false }),
         supabase.from('payment_vouchers').select('*').order('created_at', { ascending: false }),
         supabase.from('rff_awards').select('*'),
+        supabase.from('client_payments').select('*'),
       ]);
       setEvents(ev.data || []);
       setInvoices(inv.data || []);
@@ -1017,6 +1020,7 @@ const CEODashboard = ({ onTab, user }) => {
       setPaymentAuths(pa.data || []);
       setVouchers(vo.data || []);
       setAwards(aw.data || []);
+      setClientPayments(cp?.data || []);
       setLoading(false);
     };
     loadAll();
@@ -1031,7 +1035,8 @@ const CEODashboard = ({ onTab, user }) => {
   const wonOpps = opportunities.filter(o => o.status === "won");
   const pipeline = opportunities.filter(o => !["won","lost"].includes(o.status));
   const pipelineValue = pipeline.reduce((s,o) => s+(o.value||0), 0);
-  const revenueYTD = wonOpps.filter(o => o.closed_date && new Date(o.closed_date).getFullYear() === now.getFullYear()).reduce((s,o) => s+(o.value||0), 0);
+  const revenueYTD = clientPayments.filter(p => p.payment_date && new Date(p.payment_date).getFullYear() === now.getFullYear()).reduce((s,p) => s+parseFloat(p.amount||0), 0);
+  const totalClientRevenue = clientPayments.reduce((s,p) => s+parseFloat(p.amount||0), 0);
   const pendingPayments = paymentAuths.filter(p => p.status === "pending_ceo");
   const pendingTasks = tasks.filter(t => t.status !== "completed");
   const avgRating = scorecards.length > 0 ? (scorecards.reduce((s,sc) => s+(sc.total_pct||0), 0)/scorecards.length).toFixed(0) : 0;
@@ -5997,6 +6002,188 @@ const StaffPaymentRatesView = ({ user }) => {
   );
 };
 
+
+const ClientPaymentsView = ({ user }) => {
+  const [payments, setPayments] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ client_id:"", client_name:"", project_id:"", event_name:"", amount:"", payment_date: new Date().toISOString().slice(0,10), payment_method:"Bank Transfer", reference_number:"", zoho_invoice_url:"", notes:"" });
+  const isFM = user.role === "Finance Manager";
+  const isCEO = user.role === "CEO";
+
+  const load = async () => {
+    const [{ data: p }, { data: c }, { data: e }] = await Promise.all([
+      supabase.from("client_payments").select("*").order("payment_date", { ascending: false }),
+      supabase.from("clients").select("*").order("name"),
+      supabase.from("projects").select("*").order("name"),
+    ]);
+    setPayments(p || []);
+    setClients(c || []);
+    setEvents(e || []);
+  };
+  useEffect(() => { load(); }, []);
+
+  const totalReceived = payments.reduce((s,p) => s + parseFloat(p.amount||0), 0);
+  const thisYear = new Date().getFullYear();
+  const ytd = payments.filter(p => p.payment_date && new Date(p.payment_date).getFullYear() === thisYear).reduce((s,p) => s + parseFloat(p.amount||0), 0);
+
+  const handleSave = async () => {
+    if (!form.amount || !form.payment_date) { alert("Amount and date are required."); return; }
+    setSaving(true);
+    await supabase.from("client_payments").insert({
+      ...form,
+      amount: parseFloat(form.amount),
+      recorded_by: user.id,
+      recorded_by_name: user.name,
+    });
+    // Notify CEO if recorded by Finance
+    if (isFM) {
+      const { data: ceos } = await supabase.from("profiles").select("id").eq("role","CEO");
+      for (const ceo of ceos||[]) {
+        await supabase.from("notifications").insert({ user_id: ceo.id, title: "Client Payment Recorded — " + (form.client_name||"Client"), message: user.name + " recorded a payment of GHS " + parseFloat(form.amount).toLocaleString() + " from " + (form.client_name||"client") + " for " + (form.event_name||"event"), type: "finance" });
+      }
+    }
+    setSaving(false);
+    setModal(false);
+    setForm({ client_id:"", client_name:"", project_id:"", event_name:"", amount:"", payment_date: new Date().toISOString().slice(0,10), payment_method:"Bank Transfer", reference_number:"", zoho_invoice_url:"", notes:"" });
+    load();
+  };
+
+  const methodColors = { "Bank Transfer": T.cyan, "Cheque": T.amber, "Cash": T.teal, "Mobile Money": "#8B5CF6", "Other": T.textMuted };
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <div>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Finance</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Client Payments</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Record and track payments received from clients</div>
+        </div>
+        {isFM && <button onClick={() => setModal(true)} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>+ Record Payment</button>}
+      </div>
+
+      {/* KPI Strip */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(160px,1fr))", gap:12, marginBottom:24 }}>
+        {[
+          { label:"Total Received", value:"GHS "+totalReceived.toLocaleString(), color:T.teal },
+          { label:"Revenue YTD", value:"GHS "+ytd.toLocaleString(), color:T.cyan },
+          { label:"Payments Recorded", value:payments.length, color:T.amber },
+          { label:"This Month", value:"GHS "+payments.filter(p => { const d = new Date(p.payment_date); const n = new Date(); return d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear(); }).reduce((s,p)=>s+parseFloat(p.amount||0),0).toLocaleString(), color:T.magenta },
+        ].map(k => (
+          <div key={k.label} style={{ padding:"14px 16px", background:T.surface, border:`1px solid ${T.border}`, borderTop:`2px solid ${k.color}`, borderRadius:10 }}>
+            <div style={{ color:k.color, fontSize:18, fontWeight:900 }}>{k.value}</div>
+            <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginTop:4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Payments Table */}
+      {payments.length === 0 ? (
+        <div style={{ textAlign:"center", padding:60, background:T.surface, borderRadius:12, border:`1px solid ${T.border}` }}>
+          <div style={{ fontSize:40, marginBottom:16 }}>💳</div>
+          <div style={{ color:T.textPrimary, fontWeight:700, fontSize:16 }}>No payments recorded yet</div>
+          {isFM && <div style={{ color:T.textMuted, fontSize:13, marginTop:8 }}>Click + Record Payment to log a client payment</div>}
+        </div>
+      ) : (
+        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, overflow:"hidden" }}>
+          <table style={{ width:"100%", borderCollapse:"collapse" }}>
+            <thead>
+              <tr style={{ background:T.bg }}>
+                {["Client","Event","Amount","Date","Method","Reference","Recorded By"].map(h => (
+                  <th key={h} style={{ padding:"10px 16px", color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", textAlign:"left", borderBottom:`1px solid ${T.border}` }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {payments.map((p, i) => (
+                <tr key={p.id} style={{ borderBottom: i<payments.length-1?`1px solid ${T.border}44`:"none", background:i%2===0?"transparent":T.bg+"30" }}>
+                  <td style={{ padding:"12px 16px", color:T.textPrimary, fontWeight:700, fontSize:13 }}>{p.client_name||"—"}</td>
+                  <td style={{ padding:"12px 16px", color:T.textSecondary, fontSize:12 }}>{p.event_name||"—"}</td>
+                  <td style={{ padding:"12px 16px", color:T.teal, fontWeight:800, fontSize:13 }}>GHS {parseFloat(p.amount||0).toLocaleString()}</td>
+                  <td style={{ padding:"12px 16px", color:T.textMuted, fontSize:12 }}>{p.payment_date ? new Date(p.payment_date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}) : "—"}</td>
+                  <td style={{ padding:"12px 16px" }}>
+                    <span style={{ background:(methodColors[p.payment_method]||T.textMuted)+"18", color:methodColors[p.payment_method]||T.textMuted, padding:"2px 10px", borderRadius:20, fontSize:11, fontWeight:700 }}>{p.payment_method||"—"}</span>
+                  </td>
+                  <td style={{ padding:"12px 16px", color:T.textMuted, fontSize:12 }}>{p.reference_number||"—"}</td>
+                  <td style={{ padding:"12px 16px", color:T.textMuted, fontSize:11 }}>{p.recorded_by_name||"—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Record Payment Modal */}
+      {modal && isFM && (
+        <div style={{ position:"fixed", inset:0, zIndex:600, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setModal(false)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:520, maxHeight:"90vh", overflowY:"auto", padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>Record Client Payment</div>
+            <div style={{ color:T.textMuted, fontSize:13, marginBottom:20 }}>Log a payment received from a client</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Client *</label>
+                <select value={form.client_id} onChange={e => { const c = clients.find(x => x.id===e.target.value); setForm(f=>({...f, client_id:e.target.value, client_name:c?.name||c?.company||""})); }}
+                  style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  <option value="">Select client...</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.company||c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Event</label>
+                <select value={form.project_id} onChange={e => { const ev = events.find(x => x.id===e.target.value); setForm(f=>({...f, project_id:e.target.value, event_name:ev?.name||""})); }}
+                  style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  <option value="">Select event...</option>
+                  {events.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                </select>
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                <div>
+                  <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Amount (GHS) *</label>
+                  <input type="number" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} placeholder="0.00"
+                    style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                </div>
+                <div>
+                  <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Payment Date *</label>
+                  <input type="date" value={form.payment_date} onChange={e=>setForm(f=>({...f,payment_date:e.target.value}))}
+                    style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                </div>
+              </div>
+              <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Payment Method</label>
+                <select value={form.payment_method} onChange={e=>setForm(f=>({...f,payment_method:e.target.value}))}
+                  style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  {["Bank Transfer","Cheque","Cash","Mobile Money","Other"].map(m => <option key={m}>{m}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Reference Number</label>
+                <input value={form.reference_number} onChange={e=>setForm(f=>({...f,reference_number:e.target.value}))} placeholder="Bank ref, cheque no, etc."
+                  style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+              </div>
+              <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Zoho Invoice URL (Optional)</label>
+                <input value={form.zoho_invoice_url} onChange={e=>setForm(f=>({...f,zoho_invoice_url:e.target.value}))} placeholder="https://..."
+                  style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+              </div>
+              <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Notes</label>
+                <textarea value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} rows={2} placeholder="Any additional notes..."
+                  style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} />
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <button onClick={handleSave} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Record Payment"}</button>
+              <button onClick={() => setModal(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer", fontSize:13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function StretchfieldWorkRoom({ user: propUser, profile: propProfile, onLogout }) {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -6080,6 +6267,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "vendor-analytics": return <VendorAnalyticsView user={currentUser} />;
       case "payment-authorisation": return <PaymentAuthorisationView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
       case "staff-payment-rates": return <StaffPaymentRatesView user={currentUser} />;
+      case "client-payments": return <ClientPaymentsView user={currentUser} />;
       case "budget-vs-actuals": return <BudgetVsActualsView user={currentUser} />;
       case "vendor-ratings": return <VendorRatingsView user={currentUser} />;
       case "rff-approvals": return <RFFApprovalsView user={currentUser} />;
@@ -17882,7 +18070,8 @@ const BoardDashboard = ({ user }) => {
   const greeting = now.getHours() < 12 ? "Good Morning" : now.getHours() < 17 ? "Good Afternoon" : "Good Evening";
   const activeEvents = events.filter(e => !["Completed","Cancelled"].includes(e.phase||""));
   const wonOpps = opportunities.filter(o => o.status === "won");
-  const revenueYTD = wonOpps.filter(o => o.closed_date && new Date(o.closed_date).getFullYear() === now.getFullYear()).reduce((s,o) => s+(o.value||0), 0);
+  const revenueYTD = clientPayments.filter(p => p.payment_date && new Date(p.payment_date).getFullYear() === now.getFullYear()).reduce((s,p) => s+parseFloat(p.amount||0), 0);
+  const totalClientRevenue = clientPayments.reduce((s,p) => s+parseFloat(p.amount||0), 0);
   const pipeline = opportunities.filter(o => !["won","lost"].includes(o.status));
   const pipelineValue = pipeline.reduce((s,o) => s+(o.value||0), 0);
 

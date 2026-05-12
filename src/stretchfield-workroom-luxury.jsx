@@ -9591,7 +9591,7 @@ const generatePOPDF = (po, vendor, rff, event) => {
   .terms-box .label { font-size: 10px; font-weight: 700; color: #5A6E8A; text-transform: uppercase; margin-bottom: 6px; }
   .terms-box .value { font-size: 13px; color: #0A1628; line-height: 1.6; }
   .signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 40px; }
-  .sig-box { border-top: 2px solid #C2C9DC; padding-top: 10px; }
+  .sig-box { padding-top: 10px; }
   .sig-box .name { font-size: 12px; font-weight: 700; color: #0A1628; margin-top: 4px; }
   .sig-box .role { font-size: 10px; color: #5A6E8A; }
   .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #E8EBF4; display: flex; justify-content: space-between; align-items: center; }

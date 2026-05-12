@@ -12259,7 +12259,7 @@ const VendorAssignmentView = ({ user }) => {
 
   const load = async () => {
     const [r, e, v, a] = await Promise.all([
-      supabase.from("rffs").select("*").eq("approved", true).in("status", ["approved", "vendor-assigned", "quote-submitted", "quote-approved"]).order("created_at", { ascending: false }),
+      supabase.from("rffs").select("*").eq("approved", true).order("created_at", { ascending: false }),
       supabase.from("projects").select("*"),
       supabase.from("profiles").select("*").eq("role", "Vendor"),
       supabase.from("rff_vendor_assignments").select("*"),

@@ -18208,6 +18208,14 @@ const EventReportsView = ({ user }) => {
     setGenerating(true);
     // Get vendor scorecards for this event
     const eventScorecards = scorecards.filter(s => s.project_id === selectedEvent?.id);
+    // Get debrief for this event — merge all ESL submissions
+    const { data: debriefData } = await supabase.from("event_debrief").select("*").eq("project_id", selectedEvent?.id);
+    const debrief = debriefData && debriefData.length > 0 ? debriefData.reduce((merged, d) => {
+      ["what_went_well","what_to_do_differently","client_informal_feedback","surprises","recommendations"].forEach(k => {
+        if (d[k]) merged[k] = merged[k] ? merged[k]+"\n\n"+d[k] : d[k];
+      });
+      return merged;
+    }, { what_went_well:"", what_to_do_differently:"", client_informal_feedback:"", surprises:"", recommendations:"" }) : null;
     // Build detailed vendor scorecard notes for prompt
     const vendorDetailLines = eventScorecards.map(s => {
       const tier = getTier(s.total_pct);

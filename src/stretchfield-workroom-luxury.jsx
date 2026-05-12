@@ -813,6 +813,7 @@ const getNavItems = (role) => {
             { id: "po-signing", label: "Sign Purchase Orders" },
         { id: "vendor-invoices", label: "Vendor Invoices" },
             { id: "payment-authorisation", label: "Payment Authorisation" },
+            { id: "staff-payment-rates", label: "Staff Payment Rates" },
             { id: "budget-vs-actuals", label: "Budget vs Actuals" },
         { id: "zoho-books", label: "Zoho Books" },
       ]},
@@ -5885,6 +5886,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "scorecards": return <VendorScorecardsView user={currentUser} />;
       case "vendor-analytics": return <VendorAnalyticsView user={currentUser} />;
       case "payment-authorisation": return <PaymentAuthorisationView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
+      case "staff-payment-rates": return <StaffPaymentRatesView user={currentUser} />;
       case "budget-vs-actuals": return <BudgetVsActualsView user={currentUser} />;
       case "vendor-ratings": return <VendorRatingsView user={currentUser} />;
       case "rff-approvals": return <RFFApprovalsView user={currentUser} />;
@@ -13794,44 +13796,6 @@ const EventClientPortalPanel = ({ event, client, user, onClose }) => {
         </div>
       )}
 
-      {activeSection === "payment-rates" && canSetRates && (
-        <div>
-          <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:4 }}>Staff Payment Rates</div>
-          <div style={{ color:T.textMuted, fontSize:12, marginBottom:16 }}>Set project fee, per diem and transport allowance per staff. Amounts are locked for staff when submitting payment requests.</div>
-          {staffProfiles.map(staff => {
-            const existing = paymentRates.find(r => r.staff_id === staff.id);
-            return (
-              <div key={staff.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:10, padding:"14px 16px", marginBottom:10 }}>
-                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:10 }}>
-                  <div><div style={{ color:T.textPrimary, fontWeight:700, fontSize:13 }}>{staff.name}</div><div style={{ color:T.textMuted, fontSize:11 }}>{staff.role}</div></div>
-                  {existing && <span style={{ color:T.teal, fontSize:10, fontWeight:700, background:T.teal+"15", padding:"2px 8px", borderRadius:20 }}>✓ Set</span>}
-                </div>
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:10 }}>
-                  {[["Project Fee","project_fee"],["Per Diem","per_diem"],["Transport","transport_allowance"]].map(([label,field]) => (
-                    <div key={field}>
-                      <label style={{ color:T.textMuted, fontSize:9, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:3 }}>{label} (GHS)</label>
-                      <input type="number" id={"rate-"+staff.id+"-"+field} defaultValue={existing?.[field]||""} placeholder="0.00" style={{ width:"100%", padding:"7px 10px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:6, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
-                    </div>
-                  ))}
-                </div>
-                <button onClick={async () => {
-                  setSavingRates(true);
-                  const pf = parseFloat(document.getElementById("rate-"+staff.id+"-project_fee")?.value||0);
-                  const pd = parseFloat(document.getElementById("rate-"+staff.id+"-per_diem")?.value||0);
-                  const ta = parseFloat(document.getElementById("rate-"+staff.id+"-transport_allowance")?.value||0);
-                  const payload = { staff_id:staff.id, staff_name:staff.name, project_id:event.id, project_name:event.name, project_fee:pf, per_diem:pd, transport_allowance:ta, set_by:user.id, updated_at:new Date().toISOString() };
-                  if (existing) { await supabase.from("staff_event_payments").update(payload).eq("id", existing.id); }
-                  else { await supabase.from("staff_event_payments").insert(payload); }
-                  await supabase.from("notifications").insert({ user_id:staff.id, title:"Payment Rates Set — "+event.name, message:"Your payment rates for "+event.name+" have been configured.", type:"finance" });
-                  const { data: updatedRates } = await supabase.from("staff_event_payments").select("*").eq("project_id", event.id);
-                  setPaymentRates(updatedRates||[]);
-                  setSavingRates(false);
-                }} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"7px 16px", borderRadius:7, cursor:"pointer", fontWeight:800, fontSize:12 }}>{savingRates?"Saving...":existing?"Update":"Set Rates"}</button>
-              </div>
-            );
-          })}
-        </div>
-      )}
 
       {activeSection === "payment-rates" && ["CEO","Finance Manager"].includes(user.role) && (
         <div>
@@ -14163,7 +14127,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
           { id: "tasks", label: "Tasks (" + myTasks.length + ")" },
           { id: "documents", label: "Documents (" + documents.length + ")" },
           { id: "messages", label: "Messages" + (unreadMsgs > 0 ? " ●" : "") },
-          ...( ["CEO","Finance Manager"].includes(user.role) ? [{ id: "payment-rates", label: "💰 Staff Payment Rates" }] : []),
+
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveSection(tab.id)} style={{ padding: "10px 18px", border: "none", background: "none", cursor: "pointer", color: activeSection === tab.id ? T.cyan : T.textMuted, fontWeight: activeSection === tab.id ? 800 : 400, fontSize: 13, borderBottom: activeSection === tab.id ? "2px solid " + T.cyan : "2px solid transparent", marginBottom: -1, transition: "all 0.15s" }}>{tab.label}</button>
         ))}

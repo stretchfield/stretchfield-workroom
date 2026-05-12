@@ -12073,7 +12073,7 @@ const ApprovedVendorsTab = ({ apps, user, load }) => {
       contact_email: editForm.contact_email,
       bank_name: editForm.bank_name,
       bank_account_name: editForm.bank_account_name,
-      account_number: editForm.account_number,
+      account_no: editForm.account_number,
       payment_terms: editForm.payment_terms,
       address: editForm.address,
     }).eq("id", editModal.id);
@@ -12110,7 +12110,7 @@ const ApprovedVendorsTab = ({ apps, user, load }) => {
                 <div style={{ color: T.textMuted, fontSize: 11, marginTop: 1 }}>{app.contact_person} · {app.phone}</div>
               </div>
               <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                <button onClick={() => { setEditModal(app); setEditForm({ vendor_name: app.vendor_name, vendor_type: app.vendor_type, phone: app.phone, contact_person: app.contact_person, contact_email: app.contact_email, bank_name: app.bank_name||"", bank_account_name: app.bank_account_name||"", account_number: app.account_number||"", payment_terms: app.payment_terms||"", address: app.address||"" }); }} style={{ background: T.amber+"15", border: `1px solid ${T.amber}30`, color: T.amber, borderRadius: 8, padding: "5px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>✎ Edit</button>
+                <button onClick={() => { setEditModal(app); setEditForm({ vendor_name: app.vendor_name, vendor_type: app.vendor_type, phone: app.phone, contact_person: app.contact_person, contact_email: app.contact_email, bank_name: app.bank_name||"", bank_account_name: app.bank_account_name||"", account_number: app.account_no||"", payment_terms: app.payment_terms||"", address: app.address||"" }); }} style={{ background: T.amber+"15", border: `1px solid ${T.amber}30`, color: T.amber, borderRadius: 8, padding: "5px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>✎ Edit</button>
                 {app.status === "login-created" ? (
                   <button onClick={() => { setLoginModal(app); setLoginPwd(generatePassword(app.contact_email || "")); setLoginSuccess("view"); }} style={{ background: T.teal+"18", border: `1px solid ${T.teal}40`, color: T.teal, borderRadius: 20, padding: "3px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>✓ Portal Active — View Login</button>
                 ) : (
@@ -12345,7 +12345,7 @@ const VendorOnboardingView = ({ user }) => {
                         // Bank & payment from linked application
                         bank_name: linked?.bank_name || "",
                         bank_account_name: linked?.bank_account_name || "",
-                        account_number: linked?.account_number || "",
+                        account_number: linked?.account_no || "",
                         swift_code: linked?.swift_code || "",
                         bank_address: linked?.bank_address || "",
                         payment_terms: linked?.payment_terms || "",

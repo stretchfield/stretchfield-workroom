@@ -13047,7 +13047,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
 
   const handleUpdate = async () => {
     setSaving(true);
-    await supabase.from("leads").update({
+    await supabase.from("opportunities").update({
       company: editModal.company, sector: editModal.sector,
       presence: editModal.presence, event_fit: editModal.event_fit,
       notes: editModal.notes, status: editModal.status,
@@ -13056,6 +13056,12 @@ const OpportunitiesView = ({ user, onNavigate }) => {
       contact_phone: editModal.contact_phone || "",
       updated_at: new Date().toISOString(),
     }).eq("id", editModal.id);
+    if (user.role !== "CEO") {
+      const { data: ceos } = await supabase.from("profiles").select("id").eq("role","CEO");
+      for (const ceo of ceos||[]) {
+        await supabase.from("notifications").insert({ user_id: ceo.id, title: "Opportunity Updated — " + editModal.company, message: user.name + " updated " + editModal.company + " to: " + editModal.status, type: "crm" });
+      }
+    }
     setSaving(false);
     setEditModal(null);
     load();
@@ -13063,7 +13069,7 @@ const OpportunitiesView = ({ user, onNavigate }) => {
 
   const handleDelete = async (id) => {
     if (!window.confirm("Remove this opportunity?")) return;
-    await supabase.from("leads").delete().eq("id", id);
+    await supabase.from("opportunities").delete().eq("id", id);
     load();
   };
 
@@ -13210,6 +13216,19 @@ const OpportunitiesView = ({ user, onNavigate }) => {
                           </button>
                           {o.status !== "Converted" && (
                             <button onClick={() => handleConvert(o)} style={{ background: "#10B98115", border: "1px solid #10B98130", color: "#10B981", padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>→ Lead</button>
+                          )}
+                          {["CEO","Administrator"].includes(user?.role) && (
+                            <button onClick={async () => {
+                              const { data: smUsers } = await supabase.from("profiles").select("id,name").or("role.eq.Sales & Marketing,has_sm_access.eq.true").neq("id", user.id);
+                              if (!smUsers?.length) { alert("No S&M staff found"); return; }
+                              const names = smUsers.map((u,i) => (i+1)+". "+u.name).join("\n");
+                              const choice = window.prompt("Assign to:\n"+names+"\n\nEnter number:");
+                              const picked = smUsers[parseInt(choice)-1];
+                              if (!picked) return;
+                              await supabase.from("opportunities").update({ assigned_to: picked.id, assigned_name: picked.name }).eq("id", o.id);
+                              await supabase.from("notifications").insert({ user_id: picked.id, title: "Opportunity Assigned — "+o.company, message: "CEO assigned "+o.company+" to you. Check your Opportunities pipeline.", type: "crm" });
+                              load();
+                            }} style={{ background: T.amber+"15", border: `1px solid ${T.amber}30`, color: T.amber, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>👤 Assign</button>
                           )}
                           <button onClick={() => handleDelete(o.id)} style={{ background: T.red + "15", border: `1px solid ${T.red}30`, color: T.red, padding: "4px 8px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>×</button>
                         </div>

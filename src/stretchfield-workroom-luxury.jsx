@@ -6625,45 +6625,106 @@ const NotificationsView = ({ user, onNavigate }) => {
       const m = note.message?.toLowerCase() || "";
       const role = user?.role || "";
 
-      // Smart routing based on role + notification type
-      if (t.includes("new task") || t.includes("task assigned")) {
-        resolvedTarget = "events"; // Task is in event portal
-      } else if (t.includes("rff approved") || t.includes("rff declined")) {
-        resolvedTarget = role === "Vendor Manager" ? "vendors" : "vendors";
-      } else if (t.includes("quote submitted") || t.includes("quotes received")) {
-        resolvedTarget = "quotes-received";
-      } else if (t.includes("new rff assignment") || t.includes("request for quote")) {
-        resolvedTarget = role === "Vendor" ? "dashboard" : "vendor-assignment";
-      } else if (t.includes("contract award") || t.includes("gig confirmed")) {
-        resolvedTarget = role === "Finance Manager" ? "purchase-orders" : "purchase-orders";
-      } else if (t.includes("purchase order")) {
-        resolvedTarget = role === "Vendor" ? "dashboard" : "purchase-orders";
-      } else if (t.includes("payment authoris") || t.includes("payment request") || t.includes("awaiting your signature")) {
-        resolvedTarget = "payment-authorisation";
-      } else if (t.includes("voucher approved") || t.includes("payment voucher")) {
-        resolvedTarget = role === "Finance Manager" ? "finance" : "finance";
-      } else if (t.includes("invoice") && role === "Vendor") {
+      // ── COMPREHENSIVE SMART ROUTING BY ROLE + TITLE ──
+      const isVendor = role === "Vendor";
+      const isCEORole = role === "CEO";
+      const isFM = role === "Finance Manager";
+      const isVMRole = role === "Vendor Manager";
+      const isESL = role === "Strategy & Events Lead";
+      const isClient = role === "Client";
+
+      // PO & Signing
+      if (t.includes("po signature") || t.includes("purchase order") || t.includes("sign purchase") || t.includes("awaiting your signature")) {
+        if (isVendor) resolvedTarget = "dashboard";
+        else if (isFM) resolvedTarget = "purchase-orders";
+        else if (isVMRole) resolvedTarget = "purchase-orders";
+        else resolvedTarget = "purchase-orders";
+
+      // RFF & Vendor Assignment
+      } else if (t.includes("new rff assignment") || t.includes("request for quote") || t.includes("rff assigned")) {
+        resolvedTarget = isVendor ? "dashboard" : "vendor-assignment";
+      } else if (t.includes("rff approved") || t.includes("rff approved with budget")) {
+        resolvedTarget = isVMRole ? "vendor-assignment" : "rff-approvals";
+      } else if (t.includes("rff declined")) {
+        resolvedTarget = "rff-approvals";
+      } else if (t.includes("new rff") || t.includes("rff submitted")) {
+        resolvedTarget = isCEORole ? "rff-approvals" : "vendors";
+
+      // Quotes
+      } else if (t.includes("quote submitted") || t.includes("quotes received") || t.includes("new quote")) {
+        resolvedTarget = isVMRole || isCEORole ? "quotes-received" : "vendors";
+
+      // Contract Awards & Gig Confirmation
+      } else if (t.includes("contract award confirmed") || t.includes("gig confirmed") || t.includes("award confirmed")) {
+        if (isFM) resolvedTarget = "purchase-orders";
+        else if (isVMRole) resolvedTarget = "purchase-orders";
+        else if (isVendor) resolvedTarget = "dashboard";
+        else resolvedTarget = "purchase-orders";
+      } else if (t.includes("contract award") || t.includes("award submitted")) {
+        resolvedTarget = isCEORole ? "contract-awards" : "quote-comparison";
+
+      // Vendor Invoice
+      } else if (t.includes("invoice submitted") || t.includes("new invoice")) {
+        if (isVendor) resolvedTarget = "dashboard";
+        else resolvedTarget = "vendor-invoices";
+      } else if (t.includes("invoice") && isVendor) {
         resolvedTarget = "dashboard";
       } else if (t.includes("invoice")) {
-        resolvedTarget = "vendor-invoices";
-      } else if (t.includes("intelligence report") || t.includes("report section")) {
+        resolvedTarget = isFM ? "vendor-invoices" : "vendor-invoices";
+
+      // Payment & Finance
+      } else if (t.includes("payment authoris") || t.includes("payment approved") || t.includes("payment request")) {
+        if (isVendor || isClient) resolvedTarget = "dashboard";
+        else resolvedTarget = "payment-authorisation";
+      } else if (t.includes("voucher") || t.includes("petty cash")) {
+        resolvedTarget = "finance";
+      } else if (t.includes("staff payment") || t.includes("payment rate")) {
+        resolvedTarget = isFM || isCEORole ? "finance" : "dashboard";
+
+      // Event Reports & Intelligence
+      } else if (t.includes("report section") || t.includes("intelligence report") || t.includes("vendor section") || t.includes("report submitted")) {
+        resolvedTarget = "event-reports";
+      } else if (t.includes("performance report") || t.includes("scorecard") || t.includes("vendor scorecard")) {
+        if (isVendor) resolvedTarget = "dashboard";
+        else if (isVMRole) resolvedTarget = "scorecards";
+        else resolvedTarget = "scorecards";
+
+      // Tasks
+      } else if (t.includes("task assigned") || t.includes("new task") || t.includes("task due") || t.includes("task updated")) {
         resolvedTarget = "events";
-      } else if (t.includes("lead won") || t.includes("approval required")) {
-        resolvedTarget = "opportunities";
-      } else if (t.includes("change order") || t.includes("contract amendment")) {
-        resolvedTarget = role === "Vendor" ? "dashboard" : "quote-comparison";
-      } else if (t.includes("scorecard") || t.includes("performance review")) {
-        resolvedTarget = role === "Vendor" ? "dashboard" : "scorecards";
-      } else if (t.includes("leave")) {
+
+      // CRM & Leads
+      } else if (t.includes("lead won") || t.includes("new client") || t.includes("client approved")) {
+        resolvedTarget = isCEORole ? "opportunities" : "crm";
+      } else if (t.includes("follow-up") || t.includes("crm") || t.includes("lead assigned")) {
+        resolvedTarget = "crm";
+
+      // Client portal
+      } else if (isClient) {
+        if (t.includes("budget") || t.includes("invoice") || t.includes("expense")) resolvedTarget = "dashboard";
+        else resolvedTarget = "dashboard";
+
+      // HR & Leave
+      } else if (t.includes("leave approved") || t.includes("leave declined") || t.includes("leave request")) {
         resolvedTarget = "dashboard";
+      } else if (t.includes("performance review")) {
+        resolvedTarget = "dashboard";
+
+      // Vendor onboarding
+      } else if (t.includes("vendor application") || t.includes("vendor approved") || t.includes("portal login")) {
+        resolvedTarget = isCEORole ? "vendor-onboarding" : "vendors";
+
+      // Fallback by type
       } else if (note.type === "rff") {
-        resolvedTarget = role === "Vendor" ? "dashboard" : "vendors";
+        if (isVendor) resolvedTarget = "dashboard";
+        else if (isVMRole) resolvedTarget = "vendors";
+        else resolvedTarget = "rff-approvals";
       } else if (note.type === "task") {
         resolvedTarget = "events";
       } else if (note.type === "crm") {
-        resolvedTarget = "opportunities";
+        resolvedTarget = "crm";
       } else if (note.type === "finance") {
-        resolvedTarget = "finance";
+        resolvedTarget = isFM || isCEORole ? "finance" : "dashboard";
       } else {
         resolvedTarget = "dashboard";
       }

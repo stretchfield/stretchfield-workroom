@@ -14652,7 +14652,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
   return (
     <div style={{ animation: "fadeUp 0.3s ease" }}>
       <button onClick={onClose} style={{ background: "none", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 12, fontWeight: 700, padding: "0 0 12px 0", display: "flex", alignItems: "center", gap: 4 }}>← Back to Events</button>
-      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: "24px 28px", overflow: "hidden" }}>
+
 
       {/* Event Hero */}
       <div style={{ background: "linear-gradient(135deg, " + T.bgDeep + ", " + T.surface + ")", borderRadius: 12, padding: "0 0 20px 0", marginBottom: 20, position: "relative", overflow: "hidden" }}>

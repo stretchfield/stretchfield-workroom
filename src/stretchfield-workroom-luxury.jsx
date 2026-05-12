@@ -14952,7 +14952,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
         <EventDebriefSection event={event} user={user} />
       )}
 
-      </div>{/* end card wrapper */}
+    </div>{/* end card wrapper */}
     </div>
   );
 };

@@ -14651,15 +14651,11 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
 
   return (
     <div style={{ animation: "fadeUp 0.3s ease" }}>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
-        <div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 12, fontWeight: 700, padding: 0, marginBottom: 8, display: "flex", alignItems: "center", gap: 4 }}>← Back to Events</button>
-        </div>
-      </div>
+      <button onClick={onClose} style={{ background: "none", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 12, fontWeight: 700, padding: "0 0 12px 0", display: "flex", alignItems: "center", gap: 4 }}>← Back to Events</button>
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: "24px 28px", overflow: "hidden" }}>
 
       {/* Event Hero */}
-      <div style={{ background: "linear-gradient(135deg, " + T.bgDeep + ", " + T.surface + ")", border: "1px solid " + T.border, borderRadius: 16, padding: "24px 28px 20px", marginBottom: 20, position: "relative", overflow: "hidden" }}>
+      <div style={{ background: "linear-gradient(135deg, " + T.bgDeep + ", " + T.surface + ")", borderRadius: 12, padding: "0 0 20px 0", marginBottom: 20, position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: 0, right: 0, width: 200, height: 200, background: "radial-gradient(circle, " + T.cyan + "08, transparent 70%)", pointerEvents: "none" }} />
         <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 6 }}>{event.event_category || "Event"}</div>
         <h1 style={{ margin: "0 0 6px", color: T.textPrimary, fontSize: 22, fontWeight: 900, letterSpacing: "-0.02em", lineHeight: 1.2 }}>{event.name}</h1>
@@ -14954,6 +14950,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
         <EventDebriefSection event={event} user={user} />
       )}
 
+      </div>{/* end card wrapper */}
     </div>
   );
 };

@@ -17511,49 +17511,88 @@ const EventReportsView = ({ user }) => {
     setGenerating(true);
     // Get vendor scorecards for this event
     const eventScorecards = scorecards.filter(s => s.project_id === selectedEvent?.id);
+    // Build detailed vendor scorecard notes for prompt
+    const vendorDetailLines = eventScorecards.map(s => {
+      const tier = getTier(s.total_pct);
+      const catNotes = s.category_notes || {};
+      const catLines = SCORECARD_CATEGORIES
+        .filter(cat => catNotes[cat.key])
+        .map(cat => "    [" + cat.label + "]: " + catNotes[cat.key])
+        .join("\n");
+      return s.vendor_name + " — " + s.total_pct + "% (" + tier.label + ")" + (catLines ? "\n" + catLines : "");
+    }).join("\n\n");
+
     const prompt = `You are a strategic event intelligence analyst for Stretchfield — a premium African event management company whose tagline is "We don't plan events. We engineer impact."
 
-Generate a comprehensive post-event intelligence report for the following event:
+Generate a comprehensive post-event intelligence report for the following event. Write in Stretchfield's confident, consultative voice. Use the exact section structure below.
 
 EVENT: ${selectedEvent?.name}
 CLIENT: ${selectedEvent?.client}
-DATE: ${selectedEvent?.event_date}
+DATE: ${selectedEvent?.event_date ? new Date(selectedEvent.event_date).toLocaleDateString("en-GB", { day:"numeric", month:"long", year:"numeric" }) : ""}
 
-OPERATIONAL INTELLIGENCE:
-- Run of Show Adherence: ${report.run_of_show_adherence || "Not submitted"}
+---
+SECTION 1 — EXECUTIVE INTELLIGENCE SUMMARY
+Write 3–4 paragraphs summarising the overall event outcome, strategic intent, emotional resonance, and key signals. End with a "Strategic Outcomes at a Glance" list of 4–5 bullet points.
+
+Data:
+- Run of Show: ${report.run_of_show_adherence || "Not submitted"}
 - High Impact Moments: ${report.high_impact_moments || "Not submitted"}
 - Low Impact Moments: ${report.low_impact_moments || "Not submitted"}
-- Logistics Notes: ${report.logistics_notes || "Not submitted"}
 
-AUDIENCE INTELLIGENCE:
+---
+SECTION 2 — AUDIENCE, ENGAGEMENT & BRAND INTELLIGENCE
+Cover: Arrival & Early Engagement, In-Programme Behaviour, Emotional Shifts, Responsiveness & Engagement Quality, Trust & Advocacy Indicators.
+
+Data:
 - Estimated Attendance: ${report.estimated_attendance || "N/A"} (Expected: ${report.expected_attendance || "N/A"})
-- Audience Energy: Arrival: ${report.audience_energy_arrival || "N/A"}, Mid: ${report.audience_energy_mid || "N/A"}, Peak: ${report.audience_energy_peak || "N/A"}, Close: ${report.audience_energy_close || "N/A"}
+- Audience Energy: Arrival: ${report.audience_energy_arrival || "N/A"} | Mid: ${report.audience_energy_mid || "N/A"} | Peak: ${report.audience_energy_peak || "N/A"} | Close: ${report.audience_energy_close || "N/A"}
 - Key Engagement Moments: ${report.key_engagement_moments || "Not submitted"}
 - Audience Feedback: ${report.audience_feedback_observations || "Not submitted"}
 
-VENDOR INTELLIGENCE:
-- Performance Summary: ${report.vendor_performance_summary || "Not submitted"}
-- Recommended Vendors: ${report.vendors_recommended || "Not submitted"}
+---
+SECTION 3 — EXPERIENCE JOURNEY & OPERATIONAL INTELLIGENCE
+Cover: Entry & Registration, Programme Flow, Strengths Observed, High Impact vs Low Impact Moments.
+
+Data:
+- Logistics Notes: ${report.logistics_notes || "Not submitted"}
+- High Impact: ${report.high_impact_moments || "Not submitted"}
+- Low Impact: ${report.low_impact_moments || "Not submitted"}
+
+---
+SECTION 4 — VENDOR PERFORMANCE INTELLIGENCE
+Cover each vendor's performance with scores and category-level analysis. Include: Overall Assessment, Vendors Recommended, Vendors Not Recommended, Technical Delivery Quality.
+
+Data:
+${vendorDetailLines || report.vendor_performance_summary || "Not submitted"}
+- Recommended: ${report.vendors_recommended || "Not submitted"}
 - Not Recommended: ${report.vendors_not_recommended || "Not submitted"}
 - Technical Quality: ${report.technical_delivery_quality || "Not submitted"}
-${eventScorecards.length > 0 ? "- Vendor Scorecards: " + eventScorecards.map(s => s.vendor_name + ": " + s.total_pct + "%").join(", ") : ""}
 
-STRATEGIC INTELLIGENCE:
+---
+SECTION 5 — STRATEGIC INTELLIGENCE & RECOMMENDATIONS
+Cover 3–4 strategic recommendation areas, each with a "Strategic Intelligence:" insight line. End with next steps.
+
+Data:
 - Strategic Intent Achieved: ${report.strategic_intent_achieved || "Not submitted"}
 - Client Satisfaction: ${report.client_satisfaction || "Not submitted"}
 - Business Development Signals: ${report.business_development_signals || "Not submitted"}
 - Next Edition Recommendations: ${report.next_edition_recommendations || "Not submitted"}
 
-Write a professional, insightful intelligence report in Stretchfield's consultative voice. Structure it with clear sections: Executive Summary, Operational Assessment, Audience Experience Analysis, Vendor Performance Review, Strategic Impact Assessment, and Recommendations. Use confident, data-driven language that reflects Stretchfield's premium positioning. Maximum 600 words.`;
+---
+SECTION 6 — CLOSING STRATEGIC INSIGHT
+One powerful closing paragraph in Stretchfield's voice about the event's legacy and forward momentum.
+
+Format: Use clear section headers matching the names above. Write in flowing paragraphs with strategic intelligence bullets where appropriate. Maximum 900 words total. Do not use markdown formatting symbols like ** or ##.`;
 
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await fetch("/api/generate-report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, messages: [{ role: "user", content: prompt }] })
+        body: JSON.stringify({ prompt })
       });
       const data = await response.json();
-      const summary = data.content?.[0]?.text || "Unable to generate summary.";
+      if (data.error) throw new Error(data.error);
+      const summary = data.text || "Unable to generate summary.";
       await supabase.from("event_intelligence_reports").update({ ai_summary: summary, ai_generated_at: new Date().toISOString() }).eq("id", report.id);
       setReport(r => ({ ...r, ai_summary: summary }));
     } catch(e) {

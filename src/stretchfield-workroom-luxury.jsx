@@ -8207,7 +8207,7 @@ const VendorScorecardModal = ({ vendor, events, user, onClose, onSaved }) => {
   const initScores = {};
   SCORECARD_CATEGORIES.forEach(cat => cat.fields.forEach(f => { initScores[f.key] = 0; }));
   const [scores, setScores] = useState(initScores);
-  const [lineItemNotes, setLineItemNotes] = useState({});
+  const [categoryNotes, setCategoryNotes] = useState({});
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [expandedCat, setExpandedCat] = useState(null);
@@ -8231,7 +8231,7 @@ const VendorScorecardModal = ({ vendor, events, user, onClose, onSaved }) => {
       vendor_id: vendor.id, vendor_name: vendor.name,
       project_id: selectedEvent?.id || null, event_name: selectedEvent?.name || "",
       ...scores, total_score: (pct / 20), total_pct: pct, tier: tierLabel,
-      notes, scored_by: user.id,
+      notes, category_notes: categoryNotes, scored_by: user.id,
     });
     if (!error) {
       // Update vendor profile with most recent score
@@ -8318,6 +8318,16 @@ const VendorScorecardModal = ({ vendor, events, user, onClose, onSaved }) => {
                     <StarInput fieldKey={f.key} />
                   </div>
                 ))}
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>Category Notes — Reason for scores above</div>
+                  <textarea
+                    value={categoryNotes[cat.key] || ""}
+                    onChange={e => setCategoryNotes(prev => ({ ...prev, [cat.key]: e.target.value }))}
+                    placeholder={"Explain the scores given for " + cat.label + "..."}
+                    rows={3}
+                    style={{ width: "100%", padding: "8px 10px", background: T.bg, border: "1px solid " + T.cyan + "44", borderRadius: 7, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", outline: "none" }}
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -8375,7 +8385,7 @@ const VendorScorecardModal = ({ vendor, events, user, onClose, onSaved }) => {
                 setPushingReport(true);
                 const { data: sc } = await supabase.from("vendor_scorecards").select("id").eq("vendor_id", vendor.id).eq("project_id", selectedEventId).order("created_at", { ascending:false }).limit(1).single();
                 if (sc) {
-                  await supabase.from("vendor_scorecards").update({ scorecard_report:reportText, report_generated_at:new Date().toISOString(), report_pushed_at:new Date().toISOString(), visible_to_vendor:true, line_item_notes:lineItemNotes }).eq("id", sc.id);
+                  await supabase.from("vendor_scorecards").update({ scorecard_report:reportText, report_generated_at:new Date().toISOString(), report_pushed_at:new Date().toISOString(), visible_to_vendor:true, category_notes:categoryNotes }).eq("id", sc.id);
                 }
                 await supabase.from("notifications").insert({ user_id:vendor.id, title:"Performance Report — " + (reportModal.event?.name||""), message:"Stretchfield has published your performance report. Log in to view your scorecard.", type:"rff" });
                 const emailHtml = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;"><div style="height:6px;background:linear-gradient(90deg,#FF6B35,#FF3CAC,#784BA0,#2B86C5,#00C8FF);"></div><div style="background:#060B14;padding:28px 32px;"><table style="width:100%;"><tr><td><span style="color:#00C8FF;font-size:12px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;">STRETCHFIELD WORKROOM</span></td><td style="text-align:right;"><img src="https://workroom.stretchfield.com/logo512.png" style="height:32px;" /></td></tr></table><div style="color:#E8F0FF;font-size:20px;font-weight:800;margin-top:16px;padding-top:16px;border-top:1px solid #1A2E4A;">Your Performance Report is Ready</div></div><div style="padding:28px 32px;background:#F4F6FB;"><p style="color:#0A1628;font-size:14px;">Hi <strong>${vendor.name}</strong>,</p><p style="color:#0A1628;font-size:14px;">Your performance report for <strong>${reportModal.event?.name||""}</strong> has been published.</p><p style="color:#0A1628;font-size:14px;"><strong style="color:#00C8FF;">${reportModal.score}% — ${reportModal.tier.label}</strong></p><a href="https://workroom.stretchfield.com" style="display:inline-block;background:linear-gradient(135deg,#00C8FF,#00E5C8);color:#060B14;padding:12px 28px;border-radius:8px;font-weight:800;font-size:13px;text-decoration:none;margin:16px 0;">View in WorkRoom →</a><p style="color:#5A6E8A;font-size:12px;">Log in at workroom.stretchfield.com to view your full report.</p></div></div>`;
@@ -17363,7 +17373,7 @@ const EventReportsView = ({ user }) => {
     setSelectedEvent(event);
     if (isStrategy) setActiveSection("operational");
     else if (isVM) setActiveSection("vendor");
-    else if (isCEO) setActiveSection("overview");
+    else setActiveSection("overview");
 
     // Load or create report
     const { data: existing } = await supabase.from("event_intelligence_reports").select("*").eq("project_id", event.id).maybeSingle();
@@ -17383,9 +17393,14 @@ const EventReportsView = ({ user }) => {
         const avgScore = (eventScorecards.reduce((sum,s) => sum+(s.total_pct||0),0)/eventScorecards.length).toFixed(0);
         const summaryLines = eventScorecards.map(s => {
           const t = getTier(s.total_pct);
-          return s.vendor_name + ": " + s.total_pct + "% (" + t?.label + ")" + (s.scorecard_report ? " — Report pushed to vendor" : "");
+          const catNotes = s.category_notes || {};
+          const catSummary = SCORECARD_CATEGORIES
+            .filter(cat => catNotes[cat.key])
+            .map(cat => "  [" + cat.label + "] " + catNotes[cat.key])
+            .join("\n");
+          return s.vendor_name + ": " + s.total_pct + "% (" + t?.label + ")" + (catSummary ? "\n" + catSummary : "");
         });
-        const autoSummary = "Overall vendor average: " + avgScore + "%\n\n" + summaryLines.join("\n");
+        const autoSummary = "Overall vendor average: " + avgScore + "%\n\n" + summaryLines.join("\n\n");
         // Only auto-fill if vendor section not yet submitted
         if (!reportData?.vendor_submitted_at) {
           setForm(f => ({
@@ -17402,18 +17417,58 @@ const EventReportsView = ({ user }) => {
     setForm(f => ({ ...f, ...(reportData || {}) }));
   };
 
+  const mergeText = (existing, incoming) => {
+    if (!existing || existing.trim() === incoming.trim()) return incoming;
+    if (existing.includes(incoming.trim())) return existing;
+    return existing.trim() + "\n\n" + incoming.trim();
+  };
+
   const saveSection = async (section) => {
     if (!report) return;
     setSaving(true);
     const updates = { updated_at: new Date().toISOString() };
+    // Fetch fresh report to merge (multi-person Strategy Lead consolidation)
+    const { data: fresh } = await supabase.from("event_intelligence_reports").select("*").eq("project_id", selectedEvent.id).maybeSingle();
     if (section === "operational") {
-      Object.assign(updates, { run_of_show_adherence:form.run_of_show_adherence, high_impact_moments:form.high_impact_moments, low_impact_moments:form.low_impact_moments, logistics_notes:form.logistics_notes, operational_submitted_by:user.id, operational_submitted_at:new Date().toISOString() });
+      Object.assign(updates, {
+        run_of_show_adherence: mergeText(fresh?.run_of_show_adherence || "", form.run_of_show_adherence),
+        high_impact_moments: mergeText(fresh?.high_impact_moments || "", form.high_impact_moments),
+        low_impact_moments: mergeText(fresh?.low_impact_moments || "", form.low_impact_moments),
+        logistics_notes: mergeText(fresh?.logistics_notes || "", form.logistics_notes),
+        operational_submitted_by: user.id, operational_submitted_at: new Date().toISOString()
+      });
     } else if (section === "audience") {
-      Object.assign(updates, { estimated_attendance:parseInt(form.estimated_attendance)||null, expected_attendance:parseInt(form.expected_attendance)||null, audience_energy_arrival:form.audience_energy_arrival, audience_energy_mid:form.audience_energy_mid, audience_energy_peak:form.audience_energy_peak, audience_energy_close:form.audience_energy_close, key_engagement_moments:form.key_engagement_moments, audience_feedback_observations:form.audience_feedback_observations, audience_submitted_by:user.id, audience_submitted_at:new Date().toISOString() });
+      // Average numeric fields, merge text fields
+      const existingAtt = parseInt(fresh?.estimated_attendance) || 0;
+      const newAtt = parseInt(form.estimated_attendance) || 0;
+      const avgAtt = existingAtt > 0 && newAtt > 0 ? Math.round((existingAtt + newAtt) / 2) : (newAtt || existingAtt || null);
+      Object.assign(updates, {
+        estimated_attendance: avgAtt,
+        expected_attendance: parseInt(form.expected_attendance) || fresh?.expected_attendance || null,
+        audience_energy_arrival: mergeText(fresh?.audience_energy_arrival || "", form.audience_energy_arrival),
+        audience_energy_mid: mergeText(fresh?.audience_energy_mid || "", form.audience_energy_mid),
+        audience_energy_peak: mergeText(fresh?.audience_energy_peak || "", form.audience_energy_peak),
+        audience_energy_close: mergeText(fresh?.audience_energy_close || "", form.audience_energy_close),
+        key_engagement_moments: mergeText(fresh?.key_engagement_moments || "", form.key_engagement_moments),
+        audience_feedback_observations: mergeText(fresh?.audience_feedback_observations || "", form.audience_feedback_observations),
+        audience_submitted_by: user.id, audience_submitted_at: new Date().toISOString()
+      });
     } else if (section === "vendor") {
-      Object.assign(updates, { vendor_performance_summary:form.vendor_performance_summary, vendors_recommended:form.vendors_recommended, vendors_not_recommended:form.vendors_not_recommended, technical_delivery_quality:form.technical_delivery_quality, vendor_submitted_by:user.id, vendor_submitted_at:new Date().toISOString() });
+      Object.assign(updates, {
+        vendor_performance_summary: form.vendor_performance_summary,
+        vendors_recommended: form.vendors_recommended,
+        vendors_not_recommended: form.vendors_not_recommended,
+        technical_delivery_quality: form.technical_delivery_quality,
+        vendor_submitted_by: user.id, vendor_submitted_at: new Date().toISOString()
+      });
     } else if (section === "strategic") {
-      Object.assign(updates, { strategic_intent_achieved:form.strategic_intent_achieved, client_satisfaction:form.client_satisfaction, business_development_signals:form.business_development_signals, next_edition_recommendations:form.next_edition_recommendations, ceo_submitted_by:user.id, ceo_submitted_at:new Date().toISOString() });
+      Object.assign(updates, {
+        strategic_intent_achieved: form.strategic_intent_achieved,
+        client_satisfaction: form.client_satisfaction,
+        business_development_signals: form.business_development_signals,
+        next_edition_recommendations: form.next_edition_recommendations,
+        ceo_submitted_by: user.id, ceo_submitted_at: new Date().toISOString()
+      });
     }
     if (report.id) {
       await supabase.from("event_intelligence_reports").update(updates).eq("id", report.id);
@@ -17552,7 +17607,7 @@ Write a professional, insightful intelligence report in Stretchfield's consultat
     ...(isStrategy || isCEO ? [{ id:"operational", label:"Operational" }, { id:"audience", label:"Audience" }] : []),
     ...(isVM || isCEO ? [{ id:"vendor", label:"Vendor" }] : []),
     ...(isCEO ? [{ id:"strategic", label:"Strategic" }] : []),
-    { id:"overview", label:"Overview & AI" },
+    ...(isCEO ? [{ id:"overview", label:"Overview & AI" }] : []),
   ];
 
   return (

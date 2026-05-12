@@ -9684,7 +9684,7 @@ const PurchaseOrderView = ({ user }) => {
                           <button onClick={() => setPreviewPO({ po, vendor, rff, event })} style={{ background:T.cyan+"15", border:"1px solid "+T.cyan+"30", color:T.cyan, padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>Preview</button>
                           <button onClick={() => downloadPDF(generatePOPDF(po, vendor, rff, event), "PO-"+(po.internal_po_number||po.id)+".html")} style={{ background:T.surface, border:"1px solid "+T.border, color:T.textMuted, padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>↓ PDF</button>
                           {po.status === "draft" && <button onClick={() => { setNotesModal(po); setEditNotes(po.notes||""); }} style={{ background:T.amber+"15", border:"1px solid "+T.amber+"30", color:T.amber, padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>Notes</button>}
-                          {po.status === "draft" && !po.finance_signed_at && user.role === "Finance Manager" && <button onClick={() => sendForSigning(po)} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#fff", padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>✍ Sign & Send</button>}
+                          {["draft","pending_signatures"].includes(po.status) && !po.finance_signed_at && user.role === "Finance Manager" && <button onClick={() => sendForSigning(po)} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#fff", padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>✍ Sign</button>}
                           {po.status === "draft" && po.finance_signed_at && user.role === "Finance Manager" && <button onClick={() => sendForSigningAfterFinance(po)} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#fff", padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>→ Send to VM & CEO</button>}
                           {["pending_signatures","vm_signed","ceo_signed","fully_signed"].includes(po.status) && (
                             <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
@@ -17371,7 +17371,12 @@ const EventReportsView = ({ user }) => {
       supabase.from("event_intelligence_reports").select("*"),
       supabase.from("vendor_scorecards").select("*").order("created_at", { ascending: false }),
     ]);
-    setEvents(ev || []);
+    // ESL only sees events assigned to them
+    const allEvents = ev || [];
+    const filteredEvents = isStrategy
+      ? allEvents.filter(e => e.assigned_to === user.id || (Array.isArray(e.assigned_to_ids) && e.assigned_to_ids.includes(user.id)))
+      : allEvents;
+    setEvents(filteredEvents);
     setReports(rp || []);
     setScorecards(sc || []);
   };
@@ -17657,55 +17662,110 @@ Format: Use clear section headers matching the names above. Write in flowing par
   }
 
   // ── REPORT FORM VIEW ──
+  // Check if any ESL is assigned to this event
+  const eventHasESL = selectedEvent && (
+    selectedEvent.assigned_to ||
+    (Array.isArray(selectedEvent.assigned_to_ids) && selectedEvent.assigned_to_ids.length > 0)
+  );
   const sections = [
-    ...(isStrategy || isCEO ? [{ id:"operational", label:"Operational" }, { id:"audience", label:"Audience" }] : []),
+    ...(isStrategy || (isCEO && eventHasESL) ? [{ id:"operational", label:"Operational" }, { id:"audience", label:"Audience" }] : []),
     ...(isVM || isCEO ? [{ id:"vendor", label:"Vendor" }] : []),
     ...(isCEO ? [{ id:"strategic", label:"Strategic" }] : []),
     ...(isCEO ? [{ id:"overview", label:"Overview & AI" }] : []),
   ];
 
+  // Role label and colour
+  const roleLabel = isVM ? "Vendor Manager" : isStrategy ? "Strategy & Events Lead" : "CEO";
+  const roleColor = isVM ? T.amber : isStrategy ? T.magenta : T.cyan;
+
+  // Section completion map
+  const sectionDone = {
+    operational: !!report?.operational_submitted_at,
+    audience: !!report?.audience_submitted_at,
+    vendor: !!report?.vendor_submitted_at,
+    strategic: !!report?.ceo_submitted_at,
+  };
+  const mySections = isVM ? ["vendor"] : isStrategy ? ["operational","audience"] : ["operational","audience","vendor","strategic","overview"];
+  const myDone = mySections.filter(s => sectionDone[s]).length;
+  const myTotal = mySections.filter(s => s !== "overview").length;
+
   return (
     <div style={{ animation:"fadeUp 0.35s ease" }}>
-      {/* Back + Header */}
-      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20 }}>
-        <button onClick={() => { setSelectedEvent(null); setReport(null); }} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"6px 12px", borderRadius:8, cursor:"pointer", fontSize:12 }}>← Back</button>
-        <div>
-          <div style={{ color:T.textPrimary, fontWeight:800, fontSize:18 }}>{selectedEvent.name}</div>
-          <div style={{ color:T.textMuted, fontSize:12 }}>{selectedEvent.client} · Intelligence Report</div>
+      {/* ── HEADER CARD ── */}
+      <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:16, padding:"20px 24px", marginBottom:20, position:"relative", overflow:"hidden" }}>
+        <div style={{ position:"absolute", top:0, left:0, right:0, height:3, background:`linear-gradient(90deg,${roleColor},${T.teal})` }} />
+        <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:16 }}>
+          <div style={{ flex:1 }}>
+            <button onClick={() => { setSelectedEvent(null); setReport(null); }} style={{ background:"none", border:"none", color:T.textMuted, padding:"0 0 8px 0", cursor:"pointer", fontSize:12, display:"flex", alignItems:"center", gap:4 }}>← Back to Events</button>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:20, lineHeight:1.2 }}>{selectedEvent.name}</div>
+            <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>{selectedEvent.client} {selectedEvent.event_date ? "· " + new Date(selectedEvent.event_date).toLocaleDateString("en-GB", { day:"numeric", month:"long", year:"numeric" }) : ""}</div>
+            <div style={{ marginTop:10, display:"flex", gap:8, flexWrap:"wrap" }}>
+              <span style={{ background:roleColor+"18", color:roleColor, fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:20, border:`1px solid ${roleColor}30` }}>{roleLabel}</span>
+              {!isCEO && <span style={{ background:T.bg, color:T.textMuted, fontSize:11, padding:"3px 10px", borderRadius:20, border:`1px solid ${T.border}` }}>Your sections: {myDone}/{myTotal} complete</span>}
+              {!eventHasESL && isCEO && <span style={{ background:T.amber+"18", color:T.amber, fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:20 }}>⚠ No ESL assigned — Operational & Audience skipped</span>}
+            </div>
+          </div>
+          {/* Section status pills */}
+          <div style={{ display:"flex", flexDirection:"column", gap:5, minWidth:140 }}>
+            {[
+              { id:"operational", label:"Operational", show: eventHasESL || isCEO },
+              { id:"audience", label:"Audience", show: eventHasESL || isCEO },
+              { id:"vendor", label:"Vendor", show:true },
+              { id:"strategic", label:"Strategic", show:isCEO },
+            ].filter(s => s.show).map(s => (
+              <div key={s.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:8 }}>
+                <span style={{ color:T.textMuted, fontSize:11 }}>{s.label}</span>
+                <span style={{ fontSize:10, fontWeight:700, color:sectionDone[s.id]?T.teal:T.textMuted, background:sectionDone[s.id]?T.teal+"18":T.bg, padding:"1px 8px", borderRadius:10, border:`1px solid ${sectionDone[s.id]?T.teal+"30":T.border}` }}>{sectionDone[s.id]?"Done ✓":"Pending"}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Section Tabs */}
+      {/* ── SECTION TABS ── */}
       <div style={{ display:"flex", gap:2, marginBottom:20, borderBottom:`1px solid ${T.border}`, overflowX:"auto" }}>
-        {sections.map(s => (
-          <button key={s.id} onClick={() => setActiveSection(s.id)} style={{ padding:"8px 16px", border:"none", background:"none", cursor:"pointer", color:activeSection===s.id?T.cyan:T.textMuted, fontWeight:activeSection===s.id?800:400, fontSize:13, borderBottom:activeSection===s.id?`2px solid ${T.cyan}`:"2px solid transparent", marginBottom:-1, whiteSpace:"nowrap" }}>
-            {s.label}
-            {s.id === "operational" && report?.operational_submitted_at && " ✓"}
-            {s.id === "audience" && report?.audience_submitted_at && " ✓"}
-            {s.id === "vendor" && report?.vendor_submitted_at && " ✓"}
-            {s.id === "strategic" && report?.ceo_submitted_at && " ✓"}
-          </button>
-        ))}
+        {sections.map(s => {
+          const done = sectionDone[s.id];
+          const isActive = activeSection === s.id;
+          return (
+            <button key={s.id} onClick={() => setActiveSection(s.id)} style={{ padding:"10px 18px", border:"none", background:"none", cursor:"pointer", color:isActive?T.cyan:done?T.teal:T.textMuted, fontWeight:isActive?800:done?600:400, fontSize:13, borderBottom:isActive?`2px solid ${T.cyan}`:done?`2px solid ${T.teal+"60"}`:"2px solid transparent", marginBottom:-1, whiteSpace:"nowrap", transition:"all 0.15s" }}>
+              {s.label}{done ? " ✓" : ""}
+            </button>
+          );
+        })}
       </div>
 
       {/* ── OPERATIONAL SECTION ── */}
       {activeSection === "operational" && (isStrategy || isCEO) && (
         <div>
-          <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:4 }}>Operational Section</div>
-          <div style={{ color:T.textMuted, fontSize:12, marginBottom:16 }}>Filled by Strategy & Events Lead</div>
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
+            <div style={{ width:4, height:36, background:`linear-gradient(180deg,${T.magenta},${T.cyan})`, borderRadius:4 }} />
+            <div>
+              <div style={{ color:T.textPrimary, fontWeight:900, fontSize:16 }}>Operational Section</div>
+              <div style={{ color:T.textMuted, fontSize:11, marginTop:1 }}>Filled by Strategy & Events Lead · covers run of show, high/low impact moments, logistics</div>
+            </div>
+          </div>
           <EventReportField label="Run of Show Adherence" field="run_of_show_adherence" rows={3} placeholder="How closely was the run of show followed? Any deviations?" form={form} setForm={setForm} />
           <EventReportField label="High Impact Moments" field="high_impact_moments" rows={3} placeholder="What moments created the most impact?" form={form} setForm={setForm} />
           <EventReportField label="Low Impact Moments" field="low_impact_moments" rows={3} placeholder="What moments underperformed?" form={form} setForm={setForm} />
           <EventReportField label="Logistics Notes" field="logistics_notes" rows={3} placeholder="Setup, breakdown, venue, transport observations..." form={form} setForm={setForm} />
-          {(isStrategy || isCEO) && <button onClick={() => saveSection("operational")} disabled={saving} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 24px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Save Operational Section"}</button>}
+          <div style={{ display:"flex", gap:10, alignItems:"center", marginTop:8 }}>
+            {(isStrategy || isCEO) && <button onClick={() => saveSection("operational")} disabled={saving} style={{ background:`linear-gradient(135deg,${T.magenta},${T.cyan})`, border:"none", color:"#fff", padding:"11px 28px", borderRadius:10, cursor:"pointer", fontWeight:800, fontSize:13, opacity:saving?0.7:1 }}>{saving?"Saving...":"Save Operational Section ✓"}</button>}
+            {report?.operational_submitted_at && <span style={{ color:T.teal, fontSize:12, fontWeight:600 }}>Last saved {new Date(report.operational_submitted_at).toLocaleDateString("en-GB", { day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" })}</span>}
+          </div>
         </div>
       )}
 
       {/* ── AUDIENCE SECTION ── */}
       {activeSection === "audience" && (isStrategy || isCEO) && (
         <div>
-          <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:4 }}>Audience Section</div>
-          <div style={{ color:T.textMuted, fontSize:12, marginBottom:16 }}>Filled by Strategy & Events Lead</div>
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
+            <div style={{ width:4, height:36, background:`linear-gradient(180deg,${T.cyan},${T.teal})`, borderRadius:4 }} />
+            <div>
+              <div style={{ color:T.textPrimary, fontWeight:900, fontSize:16 }}>Audience Section</div>
+              <div style={{ color:T.textMuted, fontSize:11, marginTop:1 }}>Filled by Strategy & Events Lead · attendance, energy levels, engagement observations</div>
+            </div>
+          </div>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:14 }}>
             <EventReportField label="Estimated Attendance" field="estimated_attendance" rows={1} placeholder="Actual number" form={form} setForm={setForm} />
             <EventReportField label="Expected Attendance" field="expected_attendance" rows={1} placeholder="Planned number" form={form} setForm={setForm} />
@@ -17718,15 +17778,23 @@ Format: Use clear section headers matching the names above. Write in flowing par
           </div>
           <EventReportField label="Key Engagement Moments" field="key_engagement_moments" rows={3} placeholder="What drove the most engagement?" form={form} setForm={setForm} />
           <EventReportField label="Audience Feedback Observations" field="audience_feedback_observations" rows={3} placeholder="Overheard feedback, reactions, mood..." form={form} setForm={setForm} />
-          {(isStrategy || isCEO) && <button onClick={() => saveSection("audience")} disabled={saving} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 24px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Save Audience Section"}</button>}
+          <div style={{ display:"flex", gap:10, alignItems:"center", marginTop:8 }}>
+            {(isStrategy || isCEO) && <button onClick={() => saveSection("audience")} disabled={saving} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#fff", padding:"11px 28px", borderRadius:10, cursor:"pointer", fontWeight:800, fontSize:13, opacity:saving?0.7:1 }}>{saving?"Saving...":"Save Audience Section ✓"}</button>}
+            {report?.audience_submitted_at && <span style={{ color:T.teal, fontSize:12, fontWeight:600 }}>Last saved {new Date(report.audience_submitted_at).toLocaleDateString("en-GB", { day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" })}</span>}
+          </div>
         </div>
       )}
 
       {/* ── VENDOR SECTION ── */}
       {activeSection === "vendor" && (isVM || isCEO) && (
         <div>
-          <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:4 }}>Vendor Section</div>
-          <div style={{ color:T.textMuted, fontSize:12, marginBottom:16 }}>Filled by Vendor Manager · Auto-populated from scorecard data</div>
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
+            <div style={{ width:4, height:36, background:`linear-gradient(180deg,${T.amber},#F59E0B)`, borderRadius:4 }} />
+            <div>
+              <div style={{ color:T.textPrimary, fontWeight:900, fontSize:16 }}>Vendor Section</div>
+              <div style={{ color:T.textMuted, fontSize:11, marginTop:1 }}>Filled by Vendor Manager · auto-populated from scorecard data · editable before saving</div>
+            </div>
+          </div>
           {scorecards.filter(s => s.project_id === selectedEvent.id).length > 0 && (
             <div style={{ background:T.bg, border:`1px solid ${T.teal}30`, borderRadius:10, padding:"12px 14px", marginBottom:14 }}>
               <div style={{ color:T.teal, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>✦ Auto-populated from Vendor Scorecards</div>
@@ -17762,15 +17830,23 @@ Format: Use clear section headers matching the names above. Write in flowing par
               ))}
             </div>
           )}
-          {(isVM || isCEO) && <button onClick={() => saveSection("vendor")} disabled={saving} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 24px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Save Vendor Section"}</button>}
+          <div style={{ display:"flex", gap:10, alignItems:"center", marginTop:8 }}>
+            {(isVM || isCEO) && <button onClick={() => saveSection("vendor")} disabled={saving} style={{ background:`linear-gradient(135deg,${T.amber},#F59E0B)`, border:"none", color:"#060B14", padding:"11px 28px", borderRadius:10, cursor:"pointer", fontWeight:800, fontSize:13, opacity:saving?0.7:1 }}>{saving?"Saving...":"Save Vendor Section ✓"}</button>}
+            {report?.vendor_submitted_at && <span style={{ color:T.teal, fontSize:12, fontWeight:600 }}>Last saved {new Date(report.vendor_submitted_at).toLocaleDateString("en-GB", { day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" })}</span>}
+          </div>
         </div>
       )}
 
       {/* ── STRATEGIC SECTION ── */}
       {activeSection === "strategic" && isCEO && (
         <div>
-          <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:4 }}>Strategic Section</div>
-          <div style={{ color:T.textMuted, fontSize:12, marginBottom:16 }}>Filled by CEO</div>
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
+            <div style={{ width:4, height:36, background:`linear-gradient(180deg,${T.cyan},#8B5CF6)`, borderRadius:4 }} />
+            <div>
+              <div style={{ color:T.textPrimary, fontWeight:900, fontSize:16 }}>Strategic Section</div>
+              <div style={{ color:T.textMuted, fontSize:11, marginTop:1 }}>Filled by CEO · strategic intent, client satisfaction, business development signals</div>
+            </div>
+          </div>
           <EventReportField label="Was Strategic Intent Achieved?" field="strategic_intent_achieved" rows={3} placeholder="Did the event achieve its strategic objectives?" form={form} setForm={setForm} />
           <EventReportField label="Client Satisfaction Assessment" field="client_satisfaction" rows={3} placeholder="Client feedback, satisfaction level, relationship status..." form={form} setForm={setForm} />
           <EventReportField label="Business Development Signals" field="business_development_signals" rows={3} placeholder="New leads, repeat business signals, referrals..." form={form} setForm={setForm} />

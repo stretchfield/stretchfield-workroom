@@ -6004,6 +6004,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
     avatar: p.avatar,
     avatar_url: p.avatar_url || null,
     phone: p.phone || "",
+    has_sm_access: p.has_sm_access || false,
   } : null;
 
   const [currentUser, setCurrentUser] = useState(() => buildUser(propProfile));

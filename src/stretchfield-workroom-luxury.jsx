@@ -773,7 +773,7 @@ const getNavItems = (role) => {
     base.push({ id: "crm", label: "CRM / Leads", icon: "▪" }, { id: "crm-insights", label: "CRM Insights", icon: "▪" }, { id: "sm-tasks", label: "S&M Tasks", icon: "▪" });
   }
   if (["Strategy & Events Lead"].includes(role)) {
-    base.push({ id: "strategy-overview", label: "Client Overview", icon: "▪" }, { id: "feedback-summary", label: "Feedback", icon: "▪" }, { id: "event-reports", label: "Event Reports", icon: "▪" });
+    base.push({ id: "feedback-summary", label: "Feedback", icon: "▪" }, { id: "event-reports", label: "Event Reports", icon: "▪" });
   }
   if (["CEO","Country Manager"].includes(role)) {
     base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "▪" }, { id: "rff-approvals", label: "RFF Approvals", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quotes-received", label: "Quotes Received", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" }, { id: "vendor-analytics", label: "Vendor Analytics", icon: "▪" }, { id: "purchase-orders", label: "Sign Purchase Orders", icon: "▪" }, { id: "event-reports", label: "Event Reports", icon: "▪" });
@@ -1806,52 +1806,76 @@ const StaffDashboard = ({ user }) => {
                 <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Related Event *</label>
                 <select value={payReqForm.project_id} onChange={async e => {
                   const pid = e.target.value;
-                  setPayReqForm(f=>({...f, project_id:pid, amount:"", request_type:"project_fee"}));
                   if (pid) {
                     const { data: rates } = await supabase.from("staff_payment_rates").select("*").eq("staff_id", user.id).eq("project_id", pid).maybeSingle();
-                    setPayReqForm(f=>({...f, project_id:pid, _rates:rates||null, amount: rates?.project_fee ? String(rates.project_fee) : "", request_type:"project_fee"}));
+                    setPayReqForm(f=>({...f, project_id:pid, _rates:rates||null, selectedTypes:{ project_fee:false, per_diem:false, transport:false }}));
+                  } else {
+                    setPayReqForm(f=>({...f, project_id:"", _rates:null, selectedTypes:{ project_fee:false, per_diem:false, transport:false }}));
                   }
                 }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
                   <option value="">Select event...</option>
                   {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
                 </select>
               </div>
-              <div>
-                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Payment Type</label>
-                <select value={payReqForm.request_type} onChange={e => {
-                  const type = e.target.value;
-                  const rates = payReqForm._rates;
-                  let amt = "";
-                  if (type === "project_fee") amt = rates?.project_fee ? String(rates.project_fee) : "";
-                  else if (type === "per_diem") amt = rates?.per_diem ? String(rates.per_diem) : "";
-                  else if (type === "transport") amt = rates?.transport ? String(rates.transport) : "";
-                  setPayReqForm(f=>({...f, request_type:type, amount:amt}));
-                }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
-                  <option value="project_fee">Project Fee</option>
-                  <option value="per_diem">Per Diem</option>
-                  <option value="transport">Transport Allowance</option>
-                  <option value="reimbursement">Reimbursement (custom amount)</option>
-                  <option value="other">Other (custom amount)</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Amount (GHS)</label>
-                {["reimbursement","other"].includes(payReqForm.request_type) ? (
-                  <input type="number" value={payReqForm.amount} onChange={e=>setPayReqForm(f=>({...f,amount:e.target.value}))} placeholder="0.00" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
-                ) : (
-                  <div style={{ padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}44`, borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                    <span style={{ color: payReqForm.amount ? T.amber : T.textMuted, fontWeight: payReqForm.amount ? 800 : 400, fontSize:15 }}>{payReqForm.amount ? "GHS "+parseFloat(payReqForm.amount).toLocaleString() : "No rate set for this event yet"}</span>
-                    {payReqForm.amount && <span style={{ color:T.teal, fontSize:10, fontWeight:700 }}>🔒 Set by CEO/Finance</span>}
+              {payReqForm.project_id && (
+                <div>
+                  <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:8 }}>Select Payment Types</label>
+                  <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                    {[
+                      { key:"project_fee", label:"Project Fee", amount: payReqForm._rates?.project_fee },
+                      { key:"per_diem", label:"Per Diem", amount: payReqForm._rates?.per_diem },
+                      { key:"transport", label:"Transport Allowance", amount: payReqForm._rates?.transport },
+                    ].map(({ key, label, amount }) => (
+                      <div key={key} onClick={() => amount && setPayReqForm(f=>({...f, selectedTypes:{...f.selectedTypes, [key]:!f.selectedTypes[key]}}))}
+                        style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 14px", background: payReqForm.selectedTypes?.[key] ? T.cyan+"15" : T.bg, border:`1px solid ${payReqForm.selectedTypes?.[key] ? T.cyan+"60" : T.border}`, borderRadius:8, cursor: amount ? "pointer" : "default", opacity: amount ? 1 : 0.4 }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                          <div style={{ width:18, height:18, borderRadius:4, border:`2px solid ${payReqForm.selectedTypes?.[key] ? T.cyan : T.border}`, background: payReqForm.selectedTypes?.[key] ? T.cyan : "transparent", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                            {payReqForm.selectedTypes?.[key] && <span style={{ color:"#060B14", fontSize:11, fontWeight:900 }}>✓</span>}
+                          </div>
+                          <span style={{ color:T.textPrimary, fontSize:13, fontWeight:600 }}>{label}</span>
+                        </div>
+                        <div style={{ textAlign:"right" }}>
+                          {amount ? <span style={{ color:T.amber, fontWeight:800, fontSize:13 }}>GHS {parseFloat(amount).toLocaleString()}</span> : <span style={{ color:T.textMuted, fontSize:11 }}>Not set</span>}
+                          {amount && <div style={{ color:T.teal, fontSize:9, fontWeight:700 }}>🔒 Set by CEO</div>}
+                        </div>
+                      </div>
+                    ))}
+                    <div style={{ padding:"10px 14px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8 }}>
+                      <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, marginBottom:8 }}>ADD CUSTOM AMOUNT (Optional)</div>
+                      <div style={{ display:"flex", gap:8 }}>
+                        <select value={payReqForm.customType||""} onChange={e=>setPayReqForm(f=>({...f,customType:e.target.value}))}
+                          style={{ flex:1, padding:"7px 10px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:7, color:T.textPrimary, fontSize:12, fontFamily:"inherit", outline:"none" }}>
+                          <option value="">Type...</option>
+                          <option value="reimbursement">Reimbursement</option>
+                          <option value="other">Other</option>
+                        </select>
+                        <input type="number" value={payReqForm.customAmount||""} onChange={e=>setPayReqForm(f=>({...f,customAmount:e.target.value}))} placeholder="Amount (GHS)"
+                          style={{ flex:1, padding:"7px 10px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:7, color:T.textPrimary, fontSize:12, fontFamily:"inherit", outline:"none" }} />
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
+                  {(() => {
+                    const r = payReqForm._rates;
+                    const total = (payReqForm.selectedTypes?.project_fee ? parseFloat(r?.project_fee||0) : 0) +
+                      (payReqForm.selectedTypes?.per_diem ? parseFloat(r?.per_diem||0) : 0) +
+                      (payReqForm.selectedTypes?.transport ? parseFloat(r?.transport||0) : 0) +
+                      (payReqForm.customAmount ? parseFloat(payReqForm.customAmount) : 0);
+                    return total > 0 ? (
+                      <div style={{ marginTop:8, padding:"10px 14px", background:T.teal+"12", border:`1px solid ${T.teal}30`, borderRadius:8, display:"flex", justifyContent:"space-between" }}>
+                        <span style={{ color:T.teal, fontWeight:700, fontSize:13 }}>Total Request</span>
+                        <span style={{ color:T.teal, fontWeight:900, fontSize:15 }}>GHS {total.toLocaleString()}</span>
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+              )}
               <div>
                 <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Description *</label>
-                <textarea value={payReqForm.description} onChange={e=>setPayReqForm(f=>({...f,description:e.target.value}))} rows={2} placeholder="Brief description..." style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} />
+                <textarea value={payReqForm.description} onChange={e=>setPayReqForm(f=>({...f,description:e.target.value}))} rows={2} placeholder="Brief description of work done..." style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} />
               </div>
-              {["reimbursement","other"].includes(payReqForm.request_type) && (
+              {payReqForm.customType && (
                 <div>
-                  <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Upload Receipt</label>
+                  <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Upload Receipt (Optional)</label>
                   <input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={e=>setPayReqForm(f=>({...f,_receipt:e.target.files[0]}))} style={{ width:"100%", padding:"8px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:12, cursor:"pointer", boxSizing:"border-box" }} />
                   {payReqForm._receipt && <div style={{ color:T.teal, fontSize:11, marginTop:4 }}>✓ {payReqForm._receipt.name}</div>}
                 </div>
@@ -1859,7 +1883,14 @@ const StaffDashboard = ({ user }) => {
             </div>
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={async () => {
-                if (!payReqForm.amount || !payReqForm.description) { alert("Please fill in amount and description."); return; }
+                const r = payReqForm._rates;
+                const requests = [];
+                if (payReqForm.selectedTypes?.project_fee && r?.project_fee) requests.push({ type:"project_fee", amount: parseFloat(r.project_fee) });
+                if (payReqForm.selectedTypes?.per_diem && r?.per_diem) requests.push({ type:"per_diem", amount: parseFloat(r.per_diem) });
+                if (payReqForm.selectedTypes?.transport && r?.transport) requests.push({ type:"transport", amount: parseFloat(r.transport) });
+                if (payReqForm.customType && payReqForm.customAmount) requests.push({ type: payReqForm.customType, amount: parseFloat(payReqForm.customAmount) });
+                if (requests.length === 0) { alert("Please select at least one payment type."); return; }
+                if (!payReqForm.description) { alert("Please add a description."); return; }
                 setSavingPayReq(true);
                 let receipt_url = "";
                 if (payReqForm._receipt) {
@@ -1869,26 +1900,18 @@ const StaffDashboard = ({ user }) => {
                   if (!upErr) { const { data: urlData } = supabase.storage.from("rffs").getPublicUrl(path); receipt_url = urlData.publicUrl; }
                 }
                 const ev = events.find(e => e.id === payReqForm.project_id);
-                await supabase.from("staff_payment_requests").insert({
-                  staff_id: user.id, staff_name: user.name,
-                  project_id: payReqForm.project_id || null,
-                  project_name: ev?.name || "",
-                  amount: parseFloat(payReqForm.amount),
-                  description: payReqForm.description,
-                  request_type: payReqForm.request_type,
-                  status: "pending",
-                });
-                // Notify Finance
-                const { data: fms } = await supabase.from("profiles").select("id").eq("role","Finance Manager");
-                for (const fm of fms||[]) {
-                  await supabase.from("notifications").insert({ user_id: fm.id, title: "Staff Payment Request — " + user.name, message: user.name + " has submitted a payment request of GHS " + parseFloat(payReqForm.amount).toLocaleString() + " for " + payReqForm.description, type: "finance" });
+                const total = requests.reduce((s,req) => s+req.amount, 0);
+                for (const req of requests) {
+                  await supabase.from("staff_payment_requests").insert({ staff_id:user.id, staff_name:user.name, project_id:payReqForm.project_id||null, project_name:ev?.name||"", amount:req.amount, description:payReqForm.description, request_type:req.type, status:"pending", supporting_doc_url: receipt_url||"" });
                 }
+                const { data: fms } = await supabase.from("profiles").select("id").eq("role","Finance Manager");
+                for (const fm of fms||[]) { await supabase.from("notifications").insert({ user_id:fm.id, title:"Staff Payment Request — "+user.name, message:user.name+" submitted payment requests totalling GHS "+total.toLocaleString()+" for "+payReqForm.description, type:"finance" }); }
                 setSavingPayReq(false);
                 setPayReqModal(false);
-                setPayReqForm({ project_id:"", amount:"", description:"", request_type:"project_fee" });
-                const { data: pr } = await supabase.from("staff_payment_requests").select("*").eq("staff_id", user.id).order("submitted_at", { ascending: false });
-                setPaymentRequests(pr || []);
-              }} disabled={savingPayReq||!payReqForm.amount||!payReqForm.description} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13, opacity:(!payReqForm.amount||!payReqForm.description)?0.5:1 }}>{savingPayReq?"Submitting...":"Submit Request"}</button>
+                setPayReqForm({ project_id:"", description:"", _rates:null, selectedTypes:{ project_fee:false, per_diem:false, transport:false }, customAmount:"", customType:"", _receipt:null });
+                const { data: pr } = await supabase.from("staff_payment_requests").select("*").eq("staff_id", user.id).order("submitted_at", { ascending:false });
+                setPaymentRequests(pr||[]);
+              }} disabled={savingPayReq||!payReqForm.description} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13, opacity:!payReqForm.description?0.5:1 }}>{savingPayReq?"Submitting...":"Submit Request"}</button>
               <button onClick={() => setPayReqModal(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer", fontSize:13 }}>Cancel</button>
             </div>
           </div>

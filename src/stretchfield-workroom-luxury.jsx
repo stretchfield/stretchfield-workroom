@@ -5670,18 +5670,18 @@ const HRView = ({ user }) => {
       {/* Leave Request Modal */}
       {leaveModal && (
         <Modal title="Add Leave Request" onClose={() => setLeaveModal(false)}>
-          <Field label="Staff Member *"><StaffSelect value={leaveForm.staff_id} onChange={(id, name) => setLeaveForm({...leaveForm, staff_id: id, staff_name: name})} /></Field>
+          <Field label="Staff Member *"><StaffSelect value={leaveForm.staff_id} onChange={(id, name) => setLeaveForm({...leaveForm, staff_id: id, staff_name: name})} form={form} setForm={setForm} /></Field>
           <Field label="Leave Type">
             <select value={leaveForm.leave_type} onChange={e => setLeaveForm({...leaveForm, leave_type: e.target.value})} style={inputStyle}>
               {["Annual","Sick","Emergency","Maternity/Paternity","Study","Other"].map(t => <option key={t}>{t}</option>)}
             </select>
           </Field>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="Start Date *"><input type="date" value={leaveForm.start_date} onChange={e => setLeaveForm({...leaveForm, start_date: e.target.value})} style={inputStyle} /></Field>
-            <Field label="End Date *"><input type="date" value={leaveForm.end_date} onChange={e => setLeaveForm({...leaveForm, end_date: e.target.value})} style={inputStyle} /></Field>
+            <Field label="Start Date *"><input type="date" value={leaveForm.start_date} onChange={e => setLeaveForm({...leaveForm, start_date: e.target.value})} style={inputStyle} form={form} setForm={setForm} /></Field>
+            <Field label="End Date *"><input type="date" value={leaveForm.end_date} onChange={e => setLeaveForm({...leaveForm, end_date: e.target.value})} style={inputStyle} form={form} setForm={setForm} /></Field>
           </div>
           {leaveForm.start_date && leaveForm.end_date && <div style={{ color: T.cyan, fontSize: 12, marginBottom: 14, fontWeight: 700 }}>📅 {calcDays(leaveForm.start_date, leaveForm.end_date)} days requested</div>}
-          <Field label="Reason"><textarea value={leaveForm.reason} onChange={e => setLeaveForm({...leaveForm, reason: e.target.value})} rows={3} style={{...inputStyle, resize: "vertical"}} placeholder="Reason for leave..." /></Field>
+          <Field label="Reason"><textarea value={leaveForm.reason} onChange={e => setLeaveForm({...leaveForm, reason: e.target.value})} rows={3} style={{...inputStyle, resize: "vertical"}} placeholder="Reason for leave..." form={form} setForm={setForm} /></Field>
           <div style={{ display: "flex", gap: 10 }}>
             <button onClick={saveLeave} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Submit Leave Request"}</button>
             <button onClick={() => setLeaveModal(false)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
@@ -5693,22 +5693,22 @@ const HRView = ({ user }) => {
       {reviewModal && (
         <Modal title="Add Performance Review" onClose={() => setReviewModal(null)}>
           {!reviewModal.staff_id ? (
-            <Field label="Staff Member *"><StaffSelect value={reviewForm.staff_id} onChange={(id, name) => setReviewForm({...reviewForm, staff_id: id, staff_name: name})} /></Field>
+            <Field label="Staff Member *"><StaffSelect value={reviewForm.staff_id} onChange={(id, name) => setReviewForm({...reviewForm, staff_id: id, staff_name: name})} form={form} setForm={setForm} /></Field>
           ) : (
             <div style={{ background: T.cyan+"12", border: `1px solid ${T.cyan}30`, borderRadius: 8, padding: "10px 14px", marginBottom: 16, color: T.cyan, fontSize: 13, fontWeight: 700 }}>{reviewModal.staff_name}</div>
           )}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="Review Period *"><input value={reviewForm.review_period} onChange={e => setReviewForm({...reviewForm, review_period: e.target.value})} style={inputStyle} placeholder="e.g. Q1 2026" /></Field>
-            <Field label="Events Delivered"><input type="number" value={reviewForm.events_delivered} onChange={e => setReviewForm({...reviewForm, events_delivered: parseInt(e.target.value)||0})} style={inputStyle} /></Field>
+            <Field label="Review Period *"><input value={reviewForm.review_period} onChange={e => setReviewForm({...reviewForm, review_period: e.target.value})} style={inputStyle} placeholder="e.g. Q1 2026" form={form} setForm={setForm} /></Field>
+            <Field label="Events Delivered"><input type="number" value={reviewForm.events_delivered} onChange={e => setReviewForm({...reviewForm, events_delivered: parseInt(e.target.value)||0})} style={inputStyle} form={form} setForm={setForm} /></Field>
           </div>
           <Field label={`Performance Score: ${reviewForm.score}/10`}>
             <input type="range" min="1" max="10" step="0.5" value={reviewForm.score} onChange={e => setReviewForm({...reviewForm, score: parseFloat(e.target.value)})}
               style={{ width: "100%", accentColor: T.cyan }} />
             <div style={{ display: "flex", justifyContent: "space-between", color: T.textMuted, fontSize: 10, marginTop: 2 }}><span>1 — Poor</span><span style={{ color: T.cyan, fontWeight: 700 }}>{reviewForm.score}/10</span><span>10 — Exceptional</span></div>
           </Field>
-          <Field label="Strengths"><textarea value={reviewForm.strengths} onChange={e => setReviewForm({...reviewForm, strengths: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} placeholder="Key strengths observed..." /></Field>
-          <Field label="Areas for Improvement"><textarea value={reviewForm.improvements} onChange={e => setReviewForm({...reviewForm, improvements: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} placeholder="Areas to develop..." /></Field>
-          <Field label="Goals for Next Period"><textarea value={reviewForm.goals} onChange={e => setReviewForm({...reviewForm, goals: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} placeholder="Goals and objectives..." /></Field>
+          <Field label="Strengths"><textarea value={reviewForm.strengths} onChange={e => setReviewForm({...reviewForm, strengths: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} placeholder="Key strengths observed..." form={form} setForm={setForm} /></Field>
+          <Field label="Areas for Improvement"><textarea value={reviewForm.improvements} onChange={e => setReviewForm({...reviewForm, improvements: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} placeholder="Areas to develop..." form={form} setForm={setForm} /></Field>
+          <Field label="Goals for Next Period"><textarea value={reviewForm.goals} onChange={e => setReviewForm({...reviewForm, goals: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} placeholder="Goals and objectives..." form={form} setForm={setForm} /></Field>
           <div style={{ display: "flex", gap: 10 }}>
             <button onClick={() => { if(reviewModal.staff_id) setReviewForm(f => ({...f, staff_id: reviewModal.staff_id, staff_name: reviewModal.staff_name})); saveReview(); }} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Save Review"}</button>
             <button onClick={() => setReviewModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
@@ -5719,21 +5719,21 @@ const HRView = ({ user }) => {
       {/* Training Log Modal */}
       {trainingModal && (
         <Modal title="Log Training" onClose={() => setTrainingModal(null)}>
-          <Field label="Staff Member *"><StaffSelect value={trainingForm.staff_id} onChange={(id, name) => setTrainingForm({...trainingForm, staff_id: id, staff_name: name})} /></Field>
-          <Field label="Training Name *"><input value={trainingForm.training_name} onChange={e => setTrainingForm({...trainingForm, training_name: e.target.value})} style={inputStyle} placeholder="e.g. Event Safety Certification" /></Field>
+          <Field label="Staff Member *"><StaffSelect value={trainingForm.staff_id} onChange={(id, name) => setTrainingForm({...trainingForm, staff_id: id, staff_name: name})} form={form} setForm={setForm} /></Field>
+          <Field label="Training Name *"><input value={trainingForm.training_name} onChange={e => setTrainingForm({...trainingForm, training_name: e.target.value})} style={inputStyle} placeholder="e.g. Event Safety Certification" form={form} setForm={setForm} /></Field>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Field label="Training Type">
               <select value={trainingForm.training_type} onChange={e => setTrainingForm({...trainingForm, training_type: e.target.value})} style={inputStyle}>
                 {["Internal","External","Certification","Workshop","Online","Conference"].map(t => <option key={t}>{t}</option>)}
               </select>
             </Field>
-            <Field label="Provider / Institution"><input value={trainingForm.provider} onChange={e => setTrainingForm({...trainingForm, provider: e.target.value})} style={inputStyle} placeholder="Who delivered it?" /></Field>
+            <Field label="Provider / Institution"><input value={trainingForm.provider} onChange={e => setTrainingForm({...trainingForm, provider: e.target.value})} style={inputStyle} placeholder="Who delivered it?" form={form} setForm={setForm} /></Field>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="Date Completed"><input type="date" value={trainingForm.date_completed} onChange={e => setTrainingForm({...trainingForm, date_completed: e.target.value})} style={inputStyle} /></Field>
-            <Field label="Expiry Date (if applicable)"><input type="date" value={trainingForm.expiry_date} onChange={e => setTrainingForm({...trainingForm, expiry_date: e.target.value})} style={inputStyle} /></Field>
+            <Field label="Date Completed"><input type="date" value={trainingForm.date_completed} onChange={e => setTrainingForm({...trainingForm, date_completed: e.target.value})} style={inputStyle} form={form} setForm={setForm} /></Field>
+            <Field label="Expiry Date (if applicable)"><input type="date" value={trainingForm.expiry_date} onChange={e => setTrainingForm({...trainingForm, expiry_date: e.target.value})} style={inputStyle} form={form} setForm={setForm} /></Field>
           </div>
-          <Field label="Notes"><textarea value={trainingForm.notes} onChange={e => setTrainingForm({...trainingForm, notes: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} /></Field>
+          <Field label="Notes"><textarea value={trainingForm.notes} onChange={e => setTrainingForm({...trainingForm, notes: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} form={form} setForm={setForm} /></Field>
           <div style={{ display: "flex", gap: 10 }}>
             <button onClick={saveTraining} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Save Training Record"}</button>
             <button onClick={() => setTrainingModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
@@ -5744,8 +5744,8 @@ const HRView = ({ user }) => {
       {/* Training Need Modal */}
       {needModal && (
         <Modal title="Flag Training Need" onClose={() => setNeedModal(false)}>
-          <Field label="Staff Member *"><StaffSelect value={needForm.staff_id} onChange={(id, name) => setNeedForm({...needForm, staff_id: id, staff_name: name})} /></Field>
-          <Field label="Training Required *"><input value={needForm.training_required} onChange={e => setNeedForm({...needForm, training_required: e.target.value})} style={inputStyle} placeholder="e.g. Client Management, Protocol Training" /></Field>
+          <Field label="Staff Member *"><StaffSelect value={needForm.staff_id} onChange={(id, name) => setNeedForm({...needForm, staff_id: id, staff_name: name})} form={form} setForm={setForm} /></Field>
+          <Field label="Training Required *"><input value={needForm.training_required} onChange={e => setNeedForm({...needForm, training_required: e.target.value})} style={inputStyle} placeholder="e.g. Client Management, Protocol Training" form={form} setForm={setForm} /></Field>
           <Field label="Priority">
             <select value={needForm.priority} onChange={e => setNeedForm({...needForm, priority: e.target.value})} style={inputStyle}>
               <option value="high">High</option>
@@ -5753,7 +5753,7 @@ const HRView = ({ user }) => {
               <option value="low">Low</option>
             </select>
           </Field>
-          <Field label="Reason / Context"><textarea value={needForm.reason} onChange={e => setNeedForm({...needForm, reason: e.target.value})} rows={3} style={{...inputStyle, resize: "vertical"}} placeholder="Why is this training needed?" /></Field>
+          <Field label="Reason / Context"><textarea value={needForm.reason} onChange={e => setNeedForm({...needForm, reason: e.target.value})} rows={3} style={{...inputStyle, resize: "vertical"}} placeholder="Why is this training needed?" form={form} setForm={setForm} /></Field>
           <div style={{ display: "flex", gap: 10 }}>
             <button onClick={saveNeed} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.amber}, ${T.amber}99)`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Flag Training Need"}</button>
             <button onClick={() => setNeedModal(false)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>
@@ -17334,6 +17334,19 @@ const VendorAnalyticsView = ({ user }) => {
 
 
 
+const EventReportField = ({ label, field, rows=3, placeholder="", form, setForm }) => {
+  const inputStyle = { width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" };
+  const taStyle = { ...inputStyle, resize:"none" };
+  return (
+    <div style={{ marginBottom:14 }}>
+      <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>{label}</label>
+      {rows === 1
+        ? <input value={form[field]||""} onChange={e=>setForm(f=>({...f,[field]:e.target.value}))} placeholder={placeholder} style={inputStyle} />
+        : <textarea value={form[field]||""} onChange={e=>setForm(f=>({...f,[field]:e.target.value}))} rows={rows} placeholder={placeholder} style={taStyle} />}
+    </div>
+  );
+};
+
 const EventReportsView = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [reports, setReports] = useState([]);
@@ -17551,12 +17564,6 @@ Write a professional, insightful intelligence report in Stretchfield's consultat
 
   const inputStyle = { width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" };
   const taStyle = { ...inputStyle, resize:"none" };
-  const Field = ({ label, field, rows=3, placeholder="" }) => (
-    <div style={{ marginBottom:14 }}>
-      <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>{label}</label>
-      {rows === 1 ? <input value={form[field]||""} onChange={e=>setForm(f=>({...f,[field]:e.target.value}))} placeholder={placeholder} style={inputStyle} /> : <textarea value={form[field]||""} onChange={e=>setForm(f=>({...f,[field]:e.target.value}))} rows={rows} placeholder={placeholder} style={taStyle} />}
-    </div>
-  );
 
   // ── EVENT LIST VIEW ──
   if (!selectedEvent) {
@@ -17651,10 +17658,10 @@ Write a professional, insightful intelligence report in Stretchfield's consultat
         <div>
           <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:4 }}>Operational Section</div>
           <div style={{ color:T.textMuted, fontSize:12, marginBottom:16 }}>Filled by Strategy & Events Lead</div>
-          <Field label="Run of Show Adherence" field="run_of_show_adherence" rows={3} placeholder="How closely was the run of show followed? Any deviations?" />
-          <Field label="High Impact Moments" field="high_impact_moments" rows={3} placeholder="What moments created the most impact?" />
-          <Field label="Low Impact Moments" field="low_impact_moments" rows={3} placeholder="What moments underperformed?" />
-          <Field label="Logistics Notes" field="logistics_notes" rows={3} placeholder="Setup, breakdown, venue, transport observations..." />
+          <EventReportField label="Run of Show Adherence" field="run_of_show_adherence" rows={3} placeholder="How closely was the run of show followed? Any deviations?" form={form} setForm={setForm} />
+          <EventReportField label="High Impact Moments" field="high_impact_moments" rows={3} placeholder="What moments created the most impact?" form={form} setForm={setForm} />
+          <EventReportField label="Low Impact Moments" field="low_impact_moments" rows={3} placeholder="What moments underperformed?" form={form} setForm={setForm} />
+          <EventReportField label="Logistics Notes" field="logistics_notes" rows={3} placeholder="Setup, breakdown, venue, transport observations..." form={form} setForm={setForm} />
           {(isStrategy || isCEO) && <button onClick={() => saveSection("operational")} disabled={saving} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 24px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Save Operational Section"}</button>}
         </div>
       )}
@@ -17665,17 +17672,17 @@ Write a professional, insightful intelligence report in Stretchfield's consultat
           <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:4 }}>Audience Section</div>
           <div style={{ color:T.textMuted, fontSize:12, marginBottom:16 }}>Filled by Strategy & Events Lead</div>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:14 }}>
-            <Field label="Estimated Attendance" field="estimated_attendance" rows={1} placeholder="Actual number" />
-            <Field label="Expected Attendance" field="expected_attendance" rows={1} placeholder="Planned number" />
+            <EventReportField label="Estimated Attendance" field="estimated_attendance" rows={1} placeholder="Actual number" form={form} setForm={setForm} />
+            <EventReportField label="Expected Attendance" field="expected_attendance" rows={1} placeholder="Planned number" form={form} setForm={setForm} />
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:14 }}>
-            <Field label="Audience Energy — Arrival" field="audience_energy_arrival" rows={1} placeholder="Low/Medium/High" />
-            <Field label="Audience Energy — Mid" field="audience_energy_mid" rows={1} placeholder="Low/Medium/High" />
-            <Field label="Audience Energy — Peak" field="audience_energy_peak" rows={1} placeholder="Low/Medium/High" />
-            <Field label="Audience Energy — Close" field="audience_energy_close" rows={1} placeholder="Low/Medium/High" />
+            <EventReportField label="Audience Energy — Arrival" field="audience_energy_arrival" rows={1} placeholder="Low/Medium/High" form={form} setForm={setForm} />
+            <EventReportField label="Audience Energy — Mid" field="audience_energy_mid" rows={1} placeholder="Low/Medium/High" form={form} setForm={setForm} />
+            <EventReportField label="Audience Energy — Peak" field="audience_energy_peak" rows={1} placeholder="Low/Medium/High" form={form} setForm={setForm} />
+            <EventReportField label="Audience Energy — Close" field="audience_energy_close" rows={1} placeholder="Low/Medium/High" form={form} setForm={setForm} />
           </div>
-          <Field label="Key Engagement Moments" field="key_engagement_moments" rows={3} placeholder="What drove the most engagement?" />
-          <Field label="Audience Feedback Observations" field="audience_feedback_observations" rows={3} placeholder="Overheard feedback, reactions, mood..." />
+          <EventReportField label="Key Engagement Moments" field="key_engagement_moments" rows={3} placeholder="What drove the most engagement?" form={form} setForm={setForm} />
+          <EventReportField label="Audience Feedback Observations" field="audience_feedback_observations" rows={3} placeholder="Overheard feedback, reactions, mood..." form={form} setForm={setForm} />
           {(isStrategy || isCEO) && <button onClick={() => saveSection("audience")} disabled={saving} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 24px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Save Audience Section"}</button>}
         </div>
       )}
@@ -17704,10 +17711,10 @@ Write a professional, insightful intelligence report in Stretchfield's consultat
               </div>
             </div>
           )}
-          <Field label="Overall Vendor Performance Summary" field="vendor_performance_summary" rows={4} placeholder="General assessment of all vendors..." />
-          <Field label="Vendors to Recommend for Future Events" field="vendors_recommended" rows={3} placeholder="List vendors who performed excellently..." />
-          <Field label="Vendors Not Recommended" field="vendors_not_recommended" rows={3} placeholder="List vendors with performance issues..." />
-          <Field label="Technical Delivery Quality" field="technical_delivery_quality" rows={3} placeholder="AV, production, equipment quality..." />
+          <EventReportField label="Overall Vendor Performance Summary" field="vendor_performance_summary" rows={4} placeholder="General assessment of all vendors..." form={form} setForm={setForm} />
+          <EventReportField label="Vendors to Recommend for Future Events" field="vendors_recommended" rows={3} placeholder="List vendors who performed excellently..." form={form} setForm={setForm} />
+          <EventReportField label="Vendors Not Recommended" field="vendors_not_recommended" rows={3} placeholder="List vendors with performance issues..." form={form} setForm={setForm} />
+          <EventReportField label="Technical Delivery Quality" field="technical_delivery_quality" rows={3} placeholder="AV, production, equipment quality..." form={form} setForm={setForm} />
           {/* Vendor Scorecards for this event */}
           {scorecards.filter(s => s.project_id === selectedEvent.id).length > 0 && (
             <div style={{ background:T.bg, border:`1px solid ${T.border}`, borderRadius:10, padding:"14px 16px", marginBottom:14 }}>
@@ -17729,10 +17736,10 @@ Write a professional, insightful intelligence report in Stretchfield's consultat
         <div>
           <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:4 }}>Strategic Section</div>
           <div style={{ color:T.textMuted, fontSize:12, marginBottom:16 }}>Filled by CEO</div>
-          <Field label="Was Strategic Intent Achieved?" field="strategic_intent_achieved" rows={3} placeholder="Did the event achieve its strategic objectives?" />
-          <Field label="Client Satisfaction Assessment" field="client_satisfaction" rows={3} placeholder="Client feedback, satisfaction level, relationship status..." />
-          <Field label="Business Development Signals" field="business_development_signals" rows={3} placeholder="New leads, repeat business signals, referrals..." />
-          <Field label="Recommendations for Next Edition" field="next_edition_recommendations" rows={4} placeholder="What should we do differently next time?" />
+          <EventReportField label="Was Strategic Intent Achieved?" field="strategic_intent_achieved" rows={3} placeholder="Did the event achieve its strategic objectives?" form={form} setForm={setForm} />
+          <EventReportField label="Client Satisfaction Assessment" field="client_satisfaction" rows={3} placeholder="Client feedback, satisfaction level, relationship status..." form={form} setForm={setForm} />
+          <EventReportField label="Business Development Signals" field="business_development_signals" rows={3} placeholder="New leads, repeat business signals, referrals..." form={form} setForm={setForm} />
+          <EventReportField label="Recommendations for Next Edition" field="next_edition_recommendations" rows={4} placeholder="What should we do differently next time?" form={form} setForm={setForm} />
           <button onClick={() => saveSection("strategic")} disabled={saving} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 24px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Save Strategic Section"}</button>
         </div>
       )}

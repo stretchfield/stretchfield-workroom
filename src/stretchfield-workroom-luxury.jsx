@@ -10093,7 +10093,10 @@ const FinanceInvoicesView = ({ user }) => {
   useEffect(() => { load(); }, []);
 
   const updateStatus = async (id, status) => {
-    await supabase.from("vendor_invoices").update({ status, reviewed_by: user.id }).eq("id", id);
+    const updates = { status, reviewed_by: user.id };
+    if (status === "paid") updates.paid_at = new Date().toISOString();
+    if (status === "reviewed") updates.reviewed_at = new Date().toISOString();
+    await supabase.from("vendor_invoices").update(updates).eq("id", id);
     load();
   };
 

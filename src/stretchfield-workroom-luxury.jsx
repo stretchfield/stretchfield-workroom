@@ -1904,7 +1904,7 @@ const VendorDashboard = ({ user }) => {
       supabase.from("rff_vendor_assignments").select("*, rffs(id,title,event_name,status,quote_deadline)").eq("vendor_id", user.id).order("created_at", { ascending: false }),
       supabase.from("tasks").select("*").eq("assignee_id", user.id).order("created_at", { ascending: false }),
       supabase.from("vendor_scorecards").select("*").eq("vendor_id", user.id).order("created_at", { ascending: false }),
-      supabase.from("vendor_invoices").select("*").eq("vendor_id", user.id).order("created_at", { ascending: false }),
+      supabase.from("vendor_invoices").select("*, paid_at, reviewed_at").eq("vendor_id", user.id).order("created_at", { ascending: false }),
       supabase.from("rff_awards").select("*").eq("vendor_id", user.id),
       supabase.from("profiles").select("*").eq("id", user.id).single(),
       supabase.from("purchase_orders").select("id,internal_po_number,event_name,amount,currency,status,notes,created_at,rff_id").eq("vendor_id", user.id).in("status", ["sent","invoiced","paid"]).order("created_at", { ascending: false }),
@@ -2025,6 +2025,34 @@ const VendorDashboard = ({ user }) => {
         </div>
       </div>
 
+      {/* ── JOB HISTORY & RATINGS ── */}
+      {scorecards.length > 0 && (
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "18px 20px", marginBottom: 20 }}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 3 }}>Performance</div>
+            <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Job Ratings by Event</div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            {scorecards.map((sc, i) => {
+              const t = getTier(sc.total_pct);
+              return (
+                <div key={sc.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: i < scorecards.length-1 ? `1px solid ${T.border}33` : "none" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 700 }}>{sc.event_name || "Event"}</div>
+                    <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{new Date(sc.created_at).toLocaleDateString("en-GB", { day:"numeric", month:"short", year:"numeric" })}</div>
+                    {sc.notes && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4, fontStyle: "italic" }}>"{sc.notes}"</div>}
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ color: t?.color || T.amber, fontWeight: 900, fontSize: 20 }}>{sc.total_pct}%</div>
+                    <div style={{ color: t?.color || T.amber, fontSize: 11, fontWeight: 700, background: (t?.color||T.amber)+"18", padding: "2px 10px", borderRadius: 20, display: "inline-block", marginTop: 2 }}>{t?.label}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ── INVOICES ── */}
       {invoices.length > 0 && (
         <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "18px 20px", marginBottom: 20 }}>
@@ -2034,16 +2062,24 @@ const VendorDashboard = ({ user }) => {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
             {invoices.map((inv, i) => {
-              const isPaid = inv.status === "paid";
+              const isPaid = inv.status === "paid" || inv.status === "mark_paid";
+              const isReviewed = inv.status === "reviewed";
+              const submittedDate = new Date(inv.created_at);
+              const daysAgo = Math.floor((new Date() - submittedDate) / (1000*60*60*24));
+              const isOverdue = !isPaid && daysAgo > 14;
+              const statusColor = isPaid ? T.teal : isOverdue ? T.red : isReviewed ? T.cyan : T.amber;
+              const statusLabel = isPaid ? "✓ Paid" : isReviewed ? "Reviewed — Awaiting Payment" : isOverdue ? `Overdue by ${daysAgo - 14} days` : `Pending · ${daysAgo}d ago`;
               return (
-                <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < invoices.length-1 ? `1px solid ${T.border}33` : "none" }}>
-                  <div>
-                    <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{inv.title || "Invoice"}</div>
-                    <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{new Date(inv.created_at).toLocaleDateString("en-GB")}</div>
+                <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: i < invoices.length-1 ? `1px solid ${T.border}33` : "none" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{inv.title || inv.event_name || "Invoice"}</div>
+                    <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Submitted {submittedDate.toLocaleDateString("en-GB", { day:"numeric", month:"short", year:"numeric" })}</div>
+                    {inv.document_url && <a href={inv.document_url} target="_blank" rel="noreferrer" style={{ color: T.cyan, fontSize: 10, fontWeight: 700 }}>↗ View Document</a>}
                   </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ color: isPaid ? T.teal : T.amber, fontWeight: 700, fontSize: 13 }}>GHS {parseFloat(inv.amount||0).toLocaleString()}</div>
-                    <div style={{ color: isPaid ? T.teal : T.amber, fontSize: 10, fontWeight: 700 }}>{isPaid ? "✓ Paid" : "Pending"}</div>
+                  <div style={{ textAlign: "right", minWidth: 120 }}>
+                    <div style={{ color: statusColor, fontWeight: 800, fontSize: 14 }}>{inv.currency||"GHS"} {parseFloat(inv.amount||0).toLocaleString()}</div>
+                    <div style={{ color: statusColor, fontSize: 10, fontWeight: 700, marginTop: 3, background: statusColor+"15", padding: "2px 8px", borderRadius: 20, display: "inline-block" }}>{statusLabel}</div>
+                    {isPaid && inv.paid_at && <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>Paid {new Date(inv.paid_at).toLocaleDateString("en-GB")}</div>}
                   </div>
                 </div>
               );
@@ -9884,7 +9920,7 @@ const VendorInvoiceView = ({ user }) => {
 
   const load = async () => {
     const [{ data: inv }, { data: po }, { data: awards }] = await Promise.all([
-      supabase.from("vendor_invoices").select("*").eq("vendor_id", user.id).order("created_at", { ascending: false }),
+      supabase.from("vendor_invoices").select("*, paid_at, reviewed_at").eq("vendor_id", user.id).order("created_at", { ascending: false }),
       supabase.from("purchase_orders").select("*").eq("vendor_id", user.id),
       supabase.from("rff_awards").select("*, rffs(project_id, event_name, title)").eq("vendor_id", user.id).in("status", ["confirmed","po_created"]),
     ]);

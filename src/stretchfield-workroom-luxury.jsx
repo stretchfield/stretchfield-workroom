@@ -10438,13 +10438,13 @@ const QuotesReceivedView = ({ user }) => {
                       <div style={{ color: T.textMuted, fontSize: 13 }}>No vendors assigned yet.</div>
                     ) : (
                       <div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
-                          {["Vendor","Category","Quote Amount","Document","Submitted"].map(h => (
+                        <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1.2fr 1fr 1fr 1fr 40px", gap: 8, marginBottom: 8 }}>
+                          {["Vendor","Category","Quote Amount","Document","Submitted",""].map(h => (
                             <div key={h} style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</div>
                           ))}
                         </div>
                         {rffAssignments.map(a => (
-                          <div key={a.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 8, padding: "10px 0", borderBottom: `1px solid ${T.border}44`, alignItems: "center" }}>
+                          <div key={a.id} style={{ display: "grid", gridTemplateColumns: "1.5fr 1.2fr 1fr 1fr 1fr 40px", gap: 8, padding: "10px 0", borderBottom: `1px solid ${T.border}44`, alignItems: "center" }}>
                             <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{a.vendor_name}</div>
                             <div style={{ color: T.textMuted, fontSize: 12 }}>—</div>
                             <div style={{ color: a.quote_amount ? T.amber : T.textMuted, fontWeight: a.quote_amount ? 800 : 400, fontSize: 13 }}>
@@ -10457,6 +10457,15 @@ const QuotesReceivedView = ({ user }) => {
                             </div>
                             <div style={{ color: T.textMuted, fontSize: 11 }}>
                               {a.quote_submitted_at ? new Date(a.quote_submitted_at).toLocaleDateString("en-GB") : "—"}
+                            </div>
+                            <div>
+                              {a.quote_amount && (
+                                <button onClick={async () => {
+                                  if (!window.confirm("Remove quote from " + a.vendor_name + "? This will reset them to pending.")) return;
+                                  await supabase.from("rff_vendor_assignments").update({ quote_amount: null, quote_document_url: null, quote_submitted_at: null, quote_notes: null, status: "pending" }).eq("id", a.id);
+                                  load();
+                                }} style={{ background: T.red+"15", border: `1px solid ${T.red}30`, color: T.red, borderRadius: 6, padding: "3px 7px", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>×</button>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -10511,19 +10520,17 @@ const QuoteComparisonView = ({ user }) => {
   const [pastEvents, setPastEvents] = useState([]);
 
   const load = async () => {
-    const [{ data: ev }, { data: aw }, { data: vp }, { data: va }, { data: pe }] = await Promise.all([
+    const [{ data: ev }, { data: aw }, { data: co }, { data: vp }, { data: va }] = await Promise.all([
       supabase.from("projects").select("*").order("name"),
       supabase.from("rff_awards").select("*"),
       supabase.from("change_orders").select("*"),
       supabase.from("profiles").select("*").eq("role", "Vendor"),
       supabase.from("vendor_applications").select("*").eq("status", "login-created"),
-      supabase.from("rff_vendor_assignments").select("*"),
     ]);
     setEvents(ev || []);
     setAwards(aw || []);
     setVendorProfiles(vp || []);
     setVendorApps(va || []);
-    setPastEvents(pe || []);
   };
 
   useEffect(() => { load(); }, []);

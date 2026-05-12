@@ -10340,11 +10340,13 @@ const QuoteComparisonView = ({ user }) => {
         const budgetCats = budgets.map(b => b.category.toLowerCase().trim()).filter(c => c !== "other");
         const isOtherCategory = selCat === "other";
         if (isOtherCategory) {
-          // Other = vendors whose exact category is not in any specific budget category
+          // Other = vendors whose exact category is not in any specific budget category AND not matched by vendor category
           return !budgetCats.some(bc => vendorCat === bc);
         }
-        // Exact match only (with whitespace normalization)
-        return vendorCat.replace(/\s+/g, " ") === selCat.replace(/\s+/g, " ");
+        // Match vendor category directly OR match budget category label
+        const vendorCatNorm = vendorCat.replace(/\s+/g, " ");
+        const selCatNorm = selCat.replace(/\s+/g, " ");
+        return vendorCatNorm === selCatNorm;
       });
 
   const filteredAssignments = categoryFilteredAssignments;
@@ -10365,7 +10367,9 @@ const QuoteComparisonView = ({ user }) => {
       return (vp?.service_category || va?.vendor_type || "").trim() || null;
     }).filter(Boolean)
   )];
-  const categories = budgetCategories.length > 0 ? budgetCategories : vendorCategories;
+  // Merge budget categories + vendor categories so all submitted quote categories appear
+  const allCategories = [...new Set([...budgetCategories, ...vendorCategories])];
+  const categories = allCategories;
 
   const toggleCompare = (id) => {
     setCompareVendors(prev => prev.includes(id) ? prev.filter(v => v !== id) : prev.length < 5 ? [...prev, id] : [...prev.slice(1), id]);

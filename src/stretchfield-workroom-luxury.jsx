@@ -15049,7 +15049,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
           ...( ["CEO","Strategy & Events Lead","Vendor Manager","Country Manager"].includes(user.role) ? [{ id: "run-of-show", label: "Run of Show" }] : []),
           ...( ["CEO","Strategy & Events Lead","Vendor Manager","Country Manager"].includes(user.role) ? [{ id: "checklist", label: "Checklist" }] : []),
           ...( ["CEO","Strategy & Events Lead","Country Manager"].includes(user.role) ? [{ id: "comms-log", label: "Client Comms" }] : []),
-          ...( ["CEO","Strategy & Events Lead","Country Manager"].includes(user.role) ? [{ id: "debrief", label: "Debrief" }] : []),
+          ...( ["CEO","Strategy & Events Lead","Country Manager","Vendor Manager"].includes(user.role) ? [{ id: "debrief", label: "Debrief" }] : []),
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveSection(tab.id)} style={{ padding: "10px 18px", border: "none", background: "none", cursor: "pointer", color: activeSection === tab.id ? T.cyan : T.textMuted, fontWeight: activeSection === tab.id ? 800 : 400, fontSize: 13, borderBottom: activeSection === tab.id ? "2px solid " + T.cyan : "2px solid transparent", marginBottom: -1, transition: "all 0.15s", whiteSpace:"nowrap" }}>{tab.label}</button>
         ))}

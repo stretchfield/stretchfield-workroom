@@ -775,6 +775,9 @@ const getNavItems = (role) => {
   if (["Strategy & Events Lead"].includes(role)) {
     base.push({ id: "feedback-summary", label: "Feedback", icon: "▪" }, { id: "event-reports", label: "Event Reports", icon: "▪" });
   }
+  if (["Strategy & Events Lead"].includes(role) && currentUser?.has_sm_access) {
+    base.push({ id: "opportunities", label: "Opportunities", icon: "▪" }, { id: "crm", label: "CRM / Leads", icon: "▪" }, { id: "sm-tasks", label: "S&M Tasks", icon: "▪" });
+  }
   if (["CEO","Country Manager"].includes(role)) {
     base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "▪" }, { id: "rff-approvals", label: "RFF Approvals", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quotes-received", label: "Quotes Received", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" }, { id: "vendor-analytics", label: "Vendor Analytics", icon: "▪" }, { id: "purchase-orders", label: "Sign Purchase Orders", icon: "▪" }, { id: "event-reports", label: "Event Reports", icon: "▪" });
   }
@@ -12952,10 +12955,15 @@ const OpportunitiesView = ({ user, onNavigate }) => {
   const [actForm, setActForm] = useState({ type: "note", content: "", scheduled_date: "", scheduled_time: "" });
   const [addingAct, setAddingAct] = useState(false);
 
-  const canManage = ["CEO", "Sales & Marketing"].includes(user?.role);
+  const canManage = ["CEO", "Sales & Marketing"].includes(user?.role) || user?.has_sm_access;
 
   const load = async () => {
-    const { data } = await supabase.from("opportunities").select("*").order("company");
+    let query = supabase.from("opportunities").select("*").order("company");
+    // Kofi (has_sm_access but not CEO/S&M) only sees assigned or created by him
+    if (user?.has_sm_access && !["CEO","Sales & Marketing"].includes(user?.role)) {
+      query = supabase.from("opportunities").select("*").or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`).order("company");
+    }
+    const { data } = await query;
     setOpportunities(data || []);
   };
 
@@ -12976,6 +12984,13 @@ const OpportunitiesView = ({ user, onNavigate }) => {
       created_by: user.id,
       created_by_name: user.name,
     });
+    // Notify CEO if logged by non-CEO (Kofi live feed)
+    if (user.role !== "CEO") {
+      const { data: ceos } = await supabase.from("profiles").select("id").eq("role","CEO");
+      for (const ceo of ceos||[]) {
+        await supabase.from("notifications").insert({ user_id: ceo.id, title: "S&M Activity — " + company, message: user.name + " logged a " + actForm.type + " on " + company + ": " + actForm.content, type: "crm" });
+      }
+    }
     // If scheduled — add to itineraries for calendar
     if (af.scheduled_date && ["call","meeting","demo","follow-up"].includes(af.type)) {
       await supabase.from("itineraries").insert({
@@ -13023,11 +13038,10 @@ const OpportunitiesView = ({ user, onNavigate }) => {
   const handleAdd = async () => {
     if (!form.company) return;
     setSaving(true);
-    await supabase.from("leads").insert({ ...form });
-    // form already includes contact_name, contact_email, contact_phone
+    await supabase.from("opportunities").insert({ ...form, created_by: user.id, assigned_to: user.id });
     setSaving(false);
     setModal(false);
-    setForm({ company: "", sector: "", presence: "GH", event_fit: "", notes: "", status: "New" });
+    setForm({ company: "", sector: "", presence: "GH", event_fit: "", notes: "", status: "New", contact_name: "", contact_email: "", contact_phone: "" });
     load();
   };
 
@@ -13105,9 +13119,9 @@ const OpportunitiesView = ({ user, onNavigate }) => {
           <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Opportunities</h2>
           <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{opportunities.length} target companies · {converted} converted to leads</div>
         </div>
-        {canManage && (
-          <button onClick={() => setModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, letterSpacing: "0.06em" }}>+ Add Opportunity</button>
-        )}
+        <div style={{ display:"flex", gap:8 }}>
+          {canManage && <button onClick={() => setModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, letterSpacing: "0.06em" }}>+ Add Opportunity</button>}
+        </div>
       </div>
 
       {/* KPI strip */}

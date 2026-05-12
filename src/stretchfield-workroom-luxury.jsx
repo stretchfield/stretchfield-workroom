@@ -10185,7 +10185,7 @@ const PurchaseOrderView = ({ user }) => {
                               </div>
                             </div>
                           )}
-                          {po.status === "fully_signed" && <button onClick={() => publishPO(po)} style={{ background:"linear-gradient(135deg,"+T.teal+",#10B981)", border:"none", color:"#fff", padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>↑ Publish</button>}
+                          {po.status === "fully_signed" && ["CEO","Finance Manager"].includes(user.role) && <button onClick={() => publishPO(po)} style={{ background:"linear-gradient(135deg,"+T.teal+",#10B981)", border:"none", color:"#fff", padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>↑ Publish</button>}
                           {po.status === "sent" && <span style={{ color:T.teal, fontSize:10, fontWeight:700 }}>✓ Published</span>}
                           {/* VM Sign button */}
                           {["pending_signatures","ceo_signed"].includes(po.status) && user.role === "Vendor Manager" && !po.vm_signed_at && (
@@ -10219,7 +10219,7 @@ const PurchaseOrderView = ({ user }) => {
                 <div style={{ color:T.textPrimary, fontWeight:700, fontSize:14 }}>PO Preview — {previewPO.po.internal_po_number}</div>
                 <div style={{ display:"flex", gap:8 }}>
                   <button onClick={() => downloadPDF(generatePOPDF(previewPO.po, previewPO.vendor, previewPO.rff, previewPO.event), "PO-"+(previewPO.po.internal_po_number||previewPO.po.id)+".html")} style={{ background:T.cyan+"15", border:"1px solid "+T.cyan+"30", color:T.cyan, padding:"6px 14px", borderRadius:6, cursor:"pointer", fontSize:12, fontWeight:700 }}>↓ Download PDF</button>
-                  {previewPO.po.status === "draft" && <button onClick={() => { publishPO(previewPO.po); setPreviewPO(null); }} style={{ background:"linear-gradient(135deg,"+T.teal+","+T.cyan+")", border:"none", color:"#fff", padding:"6px 14px", borderRadius:6, cursor:"pointer", fontSize:12, fontWeight:700 }}>↑ Publish to Vendor</button>}
+                  {previewPO.po.status === "draft" && ["CEO","Finance Manager"].includes(user.role) && <button onClick={() => { publishPO(previewPO.po); setPreviewPO(null); }} style={{ background:"linear-gradient(135deg,"+T.teal+","+T.cyan+")", border:"none", color:"#fff", padding:"6px 14px", borderRadius:6, cursor:"pointer", fontSize:12, fontWeight:700 }}>↑ Publish to Vendor</button>}
                   <button onClick={() => setPreviewPO(null)} style={{ background:"none", border:"1px solid "+T.border, color:T.textMuted, padding:"6px 12px", borderRadius:6, cursor:"pointer", fontSize:12 }}>✕ Close</button>
                 </div>
               </div>

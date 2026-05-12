@@ -13794,11 +13794,6 @@ const EventClientPortalPanel = ({ event, client, user, onClose }) => {
         </div>
       )}
 
-            {/* Intelligence Report */}
-      {activeSection === "report" && (
-        <EventIntelligenceReport event={event} user={user} onClose={() => setActiveSection("overview")} />
-      )}
-
       {activeSection === "payment-rates" && canSetRates && (
         <div>
           <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:4 }}>Staff Payment Rates</div>
@@ -13968,18 +13963,22 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
   const daysToEvent = event.event_date ? Math.ceil((new Date(event.event_date) - new Date()) / (1000*60*60*24)) : null;
 
   const load = async () => {
-    const [tk, dc, mg, mb] = await Promise.all([
+    const [tk, dc, mg, mb, sp, pr] = await Promise.all([
       isCEO
         ? supabase.from("tasks").select("*").eq("project_id", event.id).order("created_at", { ascending: false })
         : supabase.from("tasks").select("*").eq("project_id", event.id).or("assignee_id.eq." + user.id + ",assigned_by.eq." + user.id).order("created_at", { ascending: false }),
       supabase.from("event_documents").select("*").eq("project_id", event.id).eq("uploaded_by_client", false).order("created_at", { ascending: false }),
       supabase.from("event_team_messages").select("*").eq("project_id", event.id).order("created_at", { ascending: true }),
       supabase.from("profiles").select("id,name,role,avatar").not("role", "in", "(Client,Vendor,Board of Directors)"),
+      supabase.from("profiles").select("id,name,role").not("role", "in", "(Client,Vendor,Board of Directors,CEO)"),
+      supabase.from("staff_payment_rates").select("*").eq("project_id", event.id),
     ]);
     setTasks(tk.data || []);
     setDocuments(dc.data || []);
     setMessages(mg.data || []);
     setMembers(mb.data || []);
+    setStaffProfiles(sp.data || []);
+    setPaymentRates(pr.data || []);
     // Mark messages as read
     const unread = (mg.data || []).filter(m => m.sender_id !== user.id);
     if (unread.length > 0) {
@@ -14165,8 +14164,6 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
           { id: "documents", label: "Documents (" + documents.length + ")" },
           { id: "messages", label: "Messages" + (unreadMsgs > 0 ? " ●" : "") },
           ...( ["CEO","Finance Manager"].includes(user.role) ? [{ id: "payment-rates", label: "💰 Staff Payment Rates" }] : []),
-          ...( ["CEO","Finance Manager"].includes(user.role) ? [{ id: "payment-rates", label: "Staff Payment Rates" }] : []),
-          { id: "report", label: "Intelligence Report" },
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveSection(tab.id)} style={{ padding: "10px 18px", border: "none", background: "none", cursor: "pointer", color: activeSection === tab.id ? T.cyan : T.textMuted, fontWeight: activeSection === tab.id ? 800 : 400, fontSize: 13, borderBottom: activeSection === tab.id ? "2px solid " + T.cyan : "2px solid transparent", marginBottom: -1, transition: "all 0.15s" }}>{tab.label}</button>
         ))}

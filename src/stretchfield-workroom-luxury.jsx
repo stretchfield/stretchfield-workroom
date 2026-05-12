@@ -4962,6 +4962,13 @@ const EVENT_ARCHETYPES = {
 
 
 
+const getScoreLabel = (score) => {
+  if (score >= 8) return { label: "Excellent", color: "#10B981" };
+  if (score >= 6) return { label: "Good", color: T.teal };
+  if (score >= 4) return { label: "Fair", color: T.amber };
+  return { label: "Poor", color: T.red };
+};
+
 const ImpactIntelligenceSummary = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [scorecards, setScorecardsData] = useState([]);

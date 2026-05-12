@@ -12049,11 +12049,23 @@ const ApprovedVendorsTab = ({ apps, user, load }) => {
   const approvedApps = apps.filter(a => ["approved","login-created"].includes(a.status));
   const VTYPES = ["Event Lighting","Events Ushering","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
 
+  const PAYMENT_TERMS = [
+    "50% Upfront, balance after event",
+    "50% upfront",
+    "60% Upfront Payment",
+    "70% down payment",
+    "80% upfront",
+    "Full payment upfront",
+    "30 days",
+    "50% paid before event, balance paid after event",
+    "Other",
+  ];
+
   const saveEdit = async () => {
     if (!editModal) return;
     setSavingEdit(true);
-    // Update vendor_applications
-    await supabase.from("vendor_applications").update({
+    // Update vendor_applications using the app ID
+    const { error: appError } = await supabase.from("vendor_applications").update({
       vendor_name: editForm.vendor_name,
       vendor_type: editForm.vendor_type,
       phone: editForm.phone,
@@ -12065,7 +12077,8 @@ const ApprovedVendorsTab = ({ apps, user, load }) => {
       payment_terms: editForm.payment_terms,
       address: editForm.address,
     }).eq("id", editModal.id);
-    // Also update profiles table
+    if (appError) { alert("Save failed: " + appError.message); setSavingEdit(false); return; }
+    // Update profiles using the original email (before any email change)
     const { data: profile } = await supabase.from("profiles").select("id").eq("email", editModal.contact_email).maybeSingle();
     if (profile) {
       await supabase.from("profiles").update({
@@ -12073,11 +12086,13 @@ const ApprovedVendorsTab = ({ apps, user, load }) => {
         company_name: editForm.vendor_name,
         phone: editForm.phone,
         service_category: editForm.vendor_type,
+        email: editForm.contact_email,
       }).eq("id", profile.id);
     }
     setSavingEdit(false);
     setEditModal(null);
     if (load) load();
+    alert("Vendor updated successfully.");
   };
 
   return (
@@ -12113,13 +12128,21 @@ const ApprovedVendorsTab = ({ apps, user, load }) => {
             <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>Edit Vendor — {editModal.vendor_name}</div>
             <div style={{ color:T.textMuted, fontSize:12, marginBottom:20 }}>{editModal.contact_email}</div>
             <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-              {[["Vendor Name","vendor_name"],["Phone","phone"],["Contact Person","contact_person"],["Contact Email","contact_email"],["Bank Name","bank_name"],["Account Name","bank_account_name"],["Account Number","account_number"],["Payment Terms","payment_terms"],["Address","address"]].map(([label,key]) => (
+              {[["Vendor Name","vendor_name"],["Phone","phone"],["Contact Person","contact_person"],["Contact Email","contact_email"],["Bank Name","bank_name"],["Account Name","bank_account_name"],["Account Number","account_number"],["Address","address"]].map(([label,key]) => (
                 <div key={key}>
                   <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>{label}</div>
                   <input value={editForm[key]||""} onChange={e=>setEditForm(f=>({...f,[key]:e.target.value}))}
                     style={{ width:"100%", padding:"8px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
                 </div>
               ))}
+              <div>
+                <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>Payment Terms</div>
+                <select value={editForm.payment_terms||""} onChange={e=>setEditForm(f=>({...f,payment_terms:e.target.value}))}
+                  style={{ width:"100%", padding:"8px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  <option value="">Select payment terms...</option>
+                  {PAYMENT_TERMS.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
               <div>
                 <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>Service Category</div>
                 <select value={editForm.vendor_type||""} onChange={e=>setEditForm(f=>({...f,vendor_type:e.target.value}))}

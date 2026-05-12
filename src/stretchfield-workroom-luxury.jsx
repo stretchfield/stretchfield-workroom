@@ -749,7 +749,7 @@ const Btn = ({ children, onClick, variant = "primary", small }) => {
 };
 
 // ─── SIDEBAR ─────────────────────────────────────────────────────────────────
-const getNavItems = (role) => {
+const getNavItems = (role, user) => {
   const base = [{ id: "dashboard", label: "Dashboard", icon: "▪" }];
   if (["Country Manager","Vendor Manager","Strategy & Events Lead"].includes(role)) {
     base.push({ id: "events", label: "Events", icon: "▪" });
@@ -775,7 +775,7 @@ const getNavItems = (role) => {
   if (["Strategy & Events Lead"].includes(role)) {
     base.push({ id: "feedback-summary", label: "Feedback", icon: "▪" }, { id: "event-reports", label: "Event Reports", icon: "▪" });
   }
-  if (["Strategy & Events Lead"].includes(role) && currentUser?.has_sm_access) {
+  if (["Strategy & Events Lead"].includes(role) && user?.has_sm_access) {
     base.push({ id: "opportunities", label: "Opportunities", icon: "▪" }, { id: "crm", label: "CRM / Leads", icon: "▪" }, { id: "sm-tasks", label: "S&M Tasks", icon: "▪" });
   }
   if (["CEO","Country Manager"].includes(role)) {
@@ -877,7 +877,7 @@ const getNavItems = (role) => {
 };
 
 const Sidebar = ({ user, activeTab, onTab, collapsed, onToggle }) => {
-  const navItems = getNavItems(user.role);
+  const navItems = getNavItems(user.role, user);
   return (
     <div style={{
       width: collapsed ? 64 : 240,
@@ -6152,7 +6152,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
         </div>
         <nav style={{ flex: 1, padding: "10px 8px", overflowY: "auto" }}>
           {(() => {
-            const navItems = getNavItems(currentUser.role);
+            const navItems = getNavItems(currentUser.role, currentUser);
             const isCEONav = currentUser.role === "CEO";
 
             if (!isCEONav) {
@@ -6487,7 +6487,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
             {/* Nav Items */}
             <nav style={{ flex: 1, overflowY: "auto", padding: "12px 12px" }}>
               {(() => {
-                const navItems = getNavItems(currentUser.role);
+                const navItems = getNavItems(currentUser.role, currentUser);
                 const isCEONav = currentUser.role === "CEO";
                 if (!isCEONav) {
                   return navItems.map(item => {

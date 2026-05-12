@@ -4998,7 +4998,7 @@ const ImpactIntelligenceSummary = ({ user }) => {
     const catEvents = events.filter(e => e.event_category === cat);
     const catScores = catEvents.map(e => getEventScore(e.id)).filter(s => s !== null);
     const avgCatScore = catScores.length > 0 ? (catScores.reduce((a,b) => a+b, 0) / catScores.length).toFixed(1) : null;
-    return { category: cat, count: catEvents.length, avgScore: avgCatScore, color: EVENT_ARCHETYPES[cat].color };
+    return { category: cat, count: catEvents.length, avgScore: avgCatScore, color: (EVENT_ARCHETYPES[cat]?.color || T.teal) };
   }).filter(c => c.count > 0);
 
   if (loading) return <div style={{ padding: '60px 0', textAlign: 'center', color: T.textMuted, fontSize: 13 }}>Loading Impact Intelligence...</div>;
@@ -5061,7 +5061,7 @@ const ImpactIntelligenceSummary = ({ user }) => {
               const score = getEventScore(ev.id);
               const hasBrief = briefs.some(b => b.project_id === ev.id);
               const hasReport = reports.some(r => r.project_id === ev.id);
-              const archetype = EVENT_ARCHETYPES[ev.event_category];
+              const archetype = EVENT_ARCHETYPES[ev.event_category] || EVENT_ARCHETYPES["Conference/Seminar"];
               return (
                 <tr key={ev.id} style={{ borderBottom: i < events.length-1 ? `1px solid ${T.border}44` : "none" }}
                   onMouseEnter={e => e.currentTarget.style.background = T.bg}

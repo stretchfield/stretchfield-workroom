@@ -14727,6 +14727,8 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
           <button key={tab.id} onClick={() => setActiveSection(tab.id)} style={{ padding: "10px 18px", border: "none", background: "none", cursor: "pointer", color: activeSection === tab.id ? T.cyan : T.textMuted, fontWeight: activeSection === tab.id ? 800 : 400, fontSize: 13, borderBottom: activeSection === tab.id ? "2px solid " + T.cyan : "2px solid transparent", marginBottom: -1, transition: "all 0.15s", whiteSpace:"nowrap" }}>{tab.label}</button>
         ))}
       </div>
+      <div style={{ position:"absolute", right:0, top:0, bottom:0, width:40, background:`linear-gradient(to left, ${T.surface}, transparent)`, pointerEvents:"none" }} />
+      </div>
 
       {/* Overview */}
       {activeSection === "overview" && (
@@ -16552,6 +16554,8 @@ Use professional, consultative language that positions Stretchfield as a strateg
         {sections.map(tab => (
           <button key={tab.id} onClick={() => setActiveSection(tab.id)} style={{ padding: "8px 14px", border: "none", background: "none", cursor: "pointer", color: activeSection === tab.id ? T.cyan : T.textMuted, fontWeight: activeSection === tab.id ? 800 : 400, fontSize: 12, borderBottom: activeSection === tab.id ? "2px solid " + T.cyan : "2px solid transparent", marginBottom: -1, whiteSpace: "nowrap" }}>{tab.label}</button>
         ))}
+      </div>
+      <div style={{ position:"absolute", right:0, top:0, bottom:0, width:40, background:`linear-gradient(to left, ${T.surface}, transparent)`, pointerEvents:"none" }} />
       </div>
 
       {/* Overview */}

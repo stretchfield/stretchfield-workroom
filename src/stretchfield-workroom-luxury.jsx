@@ -14444,9 +14444,7 @@ const EventDebriefSection = ({ event, user }) => {
       // Merge all submissions
       const merged = { what_went_well:"", what_to_do_differently:"", client_informal_feedback:"", surprises:"", recommendations:"" };
       data.forEach(d => {
-        Object.keys(merged).forEach(k => { if (d[k]) merged[k] = merged[k] ? merged[k]+"
-
-"+d[k] : d[k]; });
+        Object.keys(merged).forEach(k => { if (d[k]) merged[k] = merged[k] ? merged[k]+"\n\n"+d[k] : d[k]; });
       });
       setDebrief(data[0]);
       setForm(merged);

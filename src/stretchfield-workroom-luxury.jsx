@@ -1036,7 +1036,10 @@ const CEODashboard = ({ onTab, user }) => {
   const pendingTasks = tasks.filter(t => t.status !== "completed");
   const avgRating = scorecards.length > 0 ? (scorecards.reduce((s,sc) => s+(sc.total_pct||0), 0)/scorecards.length).toFixed(0) : 0;
   const recentFeedback = feedback.slice(0,3);
+  // Total business = sum of agreed client budgets
   const totalBusiness = awards.reduce((s,a) => s+(parseFloat(a.agreed_amount)||0), 0);
+  // Rename label to clarify it's vendor spend
+  const totalVendorSpend = totalBusiness;
 
   if (loading) return (
     <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -1082,7 +1085,7 @@ const CEODashboard = ({ onTab, user }) => {
             { label: "Revenue YTD", value: "GHS "+Math.round(revenueYTD/1000)+"k", color: "#10B981", tab: "opportunities" },
             { label: "Open Tasks", value: pendingTasks.length, color: pendingTasks.length > 5 ? T.amber : T.textMuted, tab: "events" },
             { label: "Vendor Rating", value: avgRating+"%", color: parseInt(avgRating) >= 70 ? T.teal : T.amber, tab: "scorecards" },
-            { label: "Total Business", value: "GHS "+Math.round(totalBusiness/1000)+"k", color: T.amber, tab: "vendors" },
+            { label: "Vendor Spend", value: "GHS "+Math.round(totalBusiness/1000)+"k", color: T.amber, tab: "vendors" },
           ].map(k => (
             <div key={k.label} onClick={() => onTab(k.tab)} style={{ cursor: "pointer", padding: "12px 14px", background: T.bg+"80", border: "1px solid "+T.border+"44", borderRadius: 10, transition: "border-color 0.15s" }}
               onMouseEnter={e => e.currentTarget.style.borderColor = k.color+"60"}

@@ -18283,6 +18283,13 @@ Data:
 - Business Development Signals: ${report.business_development_signals || "Not submitted"}
 - Next Edition Recommendations: ${report.next_edition_recommendations || "Not submitted"}
 
+POST-EVENT DEBRIEF (from Strategy Leads):
+- What Went Well: ${debrief?.what_went_well || "Not submitted"}
+- What to Do Differently: ${debrief?.what_to_do_differently || "Not submitted"}
+- Client Informal Feedback: ${debrief?.client_informal_feedback || "Not submitted"}
+- Surprises: ${debrief?.surprises || "Not submitted"}
+- Recommendations: ${debrief?.recommendations || "Not submitted"}
+
 ---
 SECTION 6 — CLOSING STRATEGIC INSIGHT
 One powerful closing paragraph in Stretchfield's voice about the event's legacy and forward momentum.

@@ -839,7 +839,7 @@ const getNavItems = (role, user) => {
     ];
   }
   if (role === "Vendor Manager") {
-    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quotes-received", label: "Quotes Received", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" }, { id: "vendor-analytics", label: "Vendor Analytics", icon: "▪" }, { id: "purchase-orders", label: "Sign Purchase Orders", icon: "▪" }, { id: "event-reports", label: "Event Reports", icon: "▪" }, { id: "budget-vs-actuals", label: "Budget vs Actuals", icon: "▪" });
+    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Vendor Directory", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quotes-received", label: "Quotes Received", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" }, { id: "vendor-analytics", label: "Vendor Analytics", icon: "▪" }, { id: "purchase-orders", label: "Sign Purchase Orders", icon: "▪" }, { id: "event-reports", label: "Event Reports", icon: "▪" }, { id: "budget-vs-actuals", label: "Budget vs Actuals", icon: "▪" });
   }
   if (["CEO","Country Manager","Vendor Manager","Finance Manager"].includes(role)) {
     base.push({ id: "invoices", label: "Invoices", icon: "▪" });

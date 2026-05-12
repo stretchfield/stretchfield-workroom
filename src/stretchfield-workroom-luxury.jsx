@@ -13201,6 +13201,14 @@ const VendorsView = ({ user }) => {
       event_type: form.event_type, rff_code: rffCode,
     });
     if (error) { setError(error.message); setSaving(false); return; }
+    // Notify CEO of new RFF pending approval
+    const { data: ceos } = await supabase.from('profiles').select('id,email,name').in('role', ['CEO', 'Country Manager']);
+    if (ceos) await Promise.all(ceos.map(c => supabase.from('notifications').insert({
+      user_id: c.id,
+      title: 'New RFF Pending Approval — ' + rffCode,
+      message: `${user.name} has submitted RFF ${rffCode} for ${form.event_name}. Please review and approve.`,
+      type: 'rff'
+    })));
     setModal(false);
     setForm({ title: '', description: '', client_id: '', client_name: '', project_id: '', event_name: '', deadline: '', event_type: '' });
     setFile(null); setSaving(false); load();

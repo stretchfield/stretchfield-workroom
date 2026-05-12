@@ -9682,19 +9682,28 @@ const generatePOPDF = (po, vendor, rff, event) => {
   <div class="section-title">Authorisation</div>
   <div class="signatures">
     <div class="sig-box">
-      ${po.finance_signature ? '<img src="' + po.finance_signature + '" style="height:48px;max-width:160px;object-fit:contain;" />' : '<div style="height:48px;border-bottom:1px solid #C2C9DC;"></div>'}
+      <div style="height:52px;display:flex;align-items:flex-end;padding-bottom:4px;">
+        ${po.finance_signature ? '<img src="' + po.finance_signature + '" style="height:48px;max-width:160px;object-fit:contain;" />' : ''}
+      </div>
+      <div style="border-bottom:1px solid #C2C9DC;margin-bottom:5px;"></div>
       <div class="name">Finance Manager</div>
       <div class="role">Reviewed by</div>
       ${po.finance_signed_at ? '<div style="font-size:9px;color:#5A6E8A;margin-top:2px;">' + new Date(po.finance_signed_at).toLocaleDateString("en-GB") + '</div>' : ''}
     </div>
     <div class="sig-box">
-      ${po.vm_signature ? '<img src="' + po.vm_signature + '" style="height:48px;max-width:160px;object-fit:contain;" />' : '<div style="height:48px;border-bottom:1px solid #C2C9DC;"></div>'}
+      <div style="height:52px;display:flex;align-items:flex-end;padding-bottom:4px;">
+        ${po.vm_signature ? '<img src="' + po.vm_signature + '" style="height:48px;max-width:160px;object-fit:contain;" />' : ''}
+      </div>
+      <div style="border-bottom:1px solid #C2C9DC;margin-bottom:5px;"></div>
       <div class="name">Vendor Manager</div>
       <div class="role">Prepared by</div>
       ${po.vm_signed_at ? '<div style="font-size:9px;color:#5A6E8A;margin-top:2px;">' + new Date(po.vm_signed_at).toLocaleDateString("en-GB") + '</div>' : ''}
     </div>
     <div class="sig-box">
-      ${po.ceo_signature ? '<img src="' + po.ceo_signature + '" style="height:48px;max-width:160px;object-fit:contain;" />' : '<div style="height:48px;border-bottom:1px solid #C2C9DC;"></div>'}
+      <div style="height:52px;display:flex;align-items:flex-end;padding-bottom:4px;">
+        ${po.ceo_signature ? '<img src="' + po.ceo_signature + '" style="height:48px;max-width:160px;object-fit:contain;" />' : ''}
+      </div>
+      <div style="border-bottom:1px solid #C2C9DC;margin-bottom:5px;"></div>
       <div class="name">CEO</div>
       <div class="role">Authorised by · Stretchfield</div>
       ${po.ceo_signed_at ? '<div style="font-size:9px;color:#5A6E8A;margin-top:2px;">' + new Date(po.ceo_signed_at).toLocaleDateString("en-GB") + '</div>' : ''}

@@ -17371,6 +17371,14 @@ const EventReportsView = ({ user }) => {
 
   const openEvent = async (event) => {
     setSelectedEvent(event);
+    setForm({
+      run_of_show_adherence:"", high_impact_moments:"", low_impact_moments:"", logistics_notes:"",
+      estimated_attendance:"", expected_attendance:"",
+      audience_energy_arrival:"", audience_energy_mid:"", audience_energy_peak:"", audience_energy_close:"",
+      key_engagement_moments:"", audience_feedback_observations:"",
+      vendor_performance_summary:"", vendors_recommended:"", vendors_not_recommended:"", technical_delivery_quality:"",
+      strategic_intent_achieved:"", client_satisfaction:"", business_development_signals:"", next_edition_recommendations:"",
+    });
     if (isStrategy) setActiveSection("operational");
     else if (isVM) setActiveSection("vendor");
     else setActiveSection("overview");
@@ -17555,6 +17563,10 @@ Write a professional, insightful intelligence report in Stretchfield's consultat
     const getReportStatus = (eventId) => {
       const r = reports.find(r => r.project_id === eventId);
       if (!r) return { label:"Not Started", color:T.textMuted };
+      if (isVM) {
+        if (r.vendor_submitted_at) return { label:"Vendor Section ✓", color:T.teal };
+        return { label:"Vendor Section Pending", color:T.amber };
+      }
       const sections = [r.operational_submitted_at, r.audience_submitted_at, r.vendor_submitted_at, r.ceo_submitted_at];
       const done = sections.filter(Boolean).length;
       if (r.ai_summary) return { label:"Complete ✓", color:T.teal };
@@ -17585,7 +17597,7 @@ Write a professional, insightful intelligence report in Stretchfield's consultat
                   </div>
                   <div style={{ textAlign:"right" }}>
                     <span style={{ color:status.color, fontSize:11, fontWeight:700, background:status.color+"18", padding:"3px 10px", borderRadius:20 }}>{status.label}</span>
-                    {r && (
+                    {r && !isVM && (
                       <div style={{ display:"flex", gap:6, marginTop:6, justifyContent:"flex-end" }}>
                         {[["Op",r.operational_submitted_at],["Aud",r.audience_submitted_at],["Vnd",r.vendor_submitted_at],["Str",r.ceo_submitted_at]].map(([lbl,val]) => (
                           <span key={lbl} style={{ color:val?T.teal:T.border, fontSize:9, fontWeight:700, background:val?T.teal+"15":T.bg, padding:"1px 5px", borderRadius:10, border:`1px solid ${val?T.teal+"30":T.border}` }}>{lbl}</span>

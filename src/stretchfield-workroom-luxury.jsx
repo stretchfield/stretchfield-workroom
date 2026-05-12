@@ -4672,7 +4672,7 @@ const StrategyMapView = ({ user }) => {
     setLoading(false);
   };
 
-  const archetype = selectedEvent ? EVENT_ARCHETYPES[selectedEvent.event_category] : null;
+  const archetype = selectedEvent ? (EVENT_ARCHETYPES[selectedEvent.event_category] || EVENT_ARCHETYPES["Conference/Seminar"]) : null;
 
   const toolStatus = (val) => {
     if (val === "Yes") return { color: "#10B981", icon: "✓" };
@@ -14713,7 +14713,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: "1px solid " + T.border }}>
+      <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: "1px solid " + T.border, overflowX: "auto", msOverflowStyle: "none", scrollbarWidth: "none" }}>
         {[
           { id: "overview", label: "Overview" },
           { id: "tasks", label: "Tasks (" + myTasks.length + ")" },

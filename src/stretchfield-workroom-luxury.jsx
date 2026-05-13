@@ -838,6 +838,10 @@ const getNavItems = (role, user) => {
         { id: "strategy-map", label: "Strategy Map" },
         { id: "impact-intelligence", label: "Impact Intelligence" },
         { id: "event-reports", label: "Event Reports" },
+        { id: "board-report", label: "Board Report" },
+        { id: "strategic-goals", label: "Strategic Goals & OKRs" },
+        { id: "client-health", label: "Client Health" },
+        { id: "team-performance", label: "Team Performance" },
       ]},
       { id: "notifications", label: "Notifications", group: true },
       { id: "calendar", label: "Calendar", group: true },
@@ -6713,6 +6717,10 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "cash-flow": return <CashFlowView user={currentUser} />;
       case "zoho-sync-status": return <ZohoSyncStatusView user={currentUser} />;
       case "audit-trail": return <AuditTrailView user={currentUser} />;
+      case "board-report": return <BoardReportView user={currentUser} />;
+      case "strategic-goals": return <StrategicGoalsView user={currentUser} />;
+      case "client-health": return <ClientHealthView user={currentUser} />;
+      case "team-performance": return <TeamPerformanceView user={currentUser} />;
       case "vendor-ratings": return <VendorRatingsView user={currentUser} />;
       case "rff-approvals": return <RFFApprovalsView user={currentUser} />;
       case "vendor-assignment": return <VendorAssignmentView user={currentUser} />;
@@ -18643,6 +18651,515 @@ const AuditTrailView = ({ user }) => {
             {entry.amount && <div style={{ color:T.amber, fontWeight:800, fontSize:14, flexShrink:0 }}>GHS {parseFloat(entry.amount||0).toLocaleString()}</div>}
           </div>
         ))}
+      </div>
+    </div>
+  );
+};
+
+
+const BoardReportView = ({ user }) => {
+  const [events, setEvents] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [opportunities, setOpportunities] = useState([]);
+  const [clientPayments, setClientPayments] = useState([]);
+  const [satisfaction, setSatisfaction] = useState([]);
+  const [goals, setGoals] = useState([]);
+  const [awards, setAwards] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [report, setReport] = useState(null);
+
+  useEffect(() => {
+    const load = async () => {
+      const [{ data: ev }, { data: cl }, { data: op }, { data: cp }, { data: sat }, { data: go }, { data: aw }] = await Promise.all([
+        supabase.from("projects").select("*").order("event_date", { ascending: false }),
+        supabase.from("clients").select("*"),
+        supabase.from("opportunities").select("*"),
+        supabase.from("client_payments").select("*"),
+        supabase.from("client_satisfaction").select("*"),
+        supabase.from("company_goals").select("*").eq("status","active"),
+        supabase.from("rff_awards").select("*"),
+      ]);
+      setEvents(ev||[]); setClients(cl||[]); setOpportunities(op||[]);
+      setClientPayments(cp||[]); setSatisfaction(sat||[]); setGoals(go||[]); setAwards(aw||[]);
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  const now = new Date();
+  const activeEvents = events.filter(e => !["Completed","Cancelled"].includes(e.phase||""));
+  const completedEvents = events.filter(e => e.phase === "Completed");
+  const revenueYTD = clientPayments.filter(p => new Date(p.payment_date).getFullYear() === now.getFullYear()).reduce((s,p) => s+parseFloat(p.amount||0), 0);
+  const totalRevenue = clientPayments.reduce((s,p) => s+parseFloat(p.amount||0), 0);
+  const pipeline = opportunities.filter(o => !["won","lost","Converted"].includes(o.status||""));
+  const pipelineValue = pipeline.reduce((s,o) => s+(o.value||0), 0);
+  const avgSat = satisfaction.length > 0 ? (satisfaction.reduce((s,r)=>s+(r.rating||0),0)/satisfaction.length).toFixed(1) : null;
+  const vendorSpend = awards.reduce((s,a) => s+parseFloat(a.agreed_amount||0), 0);
+
+  const generateReport = async () => {
+    setGenerating(true);
+    const prompt = `You are preparing a board report for Stretchfield, a premium event management company. Write a professional executive summary in 400-500 words covering:
+
+COMPANY PERFORMANCE SNAPSHOT:
+- Active Events: ${activeEvents.length}
+- Completed Events: ${completedEvents.length}
+- Revenue YTD: GHS ${revenueYTD.toLocaleString()}
+- Total Revenue: GHS ${totalRevenue.toLocaleString()}
+- Pipeline Value: GHS ${pipelineValue.toLocaleString()}
+- Vendor Spend: GHS ${vendorSpend.toLocaleString()}
+- Client Satisfaction: ${avgSat ? avgSat+"/5" : "No data yet"}
+- Active Clients: ${clients.length}
+- Pipeline Opportunities: ${pipeline.length}
+
+STRATEGIC GOALS:
+${goals.map(g => `- ${g.title}: ${g.current_value}/${g.target_value} ${g.unit} (${Math.round((g.current_value/g.target_value)*100)}%)`).join("\n") || "No goals set"}
+
+Write in a confident, strategic tone befitting a premium events company presenting to its board. Include: key achievements, operational highlights, pipeline health, financial position, and forward outlook. Use flowing paragraphs, no bullet points or markdown.`;
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1000, messages:[{ role:"user", content:prompt }] })
+    });
+    const data = await response.json();
+    setReport(data.content?.[0]?.text || "Failed to generate report.");
+    setGenerating(false);
+  };
+
+  if (loading) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"40vh" }}><div style={{ width:32, height:32, border:`3px solid ${T.border}`, borderTop:`3px solid ${T.cyan}`, borderRadius:"50%", animation:"spin 0.8s linear infinite" }} /></div>;
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <div>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Intelligence</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Board Report</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Executive summary for board & investors — {now.toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})}</div>
+        </div>
+        <button onClick={generateReport} disabled={generating} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{generating?"Generating...":"⚡ Generate AI Summary"}</button>
+      </div>
+
+      {/* KPIs */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:12, marginBottom:24 }}>
+        {[
+          { label:"Revenue YTD", value:"GHS "+revenueYTD.toLocaleString(), color:T.teal },
+          { label:"Total Revenue", value:"GHS "+totalRevenue.toLocaleString(), color:T.cyan },
+          { label:"Pipeline Value", value:"GHS "+pipelineValue.toLocaleString(), color:T.amber },
+          { label:"Active Events", value:activeEvents.length, color:T.cyan },
+          { label:"Events Delivered", value:completedEvents.length, color:T.teal },
+          { label:"Client Satisfaction", value:avgSat?avgSat+"/5":"—", color:avgSat&&parseFloat(avgSat)>=4?T.teal:T.amber },
+          { label:"Active Clients", value:clients.length, color:T.magenta },
+          { label:"Vendor Spend", value:"GHS "+vendorSpend.toLocaleString(), color:T.textMuted },
+        ].map(k => (
+          <div key={k.label} style={{ padding:"14px 16px", background:T.surface, border:`1px solid ${T.border}`, borderTop:`2px solid ${k.color}`, borderRadius:10 }}>
+            <div style={{ color:k.color, fontSize:18, fontWeight:900 }}>{k.value}</div>
+            <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginTop:4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Goals progress */}
+      {goals.length > 0 && (
+        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:"20px 24px", marginBottom:20 }}>
+          <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:16 }}>Strategic Goals Progress</div>
+          {goals.map(g => {
+            const pct = g.target_value > 0 ? Math.min(100, Math.round((g.current_value/g.target_value)*100)) : 0;
+            const color = pct >= 80 ? T.teal : pct >= 50 ? T.amber : T.red;
+            return (
+              <div key={g.id} style={{ marginBottom:16 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+                  <div style={{ color:T.textPrimary, fontSize:13, fontWeight:700 }}>{g.title}</div>
+                  <div style={{ color:color, fontSize:13, fontWeight:800 }}>{g.current_value?.toLocaleString()} / {g.target_value?.toLocaleString()} {g.unit} ({pct}%)</div>
+                </div>
+                <div style={{ height:8, background:T.border, borderRadius:4, overflow:"hidden" }}>
+                  <div style={{ height:"100%", width:pct+"%", background:`linear-gradient(90deg,${color},${color}88)`, borderRadius:4, transition:"width 0.3s" }} />
+                </div>
+                {g.target_date && <div style={{ color:T.textMuted, fontSize:10, marginTop:3 }}>Target: {new Date(g.target_date).toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})}</div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* AI Report */}
+      {report && (
+        <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:12, padding:"24px 28px", marginBottom:20 }}>
+          <div style={{ color:T.cyan, fontSize:11, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:12 }}>AI-Generated Executive Summary</div>
+          <div style={{ color:T.textSecondary, fontSize:14, lineHeight:1.8, whiteSpace:"pre-wrap" }}>{report}</div>
+        </div>
+      )}
+
+      {/* Active events table */}
+      <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, overflow:"hidden" }}>
+        <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.border}`, color:T.textPrimary, fontWeight:800, fontSize:14 }}>Active Events</div>
+        <table style={{ width:"100%", borderCollapse:"collapse" }}>
+          <thead><tr style={{ background:T.bg }}>{["Event","Client","Phase","Date"].map(h=><th key={h} style={{ padding:"8px 14px", color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", textAlign:"left", borderBottom:`1px solid ${T.border}` }}>{h}</th>)}</tr></thead>
+          <tbody>
+            {activeEvents.map((e,i) => (
+              <tr key={e.id} style={{ borderBottom:i<activeEvents.length-1?`1px solid ${T.border}44`:"none" }}>
+                <td style={{ padding:"10px 14px", color:T.textPrimary, fontWeight:700, fontSize:13 }}>{e.name}</td>
+                <td style={{ padding:"10px 14px", color:T.textMuted, fontSize:12 }}>{e.client||"—"}</td>
+                <td style={{ padding:"10px 14px" }}><span style={{ background:T.cyan+"18", color:T.cyan, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700 }}>{e.phase||"Planning"}</span></td>
+                <td style={{ padding:"10px 14px", color:T.textMuted, fontSize:12 }}>{e.event_date?new Date(e.event_date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):"TBC"}</td>
+              </tr>
+            ))}
+            {activeEvents.length===0 && <tr><td colSpan={4} style={{ padding:"30px 0", textAlign:"center", color:T.textMuted }}>No active events</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+const StrategicGoalsView = ({ user }) => {
+  const [goals, setGoals] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [editModal, setEditModal] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ title:"", description:"", category:"revenue", target_value:"", current_value:"0", unit:"GHS", target_date:"", status:"active" });
+
+  const CATEGORIES = ["revenue","events","clients","satisfaction","team","marketing","operational"];
+
+  const load = async () => {
+    const { data } = await supabase.from("company_goals").select("*").order("created_at", { ascending: false });
+    setGoals(data||[]);
+  };
+  useEffect(() => { load(); }, []);
+
+  const handleSave = async () => {
+    if (!form.title || !form.target_value) { alert("Title and target are required."); return; }
+    setSaving(true);
+    if (editModal) {
+      await supabase.from("company_goals").update({ ...form, target_value:parseFloat(form.target_value), current_value:parseFloat(form.current_value||0) }).eq("id", editModal.id);
+    } else {
+      await supabase.from("company_goals").insert({ ...form, target_value:parseFloat(form.target_value), current_value:parseFloat(form.current_value||0), created_by:user.id });
+    }
+    setSaving(false);
+    setModal(false);
+    setEditModal(null);
+    setForm({ title:"", description:"", category:"revenue", target_value:"", current_value:"0", unit:"GHS", target_date:"", status:"active" });
+    load();
+  };
+
+  const catColors = { revenue:T.teal, events:T.cyan, clients:T.magenta, satisfaction:"#F59E0B", team:"#8B5CF6", marketing:T.amber, operational:T.textMuted };
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <div>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Intelligence</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Strategic Goals & OKRs</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>{goals.filter(g=>g.status==="active").length} active goals</div>
+        </div>
+        <button onClick={() => { setForm({ title:"", description:"", category:"revenue", target_value:"", current_value:"0", unit:"GHS", target_date:"", status:"active" }); setModal(true); }} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>+ Add Goal</button>
+      </div>
+
+      <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+        {goals.map(g => {
+          const pct = g.target_value > 0 ? Math.min(100, Math.round(((g.current_value||0)/g.target_value)*100)) : 0;
+          const color = catColors[g.category] || T.cyan;
+          const statusColor = pct >= 100 ? T.teal : pct >= 60 ? T.amber : T.red;
+          return (
+            <div key={g.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderLeft:`3px solid ${color}`, borderRadius:12, padding:"20px 24px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12 }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:4 }}>
+                    <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15 }}>{g.title}</div>
+                    <span style={{ background:color+"18", color:color, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700, textTransform:"capitalize" }}>{g.category}</span>
+                    {g.status==="completed" && <span style={{ background:T.teal+"18", color:T.teal, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700 }}>✓ Completed</span>}
+                  </div>
+                  {g.description && <div style={{ color:T.textMuted, fontSize:13, marginBottom:8 }}>{g.description}</div>}
+                </div>
+                <div style={{ display:"flex", gap:8, marginLeft:16 }}>
+                  <button onClick={() => { setEditModal(g); setForm({ title:g.title, description:g.description||"", category:g.category, target_value:g.target_value, current_value:g.current_value||0, unit:g.unit||"GHS", target_date:g.target_date||"", status:g.status }); setModal(true); }} style={{ background:T.cyan+"15", border:`1px solid ${T.cyan}30`, color:T.cyan, padding:"4px 12px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>Edit</button>
+                </div>
+              </div>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                <div style={{ color:T.textMuted, fontSize:12 }}>Progress</div>
+                <div style={{ color:statusColor, fontWeight:800, fontSize:14 }}>{(g.current_value||0).toLocaleString()} / {g.target_value?.toLocaleString()} {g.unit} <span style={{ fontSize:12 }}>({pct}%)</span></div>
+              </div>
+              <div style={{ height:10, background:T.border, borderRadius:5, overflow:"hidden", marginBottom:8 }}>
+                <div style={{ height:"100%", width:pct+"%", background:`linear-gradient(90deg,${statusColor},${statusColor}88)`, borderRadius:5, transition:"width 0.5s" }} />
+              </div>
+              {g.target_date && <div style={{ color:T.textMuted, fontSize:11 }}>Target date: {new Date(g.target_date).toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})}</div>}
+            </div>
+          );
+        })}
+        {goals.length===0 && <div style={{ textAlign:"center", padding:60, background:T.surface, borderRadius:12, border:`1px solid ${T.border}` }}><div style={{ fontSize:40, marginBottom:12 }}>🎯</div><div style={{ color:T.textPrimary, fontWeight:700, fontSize:16 }}>No goals set yet</div><div style={{ color:T.textMuted, fontSize:13, marginTop:6 }}>Set your first strategic goal to track company progress.</div></div>}
+      </div>
+
+      {modal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => { setModal(false); setEditModal(null); }}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:520, maxHeight:"90vh", overflowY:"auto", padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:20 }}>{editModal?"Edit Goal":"New Strategic Goal"}</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              {[["Goal Title *","title","e.g. Achieve GHS 1M Revenue"],["Description","description","What does success look like?"],["Unit","unit","GHS, events, clients, %"]].map(([label,key,ph]) => (
+                <div key={key}><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>{label}</label>
+                <input value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))} placeholder={ph} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              ))}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Category</label>
+                <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  {CATEGORIES.map(c=><option key={c} value={c}>{c.charAt(0).toUpperCase()+c.slice(1)}</option>)}
+                </select></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Status</label>
+                <select value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  {["active","completed","paused"].map(s=><option key={s}>{s}</option>)}
+                </select></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Target Value *</label>
+                <input type="number" value={form.target_value} onChange={e=>setForm(f=>({...f,target_value:e.target.value}))} placeholder="e.g. 1000000" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Current Value</label>
+                <input type="number" value={form.current_value} onChange={e=>setForm(f=>({...f,current_value:e.target.value}))} placeholder="0" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              </div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Target Date</label>
+              <input type="date" value={form.target_date} onChange={e=>setForm(f=>({...f,target_date:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <button onClick={handleSave} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":editModal?"Save Changes":"Add Goal"}</button>
+              <button onClick={() => { setModal(false); setEditModal(null); }} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ClientHealthView = ({ user }) => {
+  const [clients, setClients] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [satisfaction, setSatisfaction] = useState([]);
+  const [clientPayments, setClientPayments] = useState([]);
+  const [healthScores, setHealthScores] = useState([]);
+  const [editModal, setEditModal] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      const [{ data: cl }, { data: ev }, { data: sat }, { data: cp }, { data: hs }] = await Promise.all([
+        supabase.from("clients").select("*").order("name"),
+        supabase.from("projects").select("*"),
+        supabase.from("client_satisfaction").select("*"),
+        supabase.from("client_payments").select("*"),
+        supabase.from("client_health_scores").select("*"),
+      ]);
+      setClients(cl||[]); setEvents(ev||[]); setSatisfaction(sat||[]);
+      setClientPayments(cp||[]); setHealthScores(hs||[]);
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  const getClientMetrics = (client) => {
+    const clientEvents = events.filter(e => e.client_id === client.id);
+    const clientSat = satisfaction.filter(s => clientEvents.some(e => e.id === s.project_id));
+    const avgSat = clientSat.length > 0 ? (clientSat.reduce((s,r)=>s+(r.rating||0),0)/clientSat.length).toFixed(1) : null;
+    const revenue = clientPayments.filter(p => p.client_id === client.id).reduce((s,p) => s+parseFloat(p.amount||0), 0);
+    const stored = healthScores.find(h => h.client_id === client.id);
+    const healthScore = stored?.health_score || (avgSat ? Math.round(parseFloat(avgSat)*20) : 50);
+    const renewalLikelihood = stored?.renewal_likelihood || (healthScore >= 80 ? "high" : healthScore >= 50 ? "medium" : "low");
+    return { clientEvents, avgSat, revenue, healthScore, renewalLikelihood, notes: stored?.notes || "", lastTouchpoint: stored?.last_touchpoint };
+  };
+
+  const renewalColors = { high:T.teal, medium:T.amber, low:T.red };
+
+  const saveHealthScore = async () => {
+    if (!editModal) return;
+    setSaving(true);
+    const existing = healthScores.find(h => h.client_id === editModal.client.id);
+    if (existing) {
+      await supabase.from("client_health_scores").update({ renewal_likelihood:editModal.renewal_likelihood, health_score:editModal.health_score, notes:editModal.notes, last_touchpoint:editModal.last_touchpoint, updated_at:new Date().toISOString(), updated_by:user.id }).eq("id", existing.id);
+    } else {
+      await supabase.from("client_health_scores").insert({ client_id:editModal.client.id, client_name:editModal.client.name||editModal.client.company, renewal_likelihood:editModal.renewal_likelihood, health_score:editModal.health_score, notes:editModal.notes, last_touchpoint:editModal.last_touchpoint, updated_by:user.id });
+    }
+    setSaving(false);
+    setEditModal(null);
+    const { data: hs } = await supabase.from("client_health_scores").select("*");
+    setHealthScores(hs||[]);
+  };
+
+  if (loading) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"40vh" }}><div style={{ width:32, height:32, border:`3px solid ${T.border}`, borderTop:`3px solid ${T.cyan}`, borderRadius:"50%", animation:"spin 0.8s linear infinite" }} /></div>;
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}` }}>
+        <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Intelligence</div>
+        <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Client Health</h2>
+        <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Satisfaction, revenue and renewal likelihood per client</div>
+      </div>
+
+      <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+        {clients.map(client => {
+          const m = getClientMetrics(client);
+          const healthColor = m.healthScore >= 80 ? T.teal : m.healthScore >= 50 ? T.amber : T.red;
+          return (
+            <div key={client.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:"20px 24px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14 }}>
+                <div>
+                  <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16 }}>{client.company||client.name}</div>
+                  <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{client.email}</div>
+                </div>
+                <div style={{ display:"flex", gap:12, alignItems:"center" }}>
+                  <div style={{ textAlign:"center" }}>
+                    <div style={{ color:healthColor, fontWeight:900, fontSize:24 }}>{m.healthScore}</div>
+                    <div style={{ color:T.textMuted, fontSize:9, textTransform:"uppercase" }}>Health Score</div>
+                  </div>
+                  <div style={{ width:1, height:40, background:T.border }} />
+                  <div style={{ textAlign:"center" }}>
+                    <div style={{ color:renewalColors[m.renewalLikelihood]||T.amber, fontWeight:800, fontSize:13, textTransform:"capitalize" }}>{m.renewalLikelihood}</div>
+                    <div style={{ color:T.textMuted, fontSize:9, textTransform:"uppercase" }}>Renewal</div>
+                  </div>
+                </div>
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginBottom:12 }}>
+                {[
+                  { label:"Events", value:m.clientEvents.length },
+                  { label:"Satisfaction", value:m.avgSat?m.avgSat+"/5":"—" },
+                  { label:"Revenue", value:"GHS "+(m.revenue).toLocaleString() },
+                  { label:"Last Touchpoint", value:m.lastTouchpoint?new Date(m.lastTouchpoint).toLocaleDateString("en-GB"):"—" },
+                ].map(k => (
+                  <div key={k.label} style={{ background:T.bg, borderRadius:8, padding:"10px 12px" }}>
+                    <div style={{ color:T.textPrimary, fontWeight:700, fontSize:14 }}>{k.value}</div>
+                    <div style={{ color:T.textMuted, fontSize:10, textTransform:"uppercase", marginTop:2 }}>{k.label}</div>
+                  </div>
+                ))}
+              </div>
+              {m.notes && <div style={{ color:T.textMuted, fontSize:12, marginBottom:10, fontStyle:"italic" }}>{m.notes}</div>}
+              <button onClick={() => setEditModal({ client, health_score:m.healthScore, renewal_likelihood:m.renewalLikelihood, notes:m.notes, last_touchpoint:m.lastTouchpoint||"" })} style={{ background:T.cyan+"15", border:`1px solid ${T.cyan}30`, color:T.cyan, padding:"5px 14px", borderRadius:7, cursor:"pointer", fontSize:11, fontWeight:700 }}>✎ Update Health</button>
+            </div>
+          );
+        })}
+        {clients.length===0 && <div style={{ textAlign:"center", padding:60, background:T.surface, borderRadius:12, border:`1px solid ${T.border}`, color:T.textMuted }}>No clients yet</div>}
+      </div>
+
+      {editModal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setEditModal(null)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:460, padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>Update Client Health</div>
+            <div style={{ color:T.textMuted, fontSize:13, marginBottom:20 }}>{editModal.client.company||editModal.client.name}</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Health Score (0-100)</label>
+              <input type="number" min="0" max="100" value={editModal.health_score} onChange={e=>setEditModal(m=>({...m,health_score:parseInt(e.target.value)||0}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Renewal Likelihood</label>
+              <select value={editModal.renewal_likelihood} onChange={e=>setEditModal(m=>({...m,renewal_likelihood:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                <option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option>
+              </select></div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Last Touchpoint</label>
+              <input type="date" value={editModal.last_touchpoint} onChange={e=>setEditModal(m=>({...m,last_touchpoint:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Notes</label>
+              <textarea value={editModal.notes} onChange={e=>setEditModal(m=>({...m,notes:e.target.value}))} rows={3} placeholder="Relationship notes, concerns, opportunities..." style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} /></div>
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <button onClick={saveHealthScore} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Save"}</button>
+              <button onClick={()=>setEditModal(null)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const TeamPerformanceView = ({ user }) => {
+  const [staff, setStaff] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [staffRequests, setStaffRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedStaff, setSelectedStaff] = useState(null);
+
+  useEffect(() => {
+    const load = async () => {
+      const [{ data: st }, { data: tk }, { data: ev }, { data: sr }] = await Promise.all([
+        supabase.from("profiles").select("*").not("role","in","(Client,Vendor,Board of Directors)").order("name"),
+        supabase.from("tasks").select("*").order("created_at", { ascending: false }),
+        supabase.from("projects").select("*"),
+        supabase.from("staff_payment_requests").select("*"),
+      ]);
+      setStaff(st||[]); setTasks(tk||[]); setEvents(ev||[]); setStaffRequests(sr||[]);
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  const getStaffMetrics = (member) => {
+    const myTasks = tasks.filter(t => t.assignee_id === member.id);
+    const completed = myTasks.filter(t => t.status === "completed");
+    const pending = myTasks.filter(t => t.status !== "completed");
+    const overdue = pending.filter(t => t.deadline && new Date(t.deadline) < new Date());
+    const completionRate = myTasks.length > 0 ? Math.round((completed.length/myTasks.length)*100) : 0;
+    const myEvents = events.filter(e => e.assigned_to === member.id || (Array.isArray(e.assigned_to_ids) && e.assigned_to_ids.includes(member.id)));
+    const myPayments = staffRequests.filter(r => r.staff_id === member.id);
+    return { myTasks, completed, pending, overdue, completionRate, myEvents, myPayments };
+  };
+
+  const roleColors = { CEO:T.cyan, "Finance Manager":T.amber, "Vendor Manager":T.teal, "Strategy & Events Lead":"#E879F9", "Sales & Marketing":T.blue };
+
+  if (loading) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"40vh" }}><div style={{ width:32, height:32, border:`3px solid ${T.border}`, borderTop:`3px solid ${T.cyan}`, borderRadius:"50%", animation:"spin 0.8s linear infinite" }} /></div>;
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}` }}>
+        <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Intelligence</div>
+        <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Team Performance</h2>
+        <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Task completion, event load and activity per team member</div>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))", gap:14 }}>
+        {staff.map(member => {
+          const m = getStaffMetrics(member);
+          const perfColor = m.completionRate >= 80 ? T.teal : m.completionRate >= 50 ? T.amber : T.red;
+          const roleColor = roleColors[member.role] || T.textMuted;
+          return (
+            <div key={member.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:"18px 20px", cursor:"pointer" }} onClick={() => setSelectedStaff(selectedStaff?.id===member.id?null:member)}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14 }}>
+                <div style={{ display:"flex", gap:12, alignItems:"center" }}>
+                  <div style={{ width:40, height:40, borderRadius:20, background:roleColor+"20", border:`2px solid ${roleColor}40`, display:"flex", alignItems:"center", justifyContent:"center", color:roleColor, fontWeight:800, fontSize:14 }}>{member.name?.split(" ").map(n=>n[0]).join("").substring(0,2)}</div>
+                  <div>
+                    <div style={{ color:T.textPrimary, fontWeight:800, fontSize:14 }}>{member.name}</div>
+                    <div style={{ color:roleColor, fontSize:11, fontWeight:700 }}>{member.role}</div>
+                  </div>
+                </div>
+                <div style={{ textAlign:"center" }}>
+                  <div style={{ color:perfColor, fontWeight:900, fontSize:22 }}>{m.completionRate}%</div>
+                  <div style={{ color:T.textMuted, fontSize:9, textTransform:"uppercase" }}>Completion</div>
+                </div>
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:8, marginBottom:10 }}>
+                {[
+                  { label:"Tasks", value:m.myTasks.length, color:T.textPrimary },
+                  { label:"Done", value:m.completed.length, color:T.teal },
+                  { label:"Pending", value:m.pending.length, color:T.amber },
+                  { label:"Overdue", value:m.overdue.length, color:m.overdue.length>0?T.red:T.textMuted },
+                ].map(k => (
+                  <div key={k.label} style={{ background:T.bg, borderRadius:6, padding:"8px 10px", textAlign:"center" }}>
+                    <div style={{ color:k.color, fontWeight:800, fontSize:16 }}>{k.value}</div>
+                    <div style={{ color:T.textMuted, fontSize:9, textTransform:"uppercase" }}>{k.label}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ height:6, background:T.border, borderRadius:3, overflow:"hidden" }}>
+                <div style={{ height:"100%", width:m.completionRate+"%", background:`linear-gradient(90deg,${perfColor},${perfColor}88)`, borderRadius:3 }} />
+              </div>
+              {selectedStaff?.id === member.id && (
+                <div style={{ marginTop:14, paddingTop:14, borderTop:`1px solid ${T.border}` }}>
+                  <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>Active Tasks</div>
+                  {m.pending.slice(0,5).map(t => (
+                    <div key={t.id} style={{ display:"flex", justifyContent:"space-between", padding:"5px 0", borderBottom:`1px solid ${T.border}22` }}>
+                      <div style={{ color:T.textSecondary, fontSize:12 }}>{t.name}</div>
+                      {t.deadline && <div style={{ color:new Date(t.deadline)<new Date()?T.red:T.textMuted, fontSize:11 }}>{new Date(t.deadline).toLocaleDateString("en-GB")}</div>}
+                    </div>
+                  ))}
+                  {m.pending.length===0 && <div style={{ color:T.teal, fontSize:12 }}>✓ All tasks completed</div>}
+                  <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", marginTop:12, marginBottom:6 }}>Assigned Events ({m.myEvents.length})</div>
+                  {m.myEvents.slice(0,3).map(e => <div key={e.id} style={{ color:T.textSecondary, fontSize:12, padding:"3px 0" }}>{e.name}</div>)}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

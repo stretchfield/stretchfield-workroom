@@ -823,6 +823,7 @@ const getNavItems = (role, user) => {
       ]},
       { id: "grp-clients", label: "Clients", group: true, children: [
         { id: "clients", label: "Client Database" },
+        { id: "client-action-items", label: "Client Action Items" },
       ]},
       { id: "grp-people", label: "People", group: true, children: [
         { id: "users", label: "User Management" },
@@ -6418,6 +6419,127 @@ const ClientPaymentsView = ({ user }) => {
 };
 
 
+
+const ClientActionItemsView = ({ user }) => {
+  const [clients, setClients] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [items, setItems] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ client_id:"", project_id:"", title:"", description:"", due_date:"" });
+
+  const load = async () => {
+    const [{ data: c }, { data: e }, { data: i }] = await Promise.all([
+      supabase.from("clients").select("id,name,company").order("name"),
+      supabase.from("projects").select("id,name").order("name"),
+      supabase.from("client_action_items").select("*").order("created_at", { ascending: false }),
+    ]);
+    setClients(c || []);
+    setEvents(e || []);
+    setItems(i || []);
+  };
+  useEffect(() => { load(); }, []);
+
+  const handleSave = async () => {
+    if (!form.title || !form.client_id) { alert("Title and client are required."); return; }
+    setSaving(true);
+    await supabase.from("client_action_items").insert({ ...form, created_by: user.id, status:"pending" });
+    // Notify client
+    const { data: clientProfile } = await supabase.from("clients").select("profile_id").eq("id", form.client_id).single();
+    if (clientProfile?.profile_id) {
+      await supabase.from("notifications").insert({ user_id: clientProfile.profile_id, title:"Action Required — "+form.title, message: form.description || "Stretchfield requires your attention on: "+form.title+(form.due_date?" Due: "+new Date(form.due_date).toLocaleDateString("en-GB"):""), type:"task" });
+    }
+    setSaving(false);
+    setModal(false);
+    setForm({ client_id:"", project_id:"", title:"", description:"", due_date:"" });
+    load();
+  };
+
+  const pending = items.filter(i => i.status === "pending").length;
+  const completed = items.filter(i => i.status === "completed").length;
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <div>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Clients</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Client Action Items</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>{pending} pending · {completed} completed</div>
+        </div>
+        {["CEO","Strategy & Events Lead"].includes(user.role) && (
+          <button onClick={() => setModal(true)} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>+ Add Action Item</button>
+        )}
+      </div>
+
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        {items.map(item => {
+          const client = clients.find(c => c.id === item.client_id);
+          const event = events.find(e => e.id === item.project_id);
+          const isOverdue = item.due_date && new Date(item.due_date) < new Date() && item.status === "pending";
+          const statusColor = item.status==="completed" ? T.teal : isOverdue ? T.red : T.amber;
+          return (
+            <div key={item.id} style={{ background:T.surface, border:`1px solid ${isOverdue?T.red+"30":T.border}`, borderLeft:`3px solid ${statusColor}`, borderRadius:12, padding:"16px 20px", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+              <div style={{ flex:1 }}>
+                <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:4 }}>
+                  <div style={{ color:T.textPrimary, fontWeight:700, fontSize:14 }}>{item.title}</div>
+                  <span style={{ background:statusColor+"18", color:statusColor, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700 }}>{item.status==="completed"?"Done":isOverdue?"Overdue":"Pending"}</span>
+                </div>
+                <div style={{ color:T.textMuted, fontSize:12 }}>{client?.company||client?.name||"—"} {event?" · "+event.name:""}</div>
+                {item.description && <div style={{ color:T.textSecondary, fontSize:12, marginTop:4 }}>{item.description}</div>}
+                {item.due_date && <div style={{ color:isOverdue?T.red:T.textMuted, fontSize:11, marginTop:4 }}>Due: {new Date(item.due_date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}</div>}
+              </div>
+            </div>
+          );
+        })}
+        {items.length === 0 && <div style={{ textAlign:"center", padding:60, background:T.surface, borderRadius:12, border:`1px solid ${T.border}`, color:T.textMuted }}>No action items yet</div>}
+      </div>
+
+      {modal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setModal(false)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:500, padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:20 }}>New Client Action Item</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Client *</label>
+                <select value={form.client_id} onChange={e=>setForm(f=>({...f,client_id:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  <option value="">Select client...</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.company||c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Event</label>
+                <select value={form.project_id} onChange={e=>setForm(f=>({...f,project_id:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  <option value="">Select event...</option>
+                  {events.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Action Title *</label>
+                <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="e.g. Approve final run of show"
+                  style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+              </div>
+              <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Description</label>
+                <textarea value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} rows={2} placeholder="Additional context..."
+                  style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} />
+              </div>
+              <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Due Date</label>
+                <input type="date" value={form.due_date} onChange={e=>setForm(f=>({...f,due_date:e.target.value}))}
+                  style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <button onClick={handleSave} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Create Action Item"}</button>
+              <button onClick={() => setModal(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ClientEventsView = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -6613,6 +6735,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "quotes": return <VendorQuotesView user={currentUser} />;
       case "vendor-tasks": return <VendorTasksView user={currentUser} />;
       case "client-events": return <ClientEventsView user={currentUser} />;
+      case "client-action-items": return <ClientActionItemsView user={currentUser} />;
       case "client-docs": return <div style={{ color: T.textSecondary }}>Documents will appear here.</div>;
       default: return null;
     }
@@ -18337,22 +18460,37 @@ const ClientDashboard = ({ user }) => {
   const [messages, setMessages] = useState([]);
   const [milestones, setMilestones] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [clientId, setClientId] = useState(null);
+  const [actionItems, setActionItems] = useState([]);
+  const [satisfaction, setSatisfaction] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [activeSection, setActiveSection] = useState("overview");
+  const [satisfactionModal, setSatisfactionModal] = useState(null);
+  const [satForm, setSatForm] = useState({ rating:0, nps_score:null, feedback:"", milestone:"" });
+  const [savingSat, setSavingSat] = useState(false);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       const { data: clientData } = await supabase.from("clients").select("id").eq("email", user.email).single();
       if (clientData) {
-        const [ev, dc, mg, ms] = await Promise.all([
+        setClientId(clientData.id);
+        const [ev, dc, mg, ms, ai, sat, rp] = await Promise.all([
           supabase.from("projects").select("*").eq("client_id", clientData.id).order("event_date", { ascending: true }),
           supabase.from("event_documents").select("*").eq("is_internal", false).order("created_at", { ascending: false }),
           supabase.from("client_messages").select("*").eq("client_id", clientData.id).order("created_at", { ascending: false }),
           supabase.from("client_milestones").select("*").order("created_at", { ascending: false }),
+          supabase.from("client_action_items").select("*").eq("client_id", clientData.id).order("due_date", { ascending: true }),
+          supabase.from("client_satisfaction").select("*").eq("client_id", clientData.id).order("submitted_at", { ascending: false }),
+          supabase.from("event_intelligence_reports").select("*"),
         ]);
         setEvents(ev.data || []);
         setDocuments(dc.data || []);
         setMessages(mg.data || []);
         setMilestones(ms.data || []);
+        setActionItems(ai.data || []);
+        setSatisfaction(sat.data || []);
+        setReports(rp.data || []);
       }
       setLoading(false);
     };
@@ -18394,6 +18532,20 @@ const ClientDashboard = ({ user }) => {
         </div>
       </div>
 
+      {/* ── SECTION TABS ── */}
+      <div style={{ display:"flex", gap:4, marginBottom:20, borderBottom:`1px solid ${T.border}`, overflowX:"auto", msOverflowStyle:"none", scrollbarWidth:"none" }}>
+        {[
+          { id:"overview", label:"Overview" },
+          { id:"action-items", label:`Action Items${actionItems.filter(a=>a.status==="pending").length>0?" ("+actionItems.filter(a=>a.status==="pending").length+")":""}` },
+          { id:"intelligence", label:"Event Intelligence" },
+          { id:"satisfaction", label:"Satisfaction" },
+        ].map(tab => (
+          <button key={tab.id} onClick={() => setActiveSection(tab.id)} style={{ padding:"8px 16px", border:"none", background:"none", cursor:"pointer", color:activeSection===tab.id?T.cyan:T.textMuted, fontWeight:activeSection===tab.id?800:400, fontSize:13, borderBottom:activeSection===tab.id?`2px solid ${T.cyan}`:"2px solid transparent", marginBottom:-1, whiteSpace:"nowrap" }}>{tab.label}</button>
+        ))}
+      </div>
+
+      {/* ── OVERVIEW ── */}
+      {activeSection === "overview" && <>
       {/* ── UPCOMING EVENTS ── */}
       {upcomingEvents.length > 0 && (
         <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "20px 22px", marginBottom: 20 }}>
@@ -18469,6 +18621,196 @@ const ClientDashboard = ({ user }) => {
           {messages.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "16px 0" }}>No messages yet</div>}
         </div>
       </div>
+      </> }
+
+      {/* ── ACTION ITEMS ── */}
+      {activeSection === "action-items" && (
+        <div>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+            <div>
+              <div style={{ color:T.textPrimary, fontWeight:800, fontSize:18 }}>Action Items</div>
+              <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>Things Stretchfield needs from you to keep your event on track</div>
+            </div>
+          </div>
+          {actionItems.length === 0 ? (
+            <div style={{ textAlign:"center", padding:"60px 0", background:T.surface, borderRadius:12, border:`1px solid ${T.border}` }}>
+              <div style={{ fontSize:40, marginBottom:12 }}>✅</div>
+              <div style={{ color:T.textPrimary, fontWeight:700, fontSize:16 }}>No action items</div>
+              <div style={{ color:T.textMuted, fontSize:13, marginTop:6 }}>You're all caught up — Stretchfield has everything needed.</div>
+            </div>
+          ) : (
+            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              {actionItems.map(item => {
+                const isOverdue = item.due_date && new Date(item.due_date) < new Date() && item.status === "pending";
+                const statusColor = item.status==="completed" ? T.teal : isOverdue ? T.red : T.amber;
+                return (
+                  <div key={item.id} style={{ background:T.surface, border:`1px solid ${isOverdue?T.red+"40":item.status==="completed"?T.teal+"30":T.amber+"30"}`, borderLeft:`3px solid ${statusColor}`, borderRadius:12, padding:"16px 20px" }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                      <div style={{ flex:1 }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+                          <div style={{ color:T.textPrimary, fontWeight:700, fontSize:14 }}>{item.title}</div>
+                          <span style={{ background:statusColor+"18", color:statusColor, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700, textTransform:"uppercase" }}>{item.status==="completed"?"Done":isOverdue?"Overdue":"Pending"}</span>
+                        </div>
+                        {item.description && <div style={{ color:T.textSecondary, fontSize:13, marginBottom:6 }}>{item.description}</div>}
+                        {item.due_date && <div style={{ color:isOverdue?T.red:T.textMuted, fontSize:11, fontWeight:isOverdue?700:400 }}>Due: {new Date(item.due_date).toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})}</div>}
+                      </div>
+                      {item.status === "pending" && (
+                        <button onClick={async () => {
+                          await supabase.from("client_action_items").update({ status:"completed", completed_at:new Date().toISOString() }).eq("id", item.id);
+                          setActionItems(prev => prev.map(a => a.id===item.id ? {...a, status:"completed"} : a));
+                        }} style={{ background:T.teal+"20", border:`1px solid ${T.teal}40`, color:T.teal, padding:"6px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700, flexShrink:0, marginLeft:12 }}>✓ Mark Done</button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── EVENT INTELLIGENCE ── */}
+      {activeSection === "intelligence" && (
+        <div>
+          <div style={{ marginBottom:20 }}>
+            <div style={{ color:T.textPrimary, fontWeight:800, fontSize:18 }}>Event Intelligence Reports</div>
+            <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>Strategic insights and post-event analysis from Stretchfield</div>
+          </div>
+          {events.length === 0 ? (
+            <div style={{ textAlign:"center", padding:"60px 0", background:T.surface, borderRadius:12, border:`1px solid ${T.border}` }}>
+              <div style={{ fontSize:40, marginBottom:12 }}>📊</div>
+              <div style={{ color:T.textPrimary, fontWeight:700 }}>No reports yet</div>
+              <div style={{ color:T.textMuted, fontSize:13, marginTop:6 }}>Intelligence reports will appear here after your events.</div>
+            </div>
+          ) : (
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              {events.map(ev => {
+                const report = reports.find(r => r.project_id === ev.id);
+                return (
+                  <div key={ev.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:"20px 24px" }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12 }}>
+                      <div>
+                        <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15 }}>{ev.name}</div>
+                        <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{ev.event_date ? new Date(ev.event_date).toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"}) : "Date TBC"}</div>
+                      </div>
+                      <span style={{ background:report?.ai_summary?T.teal+"18":T.amber+"18", color:report?.ai_summary?T.teal:T.amber, padding:"3px 12px", borderRadius:20, fontSize:11, fontWeight:700 }}>{report?.ai_summary?"Report Ready":"Pending"}</span>
+                    </div>
+                    {report?.ai_summary ? (
+                      <div>
+                        <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:8 }}>Executive Summary</div>
+                        <div style={{ color:T.textSecondary, fontSize:13, lineHeight:1.7, background:T.bg, borderRadius:10, padding:"14px 16px", maxHeight:200, overflowY:"auto" }}>{report.ai_summary.substring(0,800)}{report.ai_summary.length>800?"...":""}</div>
+                        {report.ai_summary.length > 800 && (
+                          <div style={{ color:T.textMuted, fontSize:12, marginTop:8, fontStyle:"italic" }}>Full report available upon request from your Stretchfield account manager.</div>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ color:T.textMuted, fontSize:13, fontStyle:"italic" }}>Your post-event intelligence report is being prepared by the Stretchfield team.</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── SATISFACTION ── */}
+      {activeSection === "satisfaction" && (
+        <div>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
+            <div>
+              <div style={{ color:T.textPrimary, fontWeight:800, fontSize:18 }}>Satisfaction Pulse</div>
+              <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>Share your feedback at every milestone — it makes us better</div>
+            </div>
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+            {events.map(ev => {
+              const eventSat = satisfaction.filter(s => s.project_id === ev.id);
+              const avgRating = eventSat.length > 0 ? (eventSat.reduce((s,r)=>s+(r.rating||0),0)/eventSat.length).toFixed(1) : null;
+              return (
+                <div key={ev.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:"20px 24px" }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
+                    <div>
+                      <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15 }}>{ev.name}</div>
+                      <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{ev.event_date ? new Date(ev.event_date).toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"}) : "Date TBC"}</div>
+                    </div>
+                    {avgRating && <div style={{ textAlign:"center" }}><div style={{ color:T.teal, fontWeight:900, fontSize:24 }}>{avgRating}</div><div style={{ color:T.textMuted, fontSize:10, textTransform:"uppercase" }}>Avg Rating</div></div>}
+                  </div>
+                  {/* Star ratings history */}
+                  {eventSat.length > 0 && (
+                    <div style={{ marginBottom:14 }}>
+                      {eventSat.map(s => (
+                        <div key={s.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderBottom:`1px solid ${T.border}33` }}>
+                          <div>
+                            <div style={{ color:T.textMuted, fontSize:11, fontWeight:700 }}>{s.milestone||"General Feedback"}</div>
+                            {s.feedback && <div style={{ color:T.textSecondary, fontSize:12, marginTop:2 }}>{s.feedback}</div>}
+                          </div>
+                          <div style={{ display:"flex", gap:2 }}>{[1,2,3,4,5].map(n=><span key={n} style={{ fontSize:16, color:n<=s.rating?"#F59E0B":T.border }}>★</span>)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button onClick={() => { setSatisfactionModal(ev); setSatForm({ rating:0, nps_score:null, feedback:"", milestone:"" }); }} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"8px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>+ Share Feedback</button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Satisfaction Modal */}
+      {satisfactionModal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setSatisfactionModal(null)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:480, padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>Share Your Feedback</div>
+            <div style={{ color:T.textMuted, fontSize:13, marginBottom:20 }}>{satisfactionModal.name}</div>
+            <div style={{ marginBottom:16 }}>
+              <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>Overall Rating</div>
+              <div style={{ display:"flex", gap:8 }}>
+                {[1,2,3,4,5].map(n => (
+                  <button key={n} onClick={() => setSatForm(f=>({...f,rating:n}))} style={{ fontSize:32, background:"none", border:"none", cursor:"pointer", color:n<=satForm.rating?"#F59E0B":T.border, transition:"color 0.1s" }}>★</button>
+                ))}
+              </div>
+            </div>
+            <div style={{ marginBottom:16 }}>
+              <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>How likely are you to recommend Stretchfield? (0-10)</div>
+              <div style={{ display:"flex", gap:4, flexWrap:"wrap" }}>
+                {[0,1,2,3,4,5,6,7,8,9,10].map(n => (
+                  <button key={n} onClick={() => setSatForm(f=>({...f,nps_score:n}))} style={{ width:36, height:36, borderRadius:6, border:`1px solid ${satForm.nps_score===n?T.cyan:T.border}`, background:satForm.nps_score===n?T.cyan+"20":"none", color:satForm.nps_score===n?T.cyan:T.textMuted, cursor:"pointer", fontWeight:700, fontSize:13 }}>{n}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{ marginBottom:16 }}>
+              <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:6 }}>Milestone (Optional)</div>
+              <select value={satForm.milestone} onChange={e=>setSatForm(f=>({...f,milestone:e.target.value}))}
+                style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                <option value="">General Feedback</option>
+                {["Briefing","Planning","Pre-Production","Event Day","Post-Event"].map(m=><option key={m}>{m}</option>)}
+              </select>
+            </div>
+            <div style={{ marginBottom:20 }}>
+              <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:6 }}>Comments</div>
+              <textarea value={satForm.feedback} onChange={e=>setSatForm(f=>({...f,feedback:e.target.value}))} rows={3} placeholder="Share your thoughts on Stretchfield's performance..."
+                style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} />
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={async () => {
+                if (!satForm.rating) { alert("Please select a rating."); return; }
+                setSavingSat(true);
+                await supabase.from("client_satisfaction").insert({ client_id:clientId, project_id:satisfactionModal.id, rating:satForm.rating, nps_score:satForm.nps_score, feedback:satForm.feedback, milestone:satForm.milestone, submitted_by:user.id });
+                // Notify CEO
+                const { data: ceos } = await supabase.from("profiles").select("id").eq("role","CEO");
+                for (const ceo of ceos||[]) { await supabase.from("notifications").insert({ user_id:ceo.id, title:"Client Feedback — "+satisfactionModal.name, message:user.name+" rated Stretchfield "+satForm.rating+"/5"+(satForm.feedback?" — "+satForm.feedback:""), type:"crm" }); }
+                setSatisfaction(prev => [...prev, { project_id:satisfactionModal.id, rating:satForm.rating, feedback:satForm.feedback, milestone:satForm.milestone }]);
+                setSavingSat(false);
+                setSatisfactionModal(null);
+              }} disabled={savingSat||!satForm.rating} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{savingSat?"Submitting...":"Submit Feedback"}</button>
+              <button onClick={() => setSatisfactionModal(null)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

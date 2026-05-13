@@ -19710,7 +19710,12 @@ Write in a confident, strategic tone befitting a premium events company presenti
       body: JSON.stringify({ prompt })
     });
     const data = await response.json();
-    setReport(data.text || "Failed to generate report.");
+    console.log("Board report API response:", data);
+    if (data.error) {
+      setReport("Error: " + data.error);
+    } else {
+      setReport(data.text || "No content returned.");
+    }
     setGenerating(false);
   };
 

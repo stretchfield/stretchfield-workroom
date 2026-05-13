@@ -20125,6 +20125,932 @@ const TeamPerformanceView = ({ user }) => {
   );
 };
 
+
+const VendorPerformanceView = ({ user }) => {
+  const [vendors, setVendors] = useState([]);
+  const [scorecards, setScorecards] = useState([]);
+  const [awards, setAwards] = useState([]);
+  const [watchlist, setWatchlist] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    const load = async () => {
+      const [{ data: v }, { data: sc }, { data: aw }, { data: wl }] = await Promise.all([
+        supabase.from("profiles").select("*").eq("role","Vendor").order("name"),
+        supabase.from("vendor_scorecards").select("*").order("created_at", { ascending: false }),
+        supabase.from("rff_awards").select("*"),
+        supabase.from("vendor_watchlist").select("*").eq("status","active"),
+      ]);
+      setVendors(v||[]); setScorecards(sc||[]); setAwards(aw||[]); setWatchlist(wl||[]);
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  const getVendorMetrics = (v) => {
+    const vScores = scorecards.filter(s => s.vendor_id === v.id || s.vendor_name?.trim() === v.name?.trim());
+    const vAwards = awards.filter(a => a.vendor_id === v.id);
+    const avgScore = vScores.length > 0 ? (vScores.reduce((s,sc) => s+(sc.total_pct||0), 0)/vScores.length).toFixed(1) : null;
+    const totalEarned = vAwards.reduce((s,a) => s+parseFloat(a.agreed_amount||0), 0);
+    const isWatched = watchlist.some(w => w.vendor_id === v.id);
+    const tier = v.vendor_tier || (avgScore >= 85 ? "Gold" : avgScore >= 70 ? "Silver" : avgScore ? "Bronze" : "Unrated");
+    return { vScores, vAwards, avgScore, totalEarned, isWatched, tier };
+  };
+
+  const tierColors = { Gold:"#F59E0B", Silver:"#94A3B8", Bronze:"#CD7F32", Unrated:T.textMuted };
+  const filtered = vendors.filter(v => v.name?.toLowerCase().includes(search.toLowerCase()) || v.service_category?.toLowerCase().includes(search.toLowerCase()));
+
+  if (loading) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"40vh" }}><div style={{ width:32, height:32, border:`3px solid ${T.border}`, borderTop:`3px solid ${T.cyan}`, borderRadius:"50%", animation:"spin 0.8s linear infinite" }} /></div>;
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <div>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Vendor Management</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Vendor Performance</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Scorecard history, tier progression and earnings per vendor</div>
+        </div>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search vendors..." style={{ padding:"9px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", width:220 }} />
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))", gap:14 }}>
+        {filtered.map(v => {
+          const m = getVendorMetrics(v);
+          const tierColor = tierColors[m.tier] || T.textMuted;
+          return (
+            <div key={v.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:"18px 20px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12 }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                    <div style={{ color:T.textPrimary, fontWeight:800, fontSize:14 }}>{v.name}</div>
+                    {m.isWatched && <span style={{ background:T.red+"18", color:T.red, padding:"1px 6px", borderRadius:20, fontSize:9, fontWeight:800 }}>⚠ WATCH</span>}
+                  </div>
+                  <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{v.service_category||"—"}</div>
+                </div>
+                <div style={{ textAlign:"center" }}>
+                  <div style={{ color:tierColor, fontWeight:900, fontSize:11, textTransform:"uppercase" }}>{m.tier}</div>
+                  <div style={{ color:tierColor, fontWeight:900, fontSize:22 }}>{m.avgScore||"—"}</div>
+                  <div style={{ color:T.textMuted, fontSize:9 }}>AVG SCORE</div>
+                </div>
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:10 }}>
+                {[
+                  { label:"Scorecards", value:m.vScores.length, color:T.cyan },
+                  { label:"Jobs", value:m.vAwards.length, color:T.teal },
+                  { label:"Earned", value:"GHS "+(m.totalEarned/1000).toFixed(0)+"k", color:T.amber },
+                ].map(k => (
+                  <div key={k.label} style={{ background:T.bg, borderRadius:8, padding:"8px 10px", textAlign:"center" }}>
+                    <div style={{ color:k.color, fontWeight:800, fontSize:14 }}>{k.value}</div>
+                    <div style={{ color:T.textMuted, fontSize:9, textTransform:"uppercase" }}>{k.label}</div>
+                  </div>
+                ))}
+              </div>
+              {m.vScores.length > 0 && (
+                <div style={{ height:6, background:T.border, borderRadius:3, overflow:"hidden" }}>
+                  <div style={{ height:"100%", width:parseFloat(m.avgScore)+"%", background:`linear-gradient(90deg,${tierColor},${tierColor}88)`, borderRadius:3 }} />
+                </div>
+              )}
+              {m.vScores.slice(0,2).map(sc => (
+                <div key={sc.id} style={{ display:"flex", justifyContent:"space-between", padding:"4px 0", borderBottom:`1px solid ${T.border}22`, marginTop:6 }}>
+                  <div style={{ color:T.textMuted, fontSize:11 }}>{sc.event_name||"Event"}</div>
+                  <div style={{ color:T.teal, fontWeight:700, fontSize:11 }}>{sc.total_pct}%</div>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+        {filtered.length===0 && <div style={{ textAlign:"center", padding:60, background:T.surface, borderRadius:12, border:`1px solid ${T.border}`, gridColumn:"1/-1", color:T.textMuted }}>No vendors found</div>}
+      </div>
+    </div>
+  );
+};
+
+const VendorContractsView = ({ user }) => {
+  const [contracts, setContracts] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [editModal, setEditModal] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ vendor_id:"", vendor_name:"", contract_title:"", contract_type:"service", start_date:"", end_date:"", value:"", status:"active", document_url:"", terms:"", renewal_reminder_days:30 });
+
+  const load = async () => {
+    const [{ data: c }, { data: v }] = await Promise.all([
+      supabase.from("vendor_contracts").select("*").order("end_date", { ascending: true }),
+      supabase.from("profiles").select("id,name,service_category").eq("role","Vendor").order("name"),
+    ]);
+    setContracts(c||[]); setVendors(v||[]);
+  };
+  useEffect(() => { load(); }, []);
+
+  const now = new Date();
+  const expiringSoon = contracts.filter(c => {
+    if (!c.end_date || c.status !== "active") return false;
+    const d = new Date(c.end_date);
+    const daysLeft = Math.ceil((d-now)/86400000);
+    return daysLeft <= (c.renewal_reminder_days||30) && daysLeft > 0;
+  });
+  const expired = contracts.filter(c => c.end_date && new Date(c.end_date) < now && c.status === "active");
+
+  const handleSave = async () => {
+    if (!form.contract_title || !form.vendor_id) { alert("Title and vendor required."); return; }
+    setSaving(true);
+    if (editModal) {
+      await supabase.from("vendor_contracts").update({ ...form, value:parseFloat(form.value)||0 }).eq("id", editModal.id);
+    } else {
+      await supabase.from("vendor_contracts").insert({ ...form, value:parseFloat(form.value)||0, created_by:user.id });
+    }
+    setSaving(false); setModal(false); setEditModal(null);
+    setForm({ vendor_id:"", vendor_name:"", contract_title:"", contract_type:"service", start_date:"", end_date:"", value:"", status:"active", document_url:"", terms:"", renewal_reminder_days:30 });
+    load();
+  };
+
+  const statusColors = { active:T.teal, expired:T.red, terminated:T.textMuted, renewed:T.cyan };
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <div>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Vendor Management</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Contract Management</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>{contracts.length} contracts · {expiringSoon.length} expiring soon · {expired.length} expired</div>
+        </div>
+        <button onClick={() => { setForm({ vendor_id:"", vendor_name:"", contract_title:"", contract_type:"service", start_date:"", end_date:"", value:"", status:"active", document_url:"", terms:"", renewal_reminder_days:30 }); setEditModal(null); setModal(true); }} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>+ Add Contract</button>
+      </div>
+
+      {(expiringSoon.length > 0 || expired.length > 0) && (
+        <div style={{ background:T.amber+"12", border:`1px solid ${T.amber}30`, borderRadius:12, padding:"14px 18px", marginBottom:20 }}>
+          <div style={{ color:T.amber, fontWeight:800, fontSize:13, marginBottom:6 }}>⚠ Attention Required</div>
+          {expired.map(c => <div key={c.id} style={{ color:T.red, fontSize:12, padding:"2px 0" }}>• {c.vendor_name} — {c.contract_title} EXPIRED {new Date(c.end_date).toLocaleDateString("en-GB")}</div>)}
+          {expiringSoon.map(c => { const days = Math.ceil((new Date(c.end_date)-now)/86400000); return <div key={c.id} style={{ color:T.amber, fontSize:12, padding:"2px 0" }}>• {c.vendor_name} — {c.contract_title} expires in {days} days</div>; })}
+        </div>
+      )}
+
+      <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, overflow:"hidden" }}>
+        <table style={{ width:"100%", borderCollapse:"collapse" }}>
+          <thead><tr style={{ background:T.bg }}>{["Vendor","Contract","Type","Value","Start","End","Status",""].map(h=><th key={h} style={{ padding:"10px 14px", color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", textAlign:"left", borderBottom:`1px solid ${T.border}` }}>{h}</th>)}</tr></thead>
+          <tbody>
+            {contracts.map((c,i) => {
+              const daysLeft = c.end_date ? Math.ceil((new Date(c.end_date)-now)/86400000) : null;
+              const isExpired = daysLeft !== null && daysLeft < 0;
+              return (
+                <tr key={c.id} style={{ borderBottom:i<contracts.length-1?`1px solid ${T.border}44`:"none" }}>
+                  <td style={{ padding:"10px 14px", color:T.textPrimary, fontWeight:700, fontSize:13 }}>{c.vendor_name}</td>
+                  <td style={{ padding:"10px 14px", color:T.textSecondary, fontSize:12 }}>{c.contract_title}</td>
+                  <td style={{ padding:"10px 14px" }}><span style={{ background:T.cyan+"18", color:T.cyan, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700, textTransform:"capitalize" }}>{c.contract_type}</span></td>
+                  <td style={{ padding:"10px 14px", color:T.amber, fontWeight:700, fontSize:12 }}>{c.value?`GHS ${parseFloat(c.value).toLocaleString()}`:"—"}</td>
+                  <td style={{ padding:"10px 14px", color:T.textMuted, fontSize:11 }}>{c.start_date?new Date(c.start_date).toLocaleDateString("en-GB"):"—"}</td>
+                  <td style={{ padding:"10px 14px", color:isExpired?T.red:daysLeft&&daysLeft<=30?T.amber:T.textMuted, fontSize:11, fontWeight:isExpired||daysLeft<=30?700:400 }}>{c.end_date?new Date(c.end_date).toLocaleDateString("en-GB"):"—"}{daysLeft!==null&&daysLeft>0&&daysLeft<=30?` (${daysLeft}d)`:""}</td>
+                  <td style={{ padding:"10px 14px" }}><span style={{ background:(statusColors[c.status]||T.textMuted)+"18", color:statusColors[c.status]||T.textMuted, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700, textTransform:"capitalize" }}>{c.status}</span></td>
+                  <td style={{ padding:"10px 14px" }}>
+                    <div style={{ display:"flex", gap:6 }}>
+                      {c.document_url && <a href={c.document_url} target="_blank" rel="noreferrer" style={{ color:T.cyan, fontSize:11, fontWeight:700 }}>📎</a>}
+                      <button onClick={() => { setEditModal(c); setForm({...c}); setModal(true); }} style={{ background:T.cyan+"15", border:`1px solid ${T.cyan}30`, color:T.cyan, padding:"2px 8px", borderRadius:5, cursor:"pointer", fontSize:10, fontWeight:700 }}>Edit</button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {contracts.length===0 && <tr><td colSpan={8} style={{ padding:"40px 0", textAlign:"center", color:T.textMuted }}>No contracts yet</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      {modal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={()=>{ setModal(false); setEditModal(null); }}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:540, maxHeight:"90vh", overflowY:"auto", padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:20 }}>{editModal?"Edit Contract":"Add Contract"}</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Vendor *</label>
+              <select value={form.vendor_id} onChange={e=>{ const v=vendors.find(x=>x.id===e.target.value); setForm(f=>({...f,vendor_id:e.target.value,vendor_name:v?.name||""})); }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                <option value="">Select vendor...</option>{vendors.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}
+              </select></div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Contract Title *</label>
+              <input value={form.contract_title} onChange={e=>setForm(f=>({...f,contract_title:e.target.value}))} placeholder="e.g. Event Services Agreement 2026" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Type</label>
+                <select value={form.contract_type} onChange={e=>setForm(f=>({...f,contract_type:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  {["service","retainer","one-off","framework","nda"].map(t=><option key={t}>{t}</option>)}
+                </select></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Contract Value (GHS)</label>
+                <input type="number" value={form.value} onChange={e=>setForm(f=>({...f,value:e.target.value}))} placeholder="0" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Start Date</label>
+                <input type="date" value={form.start_date} onChange={e=>setForm(f=>({...f,start_date:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>End Date</label>
+                <input type="date" value={form.end_date} onChange={e=>setForm(f=>({...f,end_date:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Status</label>
+                <select value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  {["active","expired","terminated","renewed"].map(s=><option key={s}>{s}</option>)}
+                </select></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Remind (days before)</label>
+                <input type="number" value={form.renewal_reminder_days} onChange={e=>setForm(f=>({...f,renewal_reminder_days:parseInt(e.target.value)||30}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              </div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Document URL</label>
+              <input value={form.document_url} onChange={e=>setForm(f=>({...f,document_url:e.target.value}))} placeholder="https://..." style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Key Terms</label>
+              <textarea value={form.terms} onChange={e=>setForm(f=>({...f,terms:e.target.value}))} rows={2} placeholder="Key terms, payment conditions, deliverables..." style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} /></div>
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <button onClick={handleSave} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":editModal?"Save Changes":"Add Contract"}</button>
+              <button onClick={()=>{ setModal(false); setEditModal(null); }} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const PreferredVendorsView = ({ user }) => {
+  const [preferred, setPreferred] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ vendor_id:"", vendor_name:"", service_category:"", tier:"preferred", reason:"" });
+
+  const TIERS = ["preferred","approved","restricted"];
+  const tierColors = { preferred:T.teal, approved:T.cyan, restricted:T.amber };
+
+  const load = async () => {
+    const [{ data: p }, { data: v }] = await Promise.all([
+      supabase.from("preferred_vendors").select("*").order("tier"),
+      supabase.from("profiles").select("id,name,service_category").eq("role","Vendor").order("name"),
+    ]);
+    setPreferred(p||[]); setVendors(v||[]);
+  };
+  useEffect(() => { load(); }, []);
+
+  const handleSave = async () => {
+    if (!form.vendor_id) { alert("Select a vendor."); return; }
+    setSaving(true);
+    await supabase.from("preferred_vendors").insert({ ...form, added_by: user.id });
+    setSaving(false); setModal(false);
+    setForm({ vendor_id:"", vendor_name:"", service_category:"", tier:"preferred", reason:"" });
+    load();
+  };
+
+  const grouped = TIERS.reduce((acc, tier) => {
+    acc[tier] = preferred.filter(p => p.tier === tier);
+    return acc;
+  }, {});
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <div>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Vendor Management</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Preferred Vendor List</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Pre-approved vendors for fast deployment per category</div>
+        </div>
+        <button onClick={() => setModal(true)} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>+ Add to List</button>
+      </div>
+
+      {TIERS.map(tier => (
+        <div key={tier} style={{ marginBottom:24 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+            <span style={{ background:tierColors[tier]+"18", color:tierColors[tier], padding:"3px 12px", borderRadius:20, fontSize:11, fontWeight:800, textTransform:"capitalize" }}>{tier}</span>
+            <span style={{ color:T.textMuted, fontSize:12 }}>{grouped[tier].length} vendor{grouped[tier].length!==1?"s":""}</span>
+          </div>
+          {grouped[tier].length === 0 ? (
+            <div style={{ color:T.textMuted, fontSize:13, padding:"16px 0", fontStyle:"italic" }}>No {tier} vendors yet</div>
+          ) : (
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))", gap:10 }}>
+              {grouped[tier].map(p => (
+                <div key={p.id} style={{ background:T.surface, border:`1px solid ${tierColors[p.tier]}30`, borderLeft:`3px solid ${tierColors[p.tier]}`, borderRadius:10, padding:"14px 16px", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                  <div>
+                    <div style={{ color:T.textPrimary, fontWeight:700, fontSize:13 }}>{p.vendor_name}</div>
+                    <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>{p.service_category}</div>
+                    {p.reason && <div style={{ color:T.textMuted, fontSize:11, marginTop:4, fontStyle:"italic" }}>{p.reason}</div>}
+                  </div>
+                  <button onClick={async () => { await supabase.from("preferred_vendors").delete().eq("id",p.id); load(); }} style={{ background:T.red+"15", border:`1px solid ${T.red}30`, color:T.red, padding:"3px 8px", borderRadius:5, cursor:"pointer", fontSize:11, fontWeight:700 }}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+
+      {modal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setModal(false)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:460, padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:20 }}>Add to Preferred List</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Vendor *</label>
+              <select value={form.vendor_id} onChange={e=>{ const v=vendors.find(x=>x.id===e.target.value); setForm(f=>({...f,vendor_id:e.target.value,vendor_name:v?.name||"",service_category:v?.service_category||""})); }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                <option value="">Select vendor...</option>{vendors.map(v=><option key={v.id} value={v.id}>{v.name} — {v.service_category}</option>)}
+              </select></div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Tier</label>
+              <select value={form.tier} onChange={e=>setForm(f=>({...f,tier:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                {TIERS.map(t=><option key={t}>{t}</option>)}
+              </select></div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Reason</label>
+              <textarea value={form.reason} onChange={e=>setForm(f=>({...f,reason:e.target.value}))} rows={2} placeholder="Why is this vendor preferred?" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} /></div>
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <button onClick={handleSave} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Add to List"}</button>
+              <button onClick={()=>setModal(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const VendorWatchlistView = ({ user }) => {
+  const [watchlist, setWatchlist] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ vendor_id:"", vendor_name:"", flag_type:"monitor", reason:"", status:"active" });
+
+  const FLAG_TYPES = ["monitor","warning","blacklist","payment-dispute","performance-issue"];
+  const flagColors = { monitor:T.amber, warning:"#F97316", blacklist:T.red, "payment-dispute":T.red, "performance-issue":T.amber };
+
+  const load = async () => {
+    const [{ data: w }, { data: v }] = await Promise.all([
+      supabase.from("vendor_watchlist").select("*").order("created_at", { ascending: false }),
+      supabase.from("profiles").select("id,name,service_category").eq("role","Vendor").order("name"),
+    ]);
+    setWatchlist(w||[]); setVendors(v||[]);
+  };
+  useEffect(() => { load(); }, []);
+
+  const active = watchlist.filter(w => w.status === "active");
+  const resolved = watchlist.filter(w => w.status === "resolved");
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <div>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Vendor Management</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Watchlist & Flags</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>{active.length} active flags · {resolved.length} resolved</div>
+        </div>
+        <button onClick={() => setModal(true)} style={{ background:`linear-gradient(135deg,${T.red},#F97316)`, border:"none", color:"#fff", padding:"10px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>⚠ Flag Vendor</button>
+      </div>
+
+      {active.length > 0 && (
+        <div style={{ marginBottom:20 }}>
+          <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:12 }}>Active Flags</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {active.map(w => {
+              const color = flagColors[w.flag_type] || T.amber;
+              return (
+                <div key={w.id} style={{ background:T.surface, border:`1px solid ${color}30`, borderLeft:`3px solid ${color}`, borderRadius:12, padding:"16px 20px", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:4 }}>
+                      <div style={{ color:T.textPrimary, fontWeight:700, fontSize:14 }}>{w.vendor_name}</div>
+                      <span style={{ background:color+"18", color:color, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700, textTransform:"capitalize" }}>{w.flag_type?.replace(/-/g," ")}</span>
+                    </div>
+                    <div style={{ color:T.textSecondary, fontSize:13 }}>{w.reason}</div>
+                    <div style={{ color:T.textMuted, fontSize:11, marginTop:4 }}>Flagged by {w.flagged_by_name} · {new Date(w.created_at).toLocaleDateString("en-GB")}</div>
+                  </div>
+                  <button onClick={async () => { await supabase.from("vendor_watchlist").update({ status:"resolved", resolved_at:new Date().toISOString() }).eq("id",w.id); load(); }} style={{ background:T.teal+"15", border:`1px solid ${T.teal}30`, color:T.teal, padding:"5px 12px", borderRadius:7, cursor:"pointer", fontSize:11, fontWeight:700, flexShrink:0, marginLeft:12 }}>✓ Resolve</button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {resolved.length > 0 && (
+        <div>
+          <div style={{ color:T.textMuted, fontWeight:700, fontSize:13, marginBottom:10 }}>Resolved ({resolved.length})</div>
+          {resolved.map(w => (
+            <div key={w.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:10, padding:"12px 16px", marginBottom:8, opacity:0.6 }}>
+              <div style={{ display:"flex", justifyContent:"space-between" }}>
+                <div><div style={{ color:T.textPrimary, fontWeight:700, fontSize:13 }}>{w.vendor_name}</div><div style={{ color:T.textMuted, fontSize:12 }}>{w.reason}</div></div>
+                <div style={{ color:T.teal, fontSize:11, fontWeight:700 }}>✓ Resolved</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {active.length===0 && resolved.length===0 && (
+        <div style={{ textAlign:"center", padding:60, background:T.surface, borderRadius:12, border:`1px solid ${T.border}` }}><div style={{ fontSize:40, marginBottom:12 }}>✅</div><div style={{ color:T.textPrimary, fontWeight:700 }}>No flags</div><div style={{ color:T.textMuted, fontSize:13, marginTop:6 }}>All vendors are in good standing.</div></div>
+      )}
+
+      {modal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setModal(false)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.red}30`, borderRadius:16, width:"100%", maxWidth:460, padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:20 }}>Flag Vendor</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Vendor *</label>
+              <select value={form.vendor_id} onChange={e=>{ const v=vendors.find(x=>x.id===e.target.value); setForm(f=>({...f,vendor_id:e.target.value,vendor_name:v?.name||""})); }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                <option value="">Select vendor...</option>{vendors.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}
+              </select></div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Flag Type</label>
+              <select value={form.flag_type} onChange={e=>setForm(f=>({...f,flag_type:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                {FLAG_TYPES.map(t=><option key={t} value={t}>{t.replace(/-/g," ").replace(/\w/g,l=>l.toUpperCase())}</option>)}
+              </select></div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Reason *</label>
+              <textarea value={form.reason} onChange={e=>setForm(f=>({...f,reason:e.target.value}))} rows={3} placeholder="Why is this vendor being flagged?" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} /></div>
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <button onClick={async () => {
+                if (!form.vendor_id || !form.reason) { alert("Vendor and reason required."); return; }
+                setSaving(true);
+                await supabase.from("vendor_watchlist").insert({ ...form, flagged_by:user.id, flagged_by_name:user.name });
+                setSaving(false); setModal(false);
+                setForm({ vendor_id:"", vendor_name:"", flag_type:"monitor", reason:"", status:"active" });
+                load();
+              }} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${T.red},#F97316)`, border:"none", color:"#fff", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Flag Vendor"}</button>
+              <button onClick={()=>setModal(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const VendorCommsView = ({ user }) => {
+  const [comms, setComms] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [filter, setFilter] = useState("all");
+  const [form, setForm] = useState({ vendor_id:"", vendor_name:"", project_id:"", event_name:"", type:"call", subject:"", notes:"", outcome:"", follow_up_date:"" });
+
+  const TYPES = ["call","email","meeting","site-visit","whatsapp","other"];
+  const typeColors = { call:T.cyan, email:T.teal, meeting:T.amber, "site-visit":"#8B5CF6", whatsapp:"#25D366", other:T.textMuted };
+
+  const load = async () => {
+    const [{ data: c }, { data: v }, { data: e }] = await Promise.all([
+      supabase.from("vendor_comms_log").select("*").order("created_at", { ascending: false }),
+      supabase.from("profiles").select("id,name,service_category").eq("role","Vendor").order("name"),
+      supabase.from("projects").select("id,name").order("name"),
+    ]);
+    setComms(c||[]); setVendors(v||[]); setEvents(e||[]);
+  };
+  useEffect(() => { load(); }, []);
+
+  const filtered = filter === "all" ? comms : comms.filter(c => c.type === filter);
+  const followUps = comms.filter(c => c.follow_up_date && new Date(c.follow_up_date) >= new Date());
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <div>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Vendor Management</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Vendor Communications</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>{comms.length} logged · {followUps.length} follow-ups pending</div>
+        </div>
+        <button onClick={() => setModal(true)} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>+ Log Communication</button>
+      </div>
+
+      {followUps.length > 0 && (
+        <div style={{ background:T.amber+"12", border:`1px solid ${T.amber}30`, borderRadius:12, padding:"14px 18px", marginBottom:20 }}>
+          <div style={{ color:T.amber, fontWeight:800, fontSize:13, marginBottom:6 }}>📅 Upcoming Follow-ups</div>
+          {followUps.map(f => <div key={f.id} style={{ color:T.textSecondary, fontSize:12, padding:"2px 0" }}>• {f.vendor_name} — {f.subject} → {new Date(f.follow_up_date).toLocaleDateString("en-GB")}</div>)}
+        </div>
+      )}
+
+      <div style={{ display:"flex", gap:8, marginBottom:16, flexWrap:"wrap" }}>
+        {["all",...TYPES].map(t => (
+          <button key={t} onClick={() => setFilter(t)} style={{ padding:"5px 14px", borderRadius:20, border:`1px solid ${filter===t?(typeColors[t]||T.cyan):T.border}`, background:filter===t?(typeColors[t]||T.cyan)+"20":"none", color:filter===t?(typeColors[t]||T.cyan):T.textMuted, fontSize:11, fontWeight:700, cursor:"pointer", textTransform:"capitalize" }}>{t}</button>
+        ))}
+      </div>
+
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        {filtered.map(c => {
+          const color = typeColors[c.type] || T.textMuted;
+          return (
+            <div key={c.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderLeft:`3px solid ${color}`, borderRadius:12, padding:"14px 18px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:4 }}>
+                    <div style={{ color:T.textPrimary, fontWeight:700, fontSize:14 }}>{c.vendor_name}</div>
+                    <span style={{ background:color+"18", color:color, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700, textTransform:"capitalize" }}>{c.type}</span>
+                  </div>
+                  <div style={{ color:T.textSecondary, fontSize:13, fontWeight:600 }}>{c.subject}</div>
+                  {c.event_name && <div style={{ color:T.textMuted, fontSize:12 }}>{c.event_name}</div>}
+                  {c.notes && <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>{c.notes}</div>}
+                  {c.outcome && <div style={{ color:T.teal, fontSize:12, marginTop:4, fontWeight:600 }}>Outcome: {c.outcome}</div>}
+                  {c.follow_up_date && <div style={{ color:T.amber, fontSize:11, marginTop:4 }}>Follow up: {new Date(c.follow_up_date).toLocaleDateString("en-GB")}</div>}
+                </div>
+                <div style={{ color:T.textMuted, fontSize:11, marginLeft:12, flexShrink:0 }}>
+                  <div>{new Date(c.created_at).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}</div>
+                  <div>{c.logged_by_name}</div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {filtered.length===0 && <div style={{ textAlign:"center", padding:60, background:T.surface, borderRadius:12, border:`1px solid ${T.border}`, color:T.textMuted }}>No communications logged</div>}
+      </div>
+
+      {modal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setModal(false)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:520, maxHeight:"90vh", overflowY:"auto", padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:20 }}>Log Communication</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Vendor *</label>
+                <select value={form.vendor_id} onChange={e=>{ const v=vendors.find(x=>x.id===e.target.value); setForm(f=>({...f,vendor_id:e.target.value,vendor_name:v?.name||""})); }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  <option value="">Select...</option>{vendors.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}
+                </select></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Type</label>
+                <select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  {TYPES.map(t=><option key={t}>{t}</option>)}
+                </select></div>
+              </div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Event (Optional)</label>
+              <select value={form.project_id} onChange={e=>{ const ev=events.find(x=>x.id===e.target.value); setForm(f=>({...f,project_id:e.target.value,event_name:ev?.name||""})); }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                <option value="">No specific event</option>{events.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+              </select></div>
+              {[["Subject *","subject","What was discussed?"],["Notes","notes","Key discussion points..."],["Outcome","outcome","What was agreed or decided?"]].map(([label,key,ph])=>(
+                <div key={key}><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>{label}</label>
+                {key==="subject"?<input value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))} placeholder={ph} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                :<textarea value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))} rows={2} placeholder={ph} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} />}
+                </div>
+              ))}
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Follow-up Date</label>
+              <input type="date" value={form.follow_up_date} onChange={e=>setForm(f=>({...f,follow_up_date:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <button onClick={async () => {
+                if (!form.vendor_id || !form.subject) { alert("Vendor and subject required."); return; }
+                setSaving(true);
+                await supabase.from("vendor_comms_log").insert({ ...form, logged_by:user.id, logged_by_name:user.name });
+                setSaving(false); setModal(false);
+                setForm({ vendor_id:"", vendor_name:"", project_id:"", event_name:"", type:"call", subject:"", notes:"", outcome:"", follow_up_date:"" });
+                load();
+              }} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Log Communication"}</button>
+              <button onClick={()=>setModal(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const VendorSLAView = ({ user }) => {
+  const [slas, setSlas] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ vendor_id:"", vendor_name:"", project_id:"", event_name:"", sla_item:"", agreed_standard:"", actual_delivery:"", status:"pending", breach_notes:"" });
+
+  const statusColors = { pending:T.textMuted, met:T.teal, breached:T.red, "partially-met":T.amber };
+
+  const load = async () => {
+    const [{ data: s }, { data: v }, { data: e }] = await Promise.all([
+      supabase.from("vendor_sla").select("*").order("created_at", { ascending: false }),
+      supabase.from("profiles").select("id,name").eq("role","Vendor").order("name"),
+      supabase.from("projects").select("id,name").order("name"),
+    ]);
+    setSlas(s||[]); setVendors(v||[]); setEvents(e||[]);
+  };
+  useEffect(() => { load(); }, []);
+
+  const breaches = slas.filter(s => s.status === "breached");
+  const met = slas.filter(s => s.status === "met");
+  const compliance = slas.length > 0 ? Math.round((met.length/slas.length)*100) : 0;
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <div>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Intelligence</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>SLA Tracker</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>{slas.length} SLAs tracked · {compliance}% compliance · {breaches.length} breaches</div>
+        </div>
+        <button onClick={() => setModal(true)} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>+ Add SLA</button>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:12, marginBottom:24 }}>
+        {[
+          { label:"Total SLAs", value:slas.length, color:T.cyan },
+          { label:"Met", value:met.length, color:T.teal },
+          { label:"Breached", value:breaches.length, color:breaches.length>0?T.red:T.teal },
+          { label:"Compliance", value:compliance+"%", color:compliance>=80?T.teal:compliance>=60?T.amber:T.red },
+        ].map(k => (
+          <div key={k.label} style={{ padding:"14px 16px", background:T.surface, border:`1px solid ${T.border}`, borderTop:`2px solid ${k.color}`, borderRadius:10 }}>
+            <div style={{ color:k.color, fontSize:20, fontWeight:900 }}>{k.value}</div>
+            <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginTop:4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        {slas.map(s => {
+          const color = statusColors[s.status] || T.textMuted;
+          return (
+            <div key={s.id} style={{ background:T.surface, border:`1px solid ${s.status==="breached"?T.red+"30":T.border}`, borderLeft:`3px solid ${color}`, borderRadius:12, padding:"14px 18px", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+              <div style={{ flex:1 }}>
+                <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:4 }}>
+                  <div style={{ color:T.textPrimary, fontWeight:700, fontSize:14 }}>{s.vendor_name}</div>
+                  <span style={{ background:color+"18", color:color, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700, textTransform:"capitalize" }}>{s.status}</span>
+                </div>
+                <div style={{ color:T.textSecondary, fontSize:13, fontWeight:600 }}>{s.sla_item}</div>
+                {s.event_name && <div style={{ color:T.textMuted, fontSize:12 }}>{s.event_name}</div>}
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginTop:8 }}>
+                  <div><div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase" }}>Agreed</div><div style={{ color:T.textSecondary, fontSize:12 }}>{s.agreed_standard||"—"}</div></div>
+                  <div><div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase" }}>Actual</div><div style={{ color:T.textSecondary, fontSize:12 }}>{s.actual_delivery||"Pending"}</div></div>
+                </div>
+                {s.breach_notes && <div style={{ color:T.red, fontSize:12, marginTop:6 }}>⚠ {s.breach_notes}</div>}
+              </div>
+              <div style={{ display:"flex", gap:6, marginLeft:12 }}>
+                {s.status === "pending" && (
+                  <>
+                    <button onClick={async()=>{ await supabase.from("vendor_sla").update({status:"met"}).eq("id",s.id); load(); }} style={{ background:T.teal+"15", border:`1px solid ${T.teal}30`, color:T.teal, padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:10, fontWeight:700 }}>✓ Met</button>
+                    <button onClick={async()=>{ const notes=window.prompt("Breach details:"); if(!notes) return; await supabase.from("vendor_sla").update({status:"breached",breach_notes:notes}).eq("id",s.id); load(); }} style={{ background:T.red+"15", border:`1px solid ${T.red}30`, color:T.red, padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:10, fontWeight:700 }}>✗ Breach</button>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        {slas.length===0 && <div style={{ textAlign:"center", padding:60, background:T.surface, borderRadius:12, border:`1px solid ${T.border}`, color:T.textMuted }}>No SLAs tracked yet</div>}
+      </div>
+
+      {modal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setModal(false)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:500, padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:20 }}>Add SLA</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Vendor *</label>
+                <select value={form.vendor_id} onChange={e=>{ const v=vendors.find(x=>x.id===e.target.value); setForm(f=>({...f,vendor_id:e.target.value,vendor_name:v?.name||""})); }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  <option value="">Select...</option>{vendors.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}
+                </select></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Event</label>
+                <select value={form.project_id} onChange={e=>{ const ev=events.find(x=>x.id===e.target.value); setForm(f=>({...f,project_id:e.target.value,event_name:ev?.name||""})); }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  <option value="">General</option>{events.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+                </select></div>
+              </div>
+              {[["SLA Item *","sla_item","e.g. Deliver setup by 7am"],["Agreed Standard","agreed_standard","What was the agreed benchmark?"],["Actual Delivery","actual_delivery","What actually happened? (fill after event)"]].map(([label,key,ph])=>(
+                <div key={key}><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>{label}</label>
+                <input value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))} placeholder={ph} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                </div>
+              ))}
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <button onClick={async()=>{ if(!form.vendor_id||!form.sla_item){alert("Vendor and SLA item required.");return;} setSaving(true); await supabase.from("vendor_sla").insert({...form,created_by:user.id}); setSaving(false); setModal(false); setForm({vendor_id:"",vendor_name:"",project_id:"",event_name:"",sla_item:"",agreed_standard:"",actual_delivery:"",status:"pending",breach_notes:""}); load(); }} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Add SLA"}</button>
+              <button onClick={()=>setModal(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const MarketRatesView = ({ user }) => {
+  const [rates, setRates] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [editModal, setEditModal] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ category:"", service_description:"", min_rate:"", max_rate:"", unit:"per event", source:"", last_updated:new Date().toISOString().slice(0,10) });
+  const CATEGORIES = ["Event Lighting","Events Ushering","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Security Service","Transportation","Venue Provider","Other"];
+
+  const load = async () => { const { data } = await supabase.from("vendor_market_rates").select("*").order("category"); setRates(data||[]); };
+  useEffect(() => { load(); }, []);
+
+  const handleSave = async () => {
+    if (!form.category) { alert("Category required."); return; }
+    setSaving(true);
+    if (editModal) {
+      await supabase.from("vendor_market_rates").update({ ...form, min_rate:parseFloat(form.min_rate)||0, max_rate:parseFloat(form.max_rate)||0 }).eq("id", editModal.id);
+    } else {
+      await supabase.from("vendor_market_rates").insert({ ...form, min_rate:parseFloat(form.min_rate)||0, max_rate:parseFloat(form.max_rate)||0, updated_by:user.id });
+    }
+    setSaving(false); setModal(false); setEditModal(null);
+    setForm({ category:"", service_description:"", min_rate:"", max_rate:"", unit:"per event", source:"", last_updated:new Date().toISOString().slice(0,10) });
+    load();
+  };
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <div>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Intelligence</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Market Rates</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Benchmark vendor quotes against market rates per category</div>
+        </div>
+        <button onClick={() => { setForm({ category:"", service_description:"", min_rate:"", max_rate:"", unit:"per event", source:"", last_updated:new Date().toISOString().slice(0,10) }); setEditModal(null); setModal(true); }} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>+ Add Rate</button>
+      </div>
+
+      <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, overflow:"hidden" }}>
+        <table style={{ width:"100%", borderCollapse:"collapse" }}>
+          <thead><tr style={{ background:T.bg }}>{["Category","Service","Min Rate","Max Rate","Unit","Source","Updated",""].map(h=><th key={h} style={{ padding:"10px 14px", color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", textAlign:"left", borderBottom:`1px solid ${T.border}` }}>{h}</th>)}</tr></thead>
+          <tbody>
+            {rates.map((r,i) => (
+              <tr key={r.id} style={{ borderBottom:i<rates.length-1?`1px solid ${T.border}44`:"none" }}>
+                <td style={{ padding:"10px 14px", color:T.textPrimary, fontWeight:700, fontSize:12 }}>{r.category}</td>
+                <td style={{ padding:"10px 14px", color:T.textMuted, fontSize:12 }}>{r.service_description||"—"}</td>
+                <td style={{ padding:"10px 14px", color:T.teal, fontWeight:700, fontSize:12 }}>GHS {parseFloat(r.min_rate||0).toLocaleString()}</td>
+                <td style={{ padding:"10px 14px", color:T.amber, fontWeight:700, fontSize:12 }}>GHS {parseFloat(r.max_rate||0).toLocaleString()}</td>
+                <td style={{ padding:"10px 14px", color:T.textMuted, fontSize:11 }}>{r.unit}</td>
+                <td style={{ padding:"10px 14px", color:T.textMuted, fontSize:11 }}>{r.source||"—"}</td>
+                <td style={{ padding:"10px 14px", color:T.textMuted, fontSize:11 }}>{r.last_updated?new Date(r.last_updated).toLocaleDateString("en-GB"):"—"}</td>
+                <td style={{ padding:"10px 14px" }}><button onClick={()=>{ setEditModal(r); setForm({...r}); setModal(true); }} style={{ background:T.cyan+"15", border:`1px solid ${T.cyan}30`, color:T.cyan, padding:"2px 8px", borderRadius:5, cursor:"pointer", fontSize:10, fontWeight:700 }}>Edit</button></td>
+              </tr>
+            ))}
+            {rates.length===0 && <tr><td colSpan={8} style={{ padding:"40px 0", textAlign:"center", color:T.textMuted }}>No market rates defined yet</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      {modal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={()=>{ setModal(false); setEditModal(null); }}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:480, padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:20 }}>{editModal?"Edit Rate":"Add Market Rate"}</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Category *</label>
+              <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                <option value="">Select category...</option>{CATEGORIES.map(c=><option key={c}>{c}</option>)}
+              </select></div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Service Description</label>
+              <input value={form.service_description} onChange={e=>setForm(f=>({...f,service_description:e.target.value}))} placeholder="e.g. Full event lighting rig" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Min Rate (GHS)</label>
+                <input type="number" value={form.min_rate} onChange={e=>setForm(f=>({...f,min_rate:e.target.value}))} placeholder="0" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Max Rate (GHS)</label>
+                <input type="number" value={form.max_rate} onChange={e=>setForm(f=>({...f,max_rate:e.target.value}))} placeholder="0" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Unit</label>
+                <select value={form.unit} onChange={e=>setForm(f=>({...f,unit:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  {["per event","per day","per hour","per person","per item"].map(u=><option key={u}>{u}</option>)}
+                </select></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Source</label>
+                <input value={form.source} onChange={e=>setForm(f=>({...f,source:e.target.value}))} placeholder="e.g. Industry survey" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <button onClick={handleSave} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":editModal?"Save Changes":"Add Rate"}</button>
+              <button onClick={()=>{ setModal(false); setEditModal(null); }} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ProcurementReportView = ({ user }) => {
+  const [awards, setAwards] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [rffs, setRffs] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [scorecards, setScorecards] = useState([]);
+  const [period, setPeriod] = useState("all");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      const [{ data: aw }, { data: inv }, { data: rf }, { data: ev }, { data: vp }, { data: sc }] = await Promise.all([
+        supabase.from("rff_awards").select("*"),
+        supabase.from("vendor_invoices").select("*"),
+        supabase.from("rffs").select("*"),
+        supabase.from("projects").select("*"),
+        supabase.from("profiles").select("*").eq("role","Vendor"),
+        supabase.from("vendor_scorecards").select("*"),
+      ]);
+      setAwards(aw||[]); setInvoices(inv||[]); setRffs(rf||[]); setEvents(ev||[]); setVendors(vp||[]); setScorecards(sc||[]);
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  const now = new Date();
+  const filterByPeriod = (items, dateField) => {
+    if (period === "all") return items;
+    const d = new Date(now);
+    if (period === "this_month") { d.setDate(1); d.setHours(0,0,0,0); }
+    if (period === "last_month") { d.setMonth(d.getMonth()-1); d.setDate(1); d.setHours(0,0,0,0); }
+    if (period === "this_year") { d.setMonth(0); d.setDate(1); d.setHours(0,0,0,0); }
+    return items.filter(i => i[dateField] && new Date(i[dateField]) >= d);
+  };
+
+  const filteredAwards = filterByPeriod(awards, "created_at");
+  const totalSpend = filteredAwards.reduce((s,a) => s+parseFloat(a.agreed_amount||0), 0);
+  const paidInvoices = filterByPeriod(invoices.filter(i=>i.status==="paid"), "created_at");
+  const totalPaid = paidInvoices.reduce((s,i) => s+parseFloat(i.amount||0), 0);
+  const savings = totalSpend > 0 ? ((totalSpend-totalPaid)/totalSpend*100).toFixed(1) : 0;
+
+  // Spend by category
+  const categorySpend = {};
+  filteredAwards.forEach(a => {
+    const vendor = vendors.find(v => v.id === a.vendor_id);
+    const cat = vendor?.service_category || "Other";
+    categorySpend[cat] = (categorySpend[cat]||0) + parseFloat(a.agreed_amount||0);
+  });
+  const topCategories = Object.entries(categorySpend).sort((a,b)=>b[1]-a[1]).slice(0,6);
+
+  // Top vendors by spend
+  const vendorSpend = {};
+  filteredAwards.forEach(a => {
+    vendorSpend[a.vendor_name||"Unknown"] = (vendorSpend[a.vendor_name||"Unknown"]||0) + parseFloat(a.agreed_amount||0);
+  });
+  const topVendors = Object.entries(vendorSpend).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  // Avg score per vendor
+  const avgVendorScore = vendors.map(v => {
+    const vsc = scorecards.filter(s => s.vendor_id===v.id || s.vendor_name?.trim()===v.name?.trim());
+    return { name:v.name, avg:vsc.length?((vsc.reduce((s,sc)=>s+(sc.total_pct||0),0)/vsc.length).toFixed(1)):null, count:vsc.length };
+  }).filter(v => v.avg !== null).sort((a,b)=>b.avg-a.avg);
+
+  if (loading) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"40vh" }}><div style={{ width:32, height:32, border:`3px solid ${T.border}`, borderTop:`3px solid ${T.cyan}`, borderRadius:"50%", animation:"spin 0.8s linear infinite" }} /></div>;
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <div>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Intelligence</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Procurement Report</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Vendor spend, savings and performance summary</div>
+        </div>
+        <select value={period} onChange={e=>setPeriod(e.target.value)} style={{ padding:"9px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+          <option value="all">All Time</option>
+          <option value="this_month">This Month</option>
+          <option value="last_month">Last Month</option>
+          <option value="this_year">This Year</option>
+        </select>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:12, marginBottom:24 }}>
+        {[
+          { label:"Total Awarded", value:"GHS "+totalSpend.toLocaleString(), color:T.amber },
+          { label:"Total Paid", value:"GHS "+totalPaid.toLocaleString(), color:T.red },
+          { label:"Contracts", value:filteredAwards.length, color:T.cyan },
+          { label:"Active Vendors", value:vendors.length, color:T.teal },
+          { label:"Avg Score", value: scorecards.length>0?(scorecards.reduce((s,sc)=>s+(sc.total_pct||0),0)/scorecards.length).toFixed(1)+"%":"—", color:T.magenta },
+        ].map(k => (
+          <div key={k.label} style={{ padding:"14px 16px", background:T.surface, border:`1px solid ${T.border}`, borderTop:`2px solid ${k.color}`, borderRadius:10 }}>
+            <div style={{ color:k.color, fontSize:18, fontWeight:900 }}>{k.value}</div>
+            <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginTop:4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginBottom:20 }}>
+        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:"18px 20px" }}>
+          <div style={{ color:T.textPrimary, fontWeight:800, fontSize:14, marginBottom:14 }}>Spend by Category</div>
+          {topCategories.map(([cat, spend]) => {
+            const pct = totalSpend > 0 ? (spend/totalSpend*100).toFixed(1) : 0;
+            return (
+              <div key={cat} style={{ marginBottom:10 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                  <div style={{ color:T.textSecondary, fontSize:12 }}>{cat}</div>
+                  <div style={{ color:T.amber, fontWeight:700, fontSize:12 }}>GHS {spend.toLocaleString()} ({pct}%)</div>
+                </div>
+                <div style={{ height:6, background:T.border, borderRadius:3, overflow:"hidden" }}>
+                  <div style={{ height:"100%", width:pct+"%", background:`linear-gradient(90deg,${T.amber},${T.amber}88)`, borderRadius:3 }} />
+                </div>
+              </div>
+            );
+          })}
+          {topCategories.length===0 && <div style={{ color:T.textMuted, fontSize:13 }}>No spend data yet</div>}
+        </div>
+
+        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:"18px 20px" }}>
+          <div style={{ color:T.textPrimary, fontWeight:800, fontSize:14, marginBottom:14 }}>Top Vendors by Spend</div>
+          {topVendors.map(([name, spend], i) => (
+            <div key={name} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderBottom:i<topVendors.length-1?`1px solid ${T.border}33`:"none" }}>
+              <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+                <div style={{ width:20, height:20, borderRadius:10, background:T.cyan+"20", color:T.cyan, fontSize:10, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center" }}>{i+1}</div>
+                <div style={{ color:T.textPrimary, fontSize:13, fontWeight:600 }}>{name}</div>
+              </div>
+              <div style={{ color:T.amber, fontWeight:700, fontSize:13 }}>GHS {spend.toLocaleString()}</div>
+            </div>
+          ))}
+          {topVendors.length===0 && <div style={{ color:T.textMuted, fontSize:13 }}>No awards yet</div>}
+        </div>
+      </div>
+
+      {/* Vendor scorecard league table */}
+      <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, overflow:"hidden" }}>
+        <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.border}`, color:T.textPrimary, fontWeight:800, fontSize:14 }}>Vendor Performance League Table</div>
+        <table style={{ width:"100%", borderCollapse:"collapse" }}>
+          <thead><tr style={{ background:T.bg }}>{["#","Vendor","Avg Score","Scorecards","Tier"].map(h=><th key={h} style={{ padding:"8px 14px", color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", textAlign:"left", borderBottom:`1px solid ${T.border}` }}>{h}</th>)}</tr></thead>
+          <tbody>
+            {avgVendorScore.map((v,i) => {
+              const tier = v.avg>=85?"Gold":v.avg>=70?"Silver":v.avg>=50?"Bronze":"Unrated";
+              const tierColor = { Gold:"#F59E0B", Silver:"#94A3B8", Bronze:"#CD7F32", Unrated:T.textMuted }[tier];
+              return (
+                <tr key={v.name} style={{ borderBottom:i<avgVendorScore.length-1?`1px solid ${T.border}44`:"none" }}>
+                  <td style={{ padding:"10px 14px", color:T.textMuted, fontWeight:700, fontSize:13 }}>#{i+1}</td>
+                  <td style={{ padding:"10px 14px", color:T.textPrimary, fontWeight:700, fontSize:13 }}>{v.name}</td>
+                  <td style={{ padding:"10px 14px" }}><div style={{ display:"flex", alignItems:"center", gap:8 }}><div style={{ width:80, height:6, background:T.border, borderRadius:3, overflow:"hidden" }}><div style={{ height:"100%", width:v.avg+"%", background:tierColor, borderRadius:3 }} /></div><span style={{ color:tierColor, fontWeight:800, fontSize:13 }}>{v.avg}%</span></div></td>
+                  <td style={{ padding:"10px 14px", color:T.textMuted, fontSize:12 }}>{v.count}</td>
+                  <td style={{ padding:"10px 14px" }}><span style={{ background:tierColor+"18", color:tierColor, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700 }}>{tier}</span></td>
+                </tr>
+              );
+            })}
+            {avgVendorScore.length===0 && <tr><td colSpan={5} style={{ padding:"30px 0", textAlign:"center", color:T.textMuted }}>No scorecard data yet</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 const BudgetVsActualsView = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);

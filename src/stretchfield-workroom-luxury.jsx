@@ -8576,7 +8576,7 @@ const FinanceDashboard = ({ user, onTab }) => {
             <div style={{ color:T.textMuted, fontSize:13, textAlign:"center", padding:"40px 0" }}>No staff payment requests yet</div>
           ) : (staffRequests||[]).map(req => {
             const statusColors = { pending:T.amber, pending_ceo:T.cyan, approved:T.teal, rejected:T.red, paid:"#10B981" };
-            const statusLabels = { pending:"Pending Finance Review", pending_ceo:"Sent to CEO — Awaiting Approval", approved:"CEO Approved ✓", rejected:"Rejected", paid:"Paid ✓" };
+            const statusLabels = { pending:"Pending Finance Review", pending_ceo:"Sent to CEO — Awaiting Approval", approved:"CEO Approved — Ready to Pay", rejected:"Rejected", paid:"Paid ✓" };
             return (
               <div key={req.id} style={{ background:T.surface, border:`1px solid ${req.status==="pending"?T.amber+"30":T.border}`, borderLeft:`4px solid ${statusColors[req.status]||T.border}`, borderRadius:12, padding:"16px 20px", marginBottom:10 }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
@@ -8595,7 +8595,6 @@ const FinanceDashboard = ({ user, onTab }) => {
                   <div style={{ display:"flex", gap:8 }}>
                     <button onClick={async () => {
                       await supabase.from("staff_payment_requests").update({ status:"pending_ceo", reviewed_by:user.id, reviewed_at:new Date().toISOString() }).eq("id", req.id);
-                      // Notify CEO for final approval
                       const { data: ceos } = await supabase.from("profiles").select("id").eq("role","CEO");
                       for (const ceo of ceos||[]) {
                         await supabase.from("notifications").insert({ user_id: ceo.id, title: "Staff Payment Approval Required — " + req.staff_name, message: "Finance has reviewed " + req.staff_name + "'s payment request of GHS " + parseFloat(req.amount).toLocaleString() + " for " + req.description + ". Awaiting your approval.", type: "finance" });
@@ -8612,6 +8611,40 @@ const FinanceDashboard = ({ user, onTab }) => {
                       const { data: sr } = await supabase.from("staff_payment_requests").select("*").order("submitted_at", { ascending:false });
                       setStaffRequests(sr||[]);
                     }} style={{ background:T.red+"15", border:`1px solid ${T.red}30`, color:T.red, padding:"7px 14px", borderRadius:7, cursor:"pointer", fontSize:12, fontWeight:700 }}>✕ Reject</button>
+                  </div>
+                )}
+                {req.status === "approved" && isFinance && (
+                  <div style={{ display:"flex", gap:8, alignItems:"center", marginTop:4 }}>
+                    <div style={{ color:T.teal, fontSize:12, fontWeight:700 }}>✓ CEO Approved — Ready to Process</div>
+                    <button onClick={async () => {
+                      // Get staff bank details
+                      const { data: staffProfile } = await supabase.from("profiles").select("bank_name,bank_branch,bank_account_name,bank_account_number,mobile_money_number").eq("id", req.staff_id).single();
+                      const year = new Date().getFullYear().toString().slice(-2);
+                      const { data: existingVouchers } = await supabase.from("payment_vouchers").select("id").eq("payment_type","staff_welfare");
+                      const count = (existingVouchers?.length||0) + 1;
+                      const voucherNumber = `SW/${year}/${String(count).padStart(3,"0")}`;
+                      await supabase.from("payment_vouchers").insert({
+                        voucher_number: voucherNumber,
+                        payee: req.staff_name,
+                        payment_type: "staff_welfare",
+                        description: req.description + " ("+req.request_type?.replace(/_/g," ")+")",
+                        amount: parseFloat(req.amount),
+                        project_name: req.project_name || "",
+                        bank_name: staffProfile?.bank_name || "",
+                        bank_branch: staffProfile?.bank_branch || "",
+                        account_name: staffProfile?.bank_account_name || "",
+                        account_number: staffProfile?.bank_account_number || "",
+                        mobile_money: staffProfile?.mobile_money_number || "",
+                        raised_by: user.id,
+                        status: "approved",
+                        staff_request_id: req.id,
+                      });
+                      await supabase.from("staff_payment_requests").update({ status:"paid" }).eq("id", req.id);
+                      await supabase.from("notifications").insert({ user_id: req.staff_id, title:"Payment Being Processed — "+req.staff_name, message:"Finance is processing your payment of GHS "+parseFloat(req.amount).toLocaleString()+". A payment voucher has been raised.", type:"finance" });
+                      const { data: sr } = await supabase.from("staff_payment_requests").select("*").order("submitted_at", { ascending:false });
+                      setStaffRequests(sr||[]);
+                      setFinanceTab("vouchers");
+                    }} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"7px 16px", borderRadius:7, cursor:"pointer", fontWeight:800, fontSize:12 }}>📄 Create Payment Voucher</button>
                   </div>
                 )}
               </div>

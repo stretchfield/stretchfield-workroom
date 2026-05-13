@@ -8084,6 +8084,13 @@ const FinanceDashboard = ({ user, onTab }) => {
 
   // Voucher form
   const [voucherModal, setVoucherModal] = useState(null);
+  const [fmSignModal, setFmSignModal] = useState(null);
+  const [ceoVoucherSignModal, setCeoVoucherSignModal] = useState(null);
+  const [voucherSignature, setVoucherSignature] = useState("");
+  const [voucherSignSaving, setVoucherSignSaving] = useState(false);
+  const voucherCanvasRef = React.useRef(null);
+  const [vIsDrawing, setVIsDrawing] = useState(false);
+  const [vLastPos, setVLastPos] = useState(null);
   const [vForm, setVForm] = useState({ payment_type: 'project', payee: '', description: '', amount: '', currency: 'GHS', project_id: '', event_name: '', invoice_ref: '', department: '', welfare_type: '', admin_type: '', statutory_type: '', due_date: '', notes: '' });
 
   // Estimate form
@@ -8162,7 +8169,11 @@ const FinanceDashboard = ({ user, onTab }) => {
       amount: parseFloat(vForm.amount) || 0,
       raised_by: user.id,
       status: 'pending_approval',
+      fm_signature: voucherSignature || null,
+      fm_signed_at: voucherSignature ? new Date().toISOString() : null,
+      fm_signed_by: user.name,
     });
+    setVoucherSignature("");
     // Notify CEO for approval
     const { data: ceos } = await supabase.from('profiles').select('id, email, name').eq('role', 'CEO');
     for (const ceo of ceos || []) {
@@ -8175,9 +8186,9 @@ const FinanceDashboard = ({ user, onTab }) => {
     load();
   };
 
-  // Approve voucher (CEO)
-  const approveVoucher = async (v) => {
-    await supabase.from('payment_vouchers').update({ status: 'approved', approved_by: user.id, approved_at: new Date().toISOString() }).eq('id', v.id);
+  // Approve voucher (CEO) — now requires signature via modal
+  const approveVoucherWithSignature = async (v, signature) => {
+    await supabase.from('payment_vouchers').update({ status: 'approved', approved_by: user.id, approved_at: new Date().toISOString(), ceo_signature: signature, ceo_signed_at: new Date().toISOString() }).eq('id', v.id);
     // Notify Finance Manager
     const { data: fms } = await supabase.from('profiles').select('id, email, name').eq('role', 'Finance Manager');
     for (const fm of fms || []) {
@@ -8483,7 +8494,7 @@ const FinanceDashboard = ({ user, onTab }) => {
                       <div style={{ display: 'flex', gap: 4 }}>
                         {canApprove && v.status === 'pending_approval' && (
                           <>
-                            <button onClick={() => approveVoucher(v)} style={{ background: '#10B98118', border: '1px solid #10B98130', color: '#10B981', padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>✓ Approve</button>
+                            <button onClick={() => { setCeoVoucherSignModal(v); setVoucherSignature(""); }} style={{ background: '#10B98118', border: '1px solid #10B98130', color: '#10B981', padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>✓ Sign & Approve</button>
                             <button onClick={() => rejectVoucher(v)} style={{ background: T.red+'18', border: `1px solid ${T.red}30`, color: T.red, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>✗</button>
                           </>
                         )}
@@ -8909,9 +8920,69 @@ const FinanceDashboard = ({ user, onTab }) => {
               </div>
             )}
 
+            {/* FM Signature */}
+            <div style={{ marginBottom:16 }}>
+              <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:6 }}>Your Signature (Finance Manager)</div>
+              <div style={{ border:`1px solid ${T.border}`, borderRadius:8, overflow:"hidden", background:"#fff", position:"relative" }}>
+                <canvas ref={voucherCanvasRef} width={500} height={120}
+                  style={{ display:"block", cursor:"crosshair", touchAction:"none" }}
+                  onMouseDown={e=>{ setVIsDrawing(true); const r=e.target.getBoundingClientRect(); setVLastPos({x:e.clientX-r.left,y:e.clientY-r.top}); }}
+                  onMouseMove={e=>{ if(!vIsDrawing) return; const r=e.target.getBoundingClientRect(); const pos={x:e.clientX-r.left,y:e.clientY-r.top}; const ctx=voucherCanvasRef.current?.getContext("2d"); if(ctx&&vLastPos){ctx.beginPath();ctx.moveTo(vLastPos.x,vLastPos.y);ctx.lineTo(pos.x,pos.y);ctx.strokeStyle="#1a365d";ctx.lineWidth=2;ctx.lineCap="round";ctx.stroke();} setVLastPos(pos); }}
+                  onMouseUp={()=>{ setVIsDrawing(false); setVoucherSignature(voucherCanvasRef.current?.toDataURL()||""); }}
+                  onMouseLeave={()=>{ setVIsDrawing(false); if(voucherCanvasRef.current) setVoucherSignature(voucherCanvasRef.current.toDataURL()||""); }}
+                  onTouchStart={e=>{ e.preventDefault(); setVIsDrawing(true); const r=e.target.getBoundingClientRect(); const t=e.touches[0]; setVLastPos({x:t.clientX-r.left,y:t.clientY-r.top}); }}
+                  onTouchMove={e=>{ e.preventDefault(); if(!vIsDrawing) return; const r=e.target.getBoundingClientRect(); const t=e.touches[0]; const pos={x:t.clientX-r.left,y:t.clientY-r.top}; const ctx=voucherCanvasRef.current?.getContext("2d"); if(ctx&&vLastPos){ctx.beginPath();ctx.moveTo(vLastPos.x,vLastPos.y);ctx.lineTo(pos.x,pos.y);ctx.strokeStyle="#1a365d";ctx.lineWidth=2;ctx.lineCap="round";ctx.stroke();} setVLastPos(pos); }}
+                  onTouchEnd={()=>{ setVIsDrawing(false); setVoucherSignature(voucherCanvasRef.current?.toDataURL()||""); }}
+                />
+              </div>
+              <button onClick={()=>{ const ctx=voucherCanvasRef.current?.getContext("2d"); if(ctx) ctx.clearRect(0,0,500,120); setVoucherSignature(""); }} style={{ background:"none", border:"none", color:T.textMuted, fontSize:11, cursor:"pointer", marginTop:4 }}>Clear signature</button>
+            </div>
+
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={saveVoucher} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: 'none', color: '#fff', padding: '10px 24px', borderRadius: 8, cursor: 'pointer', fontWeight: 800, fontSize: 13 }}>{saving ? 'Saving...' : 'Raise Voucher'}</button>
               <button onClick={() => setVoucherModal(null)} style={{ background: 'none', border: `1px solid ${T.border}`, color: T.textMuted, padding: '10px 20px', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CEO Sign & Approve Voucher Modal */}
+      {ceoVoucherSignModal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setCeoVoucherSignModal(null)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.teal}30`, borderRadius:16, width:"100%", maxWidth:500, padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>Sign & Approve Voucher</div>
+            <div style={{ color:T.textMuted, fontSize:13, marginBottom:6 }}>{ceoVoucherSignModal.voucher_number} — {ceoVoucherSignModal.payee}</div>
+            <div style={{ color:T.teal, fontWeight:800, fontSize:18, marginBottom:20 }}>GHS {parseFloat(ceoVoucherSignModal.amount||0).toLocaleString()}</div>
+            <div style={{ marginBottom:16 }}>
+              <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:6 }}>CEO Authorisation Signature</div>
+              <div style={{ border:`1px solid ${T.border}`, borderRadius:8, overflow:"hidden", background:"#fff", position:"relative" }}>
+                <canvas ref={voucherCanvasRef} width={440} height={120}
+                  style={{ display:"block", cursor:"crosshair", touchAction:"none", width:"100%" }}
+                  onMouseDown={e=>{ setVIsDrawing(true); const r=e.target.getBoundingClientRect(); const scaleX=440/r.width; setVLastPos({x:(e.clientX-r.left)*scaleX,y:(e.clientY-r.top)*scaleX}); }}
+                  onMouseMove={e=>{ if(!vIsDrawing) return; const r=e.target.getBoundingClientRect(); const scaleX=440/r.width; const pos={x:(e.clientX-r.left)*scaleX,y:(e.clientY-r.top)*scaleX}; const ctx=voucherCanvasRef.current?.getContext("2d"); if(ctx&&vLastPos){ctx.beginPath();ctx.moveTo(vLastPos.x,vLastPos.y);ctx.lineTo(pos.x,pos.y);ctx.strokeStyle="#1a365d";ctx.lineWidth=2;ctx.lineCap="round";ctx.stroke();} setVLastPos(pos); }}
+                  onMouseUp={()=>{ setVIsDrawing(false); setVoucherSignature(voucherCanvasRef.current?.toDataURL()||""); }}
+                  onMouseLeave={()=>{ setVIsDrawing(false); if(voucherCanvasRef.current) setVoucherSignature(voucherCanvasRef.current.toDataURL()||""); }}
+                  onTouchStart={e=>{ e.preventDefault(); setVIsDrawing(true); const r=e.target.getBoundingClientRect(); const scaleX=440/r.width; const t=e.touches[0]; setVLastPos({x:(t.clientX-r.left)*scaleX,y:(t.clientY-r.top)*scaleX}); }}
+                  onTouchMove={e=>{ e.preventDefault(); if(!vIsDrawing) return; const r=e.target.getBoundingClientRect(); const scaleX=440/r.width; const t=e.touches[0]; const pos={x:(t.clientX-r.left)*scaleX,y:(t.clientY-r.top)*scaleX}; const ctx=voucherCanvasRef.current?.getContext("2d"); if(ctx&&vLastPos){ctx.beginPath();ctx.moveTo(vLastPos.x,vLastPos.y);ctx.lineTo(pos.x,pos.y);ctx.strokeStyle="#1a365d";ctx.lineWidth=2;ctx.lineCap="round";ctx.stroke();} setVLastPos(pos); }}
+                  onTouchEnd={()=>{ setVIsDrawing(false); setVoucherSignature(voucherCanvasRef.current?.toDataURL()||""); }}
+                />
+              </div>
+              <button onClick={()=>{ const ctx=voucherCanvasRef.current?.getContext("2d"); if(ctx) ctx.clearRect(0,0,440,120); setVoucherSignature(""); }} style={{ background:"none", border:"none", color:T.textMuted, fontSize:11, cursor:"pointer", marginTop:4 }}>Clear</button>
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={async () => {
+                if (!voucherSignature || voucherSignature === voucherCanvasRef.current?.toDataURL()) {
+                  const sig = voucherCanvasRef.current?.toDataURL() || "";
+                  setVoucherSignSaving(true);
+                  await approveVoucherWithSignature(ceoVoucherSignModal, sig);
+                  setVoucherSignSaving(false);
+                  setCeoVoucherSignModal(null);
+                  setVoucherSignature("");
+                  const ctx = voucherCanvasRef.current?.getContext("2d");
+                  if (ctx) ctx.clearRect(0,0,440,120);
+                }
+              }} disabled={voucherSignSaving} style={{ flex:1, background:`linear-gradient(135deg,${T.teal},#10B981)`, border:"none", color:"#fff", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{voucherSignSaving?"Saving...":"✓ Sign & Approve"}</button>
+              <button onClick={()=>{ setCeoVoucherSignModal(null); setVoucherSignature(""); const ctx=voucherCanvasRef.current?.getContext("2d"); if(ctx) ctx.clearRect(0,0,440,120); }} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
             </div>
           </div>
         </div>
@@ -10386,19 +10457,21 @@ const generateVoucherPDF = (voucher, approver, financeManager) => {
     <div class="sig-grid">
       <div class="sig-box">
         <div class="label">Finance Manager</div>
-        <div style="height:50px;border-bottom:1px dashed #C2C9DC;margin-bottom:8px;display:flex;align-items:center;">
-          ${voucher.fm_signature ? '<img src="' + voucher.fm_signature + '" />' : '<span style="color:#C2C9DC;font-size:11px;">Signature</span>'}
+        <div style="height:60px;display:flex;align-items:flex-end;padding-bottom:4px;">
+          ${voucher.fm_signature ? '<img src="' + voucher.fm_signature + '" style="max-height:55px;max-width:160px;object-fit:contain;" />' : ''}
         </div>
+        <div style="border-bottom:1px solid #C2C9DC;margin-bottom:6px;"></div>
         <div class="name">${financeManager?.name || "Finance Manager"}</div>
-        <div class="date">${voucher.created_at ? new Date(voucher.created_at).toLocaleDateString("en-GB") : ""}</div>
+        <div class="date">${voucher.fm_signed_at ? new Date(voucher.fm_signed_at).toLocaleDateString("en-GB") : voucher.created_at ? new Date(voucher.created_at).toLocaleDateString("en-GB") : ""}</div>
       </div>
       <div class="sig-box">
-        <div class="label">CEO Approval</div>
-        <div style="height:50px;border-bottom:1px dashed #C2C9DC;margin-bottom:8px;display:flex;align-items:center;">
-          ${voucher.ceo_signature ? '<img src="' + voucher.ceo_signature + '" />' : '<span style="color:#C2C9DC;font-size:11px;">Pending CEO signature</span>'}
+        <div class="label">CEO Authorisation</div>
+        <div style="height:60px;display:flex;align-items:flex-end;padding-bottom:4px;">
+          ${voucher.ceo_signature ? '<img src="' + voucher.ceo_signature + '" style="max-height:55px;max-width:160px;object-fit:contain;" />' : ''}
         </div>
+        <div style="border-bottom:1px solid #C2C9DC;margin-bottom:6px;"></div>
         <div class="name">${approver?.name || "CEO"}</div>
-        <div class="date">${voucher.approved_at ? new Date(voucher.approved_at).toLocaleDateString("en-GB") : "Pending"}</div>
+        <div class="date">${voucher.ceo_signed_at ? new Date(voucher.ceo_signed_at).toLocaleDateString("en-GB") : "Pending approval"}</div>
       </div>
     </div>
   </div>

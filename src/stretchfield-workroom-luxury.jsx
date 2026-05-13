@@ -6927,8 +6927,8 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
               }
 
               // Group item with children
-              const isGroupActive = item.children.some(c => c.id === activeTab);
-              const [groupOpen, setGroupOpen] = React.useState(isGroupActive);
+              const isGroupActive = item.children && item.children.some(c => c.id === activeTab);
+              const [groupOpen, setGroupOpen] = React.useState(true);
 
               return (
                 <div key={item.id} style={{ marginBottom: 2 }}>
@@ -7244,8 +7244,8 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
                       }}>{item.label}</button>
                     );
                   }
-                  const isGroupActive = item.children.some(c => c.id === activeTab);
-                  const [groupOpen, setGroupOpen] = React.useState(isGroupActive);
+                  const isGroupActive = item.children && item.children.some(c => c.id === activeTab);
+                  const [groupOpen, setGroupOpen] = React.useState(true);
                   return (
                     <div key={item.id} style={{ marginBottom: 2 }}>
                       <button onClick={() => setGroupOpen(o => !o)} style={{

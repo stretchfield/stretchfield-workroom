@@ -17438,39 +17438,72 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
         <div style={{ background:T.surface, border:`1px solid ${T.amber}30`, borderRadius:14, padding:"20px 24px", marginBottom:24 }}>
           <div style={{ color:T.amber, fontSize:11, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:16 }}>⏳ Staff Payment Requests — Awaiting CEO Approval ({staffRequests.length})</div>
           <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-            {staffRequests.map(req => (
-              <div key={req.id} style={{ background:T.bg, border:`1px solid ${T.border}`, borderRadius:10, padding:"14px 16px", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-                <div style={{ flex:1 }}>
-                  <div style={{ color:T.textPrimary, fontWeight:700, fontSize:14 }}>{req.staff_name}</div>
-                  <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{req.project_name} · {req.request_type?.replace(/_/g," ")}</div>
-                  <div style={{ color:T.textSecondary, fontSize:12, marginTop:2 }}>{req.description}</div>
-                  <div style={{ color:T.textMuted, fontSize:11, marginTop:4 }}>Submitted {req.submitted_at ? new Date(req.submitted_at).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}) : "—"}</div>
-                </div>
-                <div style={{ textAlign:"right", minWidth:160 }}>
-                  <div style={{ color:T.teal, fontWeight:900, fontSize:18 }}>GHS {parseFloat(req.amount||0).toLocaleString()}</div>
-                  {isCEO && (
-                    <div style={{ display:"flex", gap:8, marginTop:10, justifyContent:"flex-end" }}>
-                      <button onClick={async () => {
-                        await supabase.from("staff_payment_requests").update({ status:"approved", ceo_approved_by:user.id, ceo_approved_at:new Date().toISOString() }).eq("id", req.id);
-                        await supabase.from("notifications").insert({ user_id: req.staff_id, title:"Payment Request Approved", message:"Your payment request of GHS "+parseFloat(req.amount).toLocaleString()+" for "+req.description+" has been approved by CEO.", type:"finance" });
-                        // Notify Finance to process
-                        const { data: fms } = await supabase.from("profiles").select("id").eq("role","Finance Manager");
-                        for (const fm of fms||[]) { await supabase.from("notifications").insert({ user_id:fm.id, title:"Staff Payment Approved — "+req.staff_name, message:"CEO approved "+req.staff_name+"'s payment of GHS "+parseFloat(req.amount).toLocaleString()+". Please process payment.", type:"finance" }); }
-                        load();
-                      }} style={{ background:T.teal+"20", border:`1px solid ${T.teal}40`, color:T.teal, padding:"6px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700 }}>✓ Approve</button>
-                      <button onClick={async () => {
-                        const reason = window.prompt("Reason for rejection:");
-                        if (!reason) return;
-                        await supabase.from("staff_payment_requests").update({ status:"rejected", notes:reason, ceo_approved_by:user.id, ceo_approved_at:new Date().toISOString() }).eq("id", req.id);
-                        await supabase.from("notifications").insert({ user_id: req.staff_id, title:"Payment Request Rejected", message:"Your payment request of GHS "+parseFloat(req.amount).toLocaleString()+" was not approved. Reason: "+reason, type:"finance" });
-                        load();
-                      }} style={{ background:T.red+"15", border:`1px solid ${T.red}30`, color:T.red, padding:"6px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700 }}>✗ Reject</button>
+            {staffRequests.map(req => {
+              const [expanded, setExpanded] = React.useState(false);
+              return (
+              <div key={req.id} style={{ background:T.bg, border:`1px solid ${T.border}`, borderRadius:10, overflow:"hidden" }}>
+                <div style={{ padding:"14px 16px", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ color:T.textPrimary, fontWeight:700, fontSize:14 }}>{req.staff_name}</div>
+                    <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{req.project_name} · <span style={{ textTransform:"capitalize" }}>{req.request_type?.replace(/_/g," ")}</span></div>
+                    <div style={{ color:T.textSecondary, fontSize:12, marginTop:2 }}>{req.description}</div>
+                    <div style={{ display:"flex", gap:12, marginTop:6, alignItems:"center" }}>
+                      <div style={{ color:T.textMuted, fontSize:11 }}>Submitted {req.submitted_at ? new Date(req.submitted_at).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}) : "—"}</div>
+                      {req.supporting_doc_url && (
+                        <a href={req.supporting_doc_url} target="_blank" rel="noreferrer" style={{ color:T.cyan, fontSize:11, fontWeight:700, textDecoration:"none" }}>📎 View Receipt</a>
+                      )}
+                      <button onClick={() => setExpanded(!expanded)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"2px 10px", borderRadius:6, cursor:"pointer", fontSize:11 }}>{expanded ? "Hide Details ▲" : "View Details ▼"}</button>
                     </div>
-                  )}
-                  {isFinance && <div style={{ color:T.amber, fontSize:11, fontWeight:700, marginTop:8 }}>Awaiting CEO approval</div>}
+                  </div>
+                  <div style={{ textAlign:"right", minWidth:160 }}>
+                    <div style={{ color:T.teal, fontWeight:900, fontSize:18 }}>GHS {parseFloat(req.amount||0).toLocaleString()}</div>
+                    {isCEO && (
+                      <div style={{ display:"flex", gap:8, marginTop:10, justifyContent:"flex-end" }}>
+                        <button onClick={async () => {
+                          await supabase.from("staff_payment_requests").update({ status:"approved", ceo_approved_by:user.id, ceo_approved_at:new Date().toISOString() }).eq("id", req.id);
+                          await supabase.from("notifications").insert({ user_id: req.staff_id, title:"Payment Request Approved", message:"Your payment request of GHS "+parseFloat(req.amount).toLocaleString()+" for "+req.description+" has been approved by CEO.", type:"finance" });
+                          const { data: fms } = await supabase.from("profiles").select("id").eq("role","Finance Manager");
+                          for (const fm of fms||[]) { await supabase.from("notifications").insert({ user_id:fm.id, title:"Staff Payment Approved — "+req.staff_name, message:"CEO approved "+req.staff_name+"'s payment of GHS "+parseFloat(req.amount).toLocaleString()+". Please process payment.", type:"finance" }); }
+                          load();
+                        }} style={{ background:T.teal+"20", border:`1px solid ${T.teal}40`, color:T.teal, padding:"6px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700 }}>✓ Approve</button>
+                        <button onClick={async () => {
+                          const reason = window.prompt("Reason for rejection:");
+                          if (!reason) return;
+                          await supabase.from("staff_payment_requests").update({ status:"rejected", notes:reason, ceo_approved_by:user.id, ceo_approved_at:new Date().toISOString() }).eq("id", req.id);
+                          await supabase.from("notifications").insert({ user_id: req.staff_id, title:"Payment Request Rejected", message:"Your payment request of GHS "+parseFloat(req.amount).toLocaleString()+" was not approved. Reason: "+reason, type:"finance" });
+                          load();
+                        }} style={{ background:T.red+"15", border:`1px solid ${T.red}30`, color:T.red, padding:"6px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700 }}>✗ Reject</button>
+                      </div>
+                    )}
+                    {isFinance && <div style={{ color:T.amber, fontSize:11, fontWeight:700, marginTop:8 }}>Awaiting CEO approval</div>}
+                  </div>
                 </div>
+                {expanded && (
+                  <div style={{ padding:"12px 16px", borderTop:`1px solid ${T.border}`, background:T.surface }}>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 }}>
+                      {[["Staff Member",req.staff_name],["Event",req.project_name],["Payment Type",req.request_type?.replace(/_/g," ")],["Amount","GHS "+parseFloat(req.amount||0).toLocaleString()],["Date Submitted",req.submitted_at?new Date(req.submitted_at).toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"}):"—"],["Status",req.status?.replace(/_/g," ")]].map(([label,val]) => (
+                        <div key={label}>
+                          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:3 }}>{label}</div>
+                          <div style={{ color:T.textPrimary, fontSize:13, fontWeight:600, textTransform:"capitalize" }}>{val||"—"}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {req.description && (
+                      <div style={{ marginTop:12 }}>
+                        <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:3 }}>Description / Notes</div>
+                        <div style={{ color:T.textSecondary, fontSize:13 }}>{req.description}</div>
+                      </div>
+                    )}
+                    {req.supporting_doc_url && (
+                      <div style={{ marginTop:12 }}>
+                        <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:6 }}>Supporting Document</div>
+                        <a href={req.supporting_doc_url} target="_blank" rel="noreferrer" style={{ display:"inline-flex", alignItems:"center", gap:6, background:T.cyan+"15", border:`1px solid ${T.cyan}30`, color:T.cyan, padding:"6px 14px", borderRadius:8, textDecoration:"none", fontSize:12, fontWeight:700 }}>📎 View Attached Document →</a>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            ))}
+            );})}
           </div>
         </div>
       )}

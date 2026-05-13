@@ -1005,6 +1005,7 @@ const CEODashboard = ({ onTab, user }) => {
   const [showBankForm, setShowBankForm] = useState(false);
   const [bankForm, setBankForm] = useState({ bank_name:"", bank_branch:"", bank_account_name:"", bank_account_number:"", mobile_money_number:"" });
   const [savingBank, setSavingBank] = useState(false);
+  const [unreadBroadcasts, setUnreadBroadcasts] = useState([]);
 
   useEffect(() => {
     const loadAll = async () => {
@@ -1041,7 +1042,13 @@ const CEODashboard = ({ onTab, user }) => {
       setAwards(aw.data || []);
       setClientPayments(cp?.data || []);
       setLoading(false);
-      // Load unread broadcasts (CEO sees their own sent — no unread for CEO)
+      // Load unread broadcasts for CEO
+      const { data: allBroadcasts } = await supabase.from("ceo_broadcasts").select("*").order("created_at", { ascending: false });
+      if (allBroadcasts && allBroadcasts.length > 0) {
+        const { data: reads } = await supabase.from("ceo_broadcast_reads").select("broadcast_id").eq("user_id", user.id);
+        const readIds = new Set((reads||[]).map(r => r.broadcast_id));
+        setUnreadBroadcasts((allBroadcasts||[]).filter(b => b.sent_by !== user.id && !readIds.has(b.id)));
+      }
       // Check bank details
       const { data: bp } = await supabase.from("profiles").select("bank_name,bank_account_number,bank_branch,bank_account_name,mobile_money_number,bank_details_requested").eq("id", user.id).single();
       if (bp) {

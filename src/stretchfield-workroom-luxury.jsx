@@ -842,6 +842,10 @@ const getNavItems = (role, user) => {
         { id: "strategic-goals", label: "Strategic Goals & OKRs" },
         { id: "client-health", label: "Client Health" },
         { id: "team-performance", label: "Team Performance" },
+        { id: "risk-register", label: "Risk Register" },
+        { id: "decision-log", label: "Decision Log" },
+        { id: "competitor-intel", label: "Competitor Intelligence" },
+        { id: "revenue-forecast", label: "Revenue Forecast" },
       ]},
       { id: "notifications", label: "Notifications", group: true },
       { id: "calendar", label: "Calendar", group: true },
@@ -6721,6 +6725,10 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "strategic-goals": return <StrategicGoalsView user={currentUser} />;
       case "client-health": return <ClientHealthView user={currentUser} />;
       case "team-performance": return <TeamPerformanceView user={currentUser} />;
+      case "risk-register": return <RiskRegisterView user={currentUser} />;
+      case "decision-log": return <DecisionLogView user={currentUser} />;
+      case "competitor-intel": return <CompetitorIntelView user={currentUser} />;
+      case "revenue-forecast": return <RevenueForecastView user={currentUser} />;
       case "vendor-ratings": return <VendorRatingsView user={currentUser} />;
       case "rff-approvals": return <RFFApprovalsView user={currentUser} />;
       case "vendor-assignment": return <VendorAssignmentView user={currentUser} />;
@@ -18656,6 +18664,506 @@ const AuditTrailView = ({ user }) => {
   );
 };
 
+
+
+const RiskRegisterView = ({ user }) => {
+  const [risks, setRisks] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [staff, setStaff] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [editModal, setEditModal] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [filter, setFilter] = useState("all");
+  const [form, setForm] = useState({ project_id:"", event_name:"", title:"", description:"", category:"operational", likelihood:"medium", impact:"medium", status:"open", owner_id:"", owner_name:"", mitigation:"" });
+
+  const CATEGORIES = ["operational","financial","reputational","vendor","client","weather","technical","security"];
+  const LEVELS = ["low","medium","high","critical"];
+  const levelColors = { low:T.teal, medium:T.amber, high:"#F97316", critical:T.red };
+
+  const load = async () => {
+    const [{ data: r }, { data: ev }, { data: st }] = await Promise.all([
+      supabase.from("risk_register").select("*").order("created_at", { ascending: false }),
+      supabase.from("projects").select("id,name").order("name"),
+      supabase.from("profiles").select("id,name,role").not("role","in","(Client,Vendor,Board of Directors)"),
+    ]);
+    setRisks(r||[]); setEvents(ev||[]); setStaff(st||[]);
+  };
+  useEffect(() => { load(); }, []);
+
+  const riskScore = (r) => {
+    const l = { low:1, medium:2, high:3, critical:4 };
+    return (l[r.likelihood]||2) * (l[r.impact]||2);
+  };
+
+  const getRiskColor = (r) => {
+    const s = riskScore(r);
+    if (s >= 12) return T.red;
+    if (s >= 6) return "#F97316";
+    if (s >= 3) return T.amber;
+    return T.teal;
+  };
+
+  const handleSave = async () => {
+    if (!form.title) { alert("Title required."); return; }
+    setSaving(true);
+    if (editModal) {
+      await supabase.from("risk_register").update({ ...form }).eq("id", editModal.id);
+    } else {
+      await supabase.from("risk_register").insert({ ...form, created_by: user.id });
+    }
+    setSaving(false); setModal(false); setEditModal(null);
+    setForm({ project_id:"", event_name:"", title:"", description:"", category:"operational", likelihood:"medium", impact:"medium", status:"open", owner_id:"", owner_name:"", mitigation:"" });
+    load();
+  };
+
+  const filtered = filter === "all" ? risks : risks.filter(r => r.status === filter);
+  const openRisks = risks.filter(r => r.status === "open");
+  const criticalRisks = openRisks.filter(r => riskScore(r) >= 9);
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <div>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Intelligence</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Risk Register</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>{openRisks.length} open risks · {criticalRisks.length} critical</div>
+        </div>
+        <button onClick={() => { setForm({ project_id:"", event_name:"", title:"", description:"", category:"operational", likelihood:"medium", impact:"medium", status:"open", owner_id:"", owner_name:"", mitigation:"" }); setModal(true); }} style={{ background:`linear-gradient(135deg,${T.red},#F97316)`, border:"none", color:"#fff", padding:"10px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>+ Log Risk</button>
+      </div>
+
+      {criticalRisks.length > 0 && (
+        <div style={{ background:T.red+"12", border:`1px solid ${T.red}30`, borderRadius:12, padding:"14px 18px", marginBottom:20 }}>
+          <div style={{ color:T.red, fontWeight:800, fontSize:13, marginBottom:6 }}>⚠ {criticalRisks.length} Critical Risk{criticalRisks.length>1?"s":""} Require Immediate Attention</div>
+          {criticalRisks.map(r => <div key={r.id} style={{ color:T.textSecondary, fontSize:12, padding:"3px 0" }}>• {r.title} {r.event_name?"— "+r.event_name:""}</div>)}
+        </div>
+      )}
+
+      <div style={{ display:"flex", gap:8, marginBottom:20 }}>
+        {["all","open","mitigated","closed"].map(s => (
+          <button key={s} onClick={() => setFilter(s)} style={{ padding:"6px 16px", borderRadius:20, border:`1px solid ${filter===s?T.cyan:T.border}`, background:filter===s?T.cyan+"20":"none", color:filter===s?T.cyan:T.textMuted, fontWeight:700, fontSize:12, cursor:"pointer", textTransform:"capitalize" }}>{s} {s==="all"?`(${risks.length})`:s==="open"?`(${openRisks.length})`:""}</button>
+        ))}
+      </div>
+
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        {filtered.map(r => {
+          const color = getRiskColor(r);
+          const score = riskScore(r);
+          return (
+            <div key={r.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderLeft:`3px solid ${color}`, borderRadius:12, padding:"16px 20px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:4 }}>
+                    <div style={{ color:T.textPrimary, fontWeight:700, fontSize:14 }}>{r.title}</div>
+                    <span style={{ background:color+"18", color:color, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700 }}>Score: {score}</span>
+                    <span style={{ background:T.bg, color:T.textMuted, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700, textTransform:"capitalize" }}>{r.category}</span>
+                    {r.status !== "open" && <span style={{ background:T.teal+"18", color:T.teal, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700, textTransform:"capitalize" }}>{r.status}</span>}
+                  </div>
+                  {r.event_name && <div style={{ color:T.textMuted, fontSize:12 }}>{r.event_name}</div>}
+                  {r.description && <div style={{ color:T.textSecondary, fontSize:13, marginTop:4 }}>{r.description}</div>}
+                  <div style={{ display:"flex", gap:12, marginTop:6 }}>
+                    <span style={{ color:levelColors[r.likelihood], fontSize:11, fontWeight:700 }}>Likelihood: {r.likelihood}</span>
+                    <span style={{ color:levelColors[r.impact], fontSize:11, fontWeight:700 }}>Impact: {r.impact}</span>
+                    {r.owner_name && <span style={{ color:T.textMuted, fontSize:11 }}>Owner: {r.owner_name}</span>}
+                  </div>
+                  {r.mitigation && <div style={{ color:T.textMuted, fontSize:12, marginTop:6, fontStyle:"italic" }}>Mitigation: {r.mitigation}</div>}
+                </div>
+                <div style={{ display:"flex", gap:6, marginLeft:12 }}>
+                  <button onClick={() => { setEditModal(r); setForm({...r}); setModal(true); }} style={{ background:T.cyan+"15", border:`1px solid ${T.cyan}30`, color:T.cyan, padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>Edit</button>
+                  {r.status === "open" && <button onClick={async () => { await supabase.from("risk_register").update({ status:"mitigated" }).eq("id",r.id); load(); }} style={{ background:T.teal+"15", border:`1px solid ${T.teal}30`, color:T.teal, padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>✓ Mitigate</button>}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {filtered.length===0 && <div style={{ textAlign:"center", padding:60, background:T.surface, borderRadius:12, border:`1px solid ${T.border}`, color:T.textMuted }}>No risks logged</div>}
+      </div>
+
+      {modal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => { setModal(false); setEditModal(null); }}>
+          <div style={{ background:T.surface, border:`1px solid ${T.red}30`, borderRadius:16, width:"100%", maxWidth:540, maxHeight:"90vh", overflowY:"auto", padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:20 }}>{editModal?"Edit Risk":"Log New Risk"}</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Event (Optional)</label>
+              <select value={form.project_id} onChange={e=>{ const ev=events.find(x=>x.id===e.target.value); setForm(f=>({...f,project_id:e.target.value,event_name:ev?.name||""})); }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                <option value="">Company-wide risk</option>
+                {events.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+              </select></div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Risk Title *</label>
+              <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="e.g. Key vendor may not deliver on time" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Description</label>
+              <textarea value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} rows={2} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} /></div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 }}>
+                {[["Category","category",CATEGORIES],["Likelihood","likelihood",LEVELS],["Impact","impact",LEVELS]].map(([label,key,opts])=>(
+                  <div key={key}><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>{label}</label>
+                  <select value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                    {opts.map(o=><option key={o} value={o}>{o.charAt(0).toUpperCase()+o.slice(1)}</option>)}
+                  </select></div>
+                ))}
+              </div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Risk Owner</label>
+              <select value={form.owner_id} onChange={e=>{ const s=staff.find(x=>x.id===e.target.value); setForm(f=>({...f,owner_id:e.target.value,owner_name:s?.name||""})); }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                <option value="">Unassigned</option>
+                {staff.map(s=><option key={s.id} value={s.id}>{s.name} ({s.role})</option>)}
+              </select></div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Mitigation Plan</label>
+              <textarea value={form.mitigation} onChange={e=>setForm(f=>({...f,mitigation:e.target.value}))} rows={2} placeholder="How will this risk be managed or reduced?" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} /></div>
+              {editModal && <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Status</label>
+              <select value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                {["open","mitigated","closed"].map(s=><option key={s}>{s}</option>)}
+              </select></div>}
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <button onClick={handleSave} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${T.red},#F97316)`, border:"none", color:"#fff", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":editModal?"Save Changes":"Log Risk"}</button>
+              <button onClick={()=>{ setModal(false); setEditModal(null); }} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const DecisionLogView = ({ user }) => {
+  const [decisions, setDecisions] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
+  const [catFilter, setCatFilter] = useState("all");
+  const [form, setForm] = useState({ project_id:"", event_name:"", title:"", decision:"", rationale:"", alternatives_considered:"", made_by_name:user.name, decision_date:new Date().toISOString().slice(0,10), category:"operational" });
+
+  const CATEGORIES = ["operational","financial","vendor","client","strategic","hr","marketing"];
+  const catColors = { operational:T.cyan, financial:T.amber, vendor:T.teal, client:T.magenta, strategic:"#8B5CF6", hr:"#F59E0B", marketing:T.blue };
+
+  const load = async () => {
+    const [{ data: d }, { data: ev }] = await Promise.all([
+      supabase.from("decision_log").select("*").order("decision_date", { ascending: false }),
+      supabase.from("projects").select("id,name").order("name"),
+    ]);
+    setDecisions(d||[]); setEvents(ev||[]);
+  };
+  useEffect(() => { load(); }, []);
+
+  const handleSave = async () => {
+    if (!form.title || !form.decision) { alert("Title and decision are required."); return; }
+    setSaving(true);
+    await supabase.from("decision_log").insert({ ...form, made_by: user.id });
+    setSaving(false); setModal(false);
+    setForm({ project_id:"", event_name:"", title:"", decision:"", rationale:"", alternatives_considered:"", made_by_name:user.name, decision_date:new Date().toISOString().slice(0,10), category:"operational" });
+    load();
+  };
+
+  const filtered = decisions.filter(d => {
+    if (catFilter !== "all" && d.category !== catFilter) return false;
+    if (search && !d.title.toLowerCase().includes(search.toLowerCase()) && !d.decision.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <div>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Intelligence</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Decision Log</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Institutional memory — {decisions.length} decisions recorded</div>
+        </div>
+        <button onClick={() => setModal(true)} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>+ Log Decision</button>
+      </div>
+
+      <div style={{ display:"flex", gap:12, marginBottom:20 }}>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search decisions..." style={{ flex:1, padding:"9px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }} />
+        <select value={catFilter} onChange={e=>setCatFilter(e.target.value)} style={{ padding:"9px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+          <option value="all">All Categories</option>
+          {CATEGORIES.map(c=><option key={c} value={c}>{c.charAt(0).toUpperCase()+c.slice(1)}</option>)}
+        </select>
+      </div>
+
+      <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+        {filtered.map(d => {
+          const color = catColors[d.category] || T.cyan;
+          return (
+            <div key={d.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderLeft:`3px solid ${color}`, borderRadius:12, padding:"18px 22px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:4 }}>
+                    <div style={{ color:T.textPrimary, fontWeight:800, fontSize:14 }}>{d.title}</div>
+                    <span style={{ background:color+"18", color:color, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700, textTransform:"capitalize" }}>{d.category}</span>
+                  </div>
+                  {d.event_name && <div style={{ color:T.textMuted, fontSize:12, marginBottom:6 }}>{d.event_name}</div>}
+                  <div style={{ color:T.textSecondary, fontSize:13, lineHeight:1.6 }}>{d.decision}</div>
+                  {d.rationale && <div style={{ color:T.textMuted, fontSize:12, marginTop:8 }}><span style={{ fontWeight:700 }}>Rationale:</span> {d.rationale}</div>}
+                  {d.alternatives_considered && <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}><span style={{ fontWeight:700 }}>Alternatives considered:</span> {d.alternatives_considered}</div>}
+                </div>
+                <div style={{ textAlign:"right", marginLeft:16, flexShrink:0 }}>
+                  <div style={{ color:T.textMuted, fontSize:11 }}>{d.decision_date ? new Date(d.decision_date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}) : "—"}</div>
+                  <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>{d.made_by_name}</div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {filtered.length===0 && <div style={{ textAlign:"center", padding:60, background:T.surface, borderRadius:12, border:`1px solid ${T.border}` }}><div style={{ fontSize:40, marginBottom:12 }}>📋</div><div style={{ color:T.textPrimary, fontWeight:700 }}>No decisions logged yet</div></div>}
+      </div>
+
+      {modal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setModal(false)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:560, maxHeight:"90vh", overflowY:"auto", padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:20 }}>Log Decision</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Event (Optional)</label>
+              <select value={form.project_id} onChange={e=>{ const ev=events.find(x=>x.id===e.target.value); setForm(f=>({...f,project_id:e.target.value,event_name:ev?.name||""})); }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                <option value="">Company-wide</option>
+                {events.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+              </select></div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Category</label>
+                <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  {CATEGORIES.map(c=><option key={c} value={c}>{c.charAt(0).toUpperCase()+c.slice(1)}</option>)}
+                </select></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Decision Date</label>
+                <input type="date" value={form.decision_date} onChange={e=>setForm(f=>({...f,decision_date:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              </div>
+              {[["Decision Title *","title","e.g. Award catering contract to Vendor X"],["The Decision *","decision","What was decided?"],["Rationale","rationale","Why was this decision made?"],["Alternatives Considered","alternatives_considered","What other options were evaluated?"]].map(([label,key,ph])=>(
+                <div key={key}><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>{label}</label>
+                {key==="title" ? <input value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))} placeholder={ph} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                : <textarea value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))} rows={2} placeholder={ph} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} />}
+                </div>
+              ))}
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <button onClick={handleSave} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Log Decision"}</button>
+              <button onClick={()=>setModal(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const CompetitorIntelView = ({ user }) => {
+  const [competitors, setCompetitors] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [editModal, setEditModal] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ competitor_name:"", category:"direct", website:"", strengths:"", weaknesses:"", recent_activity:"", events_known_of:0, pricing_notes:"", win_loss:"unknown", notes:"" });
+
+  const CATEGORIES = ["direct","indirect","aspirational"];
+  const WIN_LOSS = ["unknown","more wins","even","more losses"];
+  const catColors = { direct:T.red, indirect:T.amber, aspirational:T.cyan };
+
+  const load = async () => {
+    const { data } = await supabase.from("competitor_intel").select("*").order("created_at", { ascending: false });
+    setCompetitors(data||[]);
+  };
+  useEffect(() => { load(); }, []);
+
+  const handleSave = async () => {
+    if (!form.competitor_name) { alert("Competitor name required."); return; }
+    setSaving(true);
+    if (editModal) {
+      await supabase.from("competitor_intel").update({ ...form, updated_at:new Date().toISOString() }).eq("id", editModal.id);
+    } else {
+      await supabase.from("competitor_intel").insert({ ...form, created_by: user.id });
+    }
+    setSaving(false); setModal(false); setEditModal(null);
+    setForm({ competitor_name:"", category:"direct", website:"", strengths:"", weaknesses:"", recent_activity:"", events_known_of:0, pricing_notes:"", win_loss:"unknown", notes:"" });
+    load();
+  };
+
+  const wlColors = { "more wins":T.teal, "even":T.amber, "more losses":T.red, "unknown":T.textMuted };
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <div>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Intelligence</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Competitor Intelligence</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>{competitors.length} competitors tracked</div>
+        </div>
+        <button onClick={() => { setForm({ competitor_name:"", category:"direct", website:"", strengths:"", weaknesses:"", recent_activity:"", events_known_of:0, pricing_notes:"", win_loss:"unknown", notes:"" }); setEditModal(null); setModal(true); }} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>+ Add Competitor</button>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))", gap:14 }}>
+        {competitors.map(c => {
+          const color = catColors[c.category] || T.cyan;
+          return (
+            <div key={c.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderTop:`3px solid ${color}`, borderRadius:12, padding:"18px 20px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12 }}>
+                <div>
+                  <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15 }}>{c.competitor_name}</div>
+                  <div style={{ display:"flex", gap:8, marginTop:4 }}>
+                    <span style={{ background:color+"18", color:color, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700, textTransform:"capitalize" }}>{c.category}</span>
+                    <span style={{ background:wlColors[c.win_loss]+"18", color:wlColors[c.win_loss], padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700, textTransform:"capitalize" }}>{c.win_loss}</span>
+                  </div>
+                </div>
+                <button onClick={() => { setEditModal(c); setForm({...c}); setModal(true); }} style={{ background:T.cyan+"15", border:`1px solid ${T.cyan}30`, color:T.cyan, padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>Edit</button>
+              </div>
+              {c.website && <div style={{ color:T.cyan, fontSize:12, marginBottom:8 }}><a href={c.website} target="_blank" rel="noreferrer" style={{ color:T.cyan }}>🔗 {c.website}</a></div>}
+              {c.strengths && <div style={{ marginBottom:6 }}><span style={{ color:T.teal, fontSize:11, fontWeight:700 }}>Strengths: </span><span style={{ color:T.textSecondary, fontSize:12 }}>{c.strengths}</span></div>}
+              {c.weaknesses && <div style={{ marginBottom:6 }}><span style={{ color:T.red, fontSize:11, fontWeight:700 }}>Weaknesses: </span><span style={{ color:T.textSecondary, fontSize:12 }}>{c.weaknesses}</span></div>}
+              {c.recent_activity && <div style={{ marginBottom:6 }}><span style={{ color:T.amber, fontSize:11, fontWeight:700 }}>Recent Activity: </span><span style={{ color:T.textSecondary, fontSize:12 }}>{c.recent_activity}</span></div>}
+              {c.pricing_notes && <div style={{ marginBottom:6 }}><span style={{ color:T.textMuted, fontSize:11, fontWeight:700 }}>Pricing: </span><span style={{ color:T.textSecondary, fontSize:12 }}>{c.pricing_notes}</span></div>}
+              <div style={{ color:T.textMuted, fontSize:11, marginTop:8 }}>Known events: {c.events_known_of} · Updated: {new Date(c.updated_at).toLocaleDateString("en-GB")}</div>
+            </div>
+          );
+        })}
+        {competitors.length===0 && <div style={{ textAlign:"center", padding:60, background:T.surface, borderRadius:12, border:`1px solid ${T.border}`, gridColumn:"1/-1" }}><div style={{ fontSize:40, marginBottom:12 }}>🔍</div><div style={{ color:T.textPrimary, fontWeight:700 }}>No competitors tracked yet</div><div style={{ color:T.textMuted, fontSize:13, marginTop:6 }}>Add competitors to track their activity and wins/losses.</div></div>}
+      </div>
+
+      {modal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => { setModal(false); setEditModal(null); }}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:540, maxHeight:"90vh", overflowY:"auto", padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:20 }}>{editModal?"Edit Competitor":"Add Competitor"}</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Competitor Name *</label>
+              <input value={form.competitor_name} onChange={e=>setForm(f=>({...f,competitor_name:e.target.value}))} placeholder="e.g. EventPro Ghana" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 }}>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Category</label>
+                <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  {CATEGORIES.map(c=><option key={c}>{c}</option>)}
+                </select></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Win/Loss</label>
+                <select value={form.win_loss} onChange={e=>setForm(f=>({...f,win_loss:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  {WIN_LOSS.map(w=><option key={w}>{w}</option>)}
+                </select></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Events Known</label>
+                <input type="number" value={form.events_known_of} onChange={e=>setForm(f=>({...f,events_known_of:parseInt(e.target.value)||0}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              </div>
+              {[["Website","website","https://..."],["Strengths","strengths","What are they good at?"],["Weaknesses","weaknesses","Where do they fall short?"],["Recent Activity","recent_activity","Latest news, events, campaigns"],["Pricing Notes","pricing_notes","What do they charge?"],["Notes","notes","Other intelligence"]].map(([label,key,ph])=>(
+                <div key={key}><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>{label}</label>
+                {key==="website"?<input value={form[key]||""} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))} placeholder={ph} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                :<textarea value={form[key]||""} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))} rows={2} placeholder={ph} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} />}
+                </div>
+              ))}
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <button onClick={handleSave} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":editModal?"Save Changes":"Add Competitor"}</button>
+              <button onClick={()=>{ setModal(false); setEditModal(null); }} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const RevenueForecastView = ({ user }) => {
+  const [opportunities, setOpportunities] = useState([]);
+  const [forecasts, setForecasts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      const [{ data: op }, { data: fc }] = await Promise.all([
+        supabase.from("opportunities").select("*").not("status","in","(won,lost,Converted)").order("company"),
+        supabase.from("revenue_forecast").select("*"),
+      ]);
+      setOpportunities(op||[]); setForecasts(fc||[]);
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  const updateForecast = async (oppId, company, field, value) => {
+    const existing = forecasts.find(f => f.opportunity_id === oppId);
+    if (existing) {
+      const updated = { ...existing, [field]: value };
+      await supabase.from("revenue_forecast").update({ [field]: value }).eq("id", existing.id);
+      setForecasts(prev => prev.map(f => f.id===existing.id ? updated : f));
+    } else {
+      const { data } = await supabase.from("revenue_forecast").insert({ opportunity_id:oppId, company, [field]:value, win_probability:50, estimated_value:0, created_by:user.id }).select().single();
+      if (data) setForecasts(prev => [...prev, data]);
+    }
+  };
+
+  const getForecast = (oppId) => forecasts.find(f => f.opportunity_id === oppId) || { win_probability:50, estimated_value:0, expected_close_date:"" };
+
+  const now = new Date();
+  const next30 = opportunities.filter(o => {
+    const fc = getForecast(o.id);
+    if (!fc.expected_close_date) return false;
+    const d = new Date(fc.expected_close_date);
+    return d >= now && d <= new Date(now.getTime()+30*86400000);
+  });
+  const next90 = opportunities.filter(o => {
+    const fc = getForecast(o.id);
+    if (!fc.expected_close_date) return false;
+    const d = new Date(fc.expected_close_date);
+    return d >= now && d <= new Date(now.getTime()+90*86400000);
+  });
+
+  const weightedForecast = (ops) => ops.reduce((s,o) => {
+    const fc = getForecast(o.id);
+    return s + (parseFloat(fc.estimated_value||0) * (fc.win_probability||50) / 100);
+  }, 0);
+
+  if (loading) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"40vh" }}><div style={{ width:32, height:32, border:`3px solid ${T.border}`, borderTop:`3px solid ${T.cyan}`, borderRadius:"50%", animation:"spin 0.8s linear infinite" }} /></div>;
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}` }}>
+        <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Intelligence</div>
+        <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Revenue Forecast</h2>
+        <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Pipeline weighted by probability — {opportunities.length} active opportunities</div>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))", gap:12, marginBottom:24 }}>
+        {[
+          { label:"Weighted 30-Day", value:"GHS "+Math.round(weightedForecast(next30)).toLocaleString(), color:T.teal, sub:next30.length+" opportunities" },
+          { label:"Weighted 90-Day", value:"GHS "+Math.round(weightedForecast(next90)).toLocaleString(), color:T.cyan, sub:next90.length+" opportunities" },
+          { label:"Total Pipeline", value:"GHS "+Math.round(weightedForecast(opportunities)).toLocaleString(), color:T.amber, sub:"Weighted by probability" },
+          { label:"Opportunities", value:opportunities.length, color:T.magenta, sub:"Active pipeline" },
+        ].map(k => (
+          <div key={k.label} style={{ padding:"14px 16px", background:T.surface, border:`1px solid ${T.border}`, borderTop:`2px solid ${k.color}`, borderRadius:10 }}>
+            <div style={{ color:k.color, fontSize:18, fontWeight:900 }}>{k.value}</div>
+            <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginTop:4 }}>{k.label}</div>
+            <div style={{ color:T.textMuted, fontSize:10, marginTop:2 }}>{k.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, overflow:"hidden" }}>
+        <table style={{ width:"100%", borderCollapse:"collapse" }}>
+          <thead>
+            <tr style={{ background:T.bg }}>
+              {["Company","Status","Est. Value (GHS)","Win Prob %","Weighted","Close Date"].map(h => (
+                <th key={h} style={{ padding:"10px 14px", color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", textAlign:"left", borderBottom:`1px solid ${T.border}` }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {opportunities.map((o,i) => {
+              const fc = getForecast(o.id);
+              const weighted = Math.round(parseFloat(fc.estimated_value||0) * (fc.win_probability||50) / 100);
+              const probColor = fc.win_probability >= 70 ? T.teal : fc.win_probability >= 40 ? T.amber : T.red;
+              return (
+                <tr key={o.id} style={{ borderBottom:i<opportunities.length-1?`1px solid ${T.border}44`:"none" }}>
+                  <td style={{ padding:"10px 14px", color:T.textPrimary, fontWeight:700, fontSize:13 }}>{o.company}</td>
+                  <td style={{ padding:"10px 14px" }}><span style={{ background:T.cyan+"18", color:T.cyan, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700 }}>{o.status}</span></td>
+                  <td style={{ padding:"10px 14px" }}>
+                    <input type="number" defaultValue={fc.estimated_value||""} onBlur={e=>updateForecast(o.id,o.company,"estimated_value",parseFloat(e.target.value)||0)} placeholder="0" style={{ width:100, padding:"4px 8px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:6, color:T.textPrimary, fontSize:12, fontFamily:"inherit", outline:"none" }} />
+                  </td>
+                  <td style={{ padding:"10px 14px" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                      <input type="range" min="0" max="100" value={fc.win_probability||50} onChange={e=>updateForecast(o.id,o.company,"win_probability",parseInt(e.target.value))} style={{ width:80 }} />
+                      <span style={{ color:probColor, fontWeight:700, fontSize:12, minWidth:30 }}>{fc.win_probability||50}%</span>
+                    </div>
+                  </td>
+                  <td style={{ padding:"10px 14px", color:T.teal, fontWeight:700, fontSize:13 }}>GHS {weighted.toLocaleString()}</td>
+                  <td style={{ padding:"10px 14px" }}>
+                    <input type="date" defaultValue={fc.expected_close_date||""} onBlur={e=>updateForecast(o.id,o.company,"expected_close_date",e.target.value)} style={{ padding:"4px 8px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:6, color:T.textPrimary, fontSize:12, fontFamily:"inherit", outline:"none" }} />
+                  </td>
+                </tr>
+              );
+            })}
+            {opportunities.length===0 && <tr><td colSpan={6} style={{ padding:"40px 0", textAlign:"center", color:T.textMuted }}>No active opportunities in pipeline</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
 
 const BoardReportView = ({ user }) => {
   const [events, setEvents] = useState([]);

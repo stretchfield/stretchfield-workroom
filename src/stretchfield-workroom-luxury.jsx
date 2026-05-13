@@ -790,6 +790,8 @@ const getNavItems = (role, user) => {
     // CEO gets grouped nav — return special structure
     return [
       { id: "dashboard", label: "Dashboard", group: true },
+      { id: "approval-queue", label: "⚡ Approval Queue", icon: "▪" },
+      { id: "ceo-broadcast", label: "📢 CEO Broadcast", icon: "▪" },
       { id: "grp-events", label: "Events & Operations", group: true, children: [
         { id: "events", label: "Events" },
         { id: "impact-intelligence", label: "Impact Intelligence" },

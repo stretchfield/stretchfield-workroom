@@ -8492,11 +8492,20 @@ const FinanceDashboard = ({ user, onTab }) => {
                     <td style={{ padding: '10px 12px', color: v.due_date && new Date(v.due_date) < new Date() && v.status !== 'paid' ? T.red : T.textMuted, fontSize: 11 }}>{v.due_date || '—'}</td>
                     <td style={{ padding: '10px 12px' }}>
                       <div style={{ display: 'flex', gap: 4 }}>
+                        {isFinance && !v.fm_signature && v.status !== 'rejected' && (
+                          <button onClick={() => { setFmSignModal(v); setVoucherSignature(""); }} style={{ background: T.amber+'18', border: `1px solid ${T.amber}30`, color: T.amber, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>✍ Sign</button>
+                        )}
+                        {isFinance && v.fm_signature && v.status !== 'rejected' && (
+                          <span style={{ color: T.teal, fontSize: 10, fontWeight: 700, padding: '3px 8px' }}>FM ✓</span>
+                        )}
                         {canApprove && v.status === 'pending_approval' && (
                           <>
                             <button onClick={() => { setCeoVoucherSignModal(v); setVoucherSignature(""); }} style={{ background: '#10B98118', border: '1px solid #10B98130', color: '#10B981', padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>✓ Sign & Approve</button>
                             <button onClick={() => rejectVoucher(v)} style={{ background: T.red+'18', border: `1px solid ${T.red}30`, color: T.red, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>✗</button>
                           </>
+                        )}
+                        {canApprove && v.status === 'approved' && v.ceo_signature && (
+                          <span style={{ color: T.teal, fontSize: 10, fontWeight: 700, padding: '3px 8px' }}>CEO ✓</span>
                         )}
                         {isFinance && v.status === 'approved' && (
                           <button onClick={() => markPaid(v)} style={{ background: T.cyan+'18', border: `1px solid ${T.cyan}30`, color: T.cyan, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>Mark Paid</button>
@@ -8941,6 +8950,47 @@ const FinanceDashboard = ({ user, onTab }) => {
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={saveVoucher} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: 'none', color: '#fff', padding: '10px 24px', borderRadius: 8, cursor: 'pointer', fontWeight: 800, fontSize: 13 }}>{saving ? 'Saving...' : 'Raise Voucher'}</button>
               <button onClick={() => setVoucherModal(null)} style={{ background: 'none', border: `1px solid ${T.border}`, color: T.textMuted, padding: '10px 20px', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FM Sign Voucher Modal */}
+      {fmSignModal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setFmSignModal(null)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.amber}30`, borderRadius:16, width:"100%", maxWidth:500, padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>Finance Manager Signature</div>
+            <div style={{ color:T.textMuted, fontSize:13, marginBottom:6 }}>{fmSignModal.voucher_number} — {fmSignModal.payee}</div>
+            <div style={{ color:T.amber, fontWeight:800, fontSize:18, marginBottom:20 }}>GHS {parseFloat(fmSignModal.amount||0).toLocaleString()}</div>
+            <div style={{ marginBottom:16 }}>
+              <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:6 }}>Your Signature</div>
+              <div style={{ border:`1px solid ${T.border}`, borderRadius:8, overflow:"hidden", background:"#fff" }}>
+                <canvas ref={voucherCanvasRef} width={440} height={120}
+                  style={{ display:"block", cursor:"crosshair", touchAction:"none", width:"100%" }}
+                  onMouseDown={e=>{ setVIsDrawing(true); const r=e.target.getBoundingClientRect(); const sx=440/r.width; setVLastPos({x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sx}); }}
+                  onMouseMove={e=>{ if(!vIsDrawing) return; const r=e.target.getBoundingClientRect(); const sx=440/r.width; const pos={x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sx}; const ctx=voucherCanvasRef.current?.getContext("2d"); if(ctx&&vLastPos){ctx.beginPath();ctx.moveTo(vLastPos.x,vLastPos.y);ctx.lineTo(pos.x,pos.y);ctx.strokeStyle="#1a365d";ctx.lineWidth=2;ctx.lineCap="round";ctx.stroke();} setVLastPos(pos); }}
+                  onMouseUp={()=>{ setVIsDrawing(false); setVoucherSignature(voucherCanvasRef.current?.toDataURL()||""); }}
+                  onMouseLeave={()=>{ setVIsDrawing(false); if(voucherCanvasRef.current) setVoucherSignature(voucherCanvasRef.current.toDataURL()||""); }}
+                  onTouchStart={e=>{ e.preventDefault(); setVIsDrawing(true); const r=e.target.getBoundingClientRect(); const sx=440/r.width; const t=e.touches[0]; setVLastPos({x:(t.clientX-r.left)*sx,y:(t.clientY-r.top)*sx}); }}
+                  onTouchMove={e=>{ e.preventDefault(); if(!vIsDrawing) return; const r=e.target.getBoundingClientRect(); const sx=440/r.width; const t=e.touches[0]; const pos={x:(t.clientX-r.left)*sx,y:(t.clientY-r.top)*sx}; const ctx=voucherCanvasRef.current?.getContext("2d"); if(ctx&&vLastPos){ctx.beginPath();ctx.moveTo(vLastPos.x,vLastPos.y);ctx.lineTo(pos.x,pos.y);ctx.strokeStyle="#1a365d";ctx.lineWidth=2;ctx.lineCap="round";ctx.stroke();} setVLastPos(pos); }}
+                  onTouchEnd={()=>{ setVIsDrawing(false); setVoucherSignature(voucherCanvasRef.current?.toDataURL()||""); }}
+                />
+              </div>
+              <button onClick={()=>{ const ctx=voucherCanvasRef.current?.getContext("2d"); if(ctx) ctx.clearRect(0,0,440,120); setVoucherSignature(""); }} style={{ background:"none", border:"none", color:T.textMuted, fontSize:11, cursor:"pointer", marginTop:4 }}>Clear</button>
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={async () => {
+                const sig = voucherCanvasRef.current?.toDataURL() || "";
+                setVoucherSignSaving(true);
+                await supabase.from("payment_vouchers").update({ fm_signature: sig, fm_signed_at: new Date().toISOString(), fm_signed_by: user.name }).eq("id", fmSignModal.id);
+                setVoucherSignSaving(false);
+                setFmSignModal(null);
+                setVoucherSignature("");
+                const ctx = voucherCanvasRef.current?.getContext("2d");
+                if (ctx) ctx.clearRect(0,0,440,120);
+                load();
+              }} disabled={voucherSignSaving} style={{ flex:1, background:`linear-gradient(135deg,${T.amber},#F59E0B)`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{voucherSignSaving?"Saving...":"✍ Save Signature"}</button>
+              <button onClick={()=>{ setFmSignModal(null); setVoucherSignature(""); const ctx=voucherCanvasRef.current?.getContext("2d"); if(ctx) ctx.clearRect(0,0,440,120); }} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
             </div>
           </div>
         </div>

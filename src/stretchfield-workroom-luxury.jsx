@@ -8198,7 +8198,7 @@ const FinanceDashboard = ({ user, onTab }) => {
             <div style={{ color:T.textMuted, fontSize:13, textAlign:"center", padding:"40px 0" }}>No staff payment requests yet</div>
           ) : (staffRequests||[]).map(req => {
             const statusColors = { pending:T.amber, pending_ceo:T.cyan, approved:T.teal, rejected:T.red, paid:"#10B981" };
-            const statusLabels = { pending:"Pending Finance Review", pending_ceo:"Awaiting CEO Approval", approved:"CEO Approved", rejected:"Rejected", paid:"Paid" };
+            const statusLabels = { pending:"Pending Finance Review", pending_ceo:"Sent to CEO — Awaiting Approval", approved:"CEO Approved ✓", rejected:"Rejected", paid:"Paid ✓" };
             return (
               <div key={req.id} style={{ background:T.surface, border:`1px solid ${req.status==="pending"?T.amber+"30":T.border}`, borderLeft:`4px solid ${statusColors[req.status]||T.border}`, borderRadius:12, padding:"16px 20px", marginBottom:10 }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
@@ -8225,7 +8225,7 @@ const FinanceDashboard = ({ user, onTab }) => {
                       await supabase.from("notifications").insert({ user_id:req.staff_id, title:"Payment Request Approved", message:"Your payment request of GHS "+parseFloat(req.amount).toLocaleString()+" has been approved.", type:"finance" });
                       const { data: sr } = await supabase.from("staff_payment_requests").select("*").order("submitted_at", { ascending:false });
                       setStaffRequests(sr||[]);
-                    }} style={{ background:`linear-gradient(135deg,${T.teal},#10B981)`, border:"none", color:"#fff", padding:"7px 16px", borderRadius:7, cursor:"pointer", fontWeight:800, fontSize:12 }}>✓ Approve</button>
+                    }} style={{ background:`linear-gradient(135deg,${T.teal},#10B981)`, border:"none", color:"#fff", padding:"7px 16px", borderRadius:7, cursor:"pointer", fontWeight:800, fontSize:12 }}>✓ Send to CEO</button>
                     <button onClick={async () => {
                       const reason = window.prompt("Reason for rejection:");
                       if (!reason) return;

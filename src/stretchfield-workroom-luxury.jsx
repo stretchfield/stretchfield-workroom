@@ -790,8 +790,8 @@ const getNavItems = (role, user) => {
     // CEO gets grouped nav — return special structure
     return [
       { id: "dashboard", label: "Dashboard", group: true },
-      { id: "approval-queue", label: "⚡ Approval Queue", icon: "▪" },
-      { id: "ceo-broadcast", label: "📢 CEO Broadcast", icon: "▪" },
+      { id: "approval-queue", label: "Approval Queue", icon: "▪" },
+      { id: "ceo-broadcast", label: "CEO Broadcast", icon: "▪" },
       { id: "grp-events", label: "Events & Operations", group: true, children: [
         { id: "events", label: "Events" },
         { id: "impact-intelligence", label: "Impact Intelligence" },
@@ -18704,22 +18704,64 @@ const CEOBroadcastView = ({ user }) => {
       targets = form.specific_ids;
     }
 
-    // Insert notification for each target
-    for (const uid of targets) {
-      if (uid !== user.id) {
+    // Get email addresses for targets
+    const { data: targetProfiles } = await supabase.from("profiles").select("id,name,email").in("id", targets);
+
+    // Insert notification + send email for each target
+    for (const profile of targetProfiles||[]) {
+      if (profile.id !== user.id) {
+        const notifTitle = (form.priority === "urgent" ? "🚨 URGENT: " : form.priority === "important" ? "⚠ " : "") + form.title;
         await supabase.from("notifications").insert({
-          user_id: uid,
-          title: (form.priority === "urgent" ? "🚨 URGENT: " : form.priority === "important" ? "⚠ " : "") + form.title,
+          user_id: profile.id,
+          title: notifTitle,
           message: form.message,
           type: "broadcast",
         });
+        // Send email
+        if (profile.email) {
+          const priorityLabel = form.priority === "urgent" ? "URGENT" : form.priority === "important" ? "IMPORTANT" : "Team Update";
+          const priorityColor = form.priority === "urgent" ? "#EF4444" : form.priority === "important" ? "#F59E0B" : "#00C8FF";
+          const emailHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:0;background:#F1F5F9;font-family:'DM Sans',Arial,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F1F5F9;padding:40px 20px">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
+<tr><td style="background:#060B14;padding:28px 36px;text-align:left">
+  <table width="100%"><tr>
+    <td><img src="https://workroom.stretchfield.com/logo512.png" alt="Stretchfield" style="height:36px;vertical-align:middle;margin-right:10px"><span style="color:#00C8FF;font-size:13px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;vertical-align:middle">Stretchfield WorkRoom</span></td>
+    <td align="right"><span style="background:${priorityColor};color:${form.priority==="normal"?"#060B14":"#ffffff"};padding:4px 12px;border-radius:20px;font-size:11px;font-weight:800;text-transform:uppercase">${priorityLabel}</span></td>
+  </tr></table>
+</td></tr>
+<tr><td style="padding:36px 36px 20px">
+  <p style="margin:0 0 6px;color:#94A3B8;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em">Message from CEO</p>
+  <h1 style="margin:0 0 24px;color:#0F172A;font-size:24px;font-weight:900;line-height:1.2">${form.title}</h1>
+  <div style="background:#F8FAFC;border-left:4px solid ${priorityColor};border-radius:0 8px 8px 0;padding:20px 24px;margin-bottom:24px">
+    <p style="margin:0;color:#334155;font-size:15px;line-height:1.7;white-space:pre-wrap">${form.message}</p>
+  </div>
+  <p style="margin:0 0 4px;color:#64748B;font-size:13px">Hi ${profile.name},</p>
+  <p style="margin:0;color:#64748B;font-size:13px">This is an official communication from ${user.name}, CEO of Stretchfield. Please log in to WorkRoom to respond or take any required action.</p>
+</td></tr>
+<tr><td style="padding:20px 36px" align="center">
+  <a href="https://workroom.stretchfield.com" style="background:linear-gradient(135deg,#00C8FF,#00E5C8);color:#060B14;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:800;font-size:14px;display:inline-block">Open WorkRoom →</a>
+</td></tr>
+<tr><td style="background:#F8FAFC;padding:20px 36px;border-top:1px solid #E2E8F0">
+  <p style="margin:0;color:#94A3B8;font-size:11px;text-align:center">© ${new Date().getFullYear()} Stretchfield. All rights reserved. · <a href="https://workroom.stretchfield.com" style="color:#00C8FF">workroom.stretchfield.com</a></p>
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+          await fetch("/api/send-email", {
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body: JSON.stringify({ to: profile.email, subject: (form.priority==="urgent"?"🚨 URGENT: ":form.priority==="important"?"⚠ ":"")+form.title+" — Stretchfield WorkRoom", html: emailHtml })
+          });
+        }
       }
     }
 
     setSaving(false); setModal(false);
     setForm({ title:"", message:"", audience:"all", specific_roles:[], specific_ids:[], priority:"normal" });
     load();
-    alert(`Broadcast sent to ${targets.length} team member${targets.length!==1?"s":""}.`);
+    alert(`Broadcast sent to ${targets.length} team member${targets.length!==1?"s":""}. Notifications and emails delivered.`);
   };
 
   const audienceLabel = (b) => {

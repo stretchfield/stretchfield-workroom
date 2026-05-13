@@ -852,7 +852,7 @@ const getNavItems = (role, user) => {
     base.push({ id: "finance", label: "Finance", icon: "▪" });
   }
   if (["Finance Manager","CEO"].includes(role)) {
-    base.push({ id: "purchase-orders", label: "Purchase Orders", icon: "▪" }, { id: "vendor-invoices", label: "Vendor Invoices", icon: "▪" }, { id: "staff-payment-rates", label: "Staff Payment Rates", icon: "▪" }, { id: "client-payments", label: "Client Payments", icon: "▪" });
+    base.push({ id: "purchase-orders", label: "Purchase Orders", icon: "▪" }, { id: "vendor-invoices", label: "Vendor Invoices", icon: "▪" }, { id: "staff-payment-rates", label: "Staff Payment Rates", icon: "▪" }, { id: "client-payments", label: "Client Payments", icon: "▪" }, { id: "payment-directory", label: "Payment Directory", icon: "▪" });
   }
   if (["CEO"].includes(role)) {
     base.push({ id: "client-financials", label: "Client Financials", icon: "▪" });
@@ -6114,6 +6114,128 @@ const StaffPaymentRatesView = ({ user }) => {
 };
 
 
+
+const PaymentDirectoryView = ({ user }) => {
+  const [staff, setStaff] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [vendorApps, setVendorApps] = useState([]);
+  const [tab, setTab] = useState("staff");
+  const [search, setSearch] = useState("");
+
+  const load = async () => {
+    const [{ data: s }, { data: v }, { data: va }] = await Promise.all([
+      supabase.from("profiles").select("id,name,role,bank_name,bank_branch,bank_account_name,bank_account_number,mobile_money_number,bank_details_requested").not("role","in","(Client,Vendor,Board of Directors)").order("name"),
+      supabase.from("profiles").select("id,name,service_category,phone,email").eq("role","Vendor").order("name"),
+      supabase.from("vendor_applications").select("vendor_name,contact_email,bank_name,bank_address,bank_account_name,account_no,payment_terms,phone,contact_person").eq("status","login-created"),
+    ]);
+    setStaff(s || []);
+    setVendors(v || []);
+    setVendorApps(va || []);
+  };
+  useEffect(() => { load(); }, []);
+
+  const filteredStaff = staff.filter(s => s.name?.toLowerCase().includes(search.toLowerCase()) || s.role?.toLowerCase().includes(search.toLowerCase()));
+  const filteredVendors = vendors.filter(v => v.name?.toLowerCase().includes(search.toLowerCase()) || v.service_category?.toLowerCase().includes(search.toLowerCase()));
+
+  const staffWithBank = staff.filter(s => s.bank_name && s.bank_account_number).length;
+  const staffWithout = staff.filter(s => !s.bank_name || !s.bank_account_number).length;
+  const vendorsWithBank = vendorApps.filter(v => v.bank_name && v.account_no).length;
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}` }}>
+        <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Finance</div>
+        <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Payment Directory</h2>
+        <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Bank details for all staff and vendors</div>
+      </div>
+
+      {/* KPI Strip */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:12, marginBottom:24 }}>
+        {[
+          { label:"Staff with Bank Details", value:staffWithBank+"/"+staff.length, color:T.teal },
+          { label:"Staff Missing Details", value:staffWithout, color:staffWithout>0?T.amber:T.teal },
+          { label:"Vendors with Bank Details", value:vendorsWithBank+"/"+vendors.length, color:T.cyan },
+        ].map(k => (
+          <div key={k.label} style={{ padding:"14px 16px", background:T.surface, border:`1px solid ${T.border}`, borderTop:`2px solid ${k.color}`, borderRadius:10 }}>
+            <div style={{ color:k.color, fontSize:20, fontWeight:900 }}>{k.value}</div>
+            <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginTop:4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Search + Tabs */}
+      <div style={{ display:"flex", gap:12, marginBottom:20, alignItems:"center" }}>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name or role..."
+          style={{ flex:1, padding:"9px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }} />
+        {["staff","vendors"].map(t => (
+          <button key={t} onClick={() => setTab(t)} style={{ padding:"8px 20px", borderRadius:20, border:`1px solid ${tab===t?T.cyan:T.border}`, background:tab===t?T.cyan+"20":"none", color:tab===t?T.cyan:T.textMuted, fontWeight:700, fontSize:12, cursor:"pointer", textTransform:"capitalize" }}>{t}</button>
+        ))}
+      </div>
+
+      {/* Staff Tab */}
+      {tab === "staff" && (
+        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, overflow:"hidden" }}>
+          <table style={{ width:"100%", borderCollapse:"collapse" }}>
+            <thead>
+              <tr style={{ background:T.bg }}>
+                {["Name","Role","Bank Name","Branch","Account Name","Account Number","Mobile Money"].map(h => (
+                  <th key={h} style={{ padding:"10px 14px", color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", textAlign:"left", borderBottom:`1px solid ${T.border}` }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filteredStaff.map((s,i) => (
+                <tr key={s.id} style={{ borderBottom:i<filteredStaff.length-1?`1px solid ${T.border}44`:"none", background:i%2===0?"transparent":T.bg+"30" }}>
+                  <td style={{ padding:"12px 14px", color:T.textPrimary, fontWeight:700, fontSize:13 }}>{s.name}</td>
+                  <td style={{ padding:"12px 14px", color:T.textMuted, fontSize:12 }}>{s.role}</td>
+                  <td style={{ padding:"12px 14px", color:s.bank_name?T.textPrimary:T.red, fontSize:12 }}>{s.bank_name||"—"}</td>
+                  <td style={{ padding:"12px 14px", color:T.textMuted, fontSize:12 }}>{s.bank_branch||"—"}</td>
+                  <td style={{ padding:"12px 14px", color:T.textMuted, fontSize:12 }}>{s.bank_account_name||"—"}</td>
+                  <td style={{ padding:"12px 14px", color:s.bank_account_number?T.teal:T.red, fontWeight:s.bank_account_number?700:400, fontSize:12 }}>{s.bank_account_number||"Missing"}</td>
+                  <td style={{ padding:"12px 14px", color:T.textMuted, fontSize:12 }}>{s.mobile_money_number||"—"}</td>
+                </tr>
+              ))}
+              {filteredStaff.length===0 && <tr><td colSpan={7} style={{ padding:"40px 0", textAlign:"center", color:T.textMuted }}>No staff found</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Vendors Tab */}
+      {tab === "vendors" && (
+        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, overflow:"hidden" }}>
+          <table style={{ width:"100%", borderCollapse:"collapse" }}>
+            <thead>
+              <tr style={{ background:T.bg }}>
+                {["Vendor","Category","Contact","Bank Name","Account Name","Account Number","Payment Terms"].map(h => (
+                  <th key={h} style={{ padding:"10px 14px", color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", textAlign:"left", borderBottom:`1px solid ${T.border}` }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filteredVendors.map((v,i) => {
+                const app = vendorApps.find(a => a.contact_email === v.email || a.vendor_name?.trim() === v.name?.trim());
+                return (
+                  <tr key={v.id} style={{ borderBottom:i<filteredVendors.length-1?`1px solid ${T.border}44`:"none", background:i%2===0?"transparent":T.bg+"30" }}>
+                    <td style={{ padding:"12px 14px", color:T.textPrimary, fontWeight:700, fontSize:13 }}>{v.name}</td>
+                    <td style={{ padding:"12px 14px", color:T.textMuted, fontSize:12 }}>{v.service_category||"—"}</td>
+                    <td style={{ padding:"12px 14px", color:T.textMuted, fontSize:12 }}>{v.phone||"—"}</td>
+                    <td style={{ padding:"12px 14px", color:app?.bank_name?T.textPrimary:T.red, fontSize:12 }}>{app?.bank_name||"—"}</td>
+                    <td style={{ padding:"12px 14px", color:T.textMuted, fontSize:12 }}>{app?.bank_account_name||"—"}</td>
+                    <td style={{ padding:"12px 14px", color:app?.account_no?T.teal:T.red, fontWeight:app?.account_no?700:400, fontSize:12 }}>{app?.account_no||"Missing"}</td>
+                    <td style={{ padding:"12px 14px", color:T.textMuted, fontSize:12 }}>{app?.payment_terms||"—"}</td>
+                  </tr>
+                );
+              })}
+              {filteredVendors.length===0 && <tr><td colSpan={7} style={{ padding:"40px 0", textAlign:"center", color:T.textMuted }}>No vendors found</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ClientPaymentsView = ({ user }) => {
   const [payments, setPayments] = useState([]);
   const [clients, setClients] = useState([]);
@@ -6379,6 +6501,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "payment-authorisation": return <PaymentAuthorisationView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
       case "staff-payment-rates": return <StaffPaymentRatesView user={currentUser} />;
       case "client-payments": return <ClientPaymentsView user={currentUser} />;
+      case "payment-directory": return <PaymentDirectoryView user={currentUser} />;
       case "budget-vs-actuals": return <BudgetVsActualsView user={currentUser} />;
       case "vendor-ratings": return <VendorRatingsView user={currentUser} />;
       case "rff-approvals": return <RFFApprovalsView user={currentUser} />;

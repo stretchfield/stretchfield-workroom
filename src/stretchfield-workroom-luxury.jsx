@@ -986,6 +986,11 @@ const CEODashboard = ({ onTab, user }) => {
   const [clientPayments, setClientPayments] = useState([]);
   const [loading, setLoading] = React.useState(true);
   const [internalPortalEvent, setInternalPortalEvent] = useState(null);
+  const [bankRequested, setBankRequested] = useState(false);
+  const [bankSubmitted, setBankSubmitted] = useState(false);
+  const [showBankForm, setShowBankForm] = useState(false);
+  const [bankForm, setBankForm] = useState({ bank_name:"", bank_branch:"", bank_account_name:"", bank_account_number:"", mobile_money_number:"" });
+  const [savingBank, setSavingBank] = useState(false);
 
   useEffect(() => {
     const loadAll = async () => {
@@ -1022,9 +1027,27 @@ const CEODashboard = ({ onTab, user }) => {
       setAwards(aw.data || []);
       setClientPayments(cp?.data || []);
       setLoading(false);
+      // Check bank details
+      const { data: bp } = await supabase.from("profiles").select("bank_name,bank_account_number,bank_branch,bank_account_name,mobile_money_number,bank_details_requested").eq("id", user.id).single();
+      if (bp) {
+        setBankRequested(bp.bank_details_requested||false);
+        setBankSubmitted(!!(bp.bank_name && bp.bank_account_number));
+        if (bp.bank_name) setBankForm({ bank_name:bp.bank_name||"", bank_branch:bp.bank_branch||"", bank_account_name:bp.bank_account_name||"", bank_account_number:bp.bank_account_number||"", mobile_money_number:bp.mobile_money_number||"" });
+      }
     };
     loadAll();
   }, []);
+
+  const saveBankDetailsCEO = async () => {
+    if (!bankForm.bank_name || !bankForm.bank_account_number) { alert("Bank name and account number are required."); return; }
+    setSavingBank(true);
+    await supabase.from("profiles").update({ bank_name:bankForm.bank_name, bank_branch:bankForm.bank_branch, bank_account_name:bankForm.bank_account_name, bank_account_number:bankForm.bank_account_number, mobile_money_number:bankForm.mobile_money_number }).eq("id", user.id);
+    const { data: fms } = await supabase.from("profiles").select("id").eq("role","Finance Manager");
+    for (const fm of fms||[]) { await supabase.from("notifications").insert({ user_id:fm.id, title:"Bank Details Submitted — "+user.name, message:user.name+" submitted bank details: "+bankForm.bank_name+" · "+bankForm.bank_account_number, type:"finance" }); }
+    setSavingBank(false);
+    setBankSubmitted(true);
+    setShowBankForm(false);
+  };
 
   const now = new Date();
   const greeting = now.getHours() < 12 ? "Good Morning" : now.getHours() < 17 ? "Good Afternoon" : "Good Evening";
@@ -1054,6 +1077,33 @@ const CEODashboard = ({ onTab, user }) => {
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
+
+      {/* ── BANK DETAILS BANNER ── */}
+      {bankRequested && !bankSubmitted && (
+        <div style={{ background:`linear-gradient(135deg,${T.amber}12,${T.amber}06)`, border:`1px solid ${T.amber}40`, borderRadius:12, padding:"16px 20px", marginBottom:20 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:12 }}>
+            <div>
+              <div style={{ color:T.amber, fontWeight:800, fontSize:14 }}>💳 Bank Details Required</div>
+              <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>Finance has requested your bank details for payment processing.</div>
+            </div>
+            <button onClick={() => setShowBankForm(!showBankForm)} style={{ background:`linear-gradient(135deg,${T.amber},#F59E0B)`, border:"none", color:"#060B14", padding:"8px 18px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{showBankForm?"Close":"Submit Bank Details"}</button>
+          </div>
+          {showBankForm && (
+            <div style={{ marginTop:16, display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+              {[["Bank Name *","bank_name","e.g. GCB Bank"],["Branch Name","bank_branch","e.g. Accra Main"],["Account Name","bank_account_name","Name on account"],["Account Number *","bank_account_number","Account number"],["Mobile Money Number","mobile_money_number","e.g. 0244123456"]].map(([label,key,ph]) => (
+                <div key={key}>
+                  <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>{label}</div>
+                  <input value={bankForm[key]} onChange={e=>setBankForm(f=>({...f,[key]:e.target.value}))} placeholder={ph}
+                    style={{ width:"100%", padding:"8px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                </div>
+              ))}
+              <div style={{ gridColumn:"1/-1" }}>
+                <button onClick={saveBankDetailsCEO} disabled={savingBank} style={{ background:`linear-gradient(135deg,${T.amber},#F59E0B)`, border:"none", color:"#060B14", padding:"10px 24px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{savingBank?"Saving...":"Save Bank Details"}</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── HERO GREETING ── */}
       <div style={{ background: "linear-gradient(135deg, "+T.bgDeep+" 0%, #0D1F36 60%, "+T.bgDeep+" 100%)", border: "1px solid "+T.border, borderRadius: 16, padding: "32px 36px", marginBottom: 24, position: "relative", overflow: "hidden" }}>

@@ -18761,17 +18761,29 @@ const ClientDashboard = ({ user }) => {
       {/* Satisfaction Modal */}
       {satisfactionModal && (
         <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setSatisfactionModal(null)}>
-          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:480, padding:28 }} onClick={e=>e.stopPropagation()}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:560, maxHeight:"90vh", overflowY:"auto", padding:28 }} onClick={e=>e.stopPropagation()}>
             <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>Share Your Feedback</div>
             <div style={{ color:T.textMuted, fontSize:13, marginBottom:20 }}>{satisfactionModal.name}</div>
-            <div style={{ marginBottom:16 }}>
-              <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>Overall Rating</div>
-              <div style={{ display:"flex", gap:8 }}>
-                {[1,2,3,4,5].map(n => (
-                  <button key={n} onClick={() => setSatForm(f=>({...f,rating:n}))} style={{ fontSize:32, background:"none", border:"none", cursor:"pointer", color:n<=satForm.rating?"#F59E0B":T.border, transition:"color 0.1s" }}>★</button>
+
+            {/* Rate each milestone */}
+            <div style={{ marginBottom:20 }}>
+              <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:12 }}>Rate Each Stage</div>
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                {["Briefing","Planning","Pre-Production","Event Day","Post-Event","Overall Experience"].map(milestone => (
+                  <div key={milestone} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:T.bg, borderRadius:10, padding:"12px 16px" }}>
+                    <div style={{ color:T.textPrimary, fontSize:13, fontWeight:600 }}>{milestone}</div>
+                    <div style={{ display:"flex", gap:4 }}>
+                      {[1,2,3,4,5].map(n => (
+                        <button key={n} onClick={() => setSatForm(f=>({...f, [milestone]:n}))}
+                          style={{ fontSize:24, background:"none", border:"none", cursor:"pointer", color:n<=(satForm[milestone]||0)?"#F59E0B":T.border, transition:"color 0.1s", padding:"0 2px" }}>★</button>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
+
+            {/* NPS */}
             <div style={{ marginBottom:16 }}>
               <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>How likely are you to recommend Stretchfield? (0-10)</div>
               <div style={{ display:"flex", gap:4, flexWrap:"wrap" }}>
@@ -18780,31 +18792,34 @@ const ClientDashboard = ({ user }) => {
                 ))}
               </div>
             </div>
-            <div style={{ marginBottom:16 }}>
-              <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:6 }}>Milestone (Optional)</div>
-              <select value={satForm.milestone} onChange={e=>setSatForm(f=>({...f,milestone:e.target.value}))}
-                style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
-                <option value="">General Feedback</option>
-                {["Briefing","Planning","Pre-Production","Event Day","Post-Event"].map(m=><option key={m}>{m}</option>)}
-              </select>
-            </div>
+
+            {/* Comments */}
             <div style={{ marginBottom:20 }}>
-              <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:6 }}>Comments</div>
-              <textarea value={satForm.feedback} onChange={e=>setSatForm(f=>({...f,feedback:e.target.value}))} rows={3} placeholder="Share your thoughts on Stretchfield's performance..."
+              <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:6 }}>Additional Comments</div>
+              <textarea value={satForm.feedback||""} onChange={e=>setSatForm(f=>({...f,feedback:e.target.value}))} rows={3} placeholder="Share any additional thoughts on Stretchfield's performance..."
                 style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} />
             </div>
+
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={async () => {
-                if (!satForm.rating) { alert("Please select a rating."); return; }
+                const milestones = ["Briefing","Planning","Pre-Production","Event Day","Post-Event","Overall Experience"];
+                const hasRating = milestones.some(m => satForm[m]);
+                if (!hasRating) { alert("Please rate at least one stage."); return; }
                 setSavingSat(true);
-                await supabase.from("client_satisfaction").insert({ client_id:clientId, project_id:satisfactionModal.id, rating:satForm.rating, nps_score:satForm.nps_score, feedback:satForm.feedback, milestone:satForm.milestone, submitted_by:user.id });
-                // Notify CEO
+                // Insert one record per rated milestone
+                for (const m of milestones) {
+                  if (satForm[m]) {
+                    await supabase.from("client_satisfaction").insert({ client_id:clientId, project_id:satisfactionModal.id, rating:satForm[m], nps_score:satForm.nps_score||null, feedback:satForm.feedback||"", milestone:m, submitted_by:user.id });
+                  }
+                }
+                const overallRating = satForm["Overall Experience"] || Math.round(milestones.filter(m=>satForm[m]).reduce((s,m)=>s+satForm[m],0)/milestones.filter(m=>satForm[m]).length);
                 const { data: ceos } = await supabase.from("profiles").select("id").eq("role","CEO");
-                for (const ceo of ceos||[]) { await supabase.from("notifications").insert({ user_id:ceo.id, title:"Client Feedback — "+satisfactionModal.name, message:user.name+" rated Stretchfield "+satForm.rating+"/5"+(satForm.feedback?" — "+satForm.feedback:""), type:"crm" }); }
-                setSatisfaction(prev => [...prev, { project_id:satisfactionModal.id, rating:satForm.rating, feedback:satForm.feedback, milestone:satForm.milestone }]);
+                for (const ceo of ceos||[]) { await supabase.from("notifications").insert({ user_id:ceo.id, title:"Client Feedback Submitted — "+satisfactionModal.name, message:user.name+" submitted milestone ratings. Overall: "+overallRating+"/5. NPS: "+(satForm.nps_score!==null?satForm.nps_score+"/10":"not rated")+(satForm.feedback?" — "+satForm.feedback:""), type:"crm" }); }
+                const newEntries = milestones.filter(m=>satForm[m]).map(m=>({ project_id:satisfactionModal.id, rating:satForm[m], feedback:satForm.feedback||"", milestone:m }));
+                setSatisfaction(prev => [...prev, ...newEntries]);
                 setSavingSat(false);
                 setSatisfactionModal(null);
-              }} disabled={savingSat||!satForm.rating} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{savingSat?"Submitting...":"Submit Feedback"}</button>
+              }} disabled={savingSat} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{savingSat?"Submitting...":"Submit Feedback"}</button>
               <button onClick={() => setSatisfactionModal(null)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
             </div>
           </div>

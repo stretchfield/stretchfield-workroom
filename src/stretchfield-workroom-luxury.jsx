@@ -6424,11 +6424,25 @@ const ClientEventsView = ({ user }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.from("projects").select("*").order("event_date", { ascending: false }).then(({ data }) => {
-      setEvents(data || []);
-      setLoading(false);
+    // Find client record by profile_id, then filter projects by client_id
+    supabase.from("clients").select("id").eq("profile_id", user.id).maybeSingle().then(({ data: clientRecord }) => {
+      if (!clientRecord) {
+        // Fallback: match by email
+        supabase.from("clients").select("id").eq("email", user.email).maybeSingle().then(({ data: clientByEmail }) => {
+          if (!clientByEmail) { setLoading(false); return; }
+          supabase.from("projects").select("*").eq("client_id", clientByEmail.id).order("event_date", { ascending: false }).then(({ data }) => {
+            setEvents(data || []);
+            setLoading(false);
+          });
+        });
+        return;
+      }
+      supabase.from("projects").select("*").eq("client_id", clientRecord.id).order("event_date", { ascending: false }).then(({ data }) => {
+        setEvents(data || []);
+        setLoading(false);
+      });
     });
-  }, []);
+  }, [user.id]);
 
   if (loading) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"40vh" }}><div style={{ width:32, height:32, border:`3px solid ${T.border}`, borderTop:`3px solid ${T.cyan}`, borderRadius:"50%", animation:"spin 0.8s linear infinite" }} /></div>;
 

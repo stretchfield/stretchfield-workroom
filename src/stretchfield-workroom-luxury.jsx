@@ -852,7 +852,7 @@ const getNavItems = (role, user) => {
     base.push({ id: "finance", label: "Finance", icon: "▪" });
   }
   if (["Finance Manager","CEO"].includes(role)) {
-    base.push({ id: "purchase-orders", label: "Purchase Orders", icon: "▪" }, { id: "vendor-invoices", label: "Vendor Invoices", icon: "▪" }, { id: "payment-authorisation", label: "Payment Authorisation", icon: "▪" }, { id: "staff-payment-rates", label: "Staff Payment Rates", icon: "▪" }, { id: "client-payments", label: "Client Payments", icon: "▪" });
+    base.push({ id: "purchase-orders", label: "Purchase Orders", icon: "▪" }, { id: "vendor-invoices", label: "Vendor Invoices", icon: "▪" }, { id: "staff-payment-rates", label: "Staff Payment Rates", icon: "▪" }, { id: "client-payments", label: "Client Payments", icon: "▪" });
   }
   if (["CEO"].includes(role)) {
     base.push({ id: "client-financials", label: "Client Financials", icon: "▪" });
@@ -7849,7 +7849,7 @@ const FinanceDashboard = ({ user, onTab }) => {
       <div style={{ display: 'flex', gap: 0, marginBottom: 28, borderBottom: `1px solid ${T.border}` }}>
         {[
           { id: 'overview', label: 'Overview' },
-          { id: 'staff-requests', label: 'Staff Requests', badge: (staffRequests||[]).filter(r=>r.status==="pending").length },
+          { id: 'staff-requests', label: 'Staff Requests', badge: (staffRequests||[]).filter(r=>['pending','pending_ceo'].includes(r.status)).length },
           { id: 'vouchers', label: 'Payment Vouchers', badge: pendingVouchers.length },
           { id: 'estimates', label: 'Estimates & Invoices' },
           { id: 'petty-cash', label: 'Petty Cash' },

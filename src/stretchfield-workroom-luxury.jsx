@@ -17262,6 +17262,7 @@ Use professional, consultative language that positions Stretchfield as a strateg
 const PaymentAuthorisationView = ({ user, onNavigate }) => {
   const [auths, setAuths] = useState([]);
   const [staffRequests, setStaffRequests] = useState([]);
+  const [expandedReq, setExpandedReq] = useState(null);
   const [vendors, setVendors] = useState([]);
   const [staffProfiles, setStaffProfiles] = useState([]);
   const [awards, setAwards] = useState([]);
@@ -17438,9 +17439,7 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
         <div style={{ background:T.surface, border:`1px solid ${T.amber}30`, borderRadius:14, padding:"20px 24px", marginBottom:24 }}>
           <div style={{ color:T.amber, fontSize:11, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:16 }}>⏳ Staff Payment Requests — Awaiting CEO Approval ({staffRequests.length})</div>
           <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-            {staffRequests.map(req => {
-              const [expanded, setExpanded] = React.useState(false);
-              return (
+            {staffRequests.map(req => (
               <div key={req.id} style={{ background:T.bg, border:`1px solid ${T.border}`, borderRadius:10, overflow:"hidden" }}>
                 <div style={{ padding:"14px 16px", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
                   <div style={{ flex:1 }}>
@@ -17452,7 +17451,7 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
                       {req.supporting_doc_url && (
                         <a href={req.supporting_doc_url} target="_blank" rel="noreferrer" style={{ color:T.cyan, fontSize:11, fontWeight:700, textDecoration:"none" }}>📎 View Receipt</a>
                       )}
-                      <button onClick={() => setExpanded(!expanded)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"2px 10px", borderRadius:6, cursor:"pointer", fontSize:11 }}>{expanded ? "Hide Details ▲" : "View Details ▼"}</button>
+                      <button onClick={() => setExpandedReq(expandedReq===req.id ? null : req.id)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"2px 10px", borderRadius:6, cursor:"pointer", fontSize:11 }}>{expandedReq===req.id ? "Hide Details ▲" : "View Details ▼"}</button>
                     </div>
                   </div>
                   <div style={{ textAlign:"right", minWidth:160 }}>
@@ -17478,7 +17477,7 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
                     {isFinance && <div style={{ color:T.amber, fontSize:11, fontWeight:700, marginTop:8 }}>Awaiting CEO approval</div>}
                   </div>
                 </div>
-                {expanded && (
+                {expandedReq===req.id && (
                   <div style={{ padding:"12px 16px", borderTop:`1px solid ${T.border}`, background:T.surface }}>
                     <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 }}>
                       {[["Staff Member",req.staff_name],["Event",req.project_name],["Payment Type",req.request_type?.replace(/_/g," ")],["Amount","GHS "+parseFloat(req.amount||0).toLocaleString()],["Date Submitted",req.submitted_at?new Date(req.submitted_at).toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"}):"—"],["Status",req.status?.replace(/_/g," ")]].map(([label,val]) => (
@@ -17503,7 +17502,7 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
                   </div>
                 )}
               </div>
-            );})}
+            ))}
           </div>
         </div>
       )}

@@ -819,6 +819,9 @@ const getNavItems = (role, user) => {
             { id: "staff-payment-rates", label: "Staff Payment Rates" },
             { id: "budget-vs-actuals", label: "Budget vs Actuals" },
         { id: "client-payments", label: "Client Payments" },
+        { id: "cash-flow", label: "Cash Flow" },
+        { id: "audit-trail", label: "Audit Trail" },
+        { id: "zoho-sync-status", label: "Zoho Sync Status" },
         { id: "zoho-books", label: "Zoho Books" },
       ]},
       { id: "grp-clients", label: "Clients", group: true, children: [
@@ -853,7 +856,7 @@ const getNavItems = (role, user) => {
     base.push({ id: "finance", label: "Finance", icon: "▪" });
   }
   if (["Finance Manager","CEO"].includes(role)) {
-    base.push({ id: "purchase-orders", label: "Purchase Orders", icon: "▪" }, { id: "vendor-invoices", label: "Vendor Invoices", icon: "▪" }, { id: "staff-payment-rates", label: "Staff Payment Rates", icon: "▪" }, { id: "client-payments", label: "Client Payments", icon: "▪" }, { id: "payment-directory", label: "Payment Directory", icon: "▪" });
+    base.push({ id: "purchase-orders", label: "Purchase Orders", icon: "▪" }, { id: "vendor-invoices", label: "Vendor Invoices", icon: "▪" }, { id: "staff-payment-rates", label: "Staff Payment Rates", icon: "▪" }, { id: "client-payments", label: "Client Payments", icon: "▪" }, { id: "payment-directory", label: "Payment Directory", icon: "▪" }, { id: "cash-flow", label: "Cash Flow", icon: "▪" }, { id: "audit-trail", label: "Audit Trail", icon: "▪" }, { id: "zoho-sync-status", label: "Zoho Sync Status", icon: "▪" });
   }
   if (["CEO"].includes(role)) {
     base.push({ id: "client-financials", label: "Client Financials", icon: "▪" });
@@ -6707,6 +6710,9 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "client-payments": return <ClientPaymentsView user={currentUser} />;
       case "payment-directory": return <PaymentDirectoryView user={currentUser} />;
       case "budget-vs-actuals": return <BudgetVsActualsView user={currentUser} />;
+      case "cash-flow": return <CashFlowView user={currentUser} />;
+      case "zoho-sync-status": return <ZohoSyncStatusView user={currentUser} />;
+      case "audit-trail": return <AuditTrailView user={currentUser} />;
       case "vendor-ratings": return <VendorRatingsView user={currentUser} />;
       case "rff-approvals": return <RFFApprovalsView user={currentUser} />;
       case "vendor-assignment": return <VendorAssignmentView user={currentUser} />;
@@ -18284,6 +18290,359 @@ const EmailTestPanel = ({ user }) => {
         <div style={{ color: T.textMuted, fontSize: 11, lineHeight: 1.6 }}>
           <strong style={{ color: T.textPrimary }}>Email Infrastructure:</strong> All emails are sent via Resend using the verified domain <strong style={{ color: T.cyan }}>stretchfield.com</strong>. Sender address is <strong style={{ color: T.cyan }}>info@stretchfield.com</strong>. Check your spam folder if emails don't arrive within 2 minutes.
         </div>
+      </div>
+    </div>
+  );
+};
+
+
+const CashFlowView = ({ user }) => {
+  const [events, setEvents] = useState([]);
+  const [clientPayments, setClientPayments] = useState([]);
+  const [vendorInvoices, setVendorInvoices] = useState([]);
+  const [staffPayments, setStaffPayments] = useState([]);
+  const [vouchers, setVouchers] = useState([]);
+  const [period, setPeriod] = useState("all");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      const [{ data: ev }, { data: cp }, { data: vi }, { data: sp }, { data: vo }] = await Promise.all([
+        supabase.from("projects").select("*").order("event_date", { ascending: false }),
+        supabase.from("client_payments").select("*").order("payment_date", { ascending: false }),
+        supabase.from("vendor_invoices").select("*").eq("status","paid").order("created_at", { ascending: false }),
+        supabase.from("staff_payment_requests").select("*").eq("status","paid").order("submitted_at", { ascending: false }),
+        supabase.from("payment_vouchers").select("*").in("status",["paid","approved"]).order("created_at", { ascending: false }),
+      ]);
+      setEvents(ev||[]);
+      setClientPayments(cp||[]);
+      setVendorInvoices(vi||[]);
+      setStaffPayments(sp||[]);
+      setVouchers(vo||[]);
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  const now = new Date();
+  const filterByPeriod = (items, dateField) => {
+    if (period === "all") return items;
+    const d = new Date(now);
+    if (period === "this_month") { d.setDate(1); d.setHours(0,0,0,0); }
+    if (period === "last_month") { d.setMonth(d.getMonth()-1); d.setDate(1); d.setHours(0,0,0,0); }
+    if (period === "this_year") { d.setMonth(0); d.setDate(1); d.setHours(0,0,0,0); }
+    return items.filter(i => i[dateField] && new Date(i[dateField]) >= d);
+  };
+
+  const filteredInflows = filterByPeriod(clientPayments, "payment_date");
+  const filteredVendor = filterByPeriod(vendorInvoices, "created_at");
+  const filteredStaff = filterByPeriod(staffPayments, "submitted_at");
+  const filteredVouchers = filterByPeriod(vouchers, "created_at");
+
+  const totalInflows = filteredInflows.reduce((s,p) => s+parseFloat(p.amount||0), 0);
+  const totalVendorOut = filteredVendor.reduce((s,i) => s+parseFloat(i.amount||0), 0);
+  const totalStaffOut = filteredStaff.reduce((s,r) => s+parseFloat(r.amount||0), 0);
+  const totalVoucherOut = filteredVouchers.reduce((s,v) => s+parseFloat(v.amount||0), 0);
+  const totalOutflows = totalVendorOut + totalStaffOut + totalVoucherOut;
+  const netCashFlow = totalInflows - totalOutflows;
+
+  // Per event P&L
+  const eventPL = events.map(ev => {
+    const revenue = clientPayments.filter(p => p.project_id === ev.id).reduce((s,p) => s+parseFloat(p.amount||0), 0);
+    const vendorCost = vendorInvoices.filter(i => i.event_id === ev.id).reduce((s,i) => s+parseFloat(i.amount||0), 0);
+    const staffCost = staffPayments.filter(r => r.project_id === ev.id).reduce((s,r) => s+parseFloat(r.amount||0), 0);
+    const totalCost = vendorCost + staffCost;
+    return { ...ev, revenue, totalCost, profit: revenue - totalCost };
+  }).filter(e => e.revenue > 0 || e.totalCost > 0);
+
+  if (loading) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"40vh" }}><div style={{ width:32, height:32, border:`3px solid ${T.border}`, borderTop:`3px solid ${T.cyan}`, borderRadius:"50%", animation:"spin 0.8s linear infinite" }} /></div>;
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <div>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Finance</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Cash Flow</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Money in vs money out — syncs with Zoho for full picture</div>
+        </div>
+        <select value={period} onChange={e=>setPeriod(e.target.value)} style={{ padding:"9px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+          <option value="all">All Time</option>
+          <option value="this_month">This Month</option>
+          <option value="last_month">Last Month</option>
+          <option value="this_year">This Year</option>
+        </select>
+      </div>
+
+      {/* Summary KPIs */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:12, marginBottom:24 }}>
+        {[
+          { label:"Total Inflows", value:"GHS "+totalInflows.toLocaleString(), color:T.teal, sub:"Client payments received" },
+          { label:"Total Outflows", value:"GHS "+totalOutflows.toLocaleString(), color:T.red, sub:"Vendors + Staff + Vouchers" },
+          { label:"Net Cash Flow", value:"GHS "+Math.abs(netCashFlow).toLocaleString(), color:netCashFlow>=0?T.teal:T.red, sub:netCashFlow>=0?"Surplus":"Deficit" },
+          { label:"Vendor Payments", value:"GHS "+totalVendorOut.toLocaleString(), color:T.amber, sub:"Paid invoices" },
+          { label:"Staff Payments", value:"GHS "+(totalStaffOut+totalVoucherOut).toLocaleString(), color:T.cyan, sub:"Approved requests" },
+        ].map(k => (
+          <div key={k.label} style={{ padding:"14px 16px", background:T.surface, border:`1px solid ${T.border}`, borderTop:`2px solid ${k.color}`, borderRadius:10 }}>
+            <div style={{ color:k.color, fontSize:18, fontWeight:900 }}>{k.value}</div>
+            <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginTop:4 }}>{k.label}</div>
+            <div style={{ color:T.textMuted, fontSize:10, marginTop:2 }}>{k.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Per Event P&L */}
+      {eventPL.length > 0 && (
+        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, overflow:"hidden", marginBottom:24 }}>
+          <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.border}`, color:T.textPrimary, fontWeight:800, fontSize:14 }}>Event P&L Summary</div>
+          <table style={{ width:"100%", borderCollapse:"collapse" }}>
+            <thead>
+              <tr style={{ background:T.bg }}>
+                {["Event","Revenue","Costs","Profit/Loss","Margin"].map(h => (
+                  <th key={h} style={{ padding:"10px 14px", color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", textAlign:"left", borderBottom:`1px solid ${T.border}` }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {eventPL.map((ev,i) => {
+                const margin = ev.revenue > 0 ? ((ev.profit/ev.revenue)*100).toFixed(1) : 0;
+                return (
+                  <tr key={ev.id} style={{ borderBottom:i<eventPL.length-1?`1px solid ${T.border}44`:"none" }}>
+                    <td style={{ padding:"12px 14px", color:T.textPrimary, fontWeight:700, fontSize:13 }}>{ev.name}</td>
+                    <td style={{ padding:"12px 14px", color:T.teal, fontWeight:700 }}>GHS {ev.revenue.toLocaleString()}</td>
+                    <td style={{ padding:"12px 14px", color:T.red, fontWeight:700 }}>GHS {ev.totalCost.toLocaleString()}</td>
+                    <td style={{ padding:"12px 14px", color:ev.profit>=0?T.teal:T.red, fontWeight:800 }}>GHS {Math.abs(ev.profit).toLocaleString()} {ev.profit<0?"(Loss)":""}</td>
+                    <td style={{ padding:"12px 14px", color:parseFloat(margin)>=0?T.teal:T.red, fontWeight:700 }}>{margin}%</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Inflows */}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+        <div style={{ background:T.surface, border:`1px solid ${T.teal}30`, borderRadius:12, overflow:"hidden" }}>
+          <div style={{ padding:"12px 16px", borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between" }}>
+            <div style={{ color:T.teal, fontWeight:800, fontSize:13 }}>↑ Inflows — GHS {totalInflows.toLocaleString()}</div>
+          </div>
+          {filteredInflows.length === 0 ? <div style={{ padding:"24px", color:T.textMuted, fontSize:13, textAlign:"center" }}>No payments recorded</div> : filteredInflows.map(p => (
+            <div key={p.id} style={{ padding:"10px 16px", borderBottom:`1px solid ${T.border}22`, display:"flex", justifyContent:"space-between" }}>
+              <div><div style={{ color:T.textPrimary, fontSize:13, fontWeight:600 }}>{p.client_name}</div><div style={{ color:T.textMuted, fontSize:11 }}>{p.event_name} · {p.payment_method}</div></div>
+              <div style={{ textAlign:"right" }}><div style={{ color:T.teal, fontWeight:700 }}>GHS {parseFloat(p.amount).toLocaleString()}</div><div style={{ color:T.textMuted, fontSize:10 }}>{new Date(p.payment_date).toLocaleDateString("en-GB")}</div></div>
+            </div>
+          ))}
+        </div>
+        <div style={{ background:T.surface, border:`1px solid ${T.red}30`, borderRadius:12, overflow:"hidden" }}>
+          <div style={{ padding:"12px 16px", borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between" }}>
+            <div style={{ color:T.red, fontWeight:800, fontSize:13 }}>↓ Outflows — GHS {totalOutflows.toLocaleString()}</div>
+          </div>
+          {[...filteredVendor.map(i=>({name:i.vendor_name,desc:i.event_name,amount:i.amount,date:i.created_at,type:"Vendor"})),...filteredStaff.map(r=>({name:r.staff_name,desc:r.description,amount:r.amount,date:r.submitted_at,type:"Staff"})),...filteredVouchers.map(v=>({name:v.payee,desc:v.description,amount:v.amount,date:v.created_at,type:"Voucher"}))].sort((a,b)=>new Date(b.date)-new Date(a.date)).map((item,i) => (
+            <div key={i} style={{ padding:"10px 16px", borderBottom:`1px solid ${T.border}22`, display:"flex", justifyContent:"space-between" }}>
+              <div><div style={{ color:T.textPrimary, fontSize:13, fontWeight:600 }}>{item.name}</div><div style={{ color:T.textMuted, fontSize:11 }}>{item.desc} · <span style={{ color:T.amber }}>{item.type}</span></div></div>
+              <div style={{ textAlign:"right" }}><div style={{ color:T.red, fontWeight:700 }}>GHS {parseFloat(item.amount||0).toLocaleString()}</div><div style={{ color:T.textMuted, fontSize:10 }}>{new Date(item.date).toLocaleDateString("en-GB")}</div></div>
+            </div>
+          ))}
+          {filteredVendor.length===0&&filteredStaff.length===0&&filteredVouchers.length===0&&<div style={{ padding:"24px", color:T.textMuted, fontSize:13, textAlign:"center" }}>No outflows recorded</div>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ZohoSyncStatusView = ({ user }) => {
+  const [vouchers, setVouchers] = useState([]);
+  const [clientPayments, setClientPayments] = useState([]);
+  const [vendorInvoices, setVendorInvoices] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      const [{ data: vo }, { data: cp }, { data: vi }] = await Promise.all([
+        supabase.from("payment_vouchers").select("*").order("created_at", { ascending: false }),
+        supabase.from("client_payments").select("*").order("created_at", { ascending: false }),
+        supabase.from("vendor_invoices").select("*").order("created_at", { ascending: false }),
+      ]);
+      setVouchers(vo||[]);
+      setClientPayments(cp||[]);
+      setVendorInvoices(vi||[]);
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  const syncedVouchers = vouchers.filter(v => v.zoho_id);
+  const unsyncedVouchers = vouchers.filter(v => !v.zoho_id);
+  const syncedInvoices = vendorInvoices.filter(i => i.zoho_invoice_id);
+  const unsyncedInvoices = vendorInvoices.filter(i => !i.zoho_invoice_id);
+
+  if (loading) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"40vh" }}><div style={{ width:32, height:32, border:`3px solid ${T.border}`, borderTop:`3px solid ${T.cyan}`, borderRadius:"50%", animation:"spin 0.8s linear infinite" }} /></div>;
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}` }}>
+        <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Finance</div>
+        <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Zoho Sync Status</h2>
+        <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Track which WorkRoom records have been pushed to Zoho Books</div>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))", gap:12, marginBottom:24 }}>
+        {[
+          { label:"Vouchers Synced", value:syncedVouchers.length+"/"+vouchers.length, color:T.teal },
+          { label:"Vouchers Pending", value:unsyncedVouchers.length, color:unsyncedVouchers.length>0?T.amber:T.teal },
+          { label:"Invoices Synced", value:syncedInvoices.length+"/"+vendorInvoices.length, color:T.cyan },
+          { label:"Invoices Pending", value:unsyncedInvoices.length, color:unsyncedInvoices.length>0?T.amber:T.teal },
+        ].map(k => (
+          <div key={k.label} style={{ padding:"14px 16px", background:T.surface, border:`1px solid ${T.border}`, borderTop:`2px solid ${k.color}`, borderRadius:10 }}>
+            <div style={{ color:k.color, fontSize:20, fontWeight:900 }}>{k.value}</div>
+            <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginTop:4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ background:T.surface, border:`1px solid ${T.amber}30`, borderRadius:12, padding:"16px 20px", marginBottom:20 }}>
+        <div style={{ color:T.amber, fontWeight:800, fontSize:14, marginBottom:8 }}>⚠ Records Not Yet in Zoho</div>
+        <div style={{ color:T.textMuted, fontSize:13 }}>The following WorkRoom records need to be manually entered or synced into Zoho Books:</div>
+        {unsyncedVouchers.length > 0 && (
+          <div style={{ marginTop:12 }}>
+            <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:6 }}>Payment Vouchers ({unsyncedVouchers.length})</div>
+            {unsyncedVouchers.slice(0,5).map(v => (
+              <div key={v.id} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:`1px solid ${T.border}22` }}>
+                <span style={{ color:T.textPrimary, fontSize:12 }}>{v.voucher_number} — {v.payee}</span>
+                <span style={{ color:T.amber, fontSize:12, fontWeight:700 }}>GHS {parseFloat(v.amount||0).toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {unsyncedInvoices.length > 0 && (
+          <div style={{ marginTop:12 }}>
+            <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:6 }}>Vendor Invoices ({unsyncedInvoices.length})</div>
+            {unsyncedInvoices.slice(0,5).map(i => (
+              <div key={i.id} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:`1px solid ${T.border}22` }}>
+                <span style={{ color:T.textPrimary, fontSize:12 }}>{i.vendor_name} — {i.event_name}</span>
+                <span style={{ color:T.amber, fontSize:12, fontWeight:700 }}>GHS {parseFloat(i.amount||0).toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {unsyncedVouchers.length===0 && unsyncedInvoices.length===0 && (
+          <div style={{ color:T.teal, fontSize:13, fontWeight:700, marginTop:8 }}>✓ All records are in Zoho</div>
+        )}
+      </div>
+
+      <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:"16px 20px" }}>
+        <div style={{ color:T.textPrimary, fontWeight:800, fontSize:14, marginBottom:12 }}>All Payment Vouchers</div>
+        <table style={{ width:"100%", borderCollapse:"collapse" }}>
+          <thead>
+            <tr style={{ background:T.bg }}>
+              {["Voucher #","Payee","Amount","Status","Zoho Status"].map(h => (
+                <th key={h} style={{ padding:"8px 12px", color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", textAlign:"left", borderBottom:`1px solid ${T.border}` }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {vouchers.map((v,i) => (
+              <tr key={v.id} style={{ borderBottom:i<vouchers.length-1?`1px solid ${T.border}44`:"none" }}>
+                <td style={{ padding:"10px 12px", color:T.cyan, fontWeight:700, fontSize:12 }}>{v.voucher_number}</td>
+                <td style={{ padding:"10px 12px", color:T.textPrimary, fontSize:12 }}>{v.payee}</td>
+                <td style={{ padding:"10px 12px", color:T.amber, fontWeight:700, fontSize:12 }}>GHS {parseFloat(v.amount||0).toLocaleString()}</td>
+                <td style={{ padding:"10px 12px" }}><span style={{ background:v.status==="paid"?"#10B98118":T.amber+"18", color:v.status==="paid"?"#10B981":T.amber, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700 }}>{v.status}</span></td>
+                <td style={{ padding:"10px 12px" }}><span style={{ background:v.zoho_id?T.teal+"18":T.red+"18", color:v.zoho_id?T.teal:T.red, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700 }}>{v.zoho_id?"✓ In Zoho":"Not Synced"}</span></td>
+              </tr>
+            ))}
+            {vouchers.length===0 && <tr><td colSpan={5} style={{ padding:"30px 0", textAlign:"center", color:T.textMuted }}>No vouchers yet</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+const AuditTrailView = ({ user }) => {
+  const [notifications, setNotifications] = useState([]);
+  const [vouchers, setVouchers] = useState([]);
+  const [staffRequests, setStaffRequests] = useState([]);
+  const [pos, setPOs] = useState([]);
+  const [clientPayments, setClientPayments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    const load = async () => {
+      const [{ data: no }, { data: vo }, { data: sr }, { data: po }, { data: cp }] = await Promise.all([
+        supabase.from("notifications").select("*").order("created_at", { ascending: false }).limit(200),
+        supabase.from("payment_vouchers").select("*").order("created_at", { ascending: false }),
+        supabase.from("staff_payment_requests").select("*").order("submitted_at", { ascending: false }),
+        supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }),
+        supabase.from("client_payments").select("*").order("created_at", { ascending: false }),
+      ]);
+      setNotifications(no||[]);
+      setVouchers(vo||[]);
+      setStaffRequests(sr||[]);
+      setPOs(po||[]);
+      setClientPayments(cp||[]);
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  // Build unified audit log
+  const auditLog = [
+    ...vouchers.map(v => ({ id:"v-"+v.id, type:"payment", category:"Voucher", action:"Payment Voucher "+v.voucher_number+" raised for "+v.payee, amount:v.amount, status:v.status, date:v.created_at, actor:v.raised_by })),
+    ...staffRequests.map(r => ({ id:"sr-"+r.id, type:"staff", category:"Staff Payment", action:r.staff_name+" requested GHS "+parseFloat(r.amount||0).toLocaleString()+" — "+r.description, amount:r.amount, status:r.status, date:r.submitted_at, actor:r.staff_id })),
+    ...pos.map(p => ({ id:"po-"+p.id, type:"procurement", category:"Purchase Order", action:"PO "+p.internal_po_number+" created for "+p.vendor_name, amount:p.amount, status:p.status, date:p.created_at, actor:null })),
+    ...clientPayments.map(p => ({ id:"cp-"+p.id, type:"revenue", category:"Client Payment", action:"Payment of GHS "+parseFloat(p.amount||0).toLocaleString()+" received from "+p.client_name+" for "+p.event_name, amount:p.amount, status:"received", date:p.created_at, actor:p.recorded_by })),
+  ].sort((a,b) => new Date(b.date) - new Date(a.date));
+
+  const filtered = auditLog.filter(e => {
+    if (filter !== "all" && e.type !== filter) return false;
+    if (search && !e.action.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  const typeColors = { payment:T.amber, staff:T.cyan, procurement:T.teal, revenue:"#10B981" };
+  const typeIcons = { payment:"💳", staff:"👤", procurement:"📋", revenue:"💰" };
+
+  if (loading) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"40vh" }}><div style={{ width:32, height:32, border:`3px solid ${T.border}`, borderTop:`3px solid ${T.cyan}`, borderRadius:"50%", animation:"spin 0.8s linear infinite" }} /></div>;
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}` }}>
+        <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Finance</div>
+        <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Audit Trail</h2>
+        <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Immutable record of all financial actions — {auditLog.length} entries</div>
+      </div>
+
+      <div style={{ display:"flex", gap:12, marginBottom:20 }}>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search actions..."
+          style={{ flex:1, padding:"9px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }} />
+        <select value={filter} onChange={e=>setFilter(e.target.value)} style={{ padding:"9px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+          <option value="all">All Types</option>
+          <option value="payment">Vouchers</option>
+          <option value="staff">Staff Payments</option>
+          <option value="procurement">Purchase Orders</option>
+          <option value="revenue">Client Payments</option>
+        </select>
+      </div>
+
+      <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, overflow:"hidden" }}>
+        {filtered.length === 0 ? (
+          <div style={{ padding:"60px 0", textAlign:"center", color:T.textMuted }}>No entries found</div>
+        ) : filtered.map((entry, i) => (
+          <div key={entry.id} style={{ display:"flex", alignItems:"flex-start", gap:14, padding:"14px 18px", borderBottom:i<filtered.length-1?`1px solid ${T.border}44`:"none" }}>
+            <div style={{ width:36, height:36, borderRadius:8, background:(typeColors[entry.type]||T.textMuted)+"18", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>{typeIcons[entry.type]||"📝"}</div>
+            <div style={{ flex:1 }}>
+              <div style={{ color:T.textPrimary, fontSize:13, fontWeight:600 }}>{entry.action}</div>
+              <div style={{ display:"flex", gap:10, marginTop:4, alignItems:"center" }}>
+                <span style={{ background:(typeColors[entry.type]||T.textMuted)+"18", color:typeColors[entry.type]||T.textMuted, padding:"1px 8px", borderRadius:20, fontSize:10, fontWeight:700 }}>{entry.category}</span>
+                <span style={{ color:T.textMuted, fontSize:11 }}>{entry.date ? new Date(entry.date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—"}</span>
+                {entry.status && <span style={{ color:T.textMuted, fontSize:11, textTransform:"capitalize" }}>· {entry.status.replace(/_/g," ")}</span>}
+              </div>
+            </div>
+            {entry.amount && <div style={{ color:T.amber, fontWeight:800, fontSize:14, flexShrink:0 }}>GHS {parseFloat(entry.amount||0).toLocaleString()}</div>}
+          </div>
+        ))}
       </div>
     </div>
   );

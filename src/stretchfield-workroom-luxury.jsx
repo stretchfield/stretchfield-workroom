@@ -1671,8 +1671,21 @@ const StaffDashboard = ({ user }) => {
   const [savingPayReq, setSavingPayReq] = useState(false);
   const [events, setEvents] = useState([]);
   const [notifs, setNotifs] = useState([]);
+  const [bankForm, setBankForm] = useState({ bank_name:"", bank_branch:"", bank_account_name:"", bank_account_number:"", mobile_money_number:"" });
+  const [showBankForm, setShowBankForm] = useState(false);
+  const [savingBank, setSavingBank] = useState(false);
+  const [bankSubmitted, setBankSubmitted] = useState(false);
+  const [bankRequested, setBankRequested] = useState(false);
 
   useEffect(() => {
+    // Check bank details status
+    supabase.from("profiles").select("bank_name, bank_account_name, bank_account_number, bank_branch, mobile_money_number, bank_details_requested").eq("id", user.id).single().then(({ data }) => {
+      if (data) {
+        setBankRequested(data.bank_details_requested || false);
+        setBankSubmitted(!!(data.bank_name && data.bank_account_number));
+        if (data.bank_name) setBankForm({ bank_name: data.bank_name||"", bank_branch: data.bank_branch||"", bank_account_name: data.bank_account_name||"", bank_account_number: data.bank_account_number||"", mobile_money_number: data.mobile_money_number||"" });
+      }
+    });
     supabase.from("tasks").select("*").eq("assignee_id", user.id).order("created_at", { ascending: false }).then(({ data }) => setTasks(data || []));
     // For Strategy Lead: load all active events then filter client-side for multi-assign support
     supabase.from("projects").select("*").eq("status", "active").then(({ data }) => {
@@ -1695,8 +1708,56 @@ const StaffDashboard = ({ user }) => {
   const pending = tasks.filter(t => t.status !== "completed");
   const dueSoon = tasks.filter(t => t.deadline && new Date(t.deadline) <= new Date(Date.now() + 3 * 86400000) && t.status !== "completed");
 
+  const saveBankDetails = async () => {
+    if (!bankForm.bank_name || !bankForm.bank_account_number) { alert("Bank name and account number are required."); return; }
+    setSavingBank(true);
+    await supabase.from("profiles").update({
+      bank_name: bankForm.bank_name,
+      bank_branch: bankForm.bank_branch,
+      bank_account_name: bankForm.bank_account_name,
+      bank_account_number: bankForm.bank_account_number,
+      mobile_money_number: bankForm.mobile_money_number,
+    }).eq("id", user.id);
+    const { data: fms } = await supabase.from("profiles").select("id").eq("role","Finance Manager");
+    for (const fm of fms||[]) {
+      await supabase.from("notifications").insert({ user_id: fm.id, title: "Bank Details Submitted — " + user.name, message: user.name + " has submitted their bank details: " + bankForm.bank_name + " · Acc: " + bankForm.bank_account_number, type: "finance" });
+    }
+    setSavingBank(false);
+    setBankSubmitted(true);
+    setShowBankForm(false);
+  };
+
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
+
+      {/* ── BANK DETAILS REQUEST BANNER ── */}
+      {bankRequested && !bankSubmitted && (
+        <div style={{ background:`linear-gradient(135deg,${T.amber}12,${T.amber}06)`, border:`1px solid ${T.amber}40`, borderRadius:12, padding:"16px 20px", marginBottom:20 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:12 }}>
+            <div>
+              <div style={{ color:T.amber, fontWeight:800, fontSize:14 }}>💳 Bank Details Required</div>
+              <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>Finance has requested your bank details for payment processing.</div>
+            </div>
+            <button onClick={() => setShowBankForm(!showBankForm)} style={{ background:`linear-gradient(135deg,${T.amber},#F59E0B)`, border:"none", color:"#060B14", padding:"8px 18px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>
+              {showBankForm ? "Close" : "Submit Bank Details"}
+            </button>
+          </div>
+          {showBankForm && (
+            <div style={{ marginTop:16 }}>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:12 }}>
+                {[["Bank Name *","bank_name","e.g. GCB Bank"],["Branch Name","bank_branch","e.g. Accra Main"],["Account Name","bank_account_name","Name on account"],["Account Number *","bank_account_number","Account number"],["Mobile Money Number","mobile_money_number","e.g. 0244123456"]].map(([label,key,ph]) => (
+                  <div key={key}>
+                    <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>{label}</div>
+                    <input value={bankForm[key]} onChange={e=>setBankForm(f=>({...f,[key]:e.target.value}))} placeholder={ph}
+                      style={{ width:"100%", padding:"8px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                  </div>
+                ))}
+              </div>
+              <button onClick={saveBankDetails} disabled={savingBank} style={{ background:`linear-gradient(135deg,${T.amber},#F59E0B)`, border:"none", color:"#060B14", padding:"10px 24px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{savingBank?"Saving...":"Save Bank Details"}</button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── HERO ── */}
       <div style={{ background: `linear-gradient(135deg, ${T.bgDeep} 0%, #0D1F36 60%, ${T.bgDeep} 100%)`, border: `1px solid ${T.border}`, borderRadius: 16, padding: "32px 36px", marginBottom: 24, position: "relative", overflow: "hidden" }}>
@@ -8110,9 +8171,29 @@ const FinanceDashboard = ({ user, onTab }) => {
       {financeTab === 'staff-requests' && (
         <div>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
-            <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16 }}>Staff Payment Requests</div>
-            <span style={{ color:T.amber, fontSize:12, fontWeight:700 }}>{(staffRequests||[]).filter(r=>r.status==="pending").length} pending</span>
+            <div>
+              <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16 }}>Staff Payment Requests</div>
+              <span style={{ color:T.amber, fontSize:12, fontWeight:700 }}>{(staffRequests||[]).filter(r=>["pending","pending_ceo"].includes(r.status)).length} pending</span>
+            </div>
+            <button onClick={async () => {
+              const { data: staff } = await supabase.from("profiles").select("id,name,role,bank_name,bank_account_number").not("role","in","(Client,Vendor,Board of Directors,CEO,Finance Manager)");
+              const noBank = staff?.filter(s => !s.bank_name || !s.bank_account_number) || [];
+              if (noBank.length === 0) { alert("All staff have submitted bank details."); return; }
+              const names = noBank.map((s,i) => (i+1)+". "+s.name+" ("+s.role+")").join("\n");
+              const choice = window.prompt("Request bank details from:\n\n"+names+"\n\nEnter number (or 0 for all):");
+              if (choice === null) return;
+              const targets = choice === "0" ? noBank : [noBank[parseInt(choice)-1]].filter(Boolean);
+              for (const s of targets) {
+                await supabase.from("profiles").update({ bank_details_requested: true }).eq("id", s.id);
+                await supabase.from("notifications").insert({ user_id: s.id, title: "Bank Details Required", message: "Finance has requested your bank details for payment processing. Please log in and submit your details.", type: "finance" });
+              }
+              alert("Request sent to "+targets.map(s=>s.name).join(", "));
+            }} style={{ background:`linear-gradient(135deg,${T.amber},#F59E0B)`, border:"none", color:"#060B14", padding:"8px 16px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:12 }}>💳 Request Bank Details</button>
           </div>
+          {/* Staff with submitted bank details */}
+          {(() => {
+            return null; // Bank details shown in separate section below
+          })()}
           {(staffRequests||[]).length === 0 ? (
             <div style={{ color:T.textMuted, fontSize:13, textAlign:"center", padding:"40px 0" }}>No staff payment requests yet</div>
           ) : (staffRequests||[]).map(req => {

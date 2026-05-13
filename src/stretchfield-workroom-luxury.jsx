@@ -21083,6 +21083,504 @@ const ProcurementReportView = ({ user }) => {
   );
 };
 
+
+const EventBriefsView = ({ user }) => {
+  const [briefs, setBriefs] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [selectedBrief, setSelectedBrief] = useState(null);
+  const [modal, setModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ project_id:"", event_name:"", client_objectives:"", audience_profile:"", key_messages:"", success_metrics:"", dietary_requirements:"", accessibility_needs:"", dress_code:"", tone:"professional", special_instructions:"" });
+
+  const TONES = ["professional","formal","celebratory","corporate","creative","intimate","high-energy"];
+
+  const load = async () => {
+    const [{ data: b }, { data: ev }] = await Promise.all([
+      supabase.from("event_briefs").select("*").order("created_at", { ascending: false }),
+      supabase.from("projects").select("*").order("event_date", { ascending: false }),
+    ]);
+    setBriefs(b||[]); setEvents(ev||[]);
+  };
+  useEffect(() => { load(); }, []);
+
+  const handleSave = async () => {
+    if (!form.project_id) { alert("Select an event."); return; }
+    setSaving(true);
+    const existing = briefs.find(b => b.project_id === form.project_id);
+    if (existing) {
+      await supabase.from("event_briefs").update({ ...form, updated_at: new Date().toISOString() }).eq("id", existing.id);
+    } else {
+      await supabase.from("event_briefs").insert({ ...form, created_by: user.id });
+    }
+    setSaving(false); setModal(false);
+    setForm({ project_id:"", event_name:"", client_objectives:"", audience_profile:"", key_messages:"", success_metrics:"", dietary_requirements:"", accessibility_needs:"", dress_code:"", tone:"professional", special_instructions:"" });
+    load();
+  };
+
+  const toneColors = { professional:T.cyan, formal:"#8B5CF6", celebratory:"#F59E0B", corporate:T.teal, creative:T.magenta, intimate:"#EC4899", "high-energy":T.red };
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <div>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Events</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Event Briefs</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Client objectives, audience profile and key messages per event</div>
+        </div>
+        <button onClick={() => { setForm({ project_id:"", event_name:"", client_objectives:"", audience_profile:"", key_messages:"", success_metrics:"", dietary_requirements:"", accessibility_needs:"", dress_code:"", tone:"professional", special_instructions:"" }); setModal(true); }} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>+ Create Brief</button>
+      </div>
+
+      {selectedBrief ? (
+        <div>
+          <button onClick={() => setSelectedBrief(null)} style={{ background:"none", border:"none", color:T.textMuted, cursor:"pointer", fontSize:12, fontWeight:700, padding:"0 0 16px 0", display:"flex", alignItems:"center", gap:4 }}>← Back to Briefs</button>
+          <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:16, padding:"28px 32px" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:24 }}>
+              <div>
+                <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>Event Brief</div>
+                <div style={{ color:T.textPrimary, fontWeight:900, fontSize:20 }}>{selectedBrief.event_name}</div>
+              </div>
+              <div style={{ display:"flex", gap:8 }}>
+                <span style={{ background:(toneColors[selectedBrief.tone]||T.cyan)+"18", color:toneColors[selectedBrief.tone]||T.cyan, padding:"4px 14px", borderRadius:20, fontSize:11, fontWeight:700, textTransform:"capitalize" }}>{selectedBrief.tone}</span>
+                <button onClick={() => { setForm({...selectedBrief}); setModal(true); }} style={{ background:T.cyan+"15", border:`1px solid ${T.cyan}30`, color:T.cyan, padding:"5px 14px", borderRadius:7, cursor:"pointer", fontSize:11, fontWeight:700 }}>✎ Edit</button>
+              </div>
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:20 }}>
+              {[
+                ["Client Objectives", selectedBrief.client_objectives],
+                ["Audience Profile", selectedBrief.audience_profile],
+                ["Key Messages", selectedBrief.key_messages],
+                ["Success Metrics", selectedBrief.success_metrics],
+                ["Dietary Requirements", selectedBrief.dietary_requirements],
+                ["Accessibility Needs", selectedBrief.accessibility_needs],
+                ["Dress Code", selectedBrief.dress_code],
+                ["Special Instructions", selectedBrief.special_instructions],
+              ].filter(([,v]) => v).map(([label, value]) => (
+                <div key={label} style={{ background:T.bg, borderRadius:10, padding:"16px 18px" }}>
+                  <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:8 }}>{label}</div>
+                  <div style={{ color:T.textSecondary, fontSize:13, lineHeight:1.7 }}>{value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+          {events.map(ev => {
+            const brief = briefs.find(b => b.project_id === ev.id);
+            return (
+              <div key={ev.id} style={{ background:T.surface, border:`1px solid ${brief?T.teal+"40":T.border}`, borderLeft:`3px solid ${brief?T.teal:T.border}`, borderRadius:12, padding:"16px 20px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <div>
+                  <div style={{ color:T.textPrimary, fontWeight:700, fontSize:14 }}>{ev.name}</div>
+                  <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{ev.client} · {ev.event_date?new Date(ev.event_date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):"TBC"}</div>
+                  {brief && <div style={{ color:T.teal, fontSize:11, fontWeight:700, marginTop:4 }}>✓ Brief Created · {new Date(brief.updated_at||brief.created_at).toLocaleDateString("en-GB")}</div>}
+                  {!brief && <div style={{ color:T.amber, fontSize:11, fontWeight:700, marginTop:4 }}>⚠ No brief yet</div>}
+                </div>
+                <div style={{ display:"flex", gap:8 }}>
+                  {brief && <button onClick={() => setSelectedBrief(brief)} style={{ background:T.teal+"15", border:`1px solid ${T.teal}30`, color:T.teal, padding:"6px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700 }}>View →</button>}
+                  <button onClick={() => { if(brief) setForm({...brief}); else setForm(f=>({...f,project_id:ev.id,event_name:ev.name})); setModal(true); }} style={{ background:T.cyan+"15", border:`1px solid ${T.cyan}30`, color:T.cyan, padding:"6px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700 }}>{brief?"Edit":"Create Brief"}</button>
+                </div>
+              </div>
+            );
+          })}
+          {events.length===0 && <div style={{ textAlign:"center", padding:60, background:T.surface, borderRadius:12, border:`1px solid ${T.border}`, color:T.textMuted }}>No events assigned</div>}
+        </div>
+      )}
+
+      {modal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setModal(false)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:620, maxHeight:"90vh", overflowY:"auto", padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:20 }}>Event Brief</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Event *</label>
+              <select value={form.project_id} onChange={e=>{ const ev=events.find(x=>x.id===e.target.value); setForm(f=>({...f,project_id:e.target.value,event_name:ev?.name||""})); }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                <option value="">Select event...</option>{events.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+              </select></div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Tone</label>
+                <select value={form.tone} onChange={e=>setForm(f=>({...f,tone:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  {TONES.map(t=><option key={t}>{t}</option>)}
+                </select></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Dress Code</label>
+                <input value={form.dress_code} onChange={e=>setForm(f=>({...f,dress_code:e.target.value}))} placeholder="e.g. Business Formal" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              </div>
+              {[["Client Objectives","client_objectives","What does the client want to achieve?"],["Audience Profile","audience_profile","Who is attending? Demographics, roles, expectations"],["Key Messages","key_messages","What must attendees take away?"],["Success Metrics","success_metrics","How will we measure success?"],["Dietary Requirements","dietary_requirements","Any dietary needs or restrictions?"],["Accessibility Needs","accessibility_needs","Mobility, hearing, visual or other needs"],["Special Instructions","special_instructions","Any other specific requirements"]].map(([label,key,ph])=>(
+                <div key={key}><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>{label}</label>
+                <textarea value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))} rows={2} placeholder={ph} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} /></div>
+              ))}
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <button onClick={handleSave} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Save Brief"}</button>
+              <button onClick={()=>setModal(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const EventMilestonesView = ({ user }) => {
+  const [milestones, setMilestones] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [staff, setStaff] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState("all");
+  const [modal, setModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ project_id:"", event_name:"", title:"", due_date:"", assigned_to:"", assigned_name:"", category:"logistics", status:"pending", notes:"" });
+
+  const CATEGORIES = ["logistics","venue","vendor","client","content","technical","staffing","marketing","finance"];
+  const catColors = { logistics:T.cyan, venue:T.teal, vendor:T.amber, client:T.magenta, content:"#8B5CF6", technical:"#F97316", staffing:"#10B981", marketing:T.blue, finance:T.red };
+
+  const load = async () => {
+    const [{ data: m }, { data: ev }, { data: st }] = await Promise.all([
+      supabase.from("event_milestones").select("*").order("due_date", { ascending: true }),
+      supabase.from("projects").select("*").order("event_date", { ascending: true }),
+      supabase.from("profiles").select("id,name,role").not("role","in","(Client,Vendor,Board of Directors)"),
+    ]);
+    setMilestones(m||[]); setEvents(ev||[]); setStaff(st||[]);
+  };
+  useEffect(() => { load(); }, []);
+
+  const filtered = selectedEvent === "all" ? milestones : milestones.filter(m => m.project_id === selectedEvent);
+  const overdue = filtered.filter(m => m.due_date && new Date(m.due_date) < new Date() && m.status === "pending");
+  const upcoming = filtered.filter(m => m.due_date && new Date(m.due_date) >= new Date() && m.status === "pending");
+  const completed = filtered.filter(m => m.status === "completed");
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <div>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Events</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Event Timeline</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>{overdue.length} overdue · {upcoming.length} upcoming · {completed.length} completed</div>
+        </div>
+        <div style={{ display:"flex", gap:10 }}>
+          <select value={selectedEvent} onChange={e=>setSelectedEvent(e.target.value)} style={{ padding:"9px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+            <option value="all">All Events</option>
+            {events.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+          </select>
+          <button onClick={() => setModal(true)} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>+ Add Milestone</button>
+        </div>
+      </div>
+
+      {overdue.length > 0 && (
+        <div style={{ background:T.red+"12", border:`1px solid ${T.red}30`, borderRadius:12, padding:"14px 18px", marginBottom:20 }}>
+          <div style={{ color:T.red, fontWeight:800, fontSize:13, marginBottom:6 }}>⚠ {overdue.length} Overdue Milestone{overdue.length>1?"s":""}</div>
+          {overdue.map(m => <div key={m.id} style={{ color:T.textSecondary, fontSize:12, padding:"2px 0" }}>• {m.title} {m.event_name?"— "+m.event_name:""} (due {new Date(m.due_date).toLocaleDateString("en-GB")})</div>)}
+        </div>
+      )}
+
+      <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+        {filtered.map(m => {
+          const color = catColors[m.category] || T.cyan;
+          const isOverdue = m.due_date && new Date(m.due_date) < new Date() && m.status === "pending";
+          const daysLeft = m.due_date ? Math.ceil((new Date(m.due_date)-new Date())/86400000) : null;
+          return (
+            <div key={m.id} style={{ background:T.surface, border:`1px solid ${isOverdue?T.red+"30":T.border}`, borderLeft:`3px solid ${m.status==="completed"?T.teal:isOverdue?T.red:color}`, borderRadius:10, padding:"14px 18px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div style={{ flex:1 }}>
+                <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:4 }}>
+                  <div style={{ color:m.status==="completed"?T.textMuted:T.textPrimary, fontWeight:700, fontSize:13, textDecoration:m.status==="completed"?"line-through":"none" }}>{m.title}</div>
+                  <span style={{ background:color+"18", color:color, padding:"1px 8px", borderRadius:20, fontSize:9, fontWeight:700, textTransform:"capitalize" }}>{m.category}</span>
+                  {m.status==="completed" && <span style={{ color:T.teal, fontSize:10, fontWeight:700 }}>✓ Done</span>}
+                </div>
+                <div style={{ display:"flex", gap:12, alignItems:"center" }}>
+                  {m.event_name && <span style={{ color:T.textMuted, fontSize:11 }}>{m.event_name}</span>}
+                  {m.assigned_name && <span style={{ color:T.textMuted, fontSize:11 }}>→ {m.assigned_name}</span>}
+                  {m.due_date && <span style={{ color:isOverdue?T.red:daysLeft<=3?T.amber:T.textMuted, fontSize:11, fontWeight:isOverdue||daysLeft<=3?700:400 }}>{isOverdue?"Overdue":daysLeft===0?"Today":daysLeft+"d left"} · {new Date(m.due_date).toLocaleDateString("en-GB")}</span>}
+                </div>
+                {m.notes && <div style={{ color:T.textMuted, fontSize:11, marginTop:4, fontStyle:"italic" }}>{m.notes}</div>}
+              </div>
+              {m.status === "pending" && (
+                <button onClick={async()=>{ await supabase.from("event_milestones").update({status:"completed",completed_at:new Date().toISOString()}).eq("id",m.id); load(); }} style={{ background:T.teal+"15", border:`1px solid ${T.teal}30`, color:T.teal, padding:"5px 12px", borderRadius:7, cursor:"pointer", fontSize:11, fontWeight:700, flexShrink:0, marginLeft:12 }}>✓ Complete</button>
+              )}
+            </div>
+          );
+        })}
+        {filtered.length===0 && <div style={{ textAlign:"center", padding:60, background:T.surface, borderRadius:12, border:`1px solid ${T.border}`, color:T.textMuted }}>No milestones yet</div>}
+      </div>
+
+      {modal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={()=>setModal(false)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:500, padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:20 }}>Add Milestone</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Event</label>
+              <select value={form.project_id} onChange={e=>{ const ev=events.find(x=>x.id===e.target.value); setForm(f=>({...f,project_id:e.target.value,event_name:ev?.name||""})); }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                <option value="">Select event...</option>{events.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+              </select></div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Milestone Title *</label>
+              <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="e.g. Confirm venue layout with client" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Category</label>
+                <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  {CATEGORIES.map(c=><option key={c}>{c}</option>)}
+                </select></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Due Date</label>
+                <input type="date" value={form.due_date} onChange={e=>setForm(f=>({...f,due_date:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              </div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Assign To</label>
+              <select value={form.assigned_to} onChange={e=>{ const s=staff.find(x=>x.id===e.target.value); setForm(f=>({...f,assigned_to:e.target.value,assigned_name:s?.name||""})); }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                <option value="">Unassigned</option>{staff.map(s=><option key={s.id} value={s.id}>{s.name} ({s.role})</option>)}
+              </select></div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Notes</label>
+              <textarea value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} rows={2} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} /></div>
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <button onClick={async()=>{ if(!form.title){alert("Title required.");return;} setSaving(true); await supabase.from("event_milestones").insert({...form,created_by:user.id}); setSaving(false); setModal(false); setForm({project_id:"",event_name:"",title:"",due_date:"",assigned_to:"",assigned_name:"",category:"logistics",status:"pending",notes:""}); load(); }} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Add Milestone"}</button>
+              <button onClick={()=>setModal(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ESLPerformanceView = ({ user }) => {
+  const [events, setEvents] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [satisfaction, setSatisfaction] = useState([]);
+  const [debriefs, setDebriefs] = useState([]);
+  const [milestones, setMilestones] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      const [{ data: ev }, { data: tk }, { data: sat }, { data: db }, { data: ms }] = await Promise.all([
+        supabase.from("projects").select("*").order("event_date", { ascending: false }),
+        supabase.from("tasks").select("*").eq("assignee_id", user.id),
+        supabase.from("client_satisfaction").select("*"),
+        supabase.from("event_debrief").select("*").eq("submitted_by", user.id),
+        supabase.from("event_milestones").select("*").eq("assigned_to", user.id),
+      ]);
+      setEvents(ev||[]); setTasks(tk||[]); setSatisfaction(sat||[]); setDebriefs(db||[]); setMilestones(ms||[]);
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  const myEvents = events.filter(e => e.assigned_to === user.id || (Array.isArray(e.assigned_to_ids) && e.assigned_to_ids.includes(user.id)));
+  const completedTasks = tasks.filter(t => t.status === "completed");
+  const pendingTasks = tasks.filter(t => t.status !== "completed");
+  const overdueTasks = pendingTasks.filter(t => t.deadline && new Date(t.deadline) < new Date());
+  const completionRate = tasks.length > 0 ? Math.round((completedTasks.length/tasks.length)*100) : 0;
+  const avgSat = satisfaction.length > 0 ? (satisfaction.reduce((s,r)=>s+(r.rating||0),0)/satisfaction.length).toFixed(1) : null;
+  const debriefRate = myEvents.length > 0 ? Math.round((debriefs.length/myEvents.length)*100) : 0;
+  const milestonesCompleted = milestones.filter(m=>m.status==="completed").length;
+
+  if (loading) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"40vh" }}><div style={{ width:32, height:32, border:`3px solid ${T.border}`, borderTop:`3px solid ${T.cyan}`, borderRadius:"50%", animation:"spin 0.8s linear infinite" }} /></div>;
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}` }}>
+        <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Performance</div>
+        <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>My Performance</h2>
+        <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Your event impact and productivity metrics</div>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:12, marginBottom:24 }}>
+        {[
+          { label:"Events Assigned", value:myEvents.length, color:T.cyan },
+          { label:"Tasks Completed", value:completedTasks.length+"/"+tasks.length, color:T.teal },
+          { label:"Completion Rate", value:completionRate+"%", color:completionRate>=80?T.teal:completionRate>=50?T.amber:T.red },
+          { label:"Overdue Tasks", value:overdueTasks.length, color:overdueTasks.length>0?T.red:T.teal },
+          { label:"Client Satisfaction", value:avgSat?avgSat+"/5":"—", color:avgSat&&parseFloat(avgSat)>=4?T.teal:T.amber },
+          { label:"Debriefs Submitted", value:debriefs.length+"/"+myEvents.length, color:debriefRate>=80?T.teal:T.amber },
+          { label:"Milestones Done", value:milestonesCompleted+"/"+milestones.length, color:T.magenta },
+        ].map(k => (
+          <div key={k.label} style={{ padding:"14px 16px", background:T.surface, border:`1px solid ${T.border}`, borderTop:`2px solid ${k.color}`, borderRadius:10 }}>
+            <div style={{ color:k.color, fontSize:20, fontWeight:900 }}>{k.value}</div>
+            <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginTop:4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Task completion progress */}
+      <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:"20px 24px", marginBottom:20 }}>
+        <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:16 }}>Task Completion Progress</div>
+        <div style={{ height:12, background:T.border, borderRadius:6, overflow:"hidden", marginBottom:8 }}>
+          <div style={{ height:"100%", width:completionRate+"%", background:`linear-gradient(90deg,${completionRate>=80?T.teal:completionRate>=50?T.amber:T.red},${T.cyan})`, borderRadius:6, transition:"width 0.5s" }} />
+        </div>
+        <div style={{ display:"flex", justifyContent:"space-between", color:T.textMuted, fontSize:11 }}>
+          <span>{completedTasks.length} completed</span>
+          <span style={{ color:completionRate>=80?T.teal:T.amber, fontWeight:700 }}>{completionRate}%</span>
+          <span>{pendingTasks.length} pending</span>
+        </div>
+      </div>
+
+      {/* My Events */}
+      <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, overflow:"hidden" }}>
+        <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.border}`, color:T.textPrimary, fontWeight:800, fontSize:14 }}>My Events</div>
+        {myEvents.length === 0 ? (
+          <div style={{ padding:"40px 0", textAlign:"center", color:T.textMuted }}>No events assigned</div>
+        ) : myEvents.map((ev, i) => {
+          const evTasks = tasks.filter(t => t.project_id === ev.id);
+          const evCompleted = evTasks.filter(t => t.status==="completed");
+          const hasDebrief = debriefs.some(d => d.project_id === ev.id);
+          const evSat = satisfaction.filter(s => s.project_id === ev.id);
+          const evAvgSat = evSat.length > 0 ? (evSat.reduce((s,r)=>s+(r.rating||0),0)/evSat.length).toFixed(1) : null;
+          return (
+            <div key={ev.id} style={{ padding:"14px 18px", borderBottom:i<myEvents.length-1?`1px solid ${T.border}44`:"none", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div>
+                <div style={{ color:T.textPrimary, fontWeight:700, fontSize:13 }}>{ev.name}</div>
+                <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>{ev.event_date?new Date(ev.event_date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):"TBC"} · {ev.phase||"Planning"}</div>
+              </div>
+              <div style={{ display:"flex", gap:16, alignItems:"center" }}>
+                <div style={{ textAlign:"center" }}><div style={{ color:T.cyan, fontWeight:700, fontSize:13 }}>{evCompleted.length}/{evTasks.length}</div><div style={{ color:T.textMuted, fontSize:9, textTransform:"uppercase" }}>Tasks</div></div>
+                <div style={{ textAlign:"center" }}><div style={{ color:hasDebrief?T.teal:T.amber, fontWeight:700, fontSize:13 }}>{hasDebrief?"✓":"—"}</div><div style={{ color:T.textMuted, fontSize:9, textTransform:"uppercase" }}>Debrief</div></div>
+                {evAvgSat && <div style={{ textAlign:"center" }}><div style={{ color:T.teal, fontWeight:700, fontSize:13 }}>{evAvgSat}/5</div><div style={{ color:T.textMuted, fontSize:9, textTransform:"uppercase" }}>Sat.</div></div>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const OutreachPlannerView = ({ user }) => {
+  const [activities, setActivities] = useState([]);
+  const [opportunities, setOpportunities] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ opportunity_id:"", company:"", type:"call", content:"", scheduled_date:"", scheduled_time:"" });
+  const [weekOffset, setWeekOffset] = useState(0);
+
+  const TYPES = ["call","meeting","email","demo","follow-up","proposal"];
+  const typeColors = { call:T.cyan, meeting:T.teal, email:T.amber, demo:"#8B5CF6", "follow-up":"#F97316", proposal:T.magenta };
+
+  useEffect(() => {
+    const load = async () => {
+      const [{ data: act }, { data: opp }] = await Promise.all([
+        supabase.from("opportunity_activities").select("*").eq("created_by", user.id).order("scheduled_date", { ascending: true }),
+        supabase.from("opportunities").select("*").or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`).order("company"),
+      ]);
+      setActivities(act||[]); setOpportunities(opp||[]);
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  // Get week dates
+  const now = new Date();
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - now.getDay() + 1 + weekOffset * 7);
+  const weekDays = Array.from({length:7}, (_,i) => { const d = new Date(weekStart); d.setDate(weekStart.getDate()+i); return d; });
+  const weekLabel = `${weekDays[0].toLocaleDateString("en-GB",{day:"numeric",month:"short"})} – ${weekDays[6].toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}`;
+
+  const getActivitiesForDay = (date) => {
+    const dateStr = date.toISOString().slice(0,10);
+    return activities.filter(a => a.scheduled_date === dateStr);
+  };
+
+  const scheduledThisWeek = activities.filter(a => {
+    if (!a.scheduled_date) return false;
+    const d = new Date(a.scheduled_date);
+    return d >= weekDays[0] && d <= weekDays[6];
+  });
+
+  if (loading) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"40vh" }}><div style={{ width:32, height:32, border:`3px solid ${T.border}`, borderTop:`3px solid ${T.cyan}`, borderRadius:"50%", animation:"spin 0.8s linear infinite" }} /></div>;
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <div>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>S&M</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Outreach Planner</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>{scheduledThisWeek.length} activities this week</div>
+        </div>
+        <button onClick={() => setModal(true)} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>+ Schedule Activity</button>
+      </div>
+
+      {/* Week navigator */}
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+        <button onClick={()=>setWeekOffset(w=>w-1)} style={{ background:T.surface, border:`1px solid ${T.border}`, color:T.textMuted, padding:"6px 14px", borderRadius:7, cursor:"pointer", fontSize:12 }}>← Prev</button>
+        <div style={{ color:T.textPrimary, fontWeight:700, fontSize:14 }}>{weekLabel}</div>
+        <button onClick={()=>setWeekOffset(w=>w+1)} style={{ background:T.surface, border:`1px solid ${T.border}`, color:T.textMuted, padding:"6px 14px", borderRadius:7, cursor:"pointer", fontSize:12 }}>Next →</button>
+      </div>
+
+      {/* Week grid */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:8, marginBottom:24 }}>
+        {weekDays.map((day, i) => {
+          const dayActivities = getActivitiesForDay(day);
+          const isToday = day.toDateString() === new Date().toDateString();
+          const isPast = day < new Date() && !isToday;
+          return (
+            <div key={i} style={{ background:T.surface, border:`1px solid ${isToday?T.cyan:T.border}`, borderRadius:10, padding:"10px 8px", minHeight:100 }}>
+              <div style={{ color:isToday?T.cyan:isPast?T.textMuted:T.textPrimary, fontWeight:isToday?800:600, fontSize:11, marginBottom:6, textAlign:"center" }}>
+                <div>{["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][i]}</div>
+                <div style={{ fontSize:16, fontWeight:900 }}>{day.getDate()}</div>
+              </div>
+              {dayActivities.map(a => (
+                <div key={a.id} style={{ background:(typeColors[a.type]||T.cyan)+"20", borderRadius:4, padding:"3px 6px", marginBottom:3, fontSize:10, fontWeight:700, color:typeColors[a.type]||T.cyan, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                  {a.scheduled_time?.slice(0,5)} {a.content?.slice(0,15)}
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Activity list */}
+      <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, overflow:"hidden" }}>
+        <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.border}`, color:T.textPrimary, fontWeight:800, fontSize:14 }}>All Scheduled Activities</div>
+        {activities.filter(a=>a.scheduled_date).sort((a,b)=>new Date(a.scheduled_date)-new Date(b.scheduled_date)).map((a,i,arr) => {
+          const color = typeColors[a.type] || T.cyan;
+          const opp = opportunities.find(o => o.id === a.opportunity_id);
+          return (
+            <div key={a.id} style={{ padding:"12px 18px", borderBottom:i<arr.length-1?`1px solid ${T.border}44`:"none", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div style={{ display:"flex", gap:12, alignItems:"center" }}>
+                <div style={{ width:36, height:36, borderRadius:8, background:color+"18", display:"flex", alignItems:"center", justifyContent:"center", color:color, fontSize:11, fontWeight:800, textTransform:"capitalize", flexShrink:0 }}>{a.type?.slice(0,3)}</div>
+                <div>
+                  <div style={{ color:T.textPrimary, fontWeight:700, fontSize:13 }}>{opp?.company||"—"}</div>
+                  <div style={{ color:T.textMuted, fontSize:12 }}>{a.content}</div>
+                </div>
+              </div>
+              <div style={{ textAlign:"right", flexShrink:0, marginLeft:12 }}>
+                <div style={{ color:T.textPrimary, fontWeight:700, fontSize:12 }}>{a.scheduled_date?new Date(a.scheduled_date).toLocaleDateString("en-GB",{day:"numeric",month:"short"}):"—"}</div>
+                {a.scheduled_time && <div style={{ color:T.textMuted, fontSize:11 }}>{a.scheduled_time?.slice(0,5)}</div>}
+                <span style={{ background:color+"18", color:color, padding:"1px 8px", borderRadius:20, fontSize:9, fontWeight:700, textTransform:"capitalize" }}>{a.type}</span>
+              </div>
+            </div>
+          );
+        })}
+        {activities.filter(a=>a.scheduled_date).length===0 && <div style={{ padding:"40px 0", textAlign:"center", color:T.textMuted }}>No scheduled activities yet</div>}
+      </div>
+
+      {modal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={()=>setModal(false)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:460, padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:20 }}>Schedule Activity</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Opportunity</label>
+              <select value={form.opportunity_id} onChange={e=>{ const o=opportunities.find(x=>x.id===e.target.value); setForm(f=>({...f,opportunity_id:e.target.value,company:o?.company||""})); }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                <option value="">Select opportunity...</option>{opportunities.map(o=><option key={o.id} value={o.id}>{o.company}</option>)}
+              </select></div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Type</label>
+                <select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  {TYPES.map(t=><option key={t}>{t}</option>)}
+                </select></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Date</label>
+                <input type="date" value={form.scheduled_date} onChange={e=>setForm(f=>({...f,scheduled_date:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              </div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Time</label>
+              <input type="time" value={form.scheduled_time} onChange={e=>setForm(f=>({...f,scheduled_time:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Notes</label>
+              <textarea value={form.content} onChange={e=>setForm(f=>({...f,content:e.target.value}))} rows={2} placeholder="What will you discuss?" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} /></div>
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <button onClick={async()=>{ if(!form.opportunity_id&&!form.company){alert("Select an opportunity.");return;} setSaving(true); await supabase.from("opportunity_activities").insert({...form,created_by:user.id,created_by_name:user.name}); setSaving(false); setModal(false); setForm({opportunity_id:"",company:"",type:"call",content:"",scheduled_date:"",scheduled_time:""}); const{data}=await supabase.from("opportunity_activities").select("*").eq("created_by",user.id).order("scheduled_date",{ascending:true}); setActivities(data||[]); }} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Schedule"}</button>
+              <button onClick={()=>setModal(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const BudgetVsActualsView = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);

@@ -6417,6 +6417,74 @@ const ClientPaymentsView = ({ user }) => {
   );
 };
 
+
+const ClientEventsView = ({ user }) => {
+  const [events, setEvents] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.from("projects").select("*").order("event_date", { ascending: false }).then(({ data }) => {
+      setEvents(data || []);
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"40vh" }}><div style={{ width:32, height:32, border:`3px solid ${T.border}`, borderTop:`3px solid ${T.cyan}`, borderRadius:"50%", animation:"spin 0.8s linear infinite" }} /></div>;
+
+  if (selectedEvent) return <InternalEventPortal event={selectedEvent} user={user} allTasks={[]} onClose={() => setSelectedEvent(null)} />;
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}` }}>
+        <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Events</div>
+        <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Your Events</h2>
+        <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>{events.length} event{events.length!==1?"s":""} managed by Stretchfield</div>
+      </div>
+      {events.length === 0 ? (
+        <div style={{ textAlign:"center", padding:60, background:T.surface, borderRadius:12, border:`1px solid ${T.border}` }}>
+          <div style={{ fontSize:40, marginBottom:16 }}>📅</div>
+          <div style={{ color:T.textPrimary, fontWeight:700, fontSize:16 }}>No events yet</div>
+        </div>
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+          {events.map(e => {
+            const eventDate = e.event_date ? new Date(e.event_date) : null;
+            const now = new Date();
+            const daysLeft = eventDate ? Math.ceil((eventDate - now) / 86400000) : null;
+            const isPast = daysLeft !== null && daysLeft < 0;
+            const dotColor = isPast ? T.textMuted : daysLeft !== null && daysLeft <= 7 ? T.red : T.teal;
+            return (
+              <div key={e.id} onClick={() => setSelectedEvent(e)} style={{ background:T.surface, border:`1px solid ${T.border}`, borderLeft:`3px solid ${dotColor}`, borderRadius:12, padding:"18px 20px", cursor:"pointer" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                  <div>
+                    <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:4 }}>{e.event_category||"Event"}</div>
+                    <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16 }}>{e.name}</div>
+                    <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>{eventDate ? eventDate.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"}) : "Date TBC"}</div>
+                  </div>
+                  <div style={{ display:"flex", gap:8, alignItems:"center", flexShrink:0, marginLeft:16 }}>
+                    {daysLeft !== null && (
+                      <div style={{ background:`${dotColor}18`, border:`1px solid ${dotColor}30`, borderRadius:8, padding:"6px 12px", textAlign:"center" }}>
+                        <div style={{ color:dotColor, fontSize:16, fontWeight:900 }}>{isPast ? Math.abs(daysLeft) : daysLeft===0?"Today":daysLeft}</div>
+                        <div style={{ color:dotColor, fontSize:9, textTransform:"uppercase" }}>{isPast?"days ago":"days"}</div>
+                      </div>
+                    )}
+                    <span style={{ color:T.cyan, fontSize:12, fontWeight:700 }}>Open →</span>
+                  </div>
+                </div>
+                <div style={{ marginTop:10, display:"flex", gap:8, flexWrap:"wrap" }}>
+                  <span style={{ background:T.bg, color:T.textMuted, padding:"2px 10px", borderRadius:20, fontSize:10, fontWeight:700, textTransform:"uppercase" }}>{e.phase||"Planning"}</span>
+                  {e.client && <span style={{ background:T.cyan+"15", color:T.cyan, padding:"2px 10px", borderRadius:20, fontSize:10, fontWeight:700 }}>{e.client}</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function StretchfieldWorkRoom({ user: propUser, profile: propProfile, onLogout }) {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);

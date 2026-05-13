@@ -6790,6 +6790,14 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "decision-log": return <DecisionLogView user={currentUser} />;
       case "competitor-intel": return <CompetitorIntelView user={currentUser} />;
       case "revenue-forecast": return <RevenueForecastView user={currentUser} />;
+      case "vendor-performance": return <VendorPerformanceView user={currentUser} />;
+      case "vendor-contracts": return <VendorContractsView user={currentUser} />;
+      case "preferred-vendors": return <PreferredVendorsView user={currentUser} />;
+      case "vendor-watchlist": return <VendorWatchlistView user={currentUser} />;
+      case "vendor-comms": return <VendorCommsView user={currentUser} />;
+      case "vendor-sla": return <VendorSLAView user={currentUser} />;
+      case "market-rates": return <MarketRatesView user={currentUser} />;
+      case "procurement-report": return <ProcurementReportView user={currentUser} />;
       case "ceo-broadcast": return <CEOBroadcastView user={currentUser} />;
       case "approval-queue": return <ApprovalQueueView user={currentUser} onNavigate={setActiveTab} />;
       case "vendor-ratings": return <VendorRatingsView user={currentUser} />;

@@ -854,39 +854,26 @@ const getNavItems = (role, user) => {
     ];
   }
   if (role === "Vendor Manager") {
-    return [
-      { id: "dashboard", label: "Dashboard", group: true },
-      { id: "grp-procurement", label: "Procurement", group: true, children: [
-        { id: "vendors", label: "RFFs & Approvals" },
-        { id: "vendor-assignment", label: "Vendor Assignment" },
-        { id: "quotes-received", label: "Quotes Received" },
-        { id: "quote-comparison", label: "Quote Comparison & Award" },
-        { id: "purchase-orders", label: "Sign Purchase Orders" },
-        { id: "budget-vs-actuals", label: "Budget vs Actuals" },
-      ]},
-      { id: "grp-vendor-mgmt", label: "Vendor Management", group: true, children: [
-        { id: "vendor-onboarding", label: "Vendor Directory" },
-        { id: "vendor-performance", label: "Vendor Performance" },
-        { id: "vendor-contracts", label: "Contract Management" },
-        { id: "preferred-vendors", label: "Preferred Vendor List" },
-        { id: "vendor-watchlist", label: "Watchlist & Flags" },
-        { id: "vendor-comms", label: "Vendor Communications" },
-      ]},
-      { id: "grp-intel", label: "Intelligence", group: true, children: [
-        { id: "scorecards", label: "Vendor Scorecards" },
-        { id: "vendor-analytics", label: "Vendor Analytics" },
-        { id: "vendor-sla", label: "SLA Tracker" },
-        { id: "market-rates", label: "Market Rates" },
-        { id: "procurement-report", label: "Procurement Report" },
-      ]},
-      { id: "grp-events-vm", label: "Events", group: true, children: [
-        { id: "event-reports", label: "Event Reports" },
-        { id: "invoices", label: "Invoices" },
-      ]},
-      { id: "feedback-summary", label: "Feedback", icon: "▪" },
-      { id: "calendar", label: "Calendar", icon: "▪" },
-      { id: "notifications", label: "Notifications", icon: "▪" },
-    ];
+    base.push(
+      { id: "vendors", label: "Vendors & RFFs", icon: "▪" },
+      { id: "vendor-onboarding", label: "Vendor Directory", icon: "▪" },
+      { id: "vendor-performance", label: "Vendor Performance", icon: "▪" },
+      { id: "vendor-contracts", label: "Contract Management", icon: "▪" },
+      { id: "preferred-vendors", label: "Preferred Vendors", icon: "▪" },
+      { id: "vendor-watchlist", label: "Watchlist & Flags", icon: "▪" },
+      { id: "vendor-comms", label: "Vendor Comms", icon: "▪" },
+      { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" },
+      { id: "quotes-received", label: "Quotes Received", icon: "▪" },
+      { id: "quote-comparison", label: "Quote Comparison", icon: "▪" },
+      { id: "scorecards", label: "Vendor Scorecards", icon: "▪" },
+      { id: "vendor-analytics", label: "Vendor Analytics", icon: "▪" },
+      { id: "vendor-sla", label: "SLA Tracker", icon: "▪" },
+      { id: "market-rates", label: "Market Rates", icon: "▪" },
+      { id: "purchase-orders", label: "Sign Purchase Orders", icon: "▪" },
+      { id: "procurement-report", label: "Procurement Report", icon: "▪" },
+      { id: "event-reports", label: "Event Reports", icon: "▪" },
+      { id: "budget-vs-actuals", label: "Budget vs Actuals", icon: "▪" }
+    );
   }
   if (["CEO","Country Manager","Vendor Manager","Finance Manager"].includes(role)) {
     base.push({ id: "invoices", label: "Invoices", icon: "▪" });

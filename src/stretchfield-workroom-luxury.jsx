@@ -6729,6 +6729,8 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "decision-log": return <DecisionLogView user={currentUser} />;
       case "competitor-intel": return <CompetitorIntelView user={currentUser} />;
       case "revenue-forecast": return <RevenueForecastView user={currentUser} />;
+      case "ceo-broadcast": return <CEOBroadcastView user={currentUser} />;
+      case "approval-queue": return <ApprovalQueueView user={currentUser} onNavigate={setActiveTab} />;
       case "vendor-ratings": return <VendorRatingsView user={currentUser} />;
       case "rff-approvals": return <RFFApprovalsView user={currentUser} />;
       case "vendor-assignment": return <VendorAssignmentView user={currentUser} />;
@@ -18665,6 +18667,262 @@ const AuditTrailView = ({ user }) => {
 };
 
 
+
+
+const CEOBroadcastView = ({ user }) => {
+  const [broadcasts, setBroadcasts] = useState([]);
+  const [staff, setStaff] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ title:"", message:"", audience:"all", specific_roles:[], specific_ids:[], priority:"normal" });
+
+  const ROLES = ["Finance Manager","Vendor Manager","Strategy & Events Lead","Sales & Marketing","Country Manager"];
+  const PRIORITIES = ["normal","important","urgent"];
+  const priorityColors = { normal:T.cyan, important:T.amber, urgent:T.red };
+
+  const load = async () => {
+    const [{ data: b }, { data: s }] = await Promise.all([
+      supabase.from("notifications").select("*").eq("type","broadcast").order("created_at", { ascending: false }).limit(50),
+      supabase.from("profiles").select("id,name,role").not("role","in","(Client,Vendor,Board of Directors)").order("name"),
+    ]);
+    setBroadcasts(b||[]); setStaff(s||[]);
+  };
+  useEffect(() => { load(); }, []);
+
+  const handleSend = async () => {
+    if (!form.title || !form.message) { alert("Title and message required."); return; }
+    setSaving(true);
+
+    let targets = [];
+    if (form.audience === "all") {
+      targets = staff.map(s => s.id);
+    } else if (form.audience === "roles") {
+      targets = staff.filter(s => form.specific_roles.includes(s.role)).map(s => s.id);
+    } else if (form.audience === "specific") {
+      targets = form.specific_ids;
+    }
+
+    // Insert notification for each target
+    for (const uid of targets) {
+      if (uid !== user.id) {
+        await supabase.from("notifications").insert({
+          user_id: uid,
+          title: (form.priority === "urgent" ? "🚨 URGENT: " : form.priority === "important" ? "⚠ " : "") + form.title,
+          message: form.message,
+          type: "broadcast",
+        });
+      }
+    }
+
+    setSaving(false); setModal(false);
+    setForm({ title:"", message:"", audience:"all", specific_roles:[], specific_ids:[], priority:"normal" });
+    load();
+    alert(`Broadcast sent to ${targets.length} team member${targets.length!==1?"s":""}.`);
+  };
+
+  const audienceLabel = (b) => {
+    if (!b.title) return "All Staff";
+    return "Team";
+  };
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <div>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Communications</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>CEO Broadcast</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Send announcements directly to your team</div>
+        </div>
+        <button onClick={() => setModal(true)} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"10px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>📢 New Broadcast</button>
+      </div>
+
+      {/* Recent broadcasts */}
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        {broadcasts.length === 0 ? (
+          <div style={{ textAlign:"center", padding:60, background:T.surface, borderRadius:12, border:`1px solid ${T.border}` }}>
+            <div style={{ fontSize:40, marginBottom:12 }}>📢</div>
+            <div style={{ color:T.textPrimary, fontWeight:700, fontSize:16 }}>No broadcasts yet</div>
+            <div style={{ color:T.textMuted, fontSize:13, marginTop:6 }}>Send your first broadcast to the team.</div>
+          </div>
+        ) : broadcasts.map((b,i) => {
+          const isUrgent = b.title?.startsWith("🚨");
+          const isImportant = b.title?.startsWith("⚠");
+          const color = isUrgent ? T.red : isImportant ? T.amber : T.cyan;
+          return (
+            <div key={b.id} style={{ background:T.surface, border:`1px solid ${color}30`, borderLeft:`3px solid ${color}`, borderRadius:12, padding:"16px 20px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ color:T.textPrimary, fontWeight:800, fontSize:14, marginBottom:4 }}>{b.title}</div>
+                  <div style={{ color:T.textSecondary, fontSize:13, lineHeight:1.6 }}>{b.message}</div>
+                </div>
+                <div style={{ color:T.textMuted, fontSize:11, marginLeft:16, flexShrink:0 }}>{new Date(b.created_at).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {modal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setModal(false)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:520, maxHeight:"90vh", overflowY:"auto", padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:20 }}>New Broadcast</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Priority</label>
+                <select value={form.priority} onChange={e=>setForm(f=>({...f,priority:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${priorityColors[form.priority]}40`, borderRadius:8, color:priorityColors[form.priority], fontSize:13, fontFamily:"inherit", outline:"none", fontWeight:700 }}>
+                  {PRIORITIES.map(p=><option key={p} value={p}>{p.charAt(0).toUpperCase()+p.slice(1)}</option>)}
+                </select></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Audience</label>
+                <select value={form.audience} onChange={e=>setForm(f=>({...f,audience:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  <option value="all">All Staff</option>
+                  <option value="roles">Specific Roles</option>
+                  <option value="specific">Specific People</option>
+                </select></div>
+              </div>
+
+              {form.audience === "roles" && (
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:6 }}>Select Roles</label>
+                <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+                  {ROLES.map(r => (
+                    <button key={r} onClick={() => setForm(f => ({ ...f, specific_roles: f.specific_roles.includes(r) ? f.specific_roles.filter(x=>x!==r) : [...f.specific_roles, r] }))}
+                      style={{ padding:"5px 12px", borderRadius:20, border:`1px solid ${form.specific_roles.includes(r)?T.cyan:T.border}`, background:form.specific_roles.includes(r)?T.cyan+"20":"none", color:form.specific_roles.includes(r)?T.cyan:T.textMuted, fontSize:11, fontWeight:700, cursor:"pointer" }}>{r}</button>
+                  ))}
+                </div></div>
+              )}
+
+              {form.audience === "specific" && (
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:6 }}>Select People</label>
+                <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                  {staff.filter(s=>s.id!==user.id).map(s => (
+                    <label key={s.id} style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", padding:"6px 10px", background:form.specific_ids.includes(s.id)?T.cyan+"12":"none", borderRadius:8 }}>
+                      <input type="checkbox" checked={form.specific_ids.includes(s.id)} onChange={e => setForm(f=>({ ...f, specific_ids: e.target.checked ? [...f.specific_ids,s.id] : f.specific_ids.filter(x=>x!==s.id) }))} />
+                      <span style={{ color:T.textPrimary, fontSize:13 }}>{s.name}</span>
+                      <span style={{ color:T.textMuted, fontSize:11 }}>{s.role}</span>
+                    </label>
+                  ))}
+                </div></div>
+              )}
+
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Subject *</label>
+              <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="e.g. Important update on WHO event" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Message *</label>
+              <textarea value={form.message} onChange={e=>setForm(f=>({...f,message:e.target.value}))} rows={5} placeholder="Your message to the team..." style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} /></div>
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <button onClick={handleSend} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${priorityColors[form.priority]},${form.priority==="urgent"?"#F97316":form.priority==="important"?"#F59E0B":T.teal})`, border:"none", color:form.priority==="normal"?"#060B14":"#fff", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Sending...":"📢 Send Broadcast"}</button>
+              <button onClick={()=>setModal(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ApprovalQueueView = ({ user, onNavigate }) => {
+  const [rffs, setRffs] = useState([]);
+  const [pos, setPOs] = useState([]);
+  const [staffRequests, setStaffRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    const [{ data: rf }, { data: po }, { data: sr }] = await Promise.all([
+      supabase.from("rffs").select("*,projects(name)").eq("approved", false).order("created_at", { ascending: false }),
+      supabase.from("purchase_orders").select("*").not("status","in","(published,draft)").order("created_at", { ascending: false }),
+      supabase.from("staff_payment_requests").select("*").eq("status","pending_ceo").order("submitted_at", { ascending: false }),
+    ]);
+    setRffs(rf||[]); setPOs(po||[]); setStaffRequests(sr||[]);
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []);
+
+  const totalPending = rffs.length + pos.filter(p=>p.status==="vm_signed"||p.status==="finance_signed").length + staffRequests.length;
+
+  if (loading) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"40vh" }}><div style={{ width:32, height:32, border:`3px solid ${T.border}`, borderTop:`3px solid ${T.cyan}`, borderRadius:"50%", animation:"spin 0.8s linear infinite" }} /></div>;
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}` }}>
+        <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>CEO</div>
+        <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Approval Queue</h2>
+        <div style={{ color:totalPending>0?T.amber:T.teal, fontSize:12, marginTop:4, fontWeight:700 }}>{totalPending} item{totalPending!==1?"s":""} awaiting your attention</div>
+      </div>
+
+      {totalPending === 0 && (
+        <div style={{ textAlign:"center", padding:80, background:T.surface, borderRadius:12, border:`1px solid ${T.border}` }}>
+          <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
+          <div style={{ color:T.teal, fontWeight:800, fontSize:18 }}>All clear</div>
+          <div style={{ color:T.textMuted, fontSize:13, marginTop:8 }}>Nothing awaiting your approval right now.</div>
+        </div>
+      )}
+
+      {/* RFFs awaiting approval */}
+      {rffs.length > 0 && (
+        <div style={{ marginBottom:24 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+            <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16 }}>RFFs Awaiting Approval <span style={{ color:T.amber, fontSize:13 }}>({rffs.length})</span></div>
+            <button onClick={() => onNavigate && onNavigate("rff-approvals")} style={{ background:"none", border:`1px solid ${T.border}`, color:T.cyan, padding:"5px 14px", borderRadius:6, cursor:"pointer", fontSize:12, fontWeight:700 }}>View All RFFs →</button>
+          </div>
+          {rffs.slice(0,3).map(r => (
+            <div key={r.id} style={{ background:T.surface, border:`1px solid ${T.amber}30`, borderLeft:`3px solid ${T.amber}`, borderRadius:10, padding:"14px 18px", marginBottom:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div>
+                <div style={{ color:T.textPrimary, fontWeight:700, fontSize:13 }}>{r.title}</div>
+                <div style={{ color:T.textMuted, fontSize:12 }}>{r.projects?.name} · {r.event_name}</div>
+                <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>{new Date(r.created_at).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}</div>
+              </div>
+              <button onClick={() => onNavigate && onNavigate("rff-approvals")} style={{ background:T.amber+"20", border:`1px solid ${T.amber}40`, color:T.amber, padding:"6px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700 }}>Review →</button>
+            </div>
+          ))}
+          {rffs.length > 3 && <div style={{ color:T.textMuted, fontSize:12, textAlign:"center", marginTop:4 }}>+{rffs.length-3} more RFFs</div>}
+        </div>
+      )}
+
+      {/* POs awaiting CEO signature */}
+      {pos.filter(p=>p.status==="vm_signed"||p.status==="finance_signed").length > 0 && (
+        <div style={{ marginBottom:24 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+            <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16 }}>Purchase Orders to Sign <span style={{ color:T.cyan, fontSize:13 }}>({pos.filter(p=>p.status==="vm_signed"||p.status==="finance_signed").length})</span></div>
+            <button onClick={() => onNavigate && onNavigate("purchase-orders")} style={{ background:"none", border:`1px solid ${T.border}`, color:T.cyan, padding:"5px 14px", borderRadius:6, cursor:"pointer", fontSize:12, fontWeight:700 }}>View All POs →</button>
+          </div>
+          {pos.filter(p=>p.status==="vm_signed"||p.status==="finance_signed").slice(0,3).map(p => (
+            <div key={p.id} style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderLeft:`3px solid ${T.cyan}`, borderRadius:10, padding:"14px 18px", marginBottom:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div>
+                <div style={{ color:T.textPrimary, fontWeight:700, fontSize:13 }}>{p.internal_po_number} — {p.vendor_name}</div>
+                <div style={{ color:T.teal, fontWeight:700, fontSize:13 }}>GHS {parseFloat(p.amount||0).toLocaleString()}</div>
+                <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>Status: {p.status?.replace(/_/g," ")}</div>
+              </div>
+              <button onClick={() => onNavigate && onNavigate("purchase-orders")} style={{ background:T.cyan+"20", border:`1px solid ${T.cyan}40`, color:T.cyan, padding:"6px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700 }}>Sign →</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Staff payments awaiting CEO approval */}
+      {staffRequests.length > 0 && (
+        <div style={{ marginBottom:24 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+            <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16 }}>Staff Payment Requests <span style={{ color:T.teal, fontSize:13 }}>({staffRequests.length})</span></div>
+            <button onClick={() => onNavigate && onNavigate("payment-authorisation")} style={{ background:"none", border:`1px solid ${T.border}`, color:T.cyan, padding:"5px 14px", borderRadius:6, cursor:"pointer", fontSize:12, fontWeight:700 }}>View All →</button>
+          </div>
+          {staffRequests.slice(0,3).map(r => (
+            <div key={r.id} style={{ background:T.surface, border:`1px solid ${T.teal}30`, borderLeft:`3px solid ${T.teal}`, borderRadius:10, padding:"14px 18px", marginBottom:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div>
+                <div style={{ color:T.textPrimary, fontWeight:700, fontSize:13 }}>{r.staff_name}</div>
+                <div style={{ color:T.textMuted, fontSize:12 }}>{r.request_type?.replace(/_/g," ")} · {r.project_name}</div>
+                <div style={{ color:T.textSecondary, fontSize:12, marginTop:2 }}>{r.description}</div>
+              </div>
+              <div style={{ textAlign:"right" }}>
+                <div style={{ color:T.teal, fontWeight:900, fontSize:16 }}>GHS {parseFloat(r.amount||0).toLocaleString()}</div>
+                <button onClick={() => onNavigate && onNavigate("payment-authorisation")} style={{ background:T.teal+"20", border:`1px solid ${T.teal}40`, color:T.teal, padding:"5px 12px", borderRadius:7, cursor:"pointer", fontSize:11, fontWeight:700, marginTop:6 }}>Approve →</button>
+              </div>
+            </div>
+          ))}
+          {staffRequests.length > 3 && <div style={{ color:T.textMuted, fontSize:12, textAlign:"center", marginTop:4 }}>+{staffRequests.length-3} more requests</div>}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const RiskRegisterView = ({ user }) => {
   const [risks, setRisks] = useState([]);

@@ -7849,6 +7849,7 @@ const FinanceDashboard = ({ user, onTab }) => {
       <div style={{ display: 'flex', gap: 0, marginBottom: 28, borderBottom: `1px solid ${T.border}` }}>
         {[
           { id: 'overview', label: 'Overview' },
+          { id: 'staff-requests', label: 'Staff Requests', badge: (staffRequests||[]).filter(r=>r.status==="pending").length },
           { id: 'vouchers', label: 'Payment Vouchers', badge: pendingVouchers.length },
           { id: 'estimates', label: 'Estimates & Invoices' },
           { id: 'petty-cash', label: 'Petty Cash' },
@@ -8115,7 +8116,8 @@ const FinanceDashboard = ({ user, onTab }) => {
           {(staffRequests||[]).length === 0 ? (
             <div style={{ color:T.textMuted, fontSize:13, textAlign:"center", padding:"40px 0" }}>No staff payment requests yet</div>
           ) : (staffRequests||[]).map(req => {
-            const statusColors = { pending:T.amber, approved:T.teal, rejected:T.red, paid:"#10B981" };
+            const statusColors = { pending:T.amber, pending_ceo:T.cyan, approved:T.teal, rejected:T.red, paid:"#10B981" };
+            const statusLabels = { pending:"Pending Finance Review", pending_ceo:"Awaiting CEO Approval", approved:"CEO Approved", rejected:"Rejected", paid:"Paid" };
             return (
               <div key={req.id} style={{ background:T.surface, border:`1px solid ${req.status==="pending"?T.amber+"30":T.border}`, borderLeft:`4px solid ${statusColors[req.status]||T.border}`, borderRadius:12, padding:"16px 20px", marginBottom:10 }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>

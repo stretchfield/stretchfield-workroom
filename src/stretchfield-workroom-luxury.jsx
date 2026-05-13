@@ -8176,7 +8176,7 @@ const FinanceDashboard = ({ user, onTab }) => {
               <span style={{ color:T.amber, fontSize:12, fontWeight:700 }}>{(staffRequests||[]).filter(r=>["pending","pending_ceo"].includes(r.status)).length} pending</span>
             </div>
             <button onClick={async () => {
-              const { data: staff } = await supabase.from("profiles").select("id,name,role,bank_name,bank_account_number").not("role","in","(Client,Vendor,Board of Directors,CEO,Finance Manager)");
+              const { data: staff } = await supabase.from("profiles").select("id,name,role,bank_name,bank_account_number").not("role","in","(Client,Vendor,Board of Directors,Finance Manager)");
               const noBank = staff?.filter(s => !s.bank_name || !s.bank_account_number) || [];
               if (noBank.length === 0) { alert("All staff have submitted bank details."); return; }
               const names = noBank.map((s,i) => (i+1)+". "+s.name+" ("+s.role+")").join("\n");

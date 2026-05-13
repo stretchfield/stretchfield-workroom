@@ -1041,6 +1041,7 @@ const CEODashboard = ({ onTab, user }) => {
       setAwards(aw.data || []);
       setClientPayments(cp?.data || []);
       setLoading(false);
+      // Load unread broadcasts (CEO sees their own sent — no unread for CEO)
       // Check bank details
       const { data: bp } = await supabase.from("profiles").select("bank_name,bank_account_number,bank_branch,bank_account_name,mobile_money_number,bank_details_requested").eq("id", user.id).single();
       if (bp) {
@@ -1091,6 +1092,25 @@ const CEODashboard = ({ onTab, user }) => {
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
+
+      {/* ── CEO BROADCAST BANNERS (for CEO as recipient from board etc) ── */}
+      {unreadBroadcasts.map(b => {
+        const priorityColor = b.priority==="urgent"?T.red:b.priority==="important"?T.amber:T.cyan;
+        return (
+          <div key={b.id} style={{ background:`linear-gradient(135deg,${priorityColor}12,${priorityColor}06)`, border:`1px solid ${priorityColor}40`, borderRadius:12, padding:"16px 20px", marginBottom:12 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+              <div style={{ flex:1 }}>
+                <div style={{ color:T.textPrimary, fontWeight:800, fontSize:14, marginBottom:4 }}>{b.title}</div>
+                <div style={{ color:T.textSecondary, fontSize:13, lineHeight:1.6 }}>{b.message}</div>
+              </div>
+              <button onClick={async () => {
+                await supabase.from("ceo_broadcast_reads").insert({ broadcast_id:b.id, user_id:user.id });
+                setUnreadBroadcasts(prev => prev.filter(x => x.id !== b.id));
+              }} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"4px 12px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700, flexShrink:0, marginLeft:16 }}>✓ Read</button>
+            </div>
+          </div>
+        );
+      })}
 
       {/* ── BANK DETAILS BANNER ── */}
       {bankRequested && !bankSubmitted && (

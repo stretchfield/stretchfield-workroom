@@ -19704,13 +19704,13 @@ ${goals.map(g => `- ${g.title}: ${g.current_value}/${g.target_value} ${g.unit} (
 
 Write in a confident, strategic tone befitting a premium events company presenting to its board. Include: key achievements, operational highlights, pipeline health, financial position, and forward outlook. Use flowing paragraphs, no bullet points or markdown.`;
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch("/api/generate-report", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1000, messages:[{ role:"user", content:prompt }] })
+      body: JSON.stringify({ prompt })
     });
     const data = await response.json();
-    setReport(data.content?.[0]?.text || "Failed to generate report.");
+    setReport(data.text || "Failed to generate report.");
     setGenerating(false);
   };
 

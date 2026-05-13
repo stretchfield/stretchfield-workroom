@@ -8133,7 +8133,12 @@ const FinanceDashboard = ({ user, onTab }) => {
                 {req.status === "pending" && isFinance && (
                   <div style={{ display:"flex", gap:8 }}>
                     <button onClick={async () => {
-                      await supabase.from("staff_payment_requests").update({ status:"approved", reviewed_by:user.id, reviewed_at:new Date().toISOString() }).eq("id", req.id);
+                      await supabase.from("staff_payment_requests").update({ status:"pending_ceo", reviewed_by:user.id, reviewed_at:new Date().toISOString() }).eq("id", req.id);
+                      // Notify CEO for final approval
+                      const { data: ceos } = await supabase.from("profiles").select("id").eq("role","CEO");
+                      for (const ceo of ceos||[]) {
+                        await supabase.from("notifications").insert({ user_id: ceo.id, title: "Staff Payment Approval Required — " + req.staff_name, message: "Finance has reviewed " + req.staff_name + "'s payment request of GHS " + parseFloat(req.amount).toLocaleString() + " for " + req.description + ". Awaiting your approval.", type: "finance" });
+                      }
                       await supabase.from("notifications").insert({ user_id:req.staff_id, title:"Payment Request Approved", message:"Your payment request of GHS "+parseFloat(req.amount).toLocaleString()+" has been approved.", type:"finance" });
                       const { data: sr } = await supabase.from("staff_payment_requests").select("*").order("submitted_at", { ascending:false });
                       setStaffRequests(sr||[]);
@@ -17173,6 +17178,7 @@ Use professional, consultative language that positions Stretchfield as a strateg
 
 const PaymentAuthorisationView = ({ user, onNavigate }) => {
   const [auths, setAuths] = useState([]);
+  const [staffRequests, setStaffRequests] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [staffProfiles, setStaffProfiles] = useState([]);
   const [awards, setAwards] = useState([]);
@@ -17202,8 +17208,9 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
 
   const load = async () => {
     try {
-      const [au, vp, sp, aw, rf, inv, va] = await Promise.all([
+      const [au, sr, vp, sp, aw, rf, inv, va] = await Promise.all([
         supabase.from("payment_authorisations").select("*").order("created_at", { ascending: false }),
+        supabase.from("staff_payment_requests").select("*").eq("status","pending_ceo").order("submitted_at", { ascending: false }),
         supabase.from("profiles").select("*").eq("role", "Vendor"),
         supabase.from("profiles").select("*").in("role", ["Finance Manager","Vendor Manager","Strategy & Events Lead","CEO","Board of Directors","Sales & Marketing","Country Manager"]),
         supabase.from("rff_awards").select("*"),
@@ -17212,6 +17219,7 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
         supabase.from("vendor_applications").select("*").eq("status","login-created"),
       ]);
       setAuths(au.data || []);
+      setStaffRequests(sr.data || []);
       setVendors(vp.data || []);
       setStaffProfiles(sp.data || []);
       setAwards(aw.data || []);
@@ -17341,6 +17349,48 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
         </div>
         {isFinance && <button onClick={() => setShowForm(!showForm)} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#060B14", padding:"10px 20px", borderRadius:10, cursor:"pointer", fontWeight:800, fontSize:13 }}>+ New Payment Request</button>}
       </div>
+
+      {/* ── STAFF PAYMENT REQUESTS AWAITING CEO ── */}
+      {staffRequests.length > 0 && (
+        <div style={{ background:T.surface, border:`1px solid ${T.amber}30`, borderRadius:14, padding:"20px 24px", marginBottom:24 }}>
+          <div style={{ color:T.amber, fontSize:11, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:16 }}>⏳ Staff Payment Requests — Awaiting CEO Approval ({staffRequests.length})</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {staffRequests.map(req => (
+              <div key={req.id} style={{ background:T.bg, border:`1px solid ${T.border}`, borderRadius:10, padding:"14px 16px", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ color:T.textPrimary, fontWeight:700, fontSize:14 }}>{req.staff_name}</div>
+                  <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{req.project_name} · {req.request_type?.replace(/_/g," ")}</div>
+                  <div style={{ color:T.textSecondary, fontSize:12, marginTop:2 }}>{req.description}</div>
+                  <div style={{ color:T.textMuted, fontSize:11, marginTop:4 }}>Submitted {req.submitted_at ? new Date(req.submitted_at).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}) : "—"}</div>
+                </div>
+                <div style={{ textAlign:"right", minWidth:160 }}>
+                  <div style={{ color:T.teal, fontWeight:900, fontSize:18 }}>GHS {parseFloat(req.amount||0).toLocaleString()}</div>
+                  {isCEO && (
+                    <div style={{ display:"flex", gap:8, marginTop:10, justifyContent:"flex-end" }}>
+                      <button onClick={async () => {
+                        await supabase.from("staff_payment_requests").update({ status:"approved", ceo_approved_by:user.id, ceo_approved_at:new Date().toISOString() }).eq("id", req.id);
+                        await supabase.from("notifications").insert({ user_id: req.staff_id, title:"Payment Request Approved", message:"Your payment request of GHS "+parseFloat(req.amount).toLocaleString()+" for "+req.description+" has been approved by CEO.", type:"finance" });
+                        // Notify Finance to process
+                        const { data: fms } = await supabase.from("profiles").select("id").eq("role","Finance Manager");
+                        for (const fm of fms||[]) { await supabase.from("notifications").insert({ user_id:fm.id, title:"Staff Payment Approved — "+req.staff_name, message:"CEO approved "+req.staff_name+"'s payment of GHS "+parseFloat(req.amount).toLocaleString()+". Please process payment.", type:"finance" }); }
+                        load();
+                      }} style={{ background:T.teal+"20", border:`1px solid ${T.teal}40`, color:T.teal, padding:"6px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700 }}>✓ Approve</button>
+                      <button onClick={async () => {
+                        const reason = window.prompt("Reason for rejection:");
+                        if (!reason) return;
+                        await supabase.from("staff_payment_requests").update({ status:"rejected", notes:reason, ceo_approved_by:user.id, ceo_approved_at:new Date().toISOString() }).eq("id", req.id);
+                        await supabase.from("notifications").insert({ user_id: req.staff_id, title:"Payment Request Rejected", message:"Your payment request of GHS "+parseFloat(req.amount).toLocaleString()+" was not approved. Reason: "+reason, type:"finance" });
+                        load();
+                      }} style={{ background:T.red+"15", border:`1px solid ${T.red}30`, color:T.red, padding:"6px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700 }}>✗ Reject</button>
+                    </div>
+                  )}
+                  {isFinance && <div style={{ color:T.amber, fontSize:11, fontWeight:700, marginTop:8 }}>Awaiting CEO approval</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── NEW PAYMENT REQUEST FORM ── */}
       {showForm && isFinance && (

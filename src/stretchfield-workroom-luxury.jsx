@@ -11427,7 +11427,7 @@ const FinanceInvoicesView = ({ user }) => {
   <a href="https://workroom.stretchfield.com" style="background:linear-gradient(135deg,#00C8FF,#00E5C8);color:#060B14;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:800;font-size:14px;display:inline-block">Resubmit Invoice →</a>
 </td></tr>
 <tr><td style="background:#F8FAFC;padding:16px 32px;border-top:1px solid #E2E8F0">
-  <p style="margin:0;color:#94A3B8;font-size:11px;text-align:center">© ${new Date().getFullYear()} Stretchfield · workroom.stretchfield.com</p>
+  <p style="margin:0;color:#94A3B8;font-size:11px;text-align:center">© 2026 Stretchfield · workroom.stretchfield.com</p>
 </td></tr>
 </table></td></tr></table>
 </body></html>`;

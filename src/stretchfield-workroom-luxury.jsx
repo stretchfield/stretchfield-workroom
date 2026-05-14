@@ -772,12 +772,7 @@ const getNavItems = (role, user) => {
   if (["CEO","Sales & Marketing"].includes(role)) {
     base.push({ id: "crm", label: "CRM / Leads", icon: "▪" }, { id: "crm-insights", label: "CRM Insights", icon: "▪" }, { id: "sm-tasks", label: "S&M Tasks", icon: "▪" });
   }
-  if (["Strategy & Events Lead"].includes(role)) {
-    base.push({ id: "feedback-summary", label: "Feedback", icon: "▪" }, { id: "event-reports", label: "Event Reports", icon: "▪" });
-  }
-  if (["Strategy & Events Lead"].includes(role) && user?.has_sm_access) {
-    base.push({ id: "opportunities", label: "Opportunities", icon: "▪" }, { id: "crm", label: "CRM / Leads", icon: "▪" }, { id: "sm-tasks", label: "S&M Tasks", icon: "▪" });
-  }
+  // ESL nav handled by return [] below
   if (["CEO","Country Manager"].includes(role)) {
     base.push({ id: "vendors", label: "Vendors & RFFs", icon: "▪" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "▪" }, { id: "rff-approvals", label: "RFF Approvals", icon: "▪" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "▪" }, { id: "quotes-received", label: "Quotes Received", icon: "▪" }, { id: "quote-comparison", label: "Quote Comparison", icon: "▪" }, { id: "scorecards", label: "Vendor Scorecards", icon: "▪" }, { id: "vendor-analytics", label: "Vendor Analytics", icon: "▪" }, { id: "purchase-orders", label: "Sign Purchase Orders", icon: "▪" }, { id: "event-reports", label: "Event Reports", icon: "▪" });
   }
@@ -838,7 +833,6 @@ const getNavItems = (role, user) => {
       { id: "grp-intelligence", label: "Intelligence", group: true, children: [
         { id: "event-analysis", label: "Event Analysis" },
         { id: "strategy-map", label: "Strategy Map" },
-        { id: "impact-intelligence", label: "Impact Intelligence" },
         { id: "event-reports", label: "Event Reports" },
         { id: "board-report", label: "Board Report" },
         { id: "strategic-goals", label: "Strategic Goals & OKRs" },
@@ -884,8 +878,8 @@ const getNavItems = (role, user) => {
   if (["CEO","Country Manager","Finance Manager"].includes(role)) {
     base.push({ id: "finance", label: "Finance", icon: "▪" });
   }
-  if (["Finance Manager","CEO"].includes(role)) {
-    base.push({ id: "purchase-orders", label: "Purchase Orders", icon: "▪" }, { id: "vendor-invoices", label: "Vendor Invoices", icon: "▪" }, { id: "staff-payment-rates", label: "Staff Payment Rates", icon: "▪" }, { id: "client-payments", label: "Client Payments", icon: "▪" }, { id: "payment-directory", label: "Payment Directory", icon: "▪" }, { id: "cash-flow", label: "Cash Flow", icon: "▪" }, { id: "audit-trail", label: "Audit Trail", icon: "▪" }, { id: "zoho-sync-status", label: "Zoho Sync Status", icon: "▪" });
+  if (role === "Finance Manager") {
+    base.push({ id: "purchase-orders", label: "Purchase Orders", icon: "▪" }, { id: "vendor-invoices", label: "Vendor Invoices", icon: "▪" }, { id: "payment-authorisation", label: "Payment Authorisation", icon: "▪" }, { id: "staff-payment-rates", label: "Staff Payment Rates", icon: "▪" }, { id: "client-payments", label: "Client Payments", icon: "▪" }, { id: "payment-directory", label: "Payment Directory", icon: "▪" }, { id: "cash-flow", label: "Cash Flow", icon: "▪" }, { id: "audit-trail", label: "Audit Trail", icon: "▪" }, { id: "zoho-sync-status", label: "Zoho Sync Status", icon: "▪" });
   }
   if (["CEO"].includes(role)) {
     base.push({ id: "client-financials", label: "Client Financials", icon: "▪" });
@@ -16105,10 +16099,34 @@ const InvoicesView = () => {
                 <Badge status={inv.status} />
               </div>
               <div style={{ color: T.amber, fontSize: 20, fontWeight: 900, marginBottom: 12 }}>GHS {parseFloat(inv.amount||0).toLocaleString()}</div>
-              {inv.status === "pending" && (
-                <Btn small onClick={() => handleApprove(inv.id)}>✓ Approve</Btn>
-              )}
-              {inv.invoice_url && <a href={inv.invoice_url} target="_blank" rel="noreferrer" style={{ color:T.cyan, fontSize:11, fontWeight:700 }}>📎 View Invoice</a>}
+              <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginTop:8 }}>
+                {inv.status === "pending" && (
+                  <Btn small onClick={() => handleApprove(inv.id)}>✓ Approve</Btn>
+                )}
+                {inv.status === "approved" && (
+                  <Btn small onClick={async () => {
+                    const { data: newV } = await supabase.from("payment_vouchers").insert({
+                      payment_type: "project",
+                      payee: inv.vendor_name,
+                      payee_type: "vendor",
+                      description: "Payment for " + (inv.event_name||"services") + " — Invoice " + (inv.invoice_number||inv.id.slice(0,8)),
+                      amount: parseFloat(inv.amount||0),
+                      currency: "GHS",
+                      event_name: inv.event_name,
+                      invoice_ref: inv.invoice_number,
+                      raised_by: user.id,
+                      status: "pending_approval",
+                      voucher_number: "PV/" + new Date().getFullYear().toString().slice(-2) + "/" + String(Math.floor(Math.random()*900)+100),
+                    }).select().single();
+                    if (newV) {
+                      await supabase.from("vendor_invoices").update({ status: "voucher_created", purchase_order_id: newV.id }).eq("id", inv.id);
+                      alert("Payment voucher created: " + newV.voucher_number);
+                      load();
+                    }
+                  }}>💳 Create Voucher</Btn>
+                )}
+                {inv.invoice_url && <a href={inv.invoice_url} target="_blank" rel="noreferrer" style={{ color:T.cyan, fontSize:11, fontWeight:700, padding:"4px 8px" }}>📎 View</a>}
+              </div>
             </div>
           ))}
         </div>
@@ -19801,8 +19819,8 @@ const BoardReportView = ({ user }) => {
   }, []);
 
   const now = new Date();
-  const activeEvents = events.filter(e => !["Completed","Cancelled"].includes(e.phase||""));
-  const completedEvents = events.filter(e => e.phase === "Completed");
+  const activeEvents = events.filter(e => !["Completed","Cancelled","completed","cancelled"].includes(e.phase||""));
+  const completedEvents = events.filter(e => ["Completed","completed","Post-Event"].includes(e.phase||""));
   const revenueYTD = clientPayments.filter(p => new Date(p.payment_date).getFullYear() === now.getFullYear()).reduce((s,p) => s+parseFloat(p.amount||0), 0);
   const totalRevenue = clientPayments.reduce((s,p) => s+parseFloat(p.amount||0), 0);
   const pipeline = opportunities.filter(o => !["won","lost","Converted"].includes(o.status||""));
@@ -23209,7 +23227,7 @@ const EventsView = ({ user, userRole }) => {
   const [clients, setClients] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ name: '', client: '', client_id: '', event_date: '', event_end_date: '', deadline: '', phase: 'Planning', event_category: '', country: 'Ghana' });
+  const [form, setForm] = useState({ name: '', client: '', client_id: '', event_date: '', event_end_date: '', deadline: '', phase: 'Planning', event_category: '', country: 'Ghana', assigned_to: '', assigned_to_name: '' });
   const [saving, setSaving] = useState(false);
   const [taskModalEvent, setTaskModalEvent] = useState(null);
   const [impactEvent, setImpactEvent] = useState(null);
@@ -23255,10 +23273,12 @@ const EventsView = ({ user, userRole }) => {
       completed: 0,
       event_category: form.event_category,
       country: form.country || 'Ghana',
+      assigned_to: form.assigned_to || null,
+      assigned_to_name: form.assigned_to_name || null,
     });
     if (error) { alert('Error: ' + error.message); setSaving(false); return; }
     setModal(false);
-    setForm({ name: '', client: '', client_id: '', deadline: '', phase: 'Planning', event_category: '', country: 'Ghana' });
+    setForm({ name: '', client: '', client_id: '', event_date: '', event_end_date: '', deadline: '', phase: 'Planning', event_category: '', country: 'Ghana', assigned_to: '', assigned_to_name: '' });
     setSaving(false);
     load();
   };
@@ -23294,6 +23314,8 @@ const EventsView = ({ user, userRole }) => {
       status: editForm.status,
       event_category: editForm.event_category || null,
       country: editForm.country || 'Ghana',
+      assigned_to: editForm.assigned_to || null,
+      assigned_to_name: editForm.assigned_to_name || null,
     }).eq('id', editEvent.id);
     setSaving(false);
     setEditEvent(null);
@@ -23631,6 +23653,13 @@ const EventsView = ({ user, userRole }) => {
               onChange={e => setEditForm({ ...editForm, completion: e.target.value })}
               style={{ width: "100%", accentColor: T.cyan }} />
           </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 6 }}>Assign Strategy & Events Lead</label>
+            <select value={editForm.assigned_to||""} onChange={e => { const sl = strategyLeads.find(s => s.id === e.target.value); setEditForm({...editForm, assigned_to: e.target.value, assigned_to_name: sl?.name || ''}); }} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+              <option value="">Unassigned</option>
+              {strategyLeads.map(sl => <option key={sl.id} value={sl.id}>{sl.name}</option>)}
+            </select>
+          </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
             <Btn onClick={handleUpdate} disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</Btn>
             <Btn variant="ghost" onClick={() => setEditEvent(null)}>Cancel</Btn>
@@ -23657,6 +23686,13 @@ const EventsView = ({ user, userRole }) => {
             <select value={form.country} onChange={e => setForm({...form, country: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
               <option value="Ghana">Ghana</option>
               <option value="Nigeria">Nigeria</option>
+            </select>
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>Assign Strategy & Events Lead</div>
+            <select value={form.assigned_to} onChange={e => { const sl = strategyLeads.find(s => s.id === e.target.value); setForm({...form, assigned_to: e.target.value, assigned_to_name: sl?.name || ''}); }} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+              <option value="">Unassigned</option>
+              {strategyLeads.map(sl => <option key={sl.id} value={sl.id}>{sl.name}</option>)}
             </select>
           </div>
           {clients.length > 0 ? (

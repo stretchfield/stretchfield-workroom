@@ -18698,6 +18698,190 @@ const EmailTestPanel = ({ user }) => {
 };
 
 
+const SalesDashboardView = ({ user }) => {
+  const [payments, setPayments] = useState([]);
+  const [targets, setTargets] = useState([]);
+  const [reps, setReps] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState("all");
+  const [editTarget, setEditTarget] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const load = async () => {
+    const [{ data: p }, { data: t }, { data: r }] = await Promise.all([
+      supabase.from("client_payments").select("*").order("payment_date", { ascending: false }),
+      supabase.from("sales_targets").select("*"),
+      supabase.from("profiles").select("id,name,role,has_sm_access").or('role.in.("CEO","Sales & Marketing"),has_sm_access.eq.true'),
+    ]);
+    setPayments(p||[]); setTargets(t||[]); setReps((r||[]).filter((m,i,s)=>s.findIndex(x=>x.id===m.id)===i));
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []);
+
+  const now = new Date();
+  const filterByPeriod = (items, dateField) => {
+    if (period === "all") return items;
+    const d = new Date(now);
+    if (period === "this_month") { d.setDate(1); d.setHours(0,0,0,0); }
+    if (period === "last_month") { d.setMonth(d.getMonth()-1); d.setDate(1); d.setHours(0,0,0,0); }
+    if (period === "this_year") { d.setMonth(0); d.setDate(1); d.setHours(0,0,0,0); }
+    return items.filter(i => i[dateField] && new Date(i[dateField]) >= d);
+  };
+
+  const filteredPayments = filterByPeriod(payments, "payment_date");
+  const totalRevenue = filteredPayments.reduce((s,p) => s+parseFloat(p.amount||0), 0);
+  const totalCommission = filteredPayments.reduce((s,p) => s+parseFloat(p.commission_amount||0), 0);
+
+  const repStats = reps.map(rep => {
+    const repPayments = filteredPayments.filter(p => p.sales_rep_id === rep.id);
+    const repRevenue = repPayments.reduce((s,p) => s+parseFloat(p.amount||0), 0);
+    const repCommission = repPayments.reduce((s,p) => s+parseFloat(p.commission_amount||0), 0);
+    const target = targets.find(t => t.rep_id === rep.id);
+    const targetAmt = parseFloat(target?.target_amount||0);
+    const pct = targetAmt > 0 ? Math.min(100, Math.round((repRevenue/targetAmt)*100)) : 0;
+    return { ...rep, repPayments, repRevenue, repCommission, target, targetAmt, pct };
+  }).filter(r => r.target || r.repPayments.length > 0);
+
+  if (loading) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"40vh" }}><div style={{ width:32, height:32, border:`3px solid ${T.border}`, borderTop:`3px solid ${T.cyan}`, borderRadius:"50%", animation:"spin 0.8s linear infinite" }} /></div>;
+
+  return (
+    <div style={{ animation:"fadeUp 0.35s ease" }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <div>
+          <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:6 }}>Finance & Sales</div>
+          <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Sales Dashboard</h2>
+          <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Revenue, commissions and rep performance</div>
+        </div>
+        <select value={period} onChange={e=>setPeriod(e.target.value)} style={{ padding:"9px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+          <option value="all">All Time</option>
+          <option value="this_month">This Month</option>
+          <option value="last_month">Last Month</option>
+          <option value="this_year">This Year</option>
+        </select>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:12, marginBottom:24 }}>
+        {[
+          { label:"Total Revenue", value:"GHS "+totalRevenue.toLocaleString(), color:T.teal },
+          { label:"Total Commission", value:"GHS "+totalCommission.toLocaleString(), color:T.amber },
+          { label:"Payments", value:filteredPayments.length, color:T.cyan },
+          { label:"Active Reps", value:repStats.length, color:T.magenta },
+          { label:"Unattributed", value:filteredPayments.filter(p=>!p.sales_rep_id).length, color:filteredPayments.filter(p=>!p.sales_rep_id).length>0?T.red:T.teal },
+        ].map(k => (
+          <div key={k.label} style={{ padding:"14px 16px", background:T.surface, border:`1px solid ${T.border}`, borderTop:`2px solid ${k.color}`, borderRadius:10 }}>
+            <div style={{ color:k.color, fontSize:18, fontWeight:900 }}>{k.value}</div>
+            <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginTop:4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))", gap:16, marginBottom:24 }}>
+        {repStats.map(rep => {
+          const perfColor = rep.pct >= 80 ? T.teal : rep.pct >= 50 ? T.amber : T.red;
+          return (
+            <div key={rep.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:14, padding:"20px 24px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
+                <div>
+                  <div style={{ color:T.textPrimary, fontWeight:900, fontSize:16 }}>{rep.name}</div>
+                  <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{rep.role}</div>
+                </div>
+                <div style={{ textAlign:"right" }}>
+                  <div style={{ color:perfColor, fontWeight:900, fontSize:24 }}>{rep.pct}%</div>
+                  <div style={{ color:T.textMuted, fontSize:10, textTransform:"uppercase" }}>of target</div>
+                </div>
+              </div>
+              {rep.target && (
+                <div style={{ marginBottom:16 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+                    <div style={{ color:T.textMuted, fontSize:11 }}>Revenue vs Target</div>
+                    <div style={{ color:T.textPrimary, fontSize:11, fontWeight:700 }}>GHS {rep.repRevenue.toLocaleString()} / GHS {rep.targetAmt.toLocaleString()}</div>
+                  </div>
+                  <div style={{ height:10, background:T.border, borderRadius:5, overflow:"hidden" }}>
+                    <div style={{ height:"100%", width:rep.pct+"%", background:`linear-gradient(90deg,${perfColor},${perfColor}88)`, borderRadius:5, transition:"width 0.5s" }} />
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginTop:4 }}>
+                    <div style={{ color:T.textMuted, fontSize:10 }}>Period: {rep.target.period} · ends {rep.target.end_date?new Date(rep.target.end_date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):"—"}</div>
+                    {user.role==="CEO" && <button onClick={()=>setEditTarget({...rep.target})} style={{ background:"none", border:"none", color:T.cyan, fontSize:10, fontWeight:700, cursor:"pointer" }}>✎ Edit Target</button>}
+                  </div>
+                </div>
+              )}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:12 }}>
+                {[
+                  { label:"Revenue", value:"GHS "+Math.round(rep.repRevenue/1000)+"k", color:T.teal },
+                  { label:"Commission", value:"GHS "+Math.round(rep.repCommission/1000)+"k", color:T.amber },
+                  { label:"Deals", value:rep.repPayments.length, color:T.cyan },
+                ].map(k => (
+                  <div key={k.label} style={{ background:T.bg, borderRadius:8, padding:"10px 12px", textAlign:"center" }}>
+                    <div style={{ color:k.color, fontWeight:800, fontSize:14 }}>{k.value}</div>
+                    <div style={{ color:T.textMuted, fontSize:9, textTransform:"uppercase", marginTop:2 }}>{k.label}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ background:T.amber+"10", border:`1px solid ${T.amber}30`, borderRadius:8, padding:"10px 14px", display:"flex", justifyContent:"space-between" }}>
+                <span style={{ color:T.textMuted, fontSize:12 }}>Commission Rate</span>
+                <span style={{ color:T.amber, fontWeight:800, fontSize:13 }}>{rep.target?.commission_rate||5}%</span>
+              </div>
+            </div>
+          );
+        })}
+        {repStats.length===0 && <div style={{ textAlign:"center", padding:60, background:T.surface, borderRadius:12, border:`1px solid ${T.border}`, gridColumn:"1/-1", color:T.textMuted }}>No sales reps with targets yet</div>}
+      </div>
+
+      <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, overflow:"hidden" }}>
+        <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.border}`, color:T.textPrimary, fontWeight:800, fontSize:14 }}>All Sales Transactions</div>
+        <table style={{ width:"100%", borderCollapse:"collapse" }}>
+          <thead>
+            <tr style={{ background:T.bg }}>
+              {["Date","Client","Event","Amount","Sales Rep","Comm. Rate","Commission Payable","Method"].map(h => (
+                <th key={h} style={{ padding:"10px 14px", color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", textAlign:"left", borderBottom:`1px solid ${T.border}` }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filteredPayments.map((p,i) => (
+              <tr key={p.id} style={{ borderBottom:i<filteredPayments.length-1?`1px solid ${T.border}44`:"none" }}>
+                <td style={{ padding:"12px 14px", color:T.textMuted, fontSize:12 }}>{p.payment_date?new Date(p.payment_date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):"—"}</td>
+                <td style={{ padding:"12px 14px", color:T.textPrimary, fontWeight:700, fontSize:13 }}>{p.client_name}</td>
+                <td style={{ padding:"12px 14px", color:T.textMuted, fontSize:12 }}>{p.event_name||"—"}</td>
+                <td style={{ padding:"12px 14px", color:T.teal, fontWeight:800, fontSize:13 }}>GHS {parseFloat(p.amount||0).toLocaleString()}</td>
+                <td style={{ padding:"12px 14px" }}>{p.sales_rep_name?<span style={{ color:T.cyan, fontWeight:700, fontSize:12 }}>{p.sales_rep_name}</span>:<span style={{ color:T.red, fontSize:11 }}>Unassigned</span>}</td>
+                <td style={{ padding:"12px 14px", color:T.textMuted, fontSize:12, textAlign:"center" }}>{p.commission_rate||5}%</td>
+                <td style={{ padding:"12px 14px", color:T.amber, fontWeight:800, fontSize:13 }}>GHS {parseFloat(p.commission_amount||0).toLocaleString()}</td>
+                <td style={{ padding:"12px 14px" }}><span style={{ background:T.cyan+"18", color:T.cyan, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700 }}>{p.payment_method||"—"}</span></td>
+              </tr>
+            ))}
+            {filteredPayments.length===0 && <tr><td colSpan={8} style={{ padding:"40px 0", textAlign:"center", color:T.textMuted }}>No payments recorded</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      {editTarget && user.role==="CEO" && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setEditTarget(null)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:400, padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:20 }}>Edit Sales Target</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Target Amount (GHS)</label>
+              <input type="number" value={editTarget.target_amount} onChange={e=>setEditTarget(t=>({...t,target_amount:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Commission Rate (%)</label>
+              <input type="number" value={editTarget.commission_rate||5} onChange={e=>setEditTarget(t=>({...t,commission_rate:parseFloat(e.target.value)||5}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Start Date</label>
+                <input type="date" value={editTarget.start_date||""} onChange={e=>setEditTarget(t=>({...t,start_date:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>End Date</label>
+                <input type="date" value={editTarget.end_date||""} onChange={e=>setEditTarget(t=>({...t,end_date:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <button onClick={async () => { setSaving(true); await supabase.from("sales_targets").update({ target_amount:parseFloat(editTarget.target_amount), commission_rate:parseFloat(editTarget.commission_rate||5), start_date:editTarget.start_date, end_date:editTarget.end_date }).eq("id", editTarget.id); setSaving(false); setEditTarget(null); load(); }} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Saving...":"Save Target"}</button>
+              <button onClick={()=>setEditTarget(null)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const CashFlowView = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [clientPayments, setClientPayments] = useState([]);

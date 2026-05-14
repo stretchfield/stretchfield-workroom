@@ -2259,7 +2259,7 @@ const VendorDashboard = ({ user }) => {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
                   <span style={{ color: statusColors[po.status]||T.textMuted, fontSize: 10, fontWeight: 700, background: (statusColors[po.status]||T.textMuted)+"18", padding: "2px 8px", borderRadius: 20 }}>{po.status}</span>
-                  <button onClick={() => downloadPDF(generatePOPDF(po, {name:user.name, email:user.email}, {title:po.rff_title}, {name:po.event_name}), "PO-"+(po.internal_po_number||po.id)+".html")} style={{ background: "none", border: "none", color: T.cyan, fontSize: 10, fontWeight: 700, cursor: "pointer", padding: 0 }}>↓ PDF</button>
+                  <button onClick={() => downloadPDF(generatePOPDF(po, {name:po.vendor_name, email:user.email, ceo_signature:po.ceo_signature, ceo_signed_at:po.ceo_signed_at, vm_signature:po.vm_signature, vm_signed_at:po.vm_signed_at, fm_signature:po.fm_signature, fm_signed_at:po.fm_signed_at}, {title:po.rff_title||po.event_name}, {name:po.event_name}), "PO-"+(po.internal_po_number||po.id)+".html")} style={{ background: "none", border: "none", color: T.cyan, fontSize: 10, fontWeight: 700, cursor: "pointer", padding: 0 }}>↓ PDF</button>
                 </div>
               </div>
             );
@@ -16001,14 +16001,14 @@ const InvoicesView = () => {
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
-    const { data } = await supabase.from('invoices').select('*').order('created_at', { ascending: false });
+    const { data } = await supabase.from('vendor_invoices').select('*').order('created_at', { ascending: false });
     setInvoices(data || []);
   };
 
   useEffect(() => { load(); }, []);
 
   const handleApprove = async (id) => {
-    await supabase.from('invoices').update({ status: 'approved' }).eq('id', id);
+    await supabase.from('vendor_invoices').update({ status: 'approved' }).eq('id', id);
     load();
   };
 
@@ -16057,16 +16057,17 @@ const InvoicesView = () => {
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
                 <div>
-                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{inv.vendor}</div>
+                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{inv.vendor_name || inv.vendor || "—"}</div>
                   <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>{inv.event_name || "—"}</div>
-                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{inv.date}</div>
+                  <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{inv.invoice_number||""} · {inv.created_at?.slice(0,10)||inv.date||"—"}</div>
                 </div>
                 <Badge status={inv.status} />
               </div>
-              <div style={{ color: T.amber, fontSize: 20, fontWeight: 900, marginBottom: 12 }}>GHS {(inv.amount || 0).toLocaleString()}</div>
+              <div style={{ color: T.amber, fontSize: 20, fontWeight: 900, marginBottom: 12 }}>GHS {parseFloat(inv.amount||0).toLocaleString()}</div>
               {inv.status === "pending" && (
                 <Btn small onClick={() => handleApprove(inv.id)}>✓ Approve</Btn>
               )}
+              {inv.invoice_url && <a href={inv.invoice_url} target="_blank" rel="noreferrer" style={{ color:T.cyan, fontSize:11, fontWeight:700 }}>📎 View Invoice</a>}
             </div>
           ))}
         </div>

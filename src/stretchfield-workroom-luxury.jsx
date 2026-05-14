@@ -903,21 +903,24 @@ const getNavItems = (role, user) => {
     return [{ id: "dashboard", label: "Dashboard", icon: "▪" }, { id: "notifications", label: "Notifications", icon: "▪" }];
   }
   if (role === "Strategy & Events Lead") {
-    base.push(
+    return [
+      { id: "dashboard", label: "Dashboard", icon: "▪" },
+      { id: "events", label: "Events", icon: "▪" },
+      { id: "strategy-map", label: "Strategy Map", icon: "▪" },
       { id: "event-briefs", label: "Event Briefs", icon: "▪" },
       { id: "event-milestones", label: "Event Timeline", icon: "▪" },
       { id: "event-reports", label: "Event Reports", icon: "▪" },
+      { id: "esl-performance", label: "My Performance", icon: "▪" },
       { id: "feedback-summary", label: "Feedback", icon: "▪" },
-      { id: "esl-performance", label: "My Performance", icon: "▪" }
-    );
-    if (user?.has_sm_access) {
-      base.push(
+      ...(user?.has_sm_access ? [
         { id: "opportunities", label: "Opportunities", icon: "▪" },
         { id: "crm", label: "CRM / Leads", icon: "▪" },
         { id: "sm-tasks", label: "S&M Tasks", icon: "▪" },
-        { id: "outreach-planner", label: "Outreach Planner", icon: "▪" }
-      );
-    }
+        { id: "outreach-planner", label: "Outreach Planner", icon: "▪" },
+      ] : []),
+      { id: "calendar", label: "Calendar", icon: "▪" },
+      { id: "notifications", label: "Notifications", icon: "▪" },
+    ];
   }
   if (!["Vendor","Client","Strategy & Events Lead"].includes(role)) {
     base.push({ id: "feedback", label: "Feedback", icon: "▪" });
@@ -21222,7 +21225,14 @@ const EventBriefsView = ({ user }) => {
       supabase.from("event_briefs").select("*").order("created_at", { ascending: false }),
       supabase.from("projects").select("*").order("event_date", { ascending: false }),
     ]);
-    setBriefs(b||[]); setEvents(ev||[]);
+    setBriefs(b||[]);
+    // Filter events assigned to this ESL
+    const myEvents = (ev||[]).filter(e =>
+      e.assigned_to === user.id ||
+      (Array.isArray(e.assigned_to_ids) && e.assigned_to_ids.includes(user.id)) ||
+      user.role === "CEO" || user.role === "Finance Manager"
+    );
+    setEvents(myEvents);
   };
   useEffect(() => { load(); }, []);
 
@@ -21360,7 +21370,13 @@ const EventMilestonesView = ({ user }) => {
       supabase.from("projects").select("*").order("event_date", { ascending: true }),
       supabase.from("profiles").select("id,name,role").not("role","in","(Client,Vendor,Board of Directors)"),
     ]);
-    setMilestones(m||[]); setEvents(ev||[]); setStaff(st||[]);
+    setMilestones(m||[]);
+    const myEvents = (ev||[]).filter(e =>
+      e.assigned_to === user.id ||
+      (Array.isArray(e.assigned_to_ids) && e.assigned_to_ids.includes(user.id)) ||
+      user.role === "CEO" || user.role === "Finance Manager" || user.role === "Vendor Manager"
+    );
+    setEvents(myEvents); setStaff(st||[]);
   };
   useEffect(() => { load(); }, []);
 

@@ -17928,7 +17928,7 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
       const [au, sr, pv, vp, sp, aw, rf, inv, va] = await Promise.all([
         supabase.from("payment_authorisations").select("*").order("created_at", { ascending: false }),
         supabase.from("staff_payment_requests").select("*").eq("status","pending_ceo").order("submitted_at", { ascending: false }),
-        supabase.from("payment_vouchers").select("*").eq("status","pending_approval").order("created_at", { ascending: false }),
+        supabase.from("payment_vouchers").select("*,profiles!payment_vouchers_raised_by_fkey(name)").or("status.eq.pending_approval,and(status.eq.approved,ceo_signature.is.null)").order("created_at", { ascending: false }),
         supabase.from("profiles").select("*").eq("role", "Vendor"),
         supabase.from("profiles").select("*").in("role", ["Finance Manager","Vendor Manager","Strategy & Events Lead","CEO","Board of Directors","Sales & Marketing","Country Manager"]),
         supabase.from("rff_awards").select("*"),
@@ -18073,7 +18073,7 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
       {isCEO && pendingVouchers.length > 0 && (
         <div style={{ marginBottom:24 }}>
           <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16, marginBottom:12 }}>
-            Payment Vouchers to Sign
+            Payment Vouchers — CEO Signature Required
             <span style={{ color:T.amber, fontSize:13, fontWeight:700, marginLeft:8 }}>({pendingVouchers.length})</span>
           </div>
           <div style={{ display:"flex", flexDirection:"column", gap:10 }}>

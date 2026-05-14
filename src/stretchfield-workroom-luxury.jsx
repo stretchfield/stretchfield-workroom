@@ -20455,10 +20455,24 @@ const ClientHealthView = ({ user }) => {
     const clientEvents = events.filter(e => e.client_id === client.id);
     const clientSat = satisfaction.filter(s => clientEvents.some(e => e.id === s.project_id));
     const avgSat = clientSat.length > 0 ? (clientSat.reduce((s,r)=>s+(r.rating||0),0)/clientSat.length).toFixed(1) : null;
-    const revenue = clientPayments.filter(p => p.client_id === client.id).reduce((s,p) => s+parseFloat(p.amount||0), 0);
+    // Match payments by client_id OR client_name (company or name)
+    const revenue = clientPayments.filter(p => 
+      p.client_id === client.id || 
+      p.client_name === client.company || 
+      p.client_name === client.name
+    ).reduce((s,p) => s+parseFloat(p.amount||0), 0);
     const stored = healthScores.find(h => h.client_id === client.id);
-    const healthScore = stored?.health_score || (avgSat ? Math.round(parseFloat(avgSat)*20) : 50);
-    const renewalLikelihood = stored?.renewal_likelihood || (healthScore >= 80 ? "high" : healthScore >= 50 ? "medium" : "low");
+    // Auto-calculate health score from real data
+    let healthScore = stored?.health_score;
+    if (!healthScore) {
+      let score = 50; // base
+      if (revenue > 0) score += 20; // has paid
+      if (revenue > 100000) score += 10; // significant revenue
+      if (clientEvents.length > 0) score += 10; // has events
+      if (avgSat) score = Math.round((score + parseFloat(avgSat)*20) / 2); // blend with satisfaction
+      healthScore = Math.min(100, score);
+    }
+    const renewalLikelihood = stored?.renewal_likelihood || (healthScore >= 80 ? "high" : healthScore >= 60 ? "medium" : "low");
     return { clientEvents, avgSat, revenue, healthScore, renewalLikelihood, notes: stored?.notes || "", lastTouchpoint: stored?.last_touchpoint };
   };
 

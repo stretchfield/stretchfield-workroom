@@ -11331,7 +11331,7 @@ const FinanceInvoicesView = ({ user }) => {
                         <>
                           <button onClick={async () => {
                             await updateStatus(inv.id, "reviewed");
-                            if (inv.vendor_id) await supabase.from("notifications").insert({ user_id: inv.vendor_id, title: "Invoice Under Review", message: `Your invoice ${inv.invoice_number||""} of GHS ${parseFloat(inv.amount||0).toLocaleString()} is being reviewed by Finance.`, type: "finance" });
+                            if (inv.vendor_id) await supabase.from("notifications").insert({ user_id: inv.vendor_id, title: "Invoice Under Review", message: "Your invoice " + (inv.invoice_number||"") + " of GHS " + parseFloat(inv.amount||0).toLocaleString() + " is being reviewed by Finance.", type: "finance" });
                           }} style={{ background: T.teal+"18", border: `1px solid ${T.teal}30`, color: T.teal, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>✓ Review</button>
                           <button onClick={() => { setRejectModal(inv); setRejectComment(""); }} style={{ background: T.red+"18", border: `1px solid ${T.red}30`, color: T.red, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>✗ Reject</button>
                         </>

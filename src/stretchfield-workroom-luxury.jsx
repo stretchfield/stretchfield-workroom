@@ -8260,12 +8260,14 @@ const FinanceDashboard = ({ user, onTab }) => {
   useEffect(() => { load(); }, []);
 
   // Auto-generate voucher number
-  const genVoucherNumber = (type) => {
+  const genVoucherNumber = async (type) => {
     const prefixes = { project: 'PV', cheque: 'CHQ', petty_cash: 'PC', staff_welfare: 'SW', administrative: 'ADM', statutory: 'STAT' };
     const prefix = prefixes[type] || 'PV';
     const year = new Date().getFullYear().toString().slice(-2);
-    const count = vouchers.filter(v => v.payment_type === type).length + 1;
-    return `${prefix}/${year}/${String(count).padStart(3,'0')}`;
+    const { data: existing } = await supabase.from("payment_vouchers").select("voucher_number").ilike("voucher_number", prefix + "/" + year + "/%").order("voucher_number", { ascending: false }).limit(1);
+    const lastNum = existing?.[0]?.voucher_number?.split("/")?.[2];
+    const nextNum = String((parseInt(lastNum)||0) + 1).padStart(3,"0");
+    return `${prefix}/${year}/${nextNum}`;
   };
 
   const genEstimateNumber = () => {
@@ -8277,7 +8279,7 @@ const FinanceDashboard = ({ user, onTab }) => {
   const saveVoucher = async () => {
     if (!vForm.payee || !vForm.amount) { alert('Payee and amount are required.'); return; }
     setSaving(true);
-    const voucherNumber = genVoucherNumber(vForm.payment_type);
+    const voucherNumber = await genVoucherNumber(vForm.payment_type);
     await supabase.from('payment_vouchers').insert({
       ...vForm,
       voucher_number: voucherNumber,
@@ -11272,6 +11274,9 @@ const VendorInvoiceView = ({ user }) => {
 const FinanceInvoicesView = ({ user }) => {
   const [invoices, setInvoices] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [rejectModal, setRejectModal] = useState(null);
+  const [rejectComment, setRejectComment] = useState("");
+  const [rejecting, setRejecting] = useState(false);
 
   const load = async () => {
     const { data } = await supabase.from("vendor_invoices").select("*").order("created_at", { ascending: false });
@@ -11323,21 +11328,24 @@ const FinanceInvoicesView = ({ user }) => {
                   <td style={{ padding: "10px 14px" }}>
                     <div style={{ display: "flex", gap: 6, flexWrap:"wrap" }}>
                       {inv.status === "submitted" && (
-                        <button onClick={async () => {
-                          await updateStatus(inv.id, "reviewed");
-                          // Notify vendor invoice is being reviewed
-                          if (inv.vendor_id) await supabase.from("notifications").insert({ user_id: inv.vendor_id, title: "Invoice Under Review", message: `Your invoice ${inv.invoice_number||""} of GHS ${parseFloat(inv.amount||0).toLocaleString()} is being reviewed by Finance.`, type: "finance" });
-                        }} style={{ background: T.teal+"18", border: `1px solid ${T.teal}30`, color: T.teal, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>✓ Review</button>
+                        <>
+                          <button onClick={async () => {
+                            await updateStatus(inv.id, "reviewed");
+                            if (inv.vendor_id) await supabase.from("notifications").insert({ user_id: inv.vendor_id, title: "Invoice Under Review", message: `Your invoice ${inv.invoice_number||""} of GHS ${parseFloat(inv.amount||0).toLocaleString()} is being reviewed by Finance.`, type: "finance" });
+                          }} style={{ background: T.teal+"18", border: `1px solid ${T.teal}30`, color: T.teal, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>✓ Review</button>
+                          <button onClick={() => { setRejectModal(inv); setRejectComment(""); }} style={{ background: T.red+"18", border: `1px solid ${T.red}30`, color: T.red, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>✗ Reject</button>
+                        </>
                       )}
                       {inv.status === "reviewed" && (
                         <button onClick={async () => {
                           setSaving(true);
                           try {
                             // Get next voucher number
-                            const { data: existing } = await supabase.from("payment_vouchers").select("voucher_number").order("created_at", { ascending: false }).limit(1);
+                            const yr = new Date().getFullYear().toString().slice(-2);
+                            const { data: existing } = await supabase.from("payment_vouchers").select("voucher_number").ilike("voucher_number", "PV/" + yr + "/%").order("voucher_number", { ascending: false }).limit(1);
                             const lastNum = existing?.[0]?.voucher_number?.split("/")?.[2];
                             const nextNum = String((parseInt(lastNum)||0) + 1).padStart(3,"0");
-                            const vNum = "PV/" + new Date().getFullYear().toString().slice(-2) + "/" + nextNum;
+                            const vNum = "PV/" + yr + "/" + nextNum;
                             const { data: newV, error: ve } = await supabase.from("payment_vouchers").insert({
                               payment_type: "project",
                               payee: inv.vendor_name,
@@ -11378,6 +11386,67 @@ const FinanceInvoicesView = ({ user }) => {
   );
 };
 
+
+      {/* Reject Invoice Modal */}
+      {rejectModal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setRejectModal(null)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.red}30`, borderRadius:16, width:"100%", maxWidth:480, padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>Reject Invoice</div>
+            <div style={{ color:T.textMuted, fontSize:13, marginBottom:20 }}>{rejectModal.vendor_name} — {rejectModal.invoice_number} — GHS {parseFloat(rejectModal.amount||0).toLocaleString()}</div>
+            <div style={{ marginBottom:16 }}>
+              <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:6 }}>Reason for Rejection *</label>
+              <textarea value={rejectComment} onChange={e=>setRejectComment(e.target.value)} rows={4} placeholder="Explain what needs to be corrected — the vendor will receive this via email..." style={{ width:"100%", padding:"10px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} />
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={async () => {
+                if (!rejectComment.trim()) { alert("Please provide a rejection reason."); return; }
+                setRejecting(true);
+                // Update invoice status
+                await supabase.from("vendor_invoices").update({ status: "rejected", notes: rejectComment, reviewed_by: user.id, reviewed_at: new Date().toISOString() }).eq("id", rejectModal.id);
+                // Notify vendor in-app
+                if (rejectModal.vendor_id) {
+                  await supabase.from("notifications").insert({ user_id: rejectModal.vendor_id, title: "Invoice Rejected — Action Required", message: `Your invoice ${rejectModal.invoice_number||""} has been rejected. Reason: ${rejectComment}`, type: "finance" });
+                }
+                // Send email to vendor
+                const { data: vendorProfile } = await supabase.from("profiles").select("email,name").eq("id", rejectModal.vendor_id).single();
+                if (vendorProfile?.email) {
+                  const emailHtml = `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F1F5F9;font-family:Arial,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 20px"><tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden">
+<tr><td style="background:#060B14;padding:24px 32px"><span style="color:#00C8FF;font-size:20px;font-weight:900">STRETCHFIELD</span><span style="color:#5A6E8A;font-size:12px;margin-left:12px">WorkRoom</span></td></tr>
+<tr><td style="padding:28px 32px">
+  <p style="margin:0 0 8px;color:#EF4444;font-size:13px;font-weight:800;text-transform:uppercase">Invoice Rejected</p>
+  <h2 style="margin:0 0 20px;color:#0F172A;font-size:20px">Action Required: ${rejectModal.invoice_number||"Your Invoice"}</h2>
+  <p style="margin:0 0 16px;color:#334155;font-size:14px">Hi ${vendorProfile.name},</p>
+  <p style="margin:0 0 16px;color:#334155;font-size:14px">Your invoice of <strong>GHS ${parseFloat(rejectModal.amount||0).toLocaleString()}</strong> for <strong>${rejectModal.event_name||"services"}</strong> has been reviewed and requires correction before it can be processed.</p>
+  <div style="background:#FEF2F2;border-left:4px solid #EF4444;border-radius:0 8px 8px 0;padding:16px 20px;margin:20px 0">
+    <p style="margin:0;color:#991B1B;font-size:13px;font-weight:700;margin-bottom:6px">Reason for Rejection:</p>
+    <p style="margin:0;color:#334155;font-size:14px;line-height:1.6">${rejectComment}</p>
+  </div>
+  <p style="margin:0 0 20px;color:#334155;font-size:14px">Please make the necessary corrections and resubmit your invoice through the WorkRoom portal.</p>
+  <a href="https://workroom.stretchfield.com" style="background:linear-gradient(135deg,#00C8FF,#00E5C8);color:#060B14;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:800;font-size:14px;display:inline-block">Resubmit Invoice →</a>
+</td></tr>
+<tr><td style="background:#F8FAFC;padding:16px 32px;border-top:1px solid #E2E8F0">
+  <p style="margin:0;color:#94A3B8;font-size:11px;text-align:center">© ${new Date().getFullYear()} Stretchfield · workroom.stretchfield.com</p>
+</td></tr>
+</table></td></tr></table>
+</body></html>`;
+                  await fetch("/api/send-email", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ to: vendorProfile.email, subject: `Invoice Rejected — ${rejectModal.invoice_number||"Your Invoice"} — Action Required`, html: emailHtml }) });
+                }
+                setRejecting(false);
+                setRejectModal(null);
+                setRejectComment("");
+                load();
+                alert("Invoice rejected and vendor notified by email.");
+              }} disabled={rejecting} style={{ flex:1, background:`linear-gradient(135deg,${T.red},#F97316)`, border:"none", color:"#fff", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{rejecting?"Sending...":"Reject & Notify Vendor"}</button>
+              <button onClick={()=>{ setRejectModal(null); setRejectComment(""); }} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const QuotesReceivedView = ({ user }) => {
   const [events, setEvents] = useState([]);

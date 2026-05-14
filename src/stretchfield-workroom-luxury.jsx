@@ -18889,6 +18889,8 @@ const CashFlowView = ({ user }) => {
   const [staffPayments, setStaffPayments] = useState([]);
   const [vouchers, setVouchers] = useState([]);
   const [period, setPeriod] = useState("all");
+  const [selectedEvent, setSelectedEvent] = useState("all");
+  const [drillDown, setDrillDown] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18920,10 +18922,11 @@ const CashFlowView = ({ user }) => {
     return items.filter(i => i[dateField] && new Date(i[dateField]) >= d);
   };
 
-  const filteredInflows = filterByPeriod(clientPayments, "payment_date");
-  const filteredVendor = filterByPeriod(vendorInvoices, "created_at");
-  const filteredStaff = filterByPeriod(staffPayments, "submitted_at");
-  const filteredVouchers = filterByPeriod(vouchers, "created_at");
+  const byEvent = (items, field) => selectedEvent === "all" ? items : items.filter(i => i[field] === selectedEvent || i.project_id === selectedEvent || i.event_id === selectedEvent);
+  const filteredInflows = byEvent(filterByPeriod(clientPayments, "payment_date"), "project_id");
+  const filteredVendor = byEvent(filterByPeriod(vendorInvoices, "created_at"), "event_id");
+  const filteredStaff = byEvent(filterByPeriod(staffPayments, "submitted_at"), "project_id");
+  const filteredVouchers = byEvent(filterByPeriod(vouchers, "created_at"), "project_id");
 
   const totalInflows = filteredInflows.reduce((s,p) => s+parseFloat(p.amount||0), 0);
   const totalVendorOut = filteredVendor.reduce((s,i) => s+parseFloat(i.amount||0), 0);
@@ -18951,13 +18954,70 @@ const CashFlowView = ({ user }) => {
           <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Cash Flow</h2>
           <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Money in vs money out — syncs with Zoho for full picture</div>
         </div>
-        <select value={period} onChange={e=>setPeriod(e.target.value)} style={{ padding:"9px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
-          <option value="all">All Time</option>
-          <option value="this_month">This Month</option>
-          <option value="last_month">Last Month</option>
-          <option value="this_year">This Year</option>
-        </select>
+        <div style={{ display:"flex", gap:10 }}>
+          <select value={selectedEvent} onChange={e=>{ setSelectedEvent(e.target.value); setDrillDown(e.target.value==="all"?null:events.find(ev=>ev.id===e.target.value)||null); }} style={{ padding:"9px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+            <option value="all">All Events</option>
+            {events.map(ev=><option key={ev.id} value={ev.id}>{ev.name}</option>)}
+          </select>
+          <select value={period} onChange={e=>setPeriod(e.target.value)} style={{ padding:"9px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+            <option value="all">All Time</option>
+            <option value="this_month">This Month</option>
+            <option value="last_month">Last Month</option>
+            <option value="this_year">This Year</option>
+          </select>
+        </div>
       </div>
+
+      {/* Event Drill-down */}
+      {drillDown && (
+        <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:12, padding:"20px 24px", marginBottom:20 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
+            <div>
+              <div style={{ color:T.cyan, fontSize:10, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:4 }}>Event Breakdown</div>
+              <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18 }}>{drillDown.name}</div>
+              <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{drillDown.client} · {drillDown.event_date?new Date(drillDown.event_date).toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"}):"TBC"} · {drillDown.phase}</div>
+            </div>
+            <button onClick={()=>{ setDrillDown(null); setSelectedEvent("all"); }} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"5px 12px", borderRadius:6, cursor:"pointer", fontSize:11 }}>✕ Clear</button>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:12, marginBottom:16 }}>
+            {[
+              { label:"Revenue", value:"GHS "+filteredInflows.reduce((s,p)=>s+parseFloat(p.amount||0),0).toLocaleString(), color:T.teal },
+              { label:"Vendor Costs", value:"GHS "+filteredVendor.reduce((s,i)=>s+parseFloat(i.amount||0),0).toLocaleString(), color:T.red },
+              { label:"Staff Costs", value:"GHS "+(filteredStaff.reduce((s,r)=>s+parseFloat(r.amount||0),0)+filteredVouchers.reduce((s,v)=>s+parseFloat(v.amount||0),0)).toLocaleString(), color:T.amber },
+              { label:"Net Margin", value:(()=>{ const rev=filteredInflows.reduce((s,p)=>s+parseFloat(p.amount||0),0); const costs=filteredVendor.reduce((s,i)=>s+parseFloat(i.amount||0),0)+filteredStaff.reduce((s,r)=>s+parseFloat(r.amount||0),0)+filteredVouchers.reduce((s,v)=>s+parseFloat(v.amount||0),0); return rev>0?((rev-costs)/rev*100).toFixed(1)+"%":"—"; })(), color:T.cyan },
+            ].map(k=>(
+              <div key={k.label} style={{ background:T.bg, border:`1px solid ${T.border}`, borderTop:`2px solid ${k.color}`, borderRadius:10, padding:"14px 16px" }}>
+                <div style={{ color:k.color, fontWeight:900, fontSize:18 }}>{k.value}</div>
+                <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginTop:4 }}>{k.label}</div>
+              </div>
+            ))}
+          </div>
+          {/* Vendor breakdown */}
+          {filteredVendor.length > 0 && (
+            <div style={{ marginBottom:12 }}>
+              <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>Vendor Payments</div>
+              {filteredVendor.map(i=>(
+                <div key={i.id} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:`1px solid ${T.border}22` }}>
+                  <div><div style={{ color:T.textPrimary, fontSize:13, fontWeight:600 }}>{i.vendor_name}</div><div style={{ color:T.textMuted, fontSize:11 }}>{i.invoice_number||"Invoice"}</div></div>
+                  <div style={{ color:T.red, fontWeight:700 }}>GHS {parseFloat(i.amount||0).toLocaleString()}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {/* Staff breakdown */}
+          {filteredVouchers.filter(v=>v.event_name===drillDown.name).length > 0 && (
+            <div>
+              <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>Staff Payments & Vouchers</div>
+              {filteredVouchers.filter(v=>v.event_name===drillDown.name).map(v=>(
+                <div key={v.id} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:`1px solid ${T.border}22` }}>
+                  <div><div style={{ color:T.textPrimary, fontSize:13, fontWeight:600 }}>{v.payee}</div><div style={{ color:T.textMuted, fontSize:11 }}>{v.voucher_number} · {v.description?.slice(0,40)}</div></div>
+                  <div style={{ color:T.amber, fontWeight:700 }}>GHS {parseFloat(v.amount||0).toLocaleString()}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Summary KPIs */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:12, marginBottom:24 }}>

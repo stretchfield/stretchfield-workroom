@@ -17902,6 +17902,13 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
   const [rejectModal, setRejectModal] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const [saving, setSaving] = useState(false);
+  const [pendingVouchers, setPendingVouchers] = useState([]);
+  const [voucherSignModal, setVoucherSignModal] = useState(null);
+  const [voucherSig, setVoucherSig] = useState("");
+  const [voucherSigSaving, setVoucherSigSaving] = useState(false);
+  const voucherSigRef = React.useRef(null);
+  const [vIsDrawing, setVIsDrawing] = useState(false);
+  const [vLastPos, setVLastPos] = useState(null);
   const [form, setForm] = useState({
     payee_id: "", payee_type: "vendor", rff_id: "", invoice_id: "",
     agreed_amount: "", payment_method: "bank_transfer",
@@ -17918,9 +17925,10 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
 
   const load = async () => {
     try {
-      const [au, sr, vp, sp, aw, rf, inv, va] = await Promise.all([
+      const [au, sr, pv, vp, sp, aw, rf, inv, va] = await Promise.all([
         supabase.from("payment_authorisations").select("*").order("created_at", { ascending: false }),
         supabase.from("staff_payment_requests").select("*").eq("status","pending_ceo").order("submitted_at", { ascending: false }),
+        supabase.from("payment_vouchers").select("*").eq("status","pending_approval").order("created_at", { ascending: false }),
         supabase.from("profiles").select("*").eq("role", "Vendor"),
         supabase.from("profiles").select("*").in("role", ["Finance Manager","Vendor Manager","Strategy & Events Lead","CEO","Board of Directors","Sales & Marketing","Country Manager"]),
         supabase.from("rff_awards").select("*"),
@@ -17930,6 +17938,7 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
       ]);
       setAuths(au.data || []);
       setStaffRequests(sr.data || []);
+      setPendingVouchers(pv.data || []);
       setVendors(vp.data || []);
       setStaffProfiles(sp.data || []);
       setAwards(aw.data || []);
@@ -18060,6 +18069,35 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
         {isFinance && <button onClick={() => setShowForm(!showForm)} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#060B14", padding:"10px 20px", borderRadius:10, cursor:"pointer", fontWeight:800, fontSize:13 }}>+ New Payment Request</button>}
       </div>
 
+      {/* ── PAYMENT VOUCHERS AWAITING CEO SIGNATURE ── */}
+      {isCEO && pendingVouchers.length > 0 && (
+        <div style={{ marginBottom:24 }}>
+          <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16, marginBottom:12 }}>
+            Payment Vouchers to Sign
+            <span style={{ color:T.amber, fontSize:13, fontWeight:700, marginLeft:8 }}>({pendingVouchers.length})</span>
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {pendingVouchers.map(v => (
+              <div key={v.id} style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderLeft:`3px solid ${T.cyan}`, borderRadius:12, padding:"16px 20px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <div>
+                  <div style={{ color:T.textPrimary, fontWeight:800, fontSize:14 }}>{v.voucher_number} — {v.payee}</div>
+                  <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{v.event_name||""} · {v.payment_type?.replace(/_/g," ")}</div>
+                  <div style={{ color:T.textSecondary, fontSize:12, marginTop:2 }}>{v.description}</div>
+                  <div style={{ display:"flex", gap:12, marginTop:6 }}>
+                    {v.fm_signature && <span style={{ color:T.teal, fontSize:11, fontWeight:700 }}>FM ✓ Signed</span>}
+                    <span style={{ color:T.amber, fontSize:11, fontWeight:700 }}>Awaiting CEO Signature</span>
+                  </div>
+                </div>
+                <div style={{ textAlign:"right", flexShrink:0, marginLeft:16 }}>
+                  <div style={{ color:T.teal, fontWeight:900, fontSize:18 }}>GHS {parseFloat(v.amount||0).toLocaleString()}</div>
+                  <button onClick={() => { setVoucherSignModal(v); setVoucherSig(""); }} style={{ background:`linear-gradient(135deg,${T.teal},#10B981)`, border:"none", color:"#fff", padding:"7px 16px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:800, marginTop:8 }}>✍ Sign & Approve</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── STAFF PAYMENT REQUESTS AWAITING CEO ── */}
       {staffRequests.length > 0 && (
         <div style={{ background:T.surface, border:`1px solid ${T.amber}30`, borderRadius:14, padding:"20px 24px", marginBottom:24 }}>
@@ -18129,6 +18167,52 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── CEO VOUCHER SIGN MODAL ── */}
+      {voucherSignModal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setVoucherSignModal(null)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.teal}30`, borderRadius:16, width:"100%", maxWidth:500, padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>Sign & Approve Voucher</div>
+            <div style={{ color:T.textMuted, fontSize:13, marginBottom:4 }}>{voucherSignModal.voucher_number} — {voucherSignModal.payee}</div>
+            <div style={{ color:T.teal, fontWeight:900, fontSize:20, marginBottom:20 }}>GHS {parseFloat(voucherSignModal.amount||0).toLocaleString()}</div>
+            <div style={{ marginBottom:16 }}>
+              <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:6 }}>CEO Authorisation Signature</div>
+              <div style={{ border:`1px solid ${T.border}`, borderRadius:8, overflow:"hidden", background:"#fff" }}>
+                <canvas ref={voucherSigRef} width={440} height={120}
+                  style={{ display:"block", cursor:"crosshair", touchAction:"none", width:"100%" }}
+                  onMouseDown={e=>{ setVIsDrawing(true); const r=e.target.getBoundingClientRect(); const sx=440/r.width; setVLastPos({x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sx}); }}
+                  onMouseMove={e=>{ if(!vIsDrawing) return; const r=e.target.getBoundingClientRect(); const sx=440/r.width; const pos={x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sx}; const ctx=voucherSigRef.current?.getContext("2d"); if(ctx&&vLastPos){ctx.beginPath();ctx.moveTo(vLastPos.x,vLastPos.y);ctx.lineTo(pos.x,pos.y);ctx.strokeStyle="#1a365d";ctx.lineWidth=2;ctx.lineCap="round";ctx.stroke();} setVLastPos(pos); }}
+                  onMouseUp={()=>{ setVIsDrawing(false); setVoucherSig(voucherSigRef.current?.toDataURL()||""); }}
+                  onMouseLeave={()=>{ setVIsDrawing(false); if(voucherSigRef.current) setVoucherSig(voucherSigRef.current.toDataURL()||""); }}
+                  onTouchStart={e=>{ e.preventDefault(); setVIsDrawing(true); const r=e.target.getBoundingClientRect(); const sx=440/r.width; const t=e.touches[0]; setVLastPos({x:(t.clientX-r.left)*sx,y:(t.clientY-r.top)*sx}); }}
+                  onTouchMove={e=>{ e.preventDefault(); if(!vIsDrawing) return; const r=e.target.getBoundingClientRect(); const sx=440/r.width; const t=e.touches[0]; const pos={x:(t.clientX-r.left)*sx,y:(t.clientY-r.top)*sx}; const ctx=voucherSigRef.current?.getContext("2d"); if(ctx&&vLastPos){ctx.beginPath();ctx.moveTo(vLastPos.x,vLastPos.y);ctx.lineTo(pos.x,pos.y);ctx.strokeStyle="#1a365d";ctx.lineWidth=2;ctx.lineCap="round";ctx.stroke();} setVLastPos(pos); }}
+                  onTouchEnd={()=>{ setVIsDrawing(false); setVoucherSig(voucherSigRef.current?.toDataURL()||""); }}
+                />
+              </div>
+              <button onClick={()=>{ const ctx=voucherSigRef.current?.getContext("2d"); if(ctx) ctx.clearRect(0,0,440,120); setVoucherSig(""); }} style={{ background:"none", border:"none", color:T.textMuted, fontSize:11, cursor:"pointer", marginTop:4 }}>Clear</button>
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={async () => {
+                const sig = voucherSigRef.current?.toDataURL() || "";
+                setVoucherSigSaving(true);
+                await supabase.from("payment_vouchers").update({ status:"approved", approved_by:user.id, approved_at:new Date().toISOString(), ceo_signature:sig, ceo_signed_at:new Date().toISOString() }).eq("id", voucherSignModal.id);
+                // Notify Finance
+                const { data: fms } = await supabase.from("profiles").select("id,email,name").eq("role","Finance Manager");
+                for (const fm of fms||[]) {
+                  await supabase.from("notifications").insert({ user_id:fm.id, title:"Voucher Approved", message:`Voucher ${voucherSignModal.voucher_number} has been approved and signed by CEO. Proceed with payment.`, type:"rff" });
+                }
+                setVoucherSigSaving(false);
+                setVoucherSignModal(null);
+                setVoucherSig("");
+                const ctx = voucherSigRef.current?.getContext("2d");
+                if (ctx) ctx.clearRect(0,0,440,120);
+                load();
+              }} disabled={voucherSigSaving} style={{ flex:1, background:`linear-gradient(135deg,${T.teal},#10B981)`, border:"none", color:"#fff", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{voucherSigSaving?"Saving...":"✓ Sign & Approve"}</button>
+              <button onClick={()=>{ setVoucherSignModal(null); setVoucherSig(""); const ctx=voucherSigRef.current?.getContext("2d"); if(ctx) ctx.clearRect(0,0,440,120); }} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+            </div>
           </div>
         </div>
       )}

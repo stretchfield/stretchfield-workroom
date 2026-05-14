@@ -11332,27 +11332,33 @@ const FinanceInvoicesView = ({ user }) => {
                       {inv.status === "reviewed" && (
                         <button onClick={async () => {
                           setSaving(true);
-                          const vNum = "PV/" + new Date().getFullYear().toString().slice(-2) + "/" + String(Math.floor(Math.random()*900)+100).padStart(3,"0");
-                          const { data: newV } = await supabase.from("payment_vouchers").insert({
-                            payment_type: "project",
-                            payee: inv.vendor_name,
-                            payee_type: "vendor",
-                            description: "Payment for " + (inv.event_name||"services") + " — Invoice " + (inv.invoice_number||inv.id.slice(0,8)),
-                            amount: parseFloat(inv.amount||0),
-                            currency: "GHS",
-                            event_name: inv.event_name,
-                            invoice_ref: inv.invoice_number,
-                            raised_by: user.id,
-                            status: "pending_approval",
-                            voucher_number: vNum,
-                          }).select().single();
-                          if (newV) {
-                            await supabase.from("vendor_invoices").update({ status: "voucher_created", purchase_order_id: newV.id }).eq("id", inv.id);
-                            // Notify CEO
-                            const { data: ceos } = await supabase.from("profiles").select("id").eq("role","CEO");
-                            for (const ceo of ceos||[]) await supabase.from("notifications").insert({ user_id: ceo.id, title: "Payment Voucher Raised", message: `${user.name} raised voucher ${vNum} for GHS ${parseFloat(inv.amount||0).toLocaleString()} — ${inv.vendor_name}`, type: "finance" });
-                            alert("✓ Voucher " + vNum + " created — go to Payment Vouchers to sign and send to CEO.");
-                          }
+                          try {
+                            // Get next voucher number
+                            const { data: existing } = await supabase.from("payment_vouchers").select("voucher_number").order("created_at", { ascending: false }).limit(1);
+                            const lastNum = existing?.[0]?.voucher_number?.split("/")?.[2];
+                            const nextNum = String((parseInt(lastNum)||0) + 1).padStart(3,"0");
+                            const vNum = "PV/" + new Date().getFullYear().toString().slice(-2) + "/" + nextNum;
+                            const { data: newV, error: ve } = await supabase.from("payment_vouchers").insert({
+                              payment_type: "project",
+                              payee: inv.vendor_name,
+                              payee_type: "vendor",
+                              description: "Payment for " + (inv.event_name||"services") + " — Invoice " + (inv.invoice_number||inv.id.slice(0,8)),
+                              amount: parseFloat(inv.amount||0),
+                              currency: "GHS",
+                              event_name: inv.event_name,
+                              invoice_ref: inv.invoice_number,
+                              raised_by: user.id,
+                              status: "pending_approval",
+                              voucher_number: vNum,
+                            }).select().single();
+                            if (ve) { alert("Error creating voucher: " + ve.message); setSaving(false); return; }
+                            if (newV) {
+                              await supabase.from("vendor_invoices").update({ status: "voucher_created", purchase_order_id: newV.id }).eq("id", inv.id);
+                              const { data: ceos } = await supabase.from("profiles").select("id").eq("role","CEO");
+                              for (const ceo of ceos||[]) await supabase.from("notifications").insert({ user_id: ceo.id, title: "Payment Voucher Raised", message: `${user.name} raised voucher ${vNum} for GHS ${parseFloat(inv.amount||0).toLocaleString()} — ${inv.vendor_name}`, type: "finance" });
+                              alert("✓ Voucher " + vNum + " created. Go to Payment Vouchers tab to sign.");
+                            }
+                          } catch(e) { alert("Error: " + e.message); }
                           setSaving(false);
                           load();
                         }} disabled={saving} style={{ background: T.cyan+"18", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>💳 Create Voucher</button>

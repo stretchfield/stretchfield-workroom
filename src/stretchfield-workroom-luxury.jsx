@@ -11184,7 +11184,7 @@ const VendorInvoiceView = ({ user }) => {
     load();
   };
 
-  const statusColor = { submitted: T.amber, reviewed: T.teal, paid: "#10B981" };
+  const statusColor = { submitted: T.amber, reviewed: T.cyan, voucher_created: T.teal, paid: "#10B981" };
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
@@ -11288,7 +11288,7 @@ const FinanceInvoicesView = ({ user }) => {
     load();
   };
 
-  const statusColor = { submitted: T.amber, reviewed: T.teal, paid: "#10B981" };
+  const statusColor = { submitted: T.amber, reviewed: T.cyan, voucher_created: T.teal, paid: "#10B981" };
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
@@ -11321,9 +11321,45 @@ const FinanceInvoicesView = ({ user }) => {
                   <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 11 }}>{new Date(inv.created_at).toLocaleDateString("en-GB")}</td>
                   <td style={{ padding: "10px 14px" }}><span style={{ background: (statusColor[inv.status]||T.textMuted)+"18", color: statusColor[inv.status]||T.textMuted, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{inv.status}</span></td>
                   <td style={{ padding: "10px 14px" }}>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      {inv.status === "submitted" && <button onClick={() => updateStatus(inv.id, "reviewed")} style={{ background: T.teal + "18", border: `1px solid ${T.teal}30`, color: T.teal, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>Review</button>}
-                      {inv.status === "reviewed" && <button onClick={() => updateStatus(inv.id, "paid")} style={{ background: "#10B98118", border: "1px solid #10B98130", color: "#10B981", padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>Mark Paid</button>}
+                    <div style={{ display: "flex", gap: 6, flexWrap:"wrap" }}>
+                      {inv.status === "submitted" && (
+                        <button onClick={async () => {
+                          await updateStatus(inv.id, "reviewed");
+                          // Notify vendor invoice is being reviewed
+                          if (inv.vendor_id) await supabase.from("notifications").insert({ user_id: inv.vendor_id, title: "Invoice Under Review", message: `Your invoice ${inv.invoice_number||""} of GHS ${parseFloat(inv.amount||0).toLocaleString()} is being reviewed by Finance.`, type: "finance" });
+                        }} style={{ background: T.teal+"18", border: `1px solid ${T.teal}30`, color: T.teal, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>✓ Review</button>
+                      )}
+                      {inv.status === "reviewed" && (
+                        <button onClick={async () => {
+                          setSaving(true);
+                          const vNum = "PV/" + new Date().getFullYear().toString().slice(-2) + "/" + String(Math.floor(Math.random()*900)+100).padStart(3,"0");
+                          const { data: newV } = await supabase.from("payment_vouchers").insert({
+                            payment_type: "project",
+                            payee: inv.vendor_name,
+                            payee_type: "vendor",
+                            description: "Payment for " + (inv.event_name||"services") + " — Invoice " + (inv.invoice_number||inv.id.slice(0,8)),
+                            amount: parseFloat(inv.amount||0),
+                            currency: "GHS",
+                            event_name: inv.event_name,
+                            invoice_ref: inv.invoice_number,
+                            raised_by: user.id,
+                            status: "pending_approval",
+                            voucher_number: vNum,
+                          }).select().single();
+                          if (newV) {
+                            await supabase.from("vendor_invoices").update({ status: "voucher_created", purchase_order_id: newV.id }).eq("id", inv.id);
+                            // Notify CEO
+                            const { data: ceos } = await supabase.from("profiles").select("id").eq("role","CEO");
+                            for (const ceo of ceos||[]) await supabase.from("notifications").insert({ user_id: ceo.id, title: "Payment Voucher Raised", message: `${user.name} raised voucher ${vNum} for GHS ${parseFloat(inv.amount||0).toLocaleString()} — ${inv.vendor_name}`, type: "finance" });
+                            alert("✓ Voucher " + vNum + " created — go to Payment Vouchers to sign and send to CEO.");
+                          }
+                          setSaving(false);
+                          load();
+                        }} disabled={saving} style={{ background: T.cyan+"18", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>💳 Create Voucher</button>
+                      )}
+                      {inv.status === "voucher_created" && <span style={{ color: T.teal, fontSize: 10, fontWeight: 700 }}>✓ Voucher Raised</span>}
+                      {inv.status === "paid" && <span style={{ color: "#10B981", fontSize: 10, fontWeight: 700 }}>✓ Paid</span>}
+                      {inv.invoice_url && <a href={inv.invoice_url} target="_blank" rel="noreferrer" style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, padding: "3px 8px", border: `1px solid ${T.border}`, borderRadius: 6 }}>📄 Doc</a>}
                     </div>
                   </td>
                 </tr>

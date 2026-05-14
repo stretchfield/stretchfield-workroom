@@ -11293,22 +11293,22 @@ const FinanceInvoicesView = ({ user }) => {
     load();
   };
 
-  const statusColor = { submitted: T.amber, reviewed: T.cyan, voucher_created: T.teal, paid: "#10B981" };
+  const statusColor = { submitted: T.amber, reviewed: T.cyan, voucher_created: T.teal, paid: "#10B981", rejected: T.red };
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
-      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+      <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: "1px solid "+T.border }}>
         <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Finance</div>
-        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Vendor Invoices</h2>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800 }}>Vendor Invoices</h2>
         <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{invoices.filter(i => i.status === "submitted").length} new invoices to review</div>
       </div>
-      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ background: T.surface, border: "1px solid "+T.border, borderRadius: 12, overflow: "hidden" }}>
         {invoices.length === 0 ? (
           <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>No invoices received yet.</div>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
-              <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
+              <tr style={{ background: T.bg, borderBottom: "1px solid "+T.border }}>
                 {["Vendor","Event","Amount","Document","Date","Status","Actions"].map(h => (
                   <th key={h} style={{ padding: "10px 14px", textAlign: "left", color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>
                 ))}
@@ -11316,64 +11316,44 @@ const FinanceInvoicesView = ({ user }) => {
             </thead>
             <tbody>
               {invoices.map((inv, i) => (
-                <tr key={inv.id} style={{ borderBottom: i < invoices.length-1 ? `1px solid ${T.border}44` : "none" }}
-                  onMouseEnter={e => e.currentTarget.style.background = T.bg}
-                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                <tr key={inv.id} style={{ borderBottom: i < invoices.length-1 ? "1px solid "+T.border+"44" : "none" }}>
                   <td style={{ padding: "10px 14px", color: T.textPrimary, fontSize: 12, fontWeight: 700 }}>{inv.vendor_name}</td>
                   <td style={{ padding: "10px 14px", color: T.textSecondary, fontSize: 12 }}>{inv.event_name}</td>
-                  <td style={{ padding: "10px 14px", color: T.amber, fontSize: 12, fontWeight: 700 }}>GHS {(inv.amount||0).toLocaleString()}</td>
+                  <td style={{ padding: "10px 14px", color: T.amber, fontSize: 12, fontWeight: 700 }}>GHS {parseFloat(inv.amount||0).toLocaleString()}</td>
                   <td style={{ padding: "10px 14px" }}>{inv.invoice_url ? <a href={inv.invoice_url} target="_blank" rel="noopener noreferrer" style={{ color: T.cyan, fontSize: 12, fontWeight: 700 }}>📄 View</a> : <span style={{ color: T.textMuted, fontSize: 11 }}>No doc</span>}</td>
                   <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 11 }}>{new Date(inv.created_at).toLocaleDateString("en-GB")}</td>
                   <td style={{ padding: "10px 14px" }}><span style={{ background: (statusColor[inv.status]||T.textMuted)+"18", color: statusColor[inv.status]||T.textMuted, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{inv.status}</span></td>
                   <td style={{ padding: "10px 14px" }}>
-                    <div style={{ display: "flex", gap: 6, flexWrap:"wrap" }}>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                       {inv.status === "submitted" && (
                         <>
-                          <button onClick={async () => {
-                            await updateStatus(inv.id, "reviewed");
-                            if (inv.vendor_id) await supabase.from("notifications").insert({ user_id: inv.vendor_id, title: "Invoice Under Review", message: "Your invoice " + (inv.invoice_number||"") + " of GHS " + parseFloat(inv.amount||0).toLocaleString() + " is being reviewed by Finance.", type: "finance" });
-                          }} style={{ background: T.teal+"18", border: `1px solid ${T.teal}30`, color: T.teal, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>✓ Review</button>
-                          <button onClick={() => { setRejectModal(inv); setRejectComment(""); }} style={{ background: T.red+"18", border: `1px solid ${T.red}30`, color: T.red, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>✗ Reject</button>
+                          <button onClick={async () => { await updateStatus(inv.id, "reviewed"); if (inv.vendor_id) await supabase.from("notifications").insert({ user_id: inv.vendor_id, title: "Invoice Under Review", message: "Your invoice " + (inv.invoice_number||"") + " is being reviewed by Finance.", type: "finance" }); }} style={{ background: T.teal+"18", border: "1px solid "+T.teal+"30", color: T.teal, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>✓ Review</button>
+                          <button onClick={() => { setRejectModal(inv); setRejectComment(""); }} style={{ background: T.red+"18", border: "1px solid "+T.red+"30", color: T.red, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>✗ Reject</button>
                         </>
                       )}
                       {inv.status === "reviewed" && (
                         <button onClick={async () => {
                           setSaving(true);
                           try {
-                            // Get next voucher number
                             const yr = new Date().getFullYear().toString().slice(-2);
-                            const { data: existing } = await supabase.from("payment_vouchers").select("voucher_number").ilike("voucher_number", "PV/" + yr + "/%").order("voucher_number", { ascending: false }).limit(1);
-                            const lastNum = existing?.[0]?.voucher_number?.split("/")?.[2];
-                            const nextNum = String((parseInt(lastNum)||0) + 1).padStart(3,"0");
-                            const vNum = "PV/" + yr + "/" + nextNum;
-                            const { data: newV, error: ve } = await supabase.from("payment_vouchers").insert({
-                              payment_type: "project",
-                              payee: inv.vendor_name,
-                              payee_type: "vendor",
-                              description: "Payment for " + (inv.event_name||"services") + " — Invoice " + (inv.invoice_number||inv.id.slice(0,8)),
-                              amount: parseFloat(inv.amount||0),
-                              currency: "GHS",
-                              event_name: inv.event_name,
-                              invoice_ref: inv.invoice_number,
-                              raised_by: user.id,
-                              status: "pending_approval",
-                              voucher_number: vNum,
-                            }).select().single();
-                            if (ve) { alert("Error creating voucher: " + ve.message); setSaving(false); return; }
+                            const { data: ex } = await supabase.from("payment_vouchers").select("voucher_number").ilike("voucher_number", "PV/"+yr+"/%").order("voucher_number", { ascending: false }).limit(1);
+                            const lastNum = ex?.[0]?.voucher_number?.split("/")?.[2];
+                            const vNum = "PV/"+yr+"/"+String((parseInt(lastNum)||0)+1).padStart(3,"0");
+                            const { data: newV, error: ve } = await supabase.from("payment_vouchers").insert({ payment_type: "project", payee: inv.vendor_name, payee_type: "vendor", description: "Payment for "+(inv.event_name||"services")+" — Invoice "+(inv.invoice_number||inv.id.slice(0,8)), amount: parseFloat(inv.amount||0), currency: "GHS", event_name: inv.event_name, invoice_ref: inv.invoice_number, raised_by: user.id, status: "pending_approval", voucher_number: vNum }).select().single();
+                            if (ve) { alert("Error: "+ve.message); setSaving(false); return; }
                             if (newV) {
                               await supabase.from("vendor_invoices").update({ status: "voucher_created", purchase_order_id: newV.id }).eq("id", inv.id);
                               const { data: ceos } = await supabase.from("profiles").select("id").eq("role","CEO");
-                              for (const ceo of ceos||[]) await supabase.from("notifications").insert({ user_id: ceo.id, title: "Payment Voucher Raised", message: user.name + " raised voucher " + vNum + " for GHS " + parseFloat(inv.amount||0).toLocaleString() + " — " + inv.vendor_name, type: "finance" });
-                              alert("✓ Voucher " + vNum + " created. Go to Payment Vouchers tab to sign.");
+                              for (const ceo of ceos||[]) await supabase.from("notifications").insert({ user_id: ceo.id, title: "Payment Voucher Raised", message: user.name+" raised voucher "+vNum+" for GHS "+parseFloat(inv.amount||0).toLocaleString()+" — "+inv.vendor_name, type: "finance" });
+                              alert("Voucher "+vNum+" created. Go to Payment Vouchers tab to sign.");
                             }
-                          } catch(e) { alert("Error: " + e.message); }
-                          setSaving(false);
-                          load();
-                        }} disabled={saving} style={{ background: T.cyan+"18", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>💳 Create Voucher</button>
+                          } catch(e) { alert("Error: "+e.message); }
+                          setSaving(false); load();
+                        }} disabled={saving} style={{ background: T.cyan+"18", border: "1px solid "+T.cyan+"30", color: T.cyan, padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>💳 Create Voucher</button>
                       )}
                       {inv.status === "voucher_created" && <span style={{ color: T.teal, fontSize: 10, fontWeight: 700 }}>✓ Voucher Raised</span>}
                       {inv.status === "paid" && <span style={{ color: "#10B981", fontSize: 10, fontWeight: 700 }}>✓ Paid</span>}
-                      {inv.invoice_url && <a href={inv.invoice_url} target="_blank" rel="noreferrer" style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, padding: "3px 8px", border: `1px solid ${T.border}`, borderRadius: 6 }}>📄 Doc</a>}
+                      {inv.invoice_url && inv.status !== "submitted" && <a href={inv.invoice_url} target="_blank" rel="noreferrer" style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, padding: "3px 8px", border: "1px solid "+T.border, borderRadius: 6 }}>📄 Doc</a>}
                     </div>
                   </td>
                 </tr>
@@ -11382,39 +11362,32 @@ const FinanceInvoicesView = ({ user }) => {
           </table>
         )}
       </div>
-    </div>
-  );
-};
-
-
-      {/* Reject Invoice Modal */}
       {rejectModal && (
-        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setRejectModal(null)}>
-          <div style={{ background:T.surface, border:`1px solid ${T.red}30`, borderRadius:16, width:"100%", maxWidth:480, padding:28 }} onClick={e=>e.stopPropagation()}>
-            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>Reject Invoice</div>
-            <div style={{ color:T.textMuted, fontSize:13, marginBottom:20 }}>{rejectModal.vendor_name} — {rejectModal.invoice_number} — GHS {parseFloat(rejectModal.amount||0).toLocaleString()}</div>
-            <div style={{ marginBottom:16 }}>
-              <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:6 }}>Reason for Rejection *</label>
-              <textarea value={rejectComment} onChange={e=>setRejectComment(e.target.value)} rows={4} placeholder="Explain what needs to be corrected — the vendor will receive this via email..." style={{ width:"100%", padding:"10px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} />
+        <div style={{ position: "fixed", inset: 0, zIndex: 700, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setRejectModal(null)}>
+          <div style={{ background: T.surface, border: "1px solid "+T.red+"30", borderRadius: 16, width: "100%", maxWidth: 480, padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Reject Invoice</div>
+            <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 20 }}>{rejectModal.vendor_name} — {rejectModal.invoice_number} — GHS {parseFloat(rejectModal.amount||0).toLocaleString()}</div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 6 }}>Reason for Rejection *</label>
+              <textarea value={rejectComment} onChange={e => setRejectComment(e.target.value)} rows={4} placeholder="Explain what needs to be corrected — the vendor will receive this via email..." style={{ width: "100%", padding: "10px 12px", background: T.bg, border: "1px solid "+T.border, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", resize: "none", boxSizing: "border-box" }} />
             </div>
-            <div style={{ display:"flex", gap:10 }}>
+            <div style={{ display: "flex", gap: 10 }}>
               <button onClick={async () => {
                 if (!rejectComment.trim()) { alert("Please provide a rejection reason."); return; }
                 setRejecting(true);
                 await supabase.from("vendor_invoices").update({ status: "rejected", notes: rejectComment, reviewed_by: user.id, reviewed_at: new Date().toISOString() }).eq("id", rejectModal.id);
                 if (rejectModal.vendor_id) {
-                  await supabase.from("notifications").insert({ user_id: rejectModal.vendor_id, title: "Invoice Rejected — Action Required", message: "Your invoice " + (rejectModal.invoice_number||"") + " has been rejected. Reason: " + rejectComment, type: "finance" });
+                  await supabase.from("notifications").insert({ user_id: rejectModal.vendor_id, title: "Invoice Rejected — Action Required", message: "Your invoice "+(rejectModal.invoice_number||"")+" has been rejected. Reason: "+rejectComment, type: "finance" });
                   const { data: vp } = await supabase.from("profiles").select("email,name").eq("id", rejectModal.vendor_id).single();
                   if (vp && vp.email) {
-                    const subj = "Invoice Rejected — " + (rejectModal.invoice_number||"Your Invoice") + " — Action Required";
-                    const body = "<h2>Invoice Rejected</h2><p>Hi " + vp.name + ",</p><p>Your invoice of <strong>GHS " + parseFloat(rejectModal.amount||0).toLocaleString() + "</strong> for <strong>" + (rejectModal.event_name||"services") + "</strong> requires correction.</p><div style='background:#FEF2F2;border-left:4px solid #EF4444;padding:16px;margin:16px 0'><strong>Reason:</strong><br/>" + rejectComment + "</div><p>Please correct and resubmit via <a href='https://workroom.stretchfield.com'>WorkRoom</a>.</p>";
-                    await fetch("/api/send-email", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ to: vp.email, subject: subj, html: body }) });
+                    const body = "<h2>Invoice Rejected</h2><p>Hi "+vp.name+",</p><p>Your invoice of <strong>GHS "+parseFloat(rejectModal.amount||0).toLocaleString()+"</strong> for <strong>"+(rejectModal.event_name||"services")+"</strong> requires correction.</p><p><strong>Reason:</strong> "+rejectComment+"</p><p>Please correct and resubmit via <a href='https://workroom.stretchfield.com'>WorkRoom</a>.</p>";
+                    await fetch("/api/send-email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ to: vp.email, subject: "Invoice Rejected — "+(rejectModal.invoice_number||"Your Invoice")+" — Action Required", html: body }) });
                   }
                 }
                 setRejecting(false); setRejectModal(null); setRejectComment(""); load();
                 alert("Invoice rejected and vendor notified by email.");
-              }} disabled={rejecting} style={{ flex:1, background:"linear-gradient(135deg,#EF4444,#F97316)", border:"none", color:"#fff", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{rejecting?"Sending...":"Reject & Notify Vendor"}</button>
-              <button onClick={()=>{ setRejectModal(null); setRejectComment(""); }} style={{ background:"none", border:"1px solid "+T.border, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+              }} disabled={rejecting} style={{ flex: 1, background: "linear-gradient(135deg,#EF4444,#F97316)", border: "none", color: "#fff", padding: "11px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{rejecting ? "Sending..." : "Reject & Notify Vendor"}</button>
+              <button onClick={() => { setRejectModal(null); setRejectComment(""); }} style={{ background: "none", border: "1px solid "+T.border, color: T.textMuted, padding: "11px 16px", borderRadius: 8, cursor: "pointer" }}>Cancel</button>
             </div>
           </div>
         </div>
@@ -11422,7 +11395,6 @@ const FinanceInvoicesView = ({ user }) => {
     </div>
   );
 };
-
 const QuotesReceivedView = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [rffs, setRffs] = useState([]);

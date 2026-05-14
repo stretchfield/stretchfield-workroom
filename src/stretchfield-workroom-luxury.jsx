@@ -2149,7 +2149,7 @@ const VendorDashboard = ({ user }) => {
       supabase.from("vendor_invoices").select("*, paid_at, reviewed_at").eq("vendor_id", user.id).order("created_at", { ascending: false }),
       supabase.from("rff_awards").select("*").eq("vendor_id", user.id),
       supabase.from("profiles").select("*").eq("id", user.id).single(),
-      supabase.from("purchase_orders").select("id,internal_po_number,event_name,amount,currency,status,notes,created_at,rff_id").eq("vendor_id", user.id).in("status", ["sent","invoiced","paid"]).order("created_at", { ascending: false }),
+      supabase.from("purchase_orders").select("id,internal_po_number,event_name,amount,currency,status,notes,created_at,rff_id,rff_title,rff_category,vendor_name,vm_signature,vm_signed_at,vm_signed_by,ceo_signature,ceo_signed_at,ceo_signed_by,finance_signature,finance_signed_at,finance_signed_by").eq("vendor_id", user.id).in("status", ["sent","invoiced","paid","fully_signed","published"]).order("created_at", { ascending: false }),
       supabase.from("vendor_scorecards").select("*").eq("vendor_id", user.id).order("created_at", { ascending: false }),
     ]);
     setAssignments(asn.data || []);
@@ -2338,12 +2338,23 @@ const VendorDashboard = ({ user }) => {
             <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Rating Breakdown</div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px,1fr))", gap: 10 }}>
-            {[["Quality", latestScore.quality_pct], ["Delivery", latestScore.delivery_pct], ["Communication", latestScore.communication_pct], ["Value", latestScore.value_pct]].map(([label, val]) => (
-              <div key={label} style={{ background: T.bg, borderRadius: 8, padding: "12px", textAlign: "center" }}>
-                <div style={{ color: tier?.color||T.teal, fontWeight: 900, fontSize: 18 }}>{val||0}%</div>
-                <div style={{ color: T.textMuted, fontSize: 10, textTransform: "uppercase", fontWeight: 700, marginTop: 3 }}>{label}</div>
-              </div>
-            ))}
+            {(() => {
+              const sc = latestScore;
+              const avg = (...vals) => { const v = vals.filter(x=>x!=null); return v.length ? Math.round((v.reduce((a,b)=>a+b,0)/v.length)/5*100) : 0; };
+              return [
+                ["Quality", avg(sc.quality_product, sc.quality_execution, sc.quality_post_support, sc.quality_consistency)],
+                ["Delivery", avg(sc.reliability_delivery, sc.reliability_punctuality, sc.reliability_dependability, sc.reliability_contingency)],
+                ["Communication", avg(sc.comms_responsiveness, sc.comms_clarity, sc.comms_problem_solving, sc.comms_relationship)],
+                ["Value", avg(sc.pricing_competitiveness, sc.pricing_clarity, sc.pricing_value, sc.pricing_payment_flexibility)],
+                ["Flexibility", avg(sc.flexibility_adaptation, sc.flexibility_custom, sc.flexibility_negotiation, sc.flexibility_client_centric)],
+                ["Innovation", avg(sc.innovation_creative, sc.innovation_customization, sc.innovation_suggestions, sc.innovation_trends)],
+              ].map(([label, val]) => (
+                <div key={label} style={{ background: T.bg, borderRadius: 8, padding: "12px", textAlign: "center" }}>
+                  <div style={{ color: val>=80?T.teal:val>=60?T.amber:T.red, fontWeight: 900, fontSize: 18 }}>{val}%</div>
+                  <div style={{ color: T.textMuted, fontSize: 10, textTransform: "uppercase", fontWeight: 700, marginTop: 3 }}>{label}</div>
+                </div>
+              ));
+            })()}
           </div>
         </div>
       )}

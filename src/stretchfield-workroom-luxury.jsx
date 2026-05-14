@@ -2259,7 +2259,7 @@ const VendorDashboard = ({ user }) => {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
                   <span style={{ color: statusColors[po.status]||T.textMuted, fontSize: 10, fontWeight: 700, background: (statusColors[po.status]||T.textMuted)+"18", padding: "2px 8px", borderRadius: 20 }}>{po.status}</span>
-                  <button onClick={() => downloadPDF(generatePOPDF(po, {name:po.vendor_name, email:user.email, ceo_signature:po.ceo_signature, ceo_signed_at:po.ceo_signed_at, vm_signature:po.vm_signature, vm_signed_at:po.vm_signed_at, fm_signature:po.fm_signature, fm_signed_at:po.fm_signed_at}, {title:po.rff_title||po.event_name}, {name:po.event_name}), "PO-"+(po.internal_po_number||po.id)+".html")} style={{ background: "none", border: "none", color: T.cyan, fontSize: 10, fontWeight: 700, cursor: "pointer", padding: 0 }}>↓ PDF</button>
+                  <button onClick={() => downloadPDF(generatePOPDF(po, {name:po.vendor_name, email:user.email}, {title:po.rff_title||po.event_name}, {name:po.event_name}), "PO-"+(po.internal_po_number||po.id)+".html")} style={{ background: "none", border: "none", color: T.cyan, fontSize: 10, fontWeight: 700, cursor: "pointer", padding: 0 }}>↓ PDF</button>
                 </div>
               </div>
             );
@@ -10354,8 +10354,8 @@ const generatePOPDF = (po, vendor, rff, event) => {
     </thead>
     <tbody>
       <tr>
-        <td>${rff?.title || "Professional Services — " + po.vendor_name}</td>
-        <td>${rff?.category || vendor?.service_category || "—"}</td>
+        <td>${po.rff_title || rff?.title || po.event_name || "Professional Services"}</td>
+        <td>${po.rff_category || rff?.category || vendor?.service_category || "—"}</td>
         <td style="text-align:right;font-weight:700;">${po.currency || "GHS"} ${parseFloat(po.amount||0).toLocaleString()}</td>
       </tr>
       ${po.notes ? '<tr><td colspan="3" style="color:#5A6E8A;font-size:12px;font-style:italic;">Note: ' + po.notes + '</td></tr>' : ''}

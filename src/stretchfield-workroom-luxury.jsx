@@ -8536,6 +8536,12 @@ const FinanceDashboard = ({ user, onTab }) => {
                         {isFinance && v.fm_signature && v.status !== 'rejected' && (
                           <span style={{ color: T.teal, fontSize: 10, fontWeight: 700, padding: '3px 8px' }}>FM ✓</span>
                         )}
+                        {v.ceo_signature && (
+                          <span style={{ color: T.cyan, fontSize: 10, fontWeight: 700, padding: '3px 8px' }}>CEO ✓</span>
+                        )}
+                        {!v.ceo_signature && v.status === 'approved' && (
+                          <span style={{ color: T.amber, fontSize: 10, fontWeight: 700, padding: '3px 8px' }}>CEO pending</span>
+                        )}
                         {canApprove && v.status === 'pending_approval' && (
                           <>
                             <button onClick={() => { setCeoVoucherSignModal(v); setVoucherSignature(""); }} style={{ background: '#10B98118', border: '1px solid #10B98130', color: '#10B981', padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>✓ Sign & Approve</button>

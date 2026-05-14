@@ -7968,7 +7968,7 @@ const FinanceManagerDashboard = ({ user, onTab }) => {
 
   const now = new Date();
   const totalRevenue = clientInvoices.reduce((s,i) => s+parseFloat(i.amount||0), 0);
-  const outstanding = clientInvoices.filter(i => i.status !== "paid").reduce((s,i) => s+(i.amount||0), 0);
+  const outstanding = 0;
   const pendingVouchers = vouchers.filter(v => v.status === 'pending_approval');
   const approvedVouchers = vouchers.filter(v => v.status === 'approved');
   const paidVouchers = vouchers.filter(v => v.status === 'paid');

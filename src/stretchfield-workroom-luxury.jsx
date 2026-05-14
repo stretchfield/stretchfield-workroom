@@ -11419,7 +11419,6 @@ const FinanceInvoicesView = ({ user }) => {
           </div>
         </div>
       )}
-    </div>
   );
 };
 

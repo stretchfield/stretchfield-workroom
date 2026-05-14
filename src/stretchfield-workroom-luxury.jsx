@@ -4075,7 +4075,8 @@ const SMTasksView = ({ user }) => {
   const load = async () => {
     const [t, m] = await Promise.all([
       supabase.from("tasks").select("*").eq("task_type", "sm").order("created_at", { ascending: false }),
-      supabase.from("profiles").select("*").in("role", ["CEO", "Country Manager", "Sales & Marketing"]),
+      supabase.from("profiles").select("*").or('role.in.("CEO","Country Manager","Sales & Marketing"),has_sm_access.eq.true'),
+      supabase.from("client_payments").select("*").order("created_at", { ascending: false }),
     ]);
     setTasks(t.data || []);
     setMembers(m.data || []);
@@ -6327,19 +6328,22 @@ const ClientPaymentsView = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [modal, setModal] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ client_id:"", client_name:"", project_id:"", event_name:"", amount:"", payment_date: new Date().toISOString().slice(0,10), payment_method:"Bank Transfer", reference_number:"", zoho_invoice_url:"", notes:"" });
+  const [form, setForm] = useState({ client_id:"", client_name:"", project_id:"", event_name:"", amount:"", payment_date: new Date().toISOString().slice(0,10), payment_method:"Bank Transfer", reference_number:"", zoho_invoice_url:"", notes:"", sales_rep_id:"", sales_rep_name:"" });
   const isFM = user.role === "Finance Manager";
   const isCEO = user.role === "CEO";
+  const [salesReps, setSalesReps] = useState([]);
 
   const load = async () => {
-    const [{ data: p }, { data: c }, { data: e }] = await Promise.all([
+    const [{ data: p }, { data: c }, { data: e }, { data: sr }] = await Promise.all([
       supabase.from("client_payments").select("*").order("payment_date", { ascending: false }),
       supabase.from("clients").select("*").order("name"),
       supabase.from("projects").select("*").order("name"),
+      supabase.from("profiles").select("id,name,role").or('role.in.("CEO","Sales & Marketing"),has_sm_access.eq.true'),
     ]);
     setPayments(p || []);
     setClients(c || []);
     setEvents(e || []);
+    setSalesReps(sr || []);
   };
   useEffect(() => { load(); }, []);
 
@@ -6355,6 +6359,8 @@ const ClientPaymentsView = ({ user }) => {
       amount: parseFloat(form.amount),
       recorded_by: user.id,
       recorded_by_name: user.name,
+      sales_rep_id: form.sales_rep_id || null,
+      sales_rep_name: form.sales_rep_name || null,
     });
     // Notify CEO if recorded by Finance
     if (isFM) {
@@ -6365,7 +6371,7 @@ const ClientPaymentsView = ({ user }) => {
     }
     setSaving(false);
     setModal(false);
-    setForm({ client_id:"", client_name:"", project_id:"", event_name:"", amount:"", payment_date: new Date().toISOString().slice(0,10), payment_method:"Bank Transfer", reference_number:"", zoho_invoice_url:"", notes:"" });
+    setForm({ client_id:"", client_name:"", project_id:"", event_name:"", amount:"", payment_date: new Date().toISOString().slice(0,10), payment_method:"Bank Transfer", reference_number:"", zoho_invoice_url:"", notes:"", sales_rep_id:"", sales_rep_name:"" });
     load();
   };
 
@@ -6409,7 +6415,7 @@ const ClientPaymentsView = ({ user }) => {
           <table style={{ width:"100%", borderCollapse:"collapse" }}>
             <thead>
               <tr style={{ background:T.bg }}>
-                {["Client","Event","Amount","Date","Method","Reference","Recorded By"].map(h => (
+                {["Client","Event","Amount","Date","Method","Reference","Sales Rep","Recorded By"].map(h => (
                   <th key={h} style={{ padding:"10px 16px", color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", textAlign:"left", borderBottom:`1px solid ${T.border}` }}>{h}</th>
                 ))}
               </tr>
@@ -6489,6 +6495,14 @@ const ClientPaymentsView = ({ user }) => {
                 <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Notes</label>
                 <textarea value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} rows={2} placeholder="Any additional notes..."
                   style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} />
+              </div>
+              <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Attribute to Sales Rep</label>
+                <select value={form.sales_rep_id} onChange={e=>{ const r=salesReps.find(x=>x.id===e.target.value); setForm(f=>({...f,sales_rep_id:e.target.value,sales_rep_name:r?.name||""})); }}
+                  style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  <option value="">No attribution</option>
+                  {salesReps.map(r=><option key={r.id} value={r.id}>{r.name} ({r.role})</option>)}
+                </select>
               </div>
             </div>
             <div style={{ display:"flex", gap:10, marginTop:20 }}>
@@ -7342,16 +7356,19 @@ const CRMDashboardCEO = ({ user }) => {
   const [saving, setSaving] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [editTargetForm, setEditTargetForm] = useState({});
+  const [crmPayments, setCrmPayments] = useState([]);
 
   const load = async () => {
-    const [l, t, m] = await Promise.all([
+    const [l, t, m, cp] = await Promise.all([
       supabase.from("opportunities").select("*"),
       supabase.from("sales_targets").select("*").order("created_at", { ascending: false }),
-      supabase.from("profiles").select("*").in("role", ["CEO", "Country Manager", "Sales & Marketing"]),
+      supabase.from("profiles").select("*").or('role.in.("CEO","Country Manager","Sales & Marketing"),has_sm_access.eq.true'),
+      supabase.from("client_payments").select("*").order("created_at", { ascending: false }),
     ]);
     setOpportunitys(l.data || []);
     setTargets(t.data || []);
-    setMembers(m.data || []);
+    setMembers((m.data || []).filter((mem, idx, self) => self.findIndex(x => x.id === mem.id) === idx));
+    setCrmPayments(cp.data || []);
   };
 
   useEffect(() => { load(); }, []);
@@ -7386,12 +7403,14 @@ const CRMDashboardCEO = ({ user }) => {
   const repStats = members.map(m => {
     const repOpportunitys = opportunities.filter(l => l.assigned_to === m.id || l.created_by === m.id);
     const repWon = repOpportunitys.filter(l => l.status === "won");
-    const repRevenue = repWon.reduce((a, l) => a + (l.value || 0), 0);
+    // Use actual client payments attributed to this rep
+    const repPayments = crmPayments.filter(p => p.sales_rep_id === m.id);
+    const repRevenue = repPayments.reduce((a, p) => a + parseFloat(p.amount||0), 0);
     const repTarget = targets.find(t => t.rep_id === m.id);
     const repCycle = repWon.filter(l => l.sales_cycle_days).length
       ? Math.round(repWon.filter(l => l.sales_cycle_days).reduce((a, l) => a + l.sales_cycle_days, 0) / repWon.filter(l => l.sales_cycle_days).length) : 0;
-    return { ...m, repOpportunitys, repWon, repRevenue, repTarget, repCycle, closingPct: repOpportunitys.length ? Math.round((repWon.length / repOpportunitys.length) * 100) : 0 };
-  }).sort((a, b) => b.repRevenue - a.repRevenue);
+    return { ...m, repOpportunitys, repWon, repRevenue, repTarget, repCycle, repPayments, closingPct: repOpportunitys.length ? Math.round((repWon.length / repOpportunitys.length) * 100) : 0 };
+  }).filter(m => targets.find(t => t.rep_id === m.id) || m.repOpportunitys.length > 0).sort((a, b) => b.repRevenue - a.repRevenue);
 
   const clientEarnings = wonOpportunitys.reduce((acc, l) => { acc[l.company] = (acc[l.company] || 0) + (l.value || 0); return acc; }, {});
 
@@ -14126,11 +14145,13 @@ const OpportunitiesView = ({ user, onNavigate }) => {
       notes: 'Converted from Opportunities.',
       source: 'Opportunities',
       created_by: user && user.id,
-      assigned_to: user && user.id,
-      assigned_name: (user && user.name) || '',
+      assigned_to: opp.assigned_to || (user && user.id),
+      assigned_name: opp.assigned_name || (user && user.name) || '',
+      sales_rep_id: opp.assigned_to || (user && user.id),
+      sales_rep_name: opp.assigned_name || (user && user.name) || '',
     }).select().single();
     if (!res.error && res.data) {
-      await supabase.from('opportunities').update({ status: 'Converted' }).eq('id', opp.id);
+      await supabase.from('opportunities').update({ status: 'Converted', converted_at: new Date().toISOString() }).eq('id', opp.id);
       setSaving(false);
       load();
       if (onNavigate) onNavigate('crm');

@@ -11401,49 +11401,25 @@ const FinanceInvoicesView = ({ user }) => {
               <button onClick={async () => {
                 if (!rejectComment.trim()) { alert("Please provide a rejection reason."); return; }
                 setRejecting(true);
-                // Update invoice status
                 await supabase.from("vendor_invoices").update({ status: "rejected", notes: rejectComment, reviewed_by: user.id, reviewed_at: new Date().toISOString() }).eq("id", rejectModal.id);
-                // Notify vendor in-app
                 if (rejectModal.vendor_id) {
-                  await supabase.from("notifications").insert({ user_id: rejectModal.vendor_id, title: "Invoice Rejected — Action Required", message: `Your invoice ${rejectModal.invoice_number||""} has been rejected. Reason: ${rejectComment}`, type: "finance" });
+                  await supabase.from("notifications").insert({ user_id: rejectModal.vendor_id, title: "Invoice Rejected — Action Required", message: "Your invoice " + (rejectModal.invoice_number||"") + " has been rejected. Reason: " + rejectComment, type: "finance" });
+                  const { data: vp } = await supabase.from("profiles").select("email,name").eq("id", rejectModal.vendor_id).single();
+                  if (vp && vp.email) {
+                    const subj = "Invoice Rejected — " + (rejectModal.invoice_number||"Your Invoice") + " — Action Required";
+                    const body = "<h2>Invoice Rejected</h2><p>Hi " + vp.name + ",</p><p>Your invoice of <strong>GHS " + parseFloat(rejectModal.amount||0).toLocaleString() + "</strong> for <strong>" + (rejectModal.event_name||"services") + "</strong> requires correction.</p><div style='background:#FEF2F2;border-left:4px solid #EF4444;padding:16px;margin:16px 0'><strong>Reason:</strong><br/>" + rejectComment + "</div><p>Please correct and resubmit via <a href='https://workroom.stretchfield.com'>WorkRoom</a>.</p>";
+                    await fetch("/api/send-email", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ to: vp.email, subject: subj, html: body }) });
+                  }
                 }
-                // Send email to vendor
-                const { data: vendorProfile } = await supabase.from("profiles").select("email,name").eq("id", rejectModal.vendor_id).single();
-                if (vendorProfile?.email) {
-                  const emailHtml = `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F1F5F9;font-family:Arial,sans-serif">
-<table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 20px"><tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden">
-<tr><td style="background:#060B14;padding:24px 32px"><span style="color:#00C8FF;font-size:20px;font-weight:900">STRETCHFIELD</span><span style="color:#5A6E8A;font-size:12px;margin-left:12px">WorkRoom</span></td></tr>
-<tr><td style="padding:28px 32px">
-  <p style="margin:0 0 8px;color:#EF4444;font-size:13px;font-weight:800;text-transform:uppercase">Invoice Rejected</p>
-  <h2 style="margin:0 0 20px;color:#0F172A;font-size:20px">Action Required: ${rejectModal.invoice_number||"Your Invoice"}</h2>
-  <p style="margin:0 0 16px;color:#334155;font-size:14px">Hi ${vendorProfile.name},</p>
-  <p style="margin:0 0 16px;color:#334155;font-size:14px">Your invoice of <strong>GHS ${parseFloat(rejectModal.amount||0).toLocaleString()}</strong> for <strong>${rejectModal.event_name||"services"}</strong> has been reviewed and requires correction before it can be processed.</p>
-  <div style="background:#FEF2F2;border-left:4px solid #EF4444;border-radius:0 8px 8px 0;padding:16px 20px;margin:20px 0">
-    <p style="margin:0;color:#991B1B;font-size:13px;font-weight:700;margin-bottom:6px">Reason for Rejection:</p>
-    <p style="margin:0;color:#334155;font-size:14px;line-height:1.6">${rejectComment}</p>
-  </div>
-  <p style="margin:0 0 20px;color:#334155;font-size:14px">Please make the necessary corrections and resubmit your invoice through the WorkRoom portal.</p>
-  <a href="https://workroom.stretchfield.com" style="background:linear-gradient(135deg,#00C8FF,#00E5C8);color:#060B14;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:800;font-size:14px;display:inline-block">Resubmit Invoice →</a>
-</td></tr>
-<tr><td style="background:#F8FAFC;padding:16px 32px;border-top:1px solid #E2E8F0">
-  <p style="margin:0;color:#94A3B8;font-size:11px;text-align:center">© 2026 Stretchfield · workroom.stretchfield.com</p>
-</td></tr>
-</table></td></tr></table>
-</body></html>`;
-                  await fetch("/api/send-email", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ to: vendorProfile.email, subject: `Invoice Rejected — ${rejectModal.invoice_number||"Your Invoice"} — Action Required`, html: emailHtml }) });
-                }
-                setRejecting(false);
-                setRejectModal(null);
-                setRejectComment("");
-                load();
+                setRejecting(false); setRejectModal(null); setRejectComment(""); load();
                 alert("Invoice rejected and vendor notified by email.");
-              }} disabled={rejecting} style={{ flex:1, background:`linear-gradient(135deg,${T.red},#F97316)`, border:"none", color:"#fff", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{rejecting?"Sending...":"Reject & Notify Vendor"}</button>
-              <button onClick={()=>{ setRejectModal(null); setRejectComment(""); }} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+              }} disabled={rejecting} style={{ flex:1, background:"linear-gradient(135deg,#EF4444,#F97316)", border:"none", color:"#fff", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{rejecting?"Sending...":"Reject & Notify Vendor"}</button>
+              <button onClick={()=>{ setRejectModal(null); setRejectComment(""); }} style={{ background:"none", border:"1px solid "+T.border, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
             </div>
           </div>
         </div>
       )}
+    </div>
   );
 };
 

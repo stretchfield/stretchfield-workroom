@@ -902,6 +902,23 @@ const getNavItems = (role, user) => {
   if (role === "Board of Directors") {
     return [{ id: "dashboard", label: "Dashboard", icon: "▪" }, { id: "notifications", label: "Notifications", icon: "▪" }];
   }
+  if (role === "Strategy & Events Lead") {
+    base.push(
+      { id: "event-briefs", label: "Event Briefs", icon: "▪" },
+      { id: "event-milestones", label: "Event Timeline", icon: "▪" },
+      { id: "event-reports", label: "Event Reports", icon: "▪" },
+      { id: "feedback-summary", label: "Feedback", icon: "▪" },
+      { id: "esl-performance", label: "My Performance", icon: "▪" }
+    );
+    if (user?.has_sm_access) {
+      base.push(
+        { id: "opportunities", label: "Opportunities", icon: "▪" },
+        { id: "crm", label: "CRM / Leads", icon: "▪" },
+        { id: "sm-tasks", label: "S&M Tasks", icon: "▪" },
+        { id: "outreach-planner", label: "Outreach Planner", icon: "▪" }
+      );
+    }
+  }
   if (!["Vendor","Client","Strategy & Events Lead"].includes(role)) {
     base.push({ id: "feedback", label: "Feedback", icon: "▪" });
   }
@@ -6796,6 +6813,10 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "vendor-sla": return <VendorSLAView user={currentUser} />;
       case "market-rates": return <MarketRatesView user={currentUser} />;
       case "procurement-report": return <ProcurementReportView user={currentUser} />;
+      case "event-briefs": return <EventBriefsView user={currentUser} />;
+      case "event-milestones": return <EventMilestonesView user={currentUser} />;
+      case "esl-performance": return <ESLPerformanceView user={currentUser} />;
+      case "outreach-planner": return <OutreachPlannerView user={currentUser} />;
       case "ceo-broadcast": return <CEOBroadcastView user={currentUser} />;
       case "approval-queue": return <ApprovalQueueView user={currentUser} onNavigate={setActiveTab} />;
       case "vendor-ratings": return <VendorRatingsView user={currentUser} />;

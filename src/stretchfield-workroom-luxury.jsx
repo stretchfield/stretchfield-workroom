@@ -7947,7 +7947,7 @@ const FinanceManagerDashboard = ({ user, onTab }) => {
       supabase.from('estimates').select('*').order('created_at', { ascending: false }),
       supabase.from('petty_cash').select('*').limit(1).single(),
       supabase.from('daily_balances').select('*').order('report_date', { ascending: false }).limit(1),
-      supabase.from('client_invoices').select('*').order('created_at', { ascending: false }),
+      supabase.from('client_payments').select('*').order('created_at', { ascending: false }),
       supabase.from('vendor_invoices').select('*').order('created_at', { ascending: false }),
       supabase.from('purchase_orders').select('*').order('created_at', { ascending: false }),
       supabase.from('projects').select('*').order('event_date', { ascending: true }),
@@ -7967,7 +7967,7 @@ const FinanceManagerDashboard = ({ user, onTab }) => {
   useEffect(() => { load(); }, []);
 
   const now = new Date();
-  const totalRevenue = clientInvoices.filter(i => i.status === "paid").reduce((s,i) => s+(i.amount||0), 0);
+  const totalRevenue = clientInvoices.reduce((s,i) => s+parseFloat(i.amount||0), 0);
   const outstanding = clientInvoices.filter(i => i.status !== "paid").reduce((s,i) => s+(i.amount||0), 0);
   const pendingVouchers = vouchers.filter(v => v.status === 'pending_approval');
   const approvedVouchers = vouchers.filter(v => v.status === 'approved');

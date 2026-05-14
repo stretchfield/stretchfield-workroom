@@ -11363,7 +11363,7 @@ const FinanceInvoicesView = ({ user }) => {
                             if (newV) {
                               await supabase.from("vendor_invoices").update({ status: "voucher_created", purchase_order_id: newV.id }).eq("id", inv.id);
                               const { data: ceos } = await supabase.from("profiles").select("id").eq("role","CEO");
-                              for (const ceo of ceos||[]) await supabase.from("notifications").insert({ user_id: ceo.id, title: "Payment Voucher Raised", message: `${user.name} raised voucher ${vNum} for GHS ${parseFloat(inv.amount||0).toLocaleString()} — ${inv.vendor_name}`, type: "finance" });
+                              for (const ceo of ceos||[]) await supabase.from("notifications").insert({ user_id: ceo.id, title: "Payment Voucher Raised", message: user.name + " raised voucher " + vNum + " for GHS " + parseFloat(inv.amount||0).toLocaleString() + " — " + inv.vendor_name, type: "finance" });
                               alert("✓ Voucher " + vNum + " created. Go to Payment Vouchers tab to sign.");
                             }
                           } catch(e) { alert("Error: " + e.message); }

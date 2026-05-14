@@ -7431,11 +7431,11 @@ const CRMDashboardCEO = ({ user }) => {
     load();
   };
 
-  const wonOpportunitys = opportunities.filter(l => l.status === "won");
-  const totalRevenue = wonOpportunitys.reduce((a, l) => a + (l.value || 0), 0);
+  const wonOpportunitys = opportunities.filter(l => l.status === "won" || l.status === "Converted");
   const now = new Date();
   const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const ytdRevenue = wonOpportunitys.filter(l => l.closed_date && new Date(l.closed_date) >= startOfYear).reduce((a, l) => a + (l.value || 0), 0);
+  const totalRevenue = crmPayments.reduce((a, p) => a + parseFloat(p.amount||0), 0);
+  const ytdRevenue = crmPayments.filter(p => p.payment_date && new Date(p.payment_date) >= startOfYear).reduce((a, p) => a + parseFloat(p.amount||0), 0);
   const avgCycle = wonOpportunitys.filter(l => l.sales_cycle_days).length
     ? Math.round(wonOpportunitys.filter(l => l.sales_cycle_days).reduce((a, l) => a + l.sales_cycle_days, 0) / wonOpportunitys.filter(l => l.sales_cycle_days).length) : 0;
   const closingPct = opportunities.length ? Math.round((wonOpportunitys.length / opportunities.length) * 100) : 0;

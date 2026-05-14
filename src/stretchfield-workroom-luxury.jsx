@@ -816,6 +816,7 @@ const getNavItems = (role, user) => {
             { id: "staff-payment-rates", label: "Staff Payment Rates" },
             { id: "budget-vs-actuals", label: "Budget vs Actuals" },
         { id: "client-payments", label: "Client Payments" },
+        { id: "sales-dashboard", label: "Sales Dashboard" },
         { id: "cash-flow", label: "Cash Flow" },
         { id: "audit-trail", label: "Audit Trail" },
         { id: "zoho-sync-status", label: "Zoho Sync Status" },
@@ -879,7 +880,7 @@ const getNavItems = (role, user) => {
     base.push({ id: "finance", label: "Finance", icon: "▪" });
   }
   if (role === "Finance Manager") {
-    base.push({ id: "purchase-orders", label: "Purchase Orders", icon: "▪" }, { id: "vendor-invoices", label: "Vendor Invoices", icon: "▪" }, { id: "payment-authorisation", label: "Payment Authorisation", icon: "▪" }, { id: "staff-payment-rates", label: "Staff Payment Rates", icon: "▪" }, { id: "client-payments", label: "Client Payments", icon: "▪" }, { id: "payment-directory", label: "Payment Directory", icon: "▪" }, { id: "cash-flow", label: "Cash Flow", icon: "▪" }, { id: "audit-trail", label: "Audit Trail", icon: "▪" }, { id: "zoho-sync-status", label: "Zoho Sync Status", icon: "▪" });
+    base.push({ id: "purchase-orders", label: "Purchase Orders", icon: "▪" }, { id: "vendor-invoices", label: "Vendor Invoices", icon: "▪" }, { id: "payment-authorisation", label: "Payment Authorisation", icon: "▪" }, { id: "staff-payment-rates", label: "Staff Payment Rates", icon: "▪" }, { id: "client-payments", label: "Client Payments", icon: "▪" }, { id: "sales-dashboard", label: "Sales Dashboard", icon: "▪" }, { id: "payment-directory", label: "Payment Directory", icon: "▪" }, { id: "cash-flow", label: "Cash Flow", icon: "▪" }, { id: "audit-trail", label: "Audit Trail", icon: "▪" }, { id: "zoho-sync-status", label: "Zoho Sync Status", icon: "▪" });
   }
   if (["CEO"].includes(role)) {
     base.push({ id: "client-financials", label: "Client Financials", icon: "▪" });
@@ -6332,6 +6333,7 @@ const ClientPaymentsView = ({ user }) => {
   const isFM = user.role === "Finance Manager";
   const isCEO = user.role === "CEO";
   const [salesReps, setSalesReps] = useState([]);
+  const [editPayment, setEditPayment] = useState(null);
 
   const load = async () => {
     const [{ data: p }, { data: c }, { data: e }, { data: sr }] = await Promise.all([
@@ -6415,7 +6417,7 @@ const ClientPaymentsView = ({ user }) => {
           <table style={{ width:"100%", borderCollapse:"collapse" }}>
             <thead>
               <tr style={{ background:T.bg }}>
-                {["Client","Event","Amount","Date","Method","Reference","Sales Rep","Recorded By"].map(h => (
+                {["Client","Event","Amount","Date","Method","Reference","Sales Rep","Recorded By",""].map(h => (
                   <th key={h} style={{ padding:"10px 16px", color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", textAlign:"left", borderBottom:`1px solid ${T.border}` }}>{h}</th>
                 ))}
               </tr>
@@ -6431,11 +6433,48 @@ const ClientPaymentsView = ({ user }) => {
                     <span style={{ background:(methodColors[p.payment_method]||T.textMuted)+"18", color:methodColors[p.payment_method]||T.textMuted, padding:"2px 10px", borderRadius:20, fontSize:11, fontWeight:700 }}>{p.payment_method||"—"}</span>
                   </td>
                   <td style={{ padding:"12px 16px", color:T.textMuted, fontSize:12 }}>{p.reference_number||"—"}</td>
+                  <td style={{ padding:"12px 16px" }}>
+                    {p.sales_rep_name ? <span style={{ color:T.cyan, fontSize:12, fontWeight:600 }}>{p.sales_rep_name}</span> : <span style={{ color:T.red, fontSize:11 }}>Unassigned</span>}
+                  </td>
                   <td style={{ padding:"12px 16px", color:T.textMuted, fontSize:11 }}>{p.recorded_by_name||"—"}</td>
+                  <td style={{ padding:"12px 16px" }}>
+                    <button onClick={() => setEditPayment(p)} style={{ background:T.cyan+"15", border:`1px solid ${T.cyan}30`, color:T.cyan, padding:"3px 10px", borderRadius:6, cursor:"pointer", fontSize:10, fontWeight:700 }}>✎ Edit</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Edit Payment Modal */}
+      {editPayment && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setEditPayment(null)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:440, padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>Edit Payment</div>
+            <div style={{ color:T.teal, fontWeight:800, fontSize:16, marginBottom:20 }}>GHS {parseFloat(editPayment.amount||0).toLocaleString()} — {editPayment.client_name}</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Assign Sales Rep</label>
+              <select value={editPayment.sales_rep_id||""} onChange={e=>{ const r=salesReps.find(x=>x.id===e.target.value); setEditPayment(p=>({...p,sales_rep_id:e.target.value,sales_rep_name:r?.name||""})); }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                <option value="">No attribution</option>
+                {salesReps.map(r=><option key={r.id} value={r.id}>{r.name} ({r.role})</option>)}
+              </select></div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Commission Rate (%)</label>
+              <input type="number" value={editPayment.commission_rate||5} onChange={e=>setEditPayment(p=>({...p,commission_rate:parseFloat(e.target.value)||5,commission_amount:parseFloat(editPayment.amount||0)*parseFloat(e.target.value||5)/100}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              <div style={{ background:T.amber+"10", border:`1px solid ${T.amber}30`, borderRadius:8, padding:"12px 16px", display:"flex", justifyContent:"space-between" }}>
+                <span style={{ color:T.textMuted, fontSize:12 }}>Commission Payable</span>
+                <span style={{ color:T.amber, fontWeight:900, fontSize:18 }}>GHS {(parseFloat(editPayment.amount||0)*(editPayment.commission_rate||5)/100).toLocaleString()}</span>
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <button onClick={async () => {
+                const commAmt = parseFloat(editPayment.amount||0)*(editPayment.commission_rate||5)/100;
+                await supabase.from("client_payments").update({ sales_rep_id:editPayment.sales_rep_id||null, sales_rep_name:editPayment.sales_rep_name||null, commission_rate:editPayment.commission_rate||5, commission_amount:commAmt }).eq("id", editPayment.id);
+                setEditPayment(null); load();
+              }} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>Save</button>
+              <button onClick={()=>setEditPayment(null)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -6790,6 +6829,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "email-test": return <EmailTestPanel user={currentUser} />;
       case "crm": return <CRMView user={currentUser} />;
       case "crm-insights": return ["CEO","Country Manager"].includes(currentUser.role) ? <CRMDashboardCEO user={currentUser} /> : <CRMDashboardSM user={currentUser} />;
+      case "sales-dashboard": return <SalesDashboardView user={currentUser} />;
       case "sm-tasks": return <SMTasksView user={currentUser} />;
       case "strategy-overview": return <StrategyOverviewView />;
       case "opportunities": return <OpportunitiesView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;

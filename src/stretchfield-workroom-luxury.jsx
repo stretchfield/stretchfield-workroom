@@ -444,53 +444,6 @@ const SignatureInput = ({ label, canvasRef, onSignatureChange, savedSignature, i
 };
 
 
-const SignatureInput = ({ label, canvasRef, onSignatureChange, savedSignature, isDrawing, setIsDrawing, lastPos, setLastPos }) => {
-  const [mode, setMode] = React.useState(savedSignature ? "saved" : "draw");
-  const [usingSaved, setUsingSaved] = React.useState(!!savedSignature);
-
-  React.useEffect(() => {
-    if (mode === "saved" && savedSignature) {
-      onSignatureChange(savedSignature);
-      setUsingSaved(true);
-    } else {
-      setUsingSaved(false);
-    }
-  }, [mode]);
-
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>{label || "Signature"}</div>
-      {savedSignature && (
-        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-          <button onClick={() => setMode("saved")} style={{ padding: "5px 14px", borderRadius: 20, border: "1px solid "+(mode==="saved"?T.cyan:T.border), background: mode==="saved"?T.cyan+"20":"none", color: mode==="saved"?T.cyan:T.textMuted, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>✓ Use Saved Signature</button>
-          <button onClick={() => { setMode("draw"); onSignatureChange(""); if(canvasRef?.current){const ctx=canvasRef.current.getContext("2d");ctx.clearRect(0,0,canvasRef.current.width,canvasRef.current.height);} }} style={{ padding: "5px 14px", borderRadius: 20, border: "1px solid "+(mode==="draw"?T.cyan:T.border), background: mode==="draw"?T.cyan+"20":"none", color: mode==="draw"?T.cyan:T.textMuted, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>✍ Draw New</button>
-        </div>
-      )}
-      {mode === "saved" && savedSignature ? (
-        <div style={{ background: "#fff", border: "1px solid "+T.teal+"40", borderRadius: 8, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <img src={savedSignature} alt="Saved signature" style={{ maxHeight: 60, maxWidth: 220, objectFit: "contain" }} />
-          <span style={{ color: T.teal, fontSize: 11, fontWeight: 700 }}>✓ Saved</span>
-        </div>
-      ) : (
-        <div>
-          <div style={{ border: "1px solid "+T.border, borderRadius: 8, overflow: "hidden", background: "#fff" }}>
-            <canvas ref={canvasRef} width={440} height={120}
-              style={{ display: "block", cursor: "crosshair", touchAction: "none", width: "100%" }}
-              onMouseDown={e=>{ setIsDrawing(true); const r=e.target.getBoundingClientRect(); const sx=440/r.width; setLastPos({x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sx}); }}
-              onMouseMove={e=>{ if(!isDrawing) return; const r=e.target.getBoundingClientRect(); const sx=440/r.width; const pos={x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sx}; const ctx=canvasRef.current?.getContext("2d"); if(ctx&&lastPos){ctx.beginPath();ctx.moveTo(lastPos.x,lastPos.y);ctx.lineTo(pos.x,pos.y);ctx.strokeStyle="#1a365d";ctx.lineWidth=2;ctx.lineCap="round";ctx.stroke();} setLastPos(pos); }}
-              onMouseUp={()=>{ setIsDrawing(false); onSignatureChange(canvasRef.current?.toDataURL()||""); }}
-              onMouseLeave={()=>{ setIsDrawing(false); if(canvasRef.current) onSignatureChange(canvasRef.current.toDataURL()||""); }}
-              onTouchStart={e=>{ e.preventDefault(); setIsDrawing(true); const r=e.target.getBoundingClientRect(); const sx=440/r.width; const t=e.touches[0]; setLastPos({x:(t.clientX-r.left)*sx,y:(t.clientY-r.top)*sx}); }}
-              onTouchMove={e=>{ e.preventDefault(); if(!isDrawing) return; const r=e.target.getBoundingClientRect(); const sx=440/r.width; const t=e.touches[0]; const pos={x:(t.clientX-r.left)*sx,y:(t.clientY-r.top)*sx}; const ctx=canvasRef.current?.getContext("2d"); if(ctx&&lastPos){ctx.beginPath();ctx.moveTo(lastPos.x,lastPos.y);ctx.lineTo(pos.x,pos.y);ctx.strokeStyle="#1a365d";ctx.lineWidth=2;ctx.lineCap="round";ctx.stroke();} setLastPos(pos); }}
-              onTouchEnd={()=>{ setIsDrawing(false); onSignatureChange(canvasRef.current?.toDataURL()||""); }}
-            />
-          </div>
-          <button onClick={()=>{ const ctx=canvasRef.current?.getContext("2d"); if(ctx) ctx.clearRect(0,0,440,120); onSignatureChange(""); }} style={{ background:"none", border:"none", color:T.textMuted, fontSize:11, cursor:"pointer", marginTop:4 }}>Clear</button>
-        </div>
-      )}
-    </div>
-  );
-};
 
 const AccountSettingsModal = ({ user, onClose, onUpdate }) => {
   const [phone, setPhone] = React.useState(user.phone || "");

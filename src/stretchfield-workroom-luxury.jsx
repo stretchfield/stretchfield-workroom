@@ -13685,8 +13685,8 @@ const VendorOnboardingView = ({ user }) => {
 
           {/* Vendor Edit Modal */}
           {editVendorModal && (
-            <div style={{ position: "fixed", inset: 0, zIndex: 700, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setEditVendorModal(null)}>
-              <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 640, maxHeight: "90vh", overflow: "auto", padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ position: "fixed", inset: 0, zIndex: 900, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={e => { e.stopPropagation(); setEditVendorModal(null); }}>
+              <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 640, maxHeight: "90vh", overflow: "auto", padding: 28 }} onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
                 <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Edit Vendor — {editVendorModal.name}</div>
                 <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>{editVendorModal.email}</div>
 

@@ -1452,9 +1452,26 @@ const VendorManagerDashboard = ({ user }) => {
   const [awards, setAwards] = useState([]);
   const [internalPortalEvent, setInternalPortalEvent] = useState(null);
   const [paymentRequests, setPaymentRequests] = useState([]);
+  const [unreadBroadcasts, setUnreadBroadcasts] = useState([]);
+  const [unreadBroadcasts, setUnreadBroadcasts] = useState([]);
   const [payReqModal, setPayReqModal] = useState(false);
   const [payReqForm, setPayReqForm] = useState({ project_id:"", description:"", _rates:null, selectedTypes:{ project_fee:false, per_diem:false, transport:false }, customAmount:"", customType:"", _receipt:null });
   const [savingPayReq, setSavingPayReq] = useState(false);
+  const [pendingReportEvents, setPendingReportEvents] = useState([]);
+  const [reportGateModal, setReportGateModal] = useState(false);
+
+  const checkReportGate = async (onPass) => {
+    // Get events assigned to this staff in Post-Event or Execution phase
+    const { data: myEvents } = await supabase.from("projects").select("id,name,phase,assigned_to,assigned_to_name").or("assigned_to.eq."+user.id+",assigned_to_ids.cs.{"+user.id+"}").in("phase",["Post-Event","Execution","Completed"]);
+    if (!myEvents || myEvents.length === 0) { onPass(); return; }
+    // Check which ones have no debrief submitted by this user
+    const { data: debriefs } = await supabase.from("event_debrief").select("project_id").eq("submitted_by", user.id);
+    const submittedIds = new Set((debriefs||[]).map(d => d.project_id));
+    const missing = myEvents.filter(e => !submittedIds.has(e.id));
+    if (missing.length === 0) { onPass(); return; }
+    setPendingReportEvents(missing);
+    setReportGateModal(true);
+  };
 
 
   const VENDOR_TYPES = ["Event Lighting","Events Ushering","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
@@ -1475,6 +1492,22 @@ const VendorManagerDashboard = ({ user }) => {
       setRffs(r.data || []);
       setAwards(aw.data || []);
       supabase.from("staff_payment_requests").select("*").eq("staff_id", user.id).order("submitted_at", { ascending: false }).then(({ data: pr }) => setPaymentRequests(pr || []));
+      // Load broadcasts
+      supabase.from("ceo_broadcasts").select("*").order("created_at", { ascending: false }).then(async ({ data: broadcasts }) => {
+        if (broadcasts && broadcasts.length > 0) {
+          const { data: reads } = await supabase.from("ceo_broadcast_reads").select("broadcast_id").eq("user_id", user.id);
+          const readIds = new Set((reads||[]).map(r => r.broadcast_id));
+          setUnreadBroadcasts((broadcasts||[]).filter(b => !readIds.has(b.id)));
+        }
+      });
+      // Load broadcasts
+      supabase.from("ceo_broadcasts").select("*").order("created_at", { ascending: false }).then(async ({ data: broadcasts }) => {
+        if (broadcasts && broadcasts.length > 0) {
+          const { data: reads } = await supabase.from("ceo_broadcast_reads").select("broadcast_id").eq("user_id", user.id);
+          const readIds = new Set((reads||[]).map(r => r.broadcast_id));
+          setUnreadBroadcasts((broadcasts||[]).filter(b => !readIds.has(b.id)));
+        }
+      });
     });
   };
 
@@ -1539,6 +1572,70 @@ const VendorManagerDashboard = ({ user }) => {
         </div>
       </div>
 
+      {/* ── BROADCAST BANNERS ── */}
+      {unreadBroadcasts && unreadBroadcasts.map && unreadBroadcasts.map(b => {
+        const priorityColor = b.priority==="urgent"?T.red:b.priority==="important"?T.amber:T.cyan;
+        const priorityLabel = b.priority==="urgent"?"🚨 Urgent":b.priority==="important"?"⚠ Important":"📢 Team Update";
+        return (
+          <div key={b.id} style={{ background:`linear-gradient(135deg,${priorityColor}12,${priorityColor}06)`, border:`1px solid ${priorityColor}40`, borderRadius:12, padding:"16px 20px", marginBottom:12 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+              <div style={{ flex:1 }}>
+                <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:6 }}>
+                  <span style={{ background:priorityColor+"20", color:priorityColor, padding:"2px 10px", borderRadius:20, fontSize:10, fontWeight:800, textTransform:"uppercase" }}>{priorityLabel}</span>
+                  <span style={{ color:T.textMuted, fontSize:11 }}>from {b.sent_by_name}</span>
+                </div>
+                <div style={{ color:T.textPrimary, fontWeight:800, fontSize:14, marginBottom:4 }}>{b.title}</div>
+                <div style={{ color:T.textSecondary, fontSize:13, lineHeight:1.6 }}>{b.message}</div>
+              </div>
+              <button onClick={async () => {
+                await supabase.from("ceo_broadcast_reads").insert({ broadcast_id:b.id, user_id:user.id });
+                setUnreadBroadcasts(prev => prev.filter(x => x.id !== b.id));
+              }} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"4px 12px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700, flexShrink:0, marginLeft:16 }}>✓ Read</button>
+            </div>
+          </div>
+        );
+      })}
+
+      {/* ── ACTION ITEMS ALERT ── */}
+      {awards.filter(a => !events.find(e => e.id === rffs.find(r => r.id === a.rff_id)?.project_id && e.phase === "Completed")).length > 0 && (
+        <div style={{ background:T.amber+"12", border:`1px solid ${T.amber}30`, borderRadius:12, padding:"14px 18px", marginBottom:16 }}>
+          <div style={{ color:T.amber, fontWeight:800, fontSize:13, marginBottom:6 }}>⚡ Action Required</div>
+          <div style={{ color:T.textSecondary, fontSize:12 }}>{awards.length} confirmed vendor gig{awards.length!==1?"s":""} awaiting Purchase Orders</div>
+        </div>
+      )}
+
+      {/* ── BROADCAST BANNERS ── */}
+      {unreadBroadcasts && unreadBroadcasts.map && unreadBroadcasts.map(b => {
+        const priorityColor = b.priority==="urgent"?T.red:b.priority==="important"?T.amber:T.cyan;
+        const priorityLabel = b.priority==="urgent"?"🚨 Urgent":b.priority==="important"?"⚠ Important":"📢 Team Update";
+        return (
+          <div key={b.id} style={{ background:`linear-gradient(135deg,${priorityColor}12,${priorityColor}06)`, border:`1px solid ${priorityColor}40`, borderRadius:12, padding:"16px 20px", marginBottom:12 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+              <div style={{ flex:1 }}>
+                <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:6 }}>
+                  <span style={{ background:priorityColor+"20", color:priorityColor, padding:"2px 10px", borderRadius:20, fontSize:10, fontWeight:800, textTransform:"uppercase" }}>{priorityLabel}</span>
+                  <span style={{ color:T.textMuted, fontSize:11 }}>from {b.sent_by_name}</span>
+                </div>
+                <div style={{ color:T.textPrimary, fontWeight:800, fontSize:14, marginBottom:4 }}>{b.title}</div>
+                <div style={{ color:T.textSecondary, fontSize:13, lineHeight:1.6 }}>{b.message}</div>
+              </div>
+              <button onClick={async () => {
+                await supabase.from("ceo_broadcast_reads").insert({ broadcast_id:b.id, user_id:user.id });
+                setUnreadBroadcasts(prev => prev.filter(x => x.id !== b.id));
+              }} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"4px 12px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700, flexShrink:0, marginLeft:16 }}>✓ Read</button>
+            </div>
+          </div>
+        );
+      })}
+
+      {/* ── ACTION ITEMS ALERT ── */}
+      {awards.filter(a => !events.find(e => e.id === rffs.find(r => r.id === a.rff_id)?.project_id && e.phase === "Completed")).length > 0 && (
+        <div style={{ background:T.amber+"12", border:`1px solid ${T.amber}30`, borderRadius:12, padding:"14px 18px", marginBottom:16 }}>
+          <div style={{ color:T.amber, fontWeight:800, fontSize:13, marginBottom:6 }}>⚡ Action Required</div>
+          <div style={{ color:T.textSecondary, fontSize:12 }}>{awards.length} confirmed vendor gig{awards.length!==1?"s":""} awaiting Purchase Orders</div>
+        </div>
+      )}
+
       {/* ── TWO COLUMN ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
 
@@ -1600,7 +1697,7 @@ const VendorManagerDashboard = ({ user }) => {
             <div style={{ color:T.textMuted, fontSize:9, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.12em", marginBottom:3 }}>Finance</div>
             <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15 }}>My Payment Requests</div>
           </div>
-          <button onClick={() => setPayReqModal(true)} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"7px 14px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:12 }}>+ New Request</button>
+          <button onClick={() => checkReportGate(() => setPayReqModal(true))} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"7px 14px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:12 }}>+ New Request</button>
         </div>
         {paymentRequests.length === 0 ? (
           <div style={{ color:T.textMuted, fontSize:13, textAlign:"center", padding:"12px 0" }}>No payment requests yet</div>
@@ -1741,6 +1838,32 @@ const VendorManagerDashboard = ({ user }) => {
                 setPaymentRequests(pr||[]);
               }} disabled={savingPayReq||!payReqForm.description} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13, opacity:(!payReqForm.description)?0.5:1 }}>{savingPayReq?"Submitting...":"Submit Request"}</button>
               <button onClick={() => setPayReqModal(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer", fontSize:13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── REPORT GATE MODAL ── */}
+      {reportGateModal && (
+        <div style={{ position:"fixed", inset:0, zIndex:800, background:"rgba(0,0,0,0.9)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setReportGateModal(false)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.amber}40`, borderRadius:16, width:"100%", maxWidth:480, padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ fontSize:32, marginBottom:12, textAlign:"center" }}>📋</div>
+            <div style={{ color:T.amber, fontWeight:900, fontSize:18, marginBottom:8, textAlign:"center" }}>Report Required Before Payment</div>
+            <div style={{ color:T.textMuted, fontSize:13, marginBottom:20, textAlign:"center", lineHeight:1.6 }}>You have outstanding event report(s) to submit. Please complete your debrief before making a payment request.</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:20 }}>
+              {pendingReportEvents.map(ev => (
+                <div key={ev.id} style={{ background:T.amber+"12", border:`1px solid ${T.amber}30`, borderRadius:10, padding:"12px 16px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <div>
+                    <div style={{ color:T.textPrimary, fontWeight:700, fontSize:13 }}>{ev.name}</div>
+                    <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>{ev.phase} · Debrief not submitted</div>
+                  </div>
+                  <span style={{ color:T.amber, fontSize:10, fontWeight:800 }}>PENDING</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={() => setReportGateModal(false)} style={{ flex:1, background:`linear-gradient(135deg,${T.amber},#F59E0B)`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>Go Submit Debrief</button>
+              <button onClick={() => setReportGateModal(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
             </div>
           </div>
         </div>
@@ -1971,7 +2094,7 @@ const StaffDashboard = ({ user }) => {
             <div style={{ color:T.textMuted, fontSize:9, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.12em", marginBottom:3 }}>Finance</div>
             <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15 }}>My Payment Requests</div>
           </div>
-          <button onClick={() => setPayReqModal(true)} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"8px 16px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:12 }}>+ New Request</button>
+          <button onClick={() => checkReportGate(() => setPayReqModal(true))} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"8px 16px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:12 }}>+ New Request</button>
         </div>
         {paymentRequests.length === 0 ? (
           <div style={{ color:T.textMuted, fontSize:13, textAlign:"center", padding:"16px 0" }}>No payment requests submitted yet</div>
@@ -2110,6 +2233,32 @@ const StaffDashboard = ({ user }) => {
                 setPaymentRequests(pr||[]);
               }} disabled={savingPayReq||!payReqForm.description} style={{ flex:1, background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13, opacity:!payReqForm.description?0.5:1 }}>{savingPayReq?"Submitting...":"Submit Request"}</button>
               <button onClick={() => setPayReqModal(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer", fontSize:13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── REPORT GATE MODAL ── */}
+      {reportGateModal && (
+        <div style={{ position:"fixed", inset:0, zIndex:800, background:"rgba(0,0,0,0.9)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setReportGateModal(false)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.amber}40`, borderRadius:16, width:"100%", maxWidth:480, padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ fontSize:32, marginBottom:12, textAlign:"center" }}>📋</div>
+            <div style={{ color:T.amber, fontWeight:900, fontSize:18, marginBottom:8, textAlign:"center" }}>Report Required Before Payment</div>
+            <div style={{ color:T.textMuted, fontSize:13, marginBottom:20, textAlign:"center", lineHeight:1.6 }}>You have outstanding event report(s) to submit. Please complete your debrief report before making a payment request.</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:20 }}>
+              {pendingReportEvents.map(ev => (
+                <div key={ev.id} style={{ background:T.amber+"12", border:`1px solid ${T.amber}30`, borderRadius:10, padding:"12px 16px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <div>
+                    <div style={{ color:T.textPrimary, fontWeight:700, fontSize:13 }}>{ev.name}</div>
+                    <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>{ev.phase} · Report not submitted</div>
+                  </div>
+                  <span style={{ color:T.amber, fontSize:10, fontWeight:800 }}>PENDING</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={() => { setReportGateModal(false); }} style={{ flex:1, background:`linear-gradient(135deg,${T.amber},#F59E0B)`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>Go Submit Report</button>
+              <button onClick={() => setReportGateModal(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
             </div>
           </div>
         </div>

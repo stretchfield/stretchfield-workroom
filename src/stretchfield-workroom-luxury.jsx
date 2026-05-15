@@ -1453,7 +1453,6 @@ const VendorManagerDashboard = ({ user }) => {
   const [internalPortalEvent, setInternalPortalEvent] = useState(null);
   const [paymentRequests, setPaymentRequests] = useState([]);
   const [unreadBroadcasts, setUnreadBroadcasts] = useState([]);
-  const [unreadBroadcasts, setUnreadBroadcasts] = useState([]);
   const [payReqModal, setPayReqModal] = useState(false);
   const [payReqForm, setPayReqForm] = useState({ project_id:"", description:"", _rates:null, selectedTypes:{ project_fee:false, per_diem:false, transport:false }, customAmount:"", customType:"", _receipt:null });
   const [savingPayReq, setSavingPayReq] = useState(false);

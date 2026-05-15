@@ -394,6 +394,104 @@ const ThemeConsumer = ({ children }) => {
 
 const useTheme = () => React.useContext(ThemeContext);
 
+
+const SignatureInput = ({ label, canvasRef, onSignatureChange, savedSignature, isDrawing, setIsDrawing, lastPos, setLastPos }) => {
+  const [mode, setMode] = React.useState(savedSignature ? "saved" : "draw");
+  const [usingSaved, setUsingSaved] = React.useState(!!savedSignature);
+
+  React.useEffect(() => {
+    if (mode === "saved" && savedSignature) {
+      onSignatureChange(savedSignature);
+      setUsingSaved(true);
+    } else {
+      setUsingSaved(false);
+    }
+  }, [mode]);
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>{label || "Signature"}</div>
+      {savedSignature && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+          <button onClick={() => setMode("saved")} style={{ padding: "5px 14px", borderRadius: 20, border: "1px solid "+(mode==="saved"?T.cyan:T.border), background: mode==="saved"?T.cyan+"20":"none", color: mode==="saved"?T.cyan:T.textMuted, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>✓ Use Saved Signature</button>
+          <button onClick={() => { setMode("draw"); onSignatureChange(""); if(canvasRef?.current){const ctx=canvasRef.current.getContext("2d");ctx.clearRect(0,0,canvasRef.current.width,canvasRef.current.height);} }} style={{ padding: "5px 14px", borderRadius: 20, border: "1px solid "+(mode==="draw"?T.cyan:T.border), background: mode==="draw"?T.cyan+"20":"none", color: mode==="draw"?T.cyan:T.textMuted, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>✍ Draw New</button>
+        </div>
+      )}
+      {mode === "saved" && savedSignature ? (
+        <div style={{ background: "#fff", border: "1px solid "+T.teal+"40", borderRadius: 8, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <img src={savedSignature} alt="Saved signature" style={{ maxHeight: 60, maxWidth: 220, objectFit: "contain" }} />
+          <span style={{ color: T.teal, fontSize: 11, fontWeight: 700 }}>✓ Saved</span>
+        </div>
+      ) : (
+        <div>
+          <div style={{ border: "1px solid "+T.border, borderRadius: 8, overflow: "hidden", background: "#fff" }}>
+            <canvas ref={canvasRef} width={440} height={120}
+              style={{ display: "block", cursor: "crosshair", touchAction: "none", width: "100%" }}
+              onMouseDown={e=>{ setIsDrawing(true); const r=e.target.getBoundingClientRect(); const sx=440/r.width; setLastPos({x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sx}); }}
+              onMouseMove={e=>{ if(!isDrawing) return; const r=e.target.getBoundingClientRect(); const sx=440/r.width; const pos={x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sx}; const ctx=canvasRef.current?.getContext("2d"); if(ctx&&lastPos){ctx.beginPath();ctx.moveTo(lastPos.x,lastPos.y);ctx.lineTo(pos.x,pos.y);ctx.strokeStyle="#1a365d";ctx.lineWidth=2;ctx.lineCap="round";ctx.stroke();} setLastPos(pos); }}
+              onMouseUp={()=>{ setIsDrawing(false); onSignatureChange(canvasRef.current?.toDataURL()||""); }}
+              onMouseLeave={()=>{ setIsDrawing(false); if(canvasRef.current) onSignatureChange(canvasRef.current.toDataURL()||""); }}
+              onTouchStart={e=>{ e.preventDefault(); setIsDrawing(true); const r=e.target.getBoundingClientRect(); const sx=440/r.width; const t=e.touches[0]; setLastPos({x:(t.clientX-r.left)*sx,y:(t.clientY-r.top)*sx}); }}
+              onTouchMove={e=>{ e.preventDefault(); if(!isDrawing) return; const r=e.target.getBoundingClientRect(); const sx=440/r.width; const t=e.touches[0]; const pos={x:(t.clientX-r.left)*sx,y:(t.clientY-r.top)*sx}; const ctx=canvasRef.current?.getContext("2d"); if(ctx&&lastPos){ctx.beginPath();ctx.moveTo(lastPos.x,lastPos.y);ctx.lineTo(pos.x,pos.y);ctx.strokeStyle="#1a365d";ctx.lineWidth=2;ctx.lineCap="round";ctx.stroke();} setLastPos(pos); }}
+              onTouchEnd={()=>{ setIsDrawing(false); onSignatureChange(canvasRef.current?.toDataURL()||""); }}
+            />
+          </div>
+          <button onClick={()=>{ const ctx=canvasRef.current?.getContext("2d"); if(ctx) ctx.clearRect(0,0,440,120); onSignatureChange(""); }} style={{ background:"none", border:"none", color:T.textMuted, fontSize:11, cursor:"pointer", marginTop:4 }}>Clear</button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+const SignatureInput = ({ label, canvasRef, onSignatureChange, savedSignature, isDrawing, setIsDrawing, lastPos, setLastPos }) => {
+  const [mode, setMode] = React.useState(savedSignature ? "saved" : "draw");
+  const [usingSaved, setUsingSaved] = React.useState(!!savedSignature);
+
+  React.useEffect(() => {
+    if (mode === "saved" && savedSignature) {
+      onSignatureChange(savedSignature);
+      setUsingSaved(true);
+    } else {
+      setUsingSaved(false);
+    }
+  }, [mode]);
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>{label || "Signature"}</div>
+      {savedSignature && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+          <button onClick={() => setMode("saved")} style={{ padding: "5px 14px", borderRadius: 20, border: "1px solid "+(mode==="saved"?T.cyan:T.border), background: mode==="saved"?T.cyan+"20":"none", color: mode==="saved"?T.cyan:T.textMuted, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>✓ Use Saved Signature</button>
+          <button onClick={() => { setMode("draw"); onSignatureChange(""); if(canvasRef?.current){const ctx=canvasRef.current.getContext("2d");ctx.clearRect(0,0,canvasRef.current.width,canvasRef.current.height);} }} style={{ padding: "5px 14px", borderRadius: 20, border: "1px solid "+(mode==="draw"?T.cyan:T.border), background: mode==="draw"?T.cyan+"20":"none", color: mode==="draw"?T.cyan:T.textMuted, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>✍ Draw New</button>
+        </div>
+      )}
+      {mode === "saved" && savedSignature ? (
+        <div style={{ background: "#fff", border: "1px solid "+T.teal+"40", borderRadius: 8, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <img src={savedSignature} alt="Saved signature" style={{ maxHeight: 60, maxWidth: 220, objectFit: "contain" }} />
+          <span style={{ color: T.teal, fontSize: 11, fontWeight: 700 }}>✓ Saved</span>
+        </div>
+      ) : (
+        <div>
+          <div style={{ border: "1px solid "+T.border, borderRadius: 8, overflow: "hidden", background: "#fff" }}>
+            <canvas ref={canvasRef} width={440} height={120}
+              style={{ display: "block", cursor: "crosshair", touchAction: "none", width: "100%" }}
+              onMouseDown={e=>{ setIsDrawing(true); const r=e.target.getBoundingClientRect(); const sx=440/r.width; setLastPos({x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sx}); }}
+              onMouseMove={e=>{ if(!isDrawing) return; const r=e.target.getBoundingClientRect(); const sx=440/r.width; const pos={x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sx}; const ctx=canvasRef.current?.getContext("2d"); if(ctx&&lastPos){ctx.beginPath();ctx.moveTo(lastPos.x,lastPos.y);ctx.lineTo(pos.x,pos.y);ctx.strokeStyle="#1a365d";ctx.lineWidth=2;ctx.lineCap="round";ctx.stroke();} setLastPos(pos); }}
+              onMouseUp={()=>{ setIsDrawing(false); onSignatureChange(canvasRef.current?.toDataURL()||""); }}
+              onMouseLeave={()=>{ setIsDrawing(false); if(canvasRef.current) onSignatureChange(canvasRef.current.toDataURL()||""); }}
+              onTouchStart={e=>{ e.preventDefault(); setIsDrawing(true); const r=e.target.getBoundingClientRect(); const sx=440/r.width; const t=e.touches[0]; setLastPos({x:(t.clientX-r.left)*sx,y:(t.clientY-r.top)*sx}); }}
+              onTouchMove={e=>{ e.preventDefault(); if(!isDrawing) return; const r=e.target.getBoundingClientRect(); const sx=440/r.width; const t=e.touches[0]; const pos={x:(t.clientX-r.left)*sx,y:(t.clientY-r.top)*sx}; const ctx=canvasRef.current?.getContext("2d"); if(ctx&&lastPos){ctx.beginPath();ctx.moveTo(lastPos.x,lastPos.y);ctx.lineTo(pos.x,pos.y);ctx.strokeStyle="#1a365d";ctx.lineWidth=2;ctx.lineCap="round";ctx.stroke();} setLastPos(pos); }}
+              onTouchEnd={()=>{ setIsDrawing(false); onSignatureChange(canvasRef.current?.toDataURL()||""); }}
+            />
+          </div>
+          <button onClick={()=>{ const ctx=canvasRef.current?.getContext("2d"); if(ctx) ctx.clearRect(0,0,440,120); onSignatureChange(""); }} style={{ background:"none", border:"none", color:T.textMuted, fontSize:11, cursor:"pointer", marginTop:4 }}>Clear</button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AccountSettingsModal = ({ user, onClose, onUpdate }) => {
   const [phone, setPhone] = React.useState(user.phone || "");
   const [password, setPassword] = React.useState("");
@@ -404,7 +502,11 @@ const AccountSettingsModal = ({ user, onClose, onUpdate }) => {
   const [uploading, setUploading] = React.useState(false);
   const [msg, setMsg] = React.useState("");
   const [error, setError] = React.useState("");
+  const [savedSignature, setSavedSignature] = React.useState(user.saved_signature || null);
+  const [sigFile, setSigFile] = React.useState(null);
+  const [sigUploading, setSigUploading] = React.useState(false);
   const fileRef = React.useRef();
+  const sigFileRef = React.useRef();
 
   const handleAvatarChange = (e) => {
     const f = e.target.files[0];
@@ -431,8 +533,23 @@ const AccountSettingsModal = ({ user, onClose, onUpdate }) => {
       setUploading(false);
     }
 
+    // Upload signature if changed
+    let saved_signature = user.saved_signature || null;
+    if (sigFile) {
+      setSigUploading(true);
+      const ext = sigFile.name.split(".").pop();
+      const filename = "signature_"+user.id+"_"+Date.now()+"."+ext;
+      const { error: sigErr } = await supabase.storage.from("avatars").upload(filename, sigFile, { upsert: true });
+      if (!sigErr) {
+        const { data: sigUrl } = supabase.storage.from("avatars").getPublicUrl(filename);
+        saved_signature = sigUrl.publicUrl;
+        setSavedSignature(saved_signature);
+      }
+      setSigUploading(false);
+    }
+
     // Update profile
-    const updates = { phone, avatar_url };
+    const updates = { phone, avatar_url, saved_signature };
     await supabase.from("profiles").update(updates).eq("id", user.id);
 
     // Update password if provided
@@ -522,6 +639,29 @@ const AccountSettingsModal = ({ user, onClose, onUpdate }) => {
               onBlur={e => e.target.style.borderColor = T.border} />
           </div>
 
+          {/* ── SIGNATURE UPLOAD ── */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 8 }}>Saved Signature</label>
+            {savedSignature ? (
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ background: "#fff", border: "1px solid "+T.border, borderRadius: 8, padding: "12px 16px", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <img src={savedSignature} alt="Saved signature" style={{ maxHeight: 50, maxWidth: 200, objectFit: "contain" }} />
+                  <button onClick={() => { setSavedSignature(null); setSigFile(null); }} style={{ background: T.red+"15", border: "1px solid "+T.red+"30", color: T.red, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>Remove</button>
+                </div>
+                <div style={{ color: T.teal, fontSize: 11 }}>✓ Signature saved — will be available in all signing modals</div>
+              </div>
+            ) : (
+              <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 8 }}>No signature saved yet. Upload a PNG or JPG of your signature.</div>
+            )}
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <input ref={sigFileRef} type="file" accept=".png,.jpg,.jpeg" onChange={e => { const f = e.target.files[0]; if (!f) return; setSigFile(f); setSavedSignature(URL.createObjectURL(f)); }} style={{ display: "none" }} />
+              <button onClick={() => sigFileRef.current?.click()} style={{ background: T.cyan+"15", border: "1px solid "+T.cyan+"30", color: T.cyan, padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 12 }}>
+                {sigFile ? "✓ "+sigFile.name.slice(0,20) : "📎 Upload Signature (PNG/JPG)"}
+              </button>
+              {sigUploading && <span style={{ color: T.textMuted, fontSize: 12 }}>Uploading...</span>}
+            </div>
+          </div>
+
           {error && <div style={{ color: T.red, fontSize: 12, marginBottom: 12, padding: "8px 12px", background: T.red + "12", borderRadius: 8 }}>{error}</div>}
           {msg && <div style={{ color: T.teal, fontSize: 12, marginBottom: 12, padding: "8px 12px", background: T.teal + "12", borderRadius: 8 }}>✓ {msg}</div>}
 
@@ -529,7 +669,7 @@ const AccountSettingsModal = ({ user, onClose, onUpdate }) => {
             width: "100%", padding: "11px", background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`,
             border: "none", borderRadius: 8, color: "#fff", fontWeight: 800, fontSize: 13,
             cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1, fontFamily: "inherit",
-          }}>{uploading ? "Uploading..." : saving ? "Saving..." : "Save Changes"}</button>
+          }}>{uploading || sigUploading ? "Uploading..." : saving ? "Saving..." : "Save Changes"}</button>
         </div>
       </div>
     </div>
@@ -9233,25 +9373,10 @@ const FinanceDashboard = ({ user, onTab }) => {
             <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>Finance Manager Signature</div>
             <div style={{ color:T.textMuted, fontSize:13, marginBottom:6 }}>{fmSignModal.voucher_number} — {fmSignModal.payee}</div>
             <div style={{ color:T.amber, fontWeight:800, fontSize:18, marginBottom:20 }}>GHS {parseFloat(fmSignModal.amount||0).toLocaleString()}</div>
-            <div style={{ marginBottom:16 }}>
-              <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:6 }}>Your Signature</div>
-              <div style={{ border:`1px solid ${T.border}`, borderRadius:8, overflow:"hidden", background:"#fff" }}>
-                <canvas ref={voucherCanvasRef} width={440} height={120}
-                  style={{ display:"block", cursor:"crosshair", touchAction:"none", width:"100%" }}
-                  onMouseDown={e=>{ setVIsDrawing(true); const r=e.target.getBoundingClientRect(); const sx=440/r.width; setVLastPos({x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sx}); }}
-                  onMouseMove={e=>{ if(!vIsDrawing) return; const r=e.target.getBoundingClientRect(); const sx=440/r.width; const pos={x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sx}; const ctx=voucherCanvasRef.current?.getContext("2d"); if(ctx&&vLastPos){ctx.beginPath();ctx.moveTo(vLastPos.x,vLastPos.y);ctx.lineTo(pos.x,pos.y);ctx.strokeStyle="#1a365d";ctx.lineWidth=2;ctx.lineCap="round";ctx.stroke();} setVLastPos(pos); }}
-                  onMouseUp={()=>{ setVIsDrawing(false); setVoucherSignature(voucherCanvasRef.current?.toDataURL()||""); }}
-                  onMouseLeave={()=>{ setVIsDrawing(false); if(voucherCanvasRef.current) setVoucherSignature(voucherCanvasRef.current.toDataURL()||""); }}
-                  onTouchStart={e=>{ e.preventDefault(); setVIsDrawing(true); const r=e.target.getBoundingClientRect(); const sx=440/r.width; const t=e.touches[0]; setVLastPos({x:(t.clientX-r.left)*sx,y:(t.clientY-r.top)*sx}); }}
-                  onTouchMove={e=>{ e.preventDefault(); if(!vIsDrawing) return; const r=e.target.getBoundingClientRect(); const sx=440/r.width; const t=e.touches[0]; const pos={x:(t.clientX-r.left)*sx,y:(t.clientY-r.top)*sx}; const ctx=voucherCanvasRef.current?.getContext("2d"); if(ctx&&vLastPos){ctx.beginPath();ctx.moveTo(vLastPos.x,vLastPos.y);ctx.lineTo(pos.x,pos.y);ctx.strokeStyle="#1a365d";ctx.lineWidth=2;ctx.lineCap="round";ctx.stroke();} setVLastPos(pos); }}
-                  onTouchEnd={()=>{ setVIsDrawing(false); setVoucherSignature(voucherCanvasRef.current?.toDataURL()||""); }}
-                />
-              </div>
-              <button onClick={()=>{ const ctx=voucherCanvasRef.current?.getContext("2d"); if(ctx) ctx.clearRect(0,0,440,120); setVoucherSignature(""); }} style={{ background:"none", border:"none", color:T.textMuted, fontSize:11, cursor:"pointer", marginTop:4 }}>Clear</button>
-            </div>
+            <SignatureInput label="Your Signature (Finance Manager)" canvasRef={voucherCanvasRef} onSignatureChange={setVoucherSignature} savedSignature={user.saved_signature} isDrawing={vIsDrawing} setIsDrawing={setVIsDrawing} lastPos={vLastPos} setLastPos={setVLastPos} />
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={async () => {
-                const sig = voucherCanvasRef.current?.toDataURL() || "";
+                const sig = voucherSignature || voucherCanvasRef.current?.toDataURL() || "";
                 setVoucherSignSaving(true);
                 await supabase.from("payment_vouchers").update({ fm_signature: sig, fm_signed_at: new Date().toISOString(), fm_signed_by: user.name }).eq("id", fmSignModal.id);
                 setVoucherSignSaving(false);
@@ -9275,20 +9400,7 @@ const FinanceDashboard = ({ user, onTab }) => {
             <div style={{ color:T.textMuted, fontSize:13, marginBottom:6 }}>{ceoVoucherSignModal.voucher_number} — {ceoVoucherSignModal.payee}</div>
             <div style={{ color:T.teal, fontWeight:800, fontSize:18, marginBottom:20 }}>GHS {parseFloat(ceoVoucherSignModal.amount||0).toLocaleString()}</div>
             <div style={{ marginBottom:16 }}>
-              <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:6 }}>CEO Authorisation Signature</div>
-              <div style={{ border:`1px solid ${T.border}`, borderRadius:8, overflow:"hidden", background:"#fff", position:"relative" }}>
-                <canvas ref={voucherCanvasRef} width={440} height={120}
-                  style={{ display:"block", cursor:"crosshair", touchAction:"none", width:"100%" }}
-                  onMouseDown={e=>{ setVIsDrawing(true); const r=e.target.getBoundingClientRect(); const scaleX=440/r.width; setVLastPos({x:(e.clientX-r.left)*scaleX,y:(e.clientY-r.top)*scaleX}); }}
-                  onMouseMove={e=>{ if(!vIsDrawing) return; const r=e.target.getBoundingClientRect(); const scaleX=440/r.width; const pos={x:(e.clientX-r.left)*scaleX,y:(e.clientY-r.top)*scaleX}; const ctx=voucherCanvasRef.current?.getContext("2d"); if(ctx&&vLastPos){ctx.beginPath();ctx.moveTo(vLastPos.x,vLastPos.y);ctx.lineTo(pos.x,pos.y);ctx.strokeStyle="#1a365d";ctx.lineWidth=2;ctx.lineCap="round";ctx.stroke();} setVLastPos(pos); }}
-                  onMouseUp={()=>{ setVIsDrawing(false); setVoucherSignature(voucherCanvasRef.current?.toDataURL()||""); }}
-                  onMouseLeave={()=>{ setVIsDrawing(false); if(voucherCanvasRef.current) setVoucherSignature(voucherCanvasRef.current.toDataURL()||""); }}
-                  onTouchStart={e=>{ e.preventDefault(); setVIsDrawing(true); const r=e.target.getBoundingClientRect(); const scaleX=440/r.width; const t=e.touches[0]; setVLastPos({x:(t.clientX-r.left)*scaleX,y:(t.clientY-r.top)*scaleX}); }}
-                  onTouchMove={e=>{ e.preventDefault(); if(!vIsDrawing) return; const r=e.target.getBoundingClientRect(); const scaleX=440/r.width; const t=e.touches[0]; const pos={x:(t.clientX-r.left)*scaleX,y:(t.clientY-r.top)*scaleX}; const ctx=voucherCanvasRef.current?.getContext("2d"); if(ctx&&vLastPos){ctx.beginPath();ctx.moveTo(vLastPos.x,vLastPos.y);ctx.lineTo(pos.x,pos.y);ctx.strokeStyle="#1a365d";ctx.lineWidth=2;ctx.lineCap="round";ctx.stroke();} setVLastPos(pos); }}
-                  onTouchEnd={()=>{ setVIsDrawing(false); setVoucherSignature(voucherCanvasRef.current?.toDataURL()||""); }}
-                />
-              </div>
-              <button onClick={()=>{ const ctx=voucherCanvasRef.current?.getContext("2d"); if(ctx) ctx.clearRect(0,0,440,120); setVoucherSignature(""); }} style={{ background:"none", border:"none", color:T.textMuted, fontSize:11, cursor:"pointer", marginTop:4 }}>Clear</button>
+              <SignatureInput label="CEO Authorisation Signature" canvasRef={voucherCanvasRef} onSignatureChange={setVoucherSignature} savedSignature={user.saved_signature} isDrawing={vIsDrawing} setIsDrawing={setVIsDrawing} lastPos={vLastPos} setLastPos={setVLastPos} />
             </div>
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={async () => {
@@ -18494,20 +18606,7 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
             <div style={{ color:T.textMuted, fontSize:13, marginBottom:4 }}>{voucherSignModal.voucher_number} — {voucherSignModal.payee}</div>
             <div style={{ color:T.teal, fontWeight:900, fontSize:20, marginBottom:20 }}>GHS {parseFloat(voucherSignModal.amount||0).toLocaleString()}</div>
             <div style={{ marginBottom:16 }}>
-              <div style={{ color:T.textMuted, fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:6 }}>CEO Authorisation Signature</div>
-              <div style={{ border:`1px solid ${T.border}`, borderRadius:8, overflow:"hidden", background:"#fff" }}>
-                <canvas ref={voucherSigRef} width={440} height={120}
-                  style={{ display:"block", cursor:"crosshair", touchAction:"none", width:"100%" }}
-                  onMouseDown={e=>{ setVIsDrawing(true); const r=e.target.getBoundingClientRect(); const sx=440/r.width; setVLastPos({x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sx}); }}
-                  onMouseMove={e=>{ if(!vIsDrawing) return; const r=e.target.getBoundingClientRect(); const sx=440/r.width; const pos={x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sx}; const ctx=voucherSigRef.current?.getContext("2d"); if(ctx&&vLastPos){ctx.beginPath();ctx.moveTo(vLastPos.x,vLastPos.y);ctx.lineTo(pos.x,pos.y);ctx.strokeStyle="#1a365d";ctx.lineWidth=2;ctx.lineCap="round";ctx.stroke();} setVLastPos(pos); }}
-                  onMouseUp={()=>{ setVIsDrawing(false); setVoucherSig(voucherSigRef.current?.toDataURL()||""); }}
-                  onMouseLeave={()=>{ setVIsDrawing(false); if(voucherSigRef.current) setVoucherSig(voucherSigRef.current.toDataURL()||""); }}
-                  onTouchStart={e=>{ e.preventDefault(); setVIsDrawing(true); const r=e.target.getBoundingClientRect(); const sx=440/r.width; const t=e.touches[0]; setVLastPos({x:(t.clientX-r.left)*sx,y:(t.clientY-r.top)*sx}); }}
-                  onTouchMove={e=>{ e.preventDefault(); if(!vIsDrawing) return; const r=e.target.getBoundingClientRect(); const sx=440/r.width; const t=e.touches[0]; const pos={x:(t.clientX-r.left)*sx,y:(t.clientY-r.top)*sx}; const ctx=voucherSigRef.current?.getContext("2d"); if(ctx&&vLastPos){ctx.beginPath();ctx.moveTo(vLastPos.x,vLastPos.y);ctx.lineTo(pos.x,pos.y);ctx.strokeStyle="#1a365d";ctx.lineWidth=2;ctx.lineCap="round";ctx.stroke();} setVLastPos(pos); }}
-                  onTouchEnd={()=>{ setVIsDrawing(false); setVoucherSig(voucherSigRef.current?.toDataURL()||""); }}
-                />
-              </div>
-              <button onClick={()=>{ const ctx=voucherSigRef.current?.getContext("2d"); if(ctx) ctx.clearRect(0,0,440,120); setVoucherSig(""); }} style={{ background:"none", border:"none", color:T.textMuted, fontSize:11, cursor:"pointer", marginTop:4 }}>Clear</button>
+              <SignatureInput label="CEO Authorisation Signature" canvasRef={voucherSigRef} onSignatureChange={setVoucherSig} savedSignature={user.saved_signature} isDrawing={vIsDrawing} setIsDrawing={setVIsDrawing} lastPos={vLastPos} setLastPos={setVLastPos} />
             </div>
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={async () => {
@@ -19704,7 +19803,7 @@ const ApprovalQueueView = ({ user, onNavigate }) => {
   const load = async () => {
     const [{ data: rf }, { data: po }, { data: sr }] = await Promise.all([
       supabase.from("rffs").select("*,projects(name)").eq("approved", false).order("created_at", { ascending: false }),
-      supabase.from("purchase_orders").select("*").not("status","in","(published,draft)").order("created_at", { ascending: false }),
+      supabase.from("purchase_orders").select("*").in("status",["vm_signed","finance_signed","fully_signed","pending_ceo"]).order("created_at", { ascending: false }),
       supabase.from("staff_payment_requests").select("*").eq("status","pending_ceo").order("submitted_at", { ascending: false }),
     ]);
     setRffs(rf||[]); setPOs(po||[]); setStaffRequests(sr||[]);
@@ -19712,7 +19811,7 @@ const ApprovalQueueView = ({ user, onNavigate }) => {
   };
   useEffect(() => { load(); }, []);
 
-  const totalPending = rffs.length + pos.filter(p=>p.status==="vm_signed"||p.status==="finance_signed").length + staffRequests.length;
+  const totalPending = rffs.length + pos.filter(p=>["vm_signed","finance_signed","fully_signed"].includes(p.status)).length + staffRequests.length;
 
   if (loading) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"40vh" }}><div style={{ width:32, height:32, border:`3px solid ${T.border}`, borderTop:`3px solid ${T.cyan}`, borderRadius:"50%", animation:"spin 0.8s linear infinite" }} /></div>;
 
@@ -19754,13 +19853,13 @@ const ApprovalQueueView = ({ user, onNavigate }) => {
       )}
 
       {/* POs awaiting CEO signature */}
-      {pos.filter(p=>p.status==="vm_signed"||p.status==="finance_signed").length > 0 && (
+      {pos.filter(p=>["vm_signed","finance_signed","fully_signed"].includes(p.status)).length > 0 && (
         <div style={{ marginBottom:24 }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
-            <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16 }}>Purchase Orders to Sign <span style={{ color:T.cyan, fontSize:13 }}>({pos.filter(p=>p.status==="vm_signed"||p.status==="finance_signed").length})</span></div>
+            <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16 }}>Purchase Orders to Sign <span style={{ color:T.cyan, fontSize:13 }}>({pos.filter(p=>["vm_signed","finance_signed","fully_signed"].includes(p.status)).length})</span></div>
             <button onClick={() => onNavigate && onNavigate("purchase-orders")} style={{ background:"none", border:`1px solid ${T.border}`, color:T.cyan, padding:"5px 14px", borderRadius:6, cursor:"pointer", fontSize:12, fontWeight:700 }}>View All POs →</button>
           </div>
-          {pos.filter(p=>p.status==="vm_signed"||p.status==="finance_signed").slice(0,3).map(p => (
+          {pos.filter(p=>["vm_signed","finance_signed","fully_signed"].includes(p.status)).slice(0,3).map(p => (
             <div key={p.id} style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderLeft:`3px solid ${T.cyan}`, borderRadius:10, padding:"14px 18px", marginBottom:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
               <div>
                 <div style={{ color:T.textPrimary, fontWeight:700, fontSize:13 }}>{p.internal_po_number} — {p.vendor_name}</div>

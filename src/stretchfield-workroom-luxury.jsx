@@ -1551,6 +1551,11 @@ const VendorManagerDashboard = ({ user }) => {
   const [savingPayReq, setSavingPayReq] = useState(false);
   const [pendingReportEvents, setPendingReportEvents] = useState([]);
   const [reportGateModal, setReportGateModal] = useState(false);
+  const [showBankForm, setShowBankForm] = useState(false);
+  const [bankForm, setBankForm] = useState({ bank_name:"", bank_branch:"", bank_account_name:"", bank_account_number:"", mobile_money_number:"" });
+  const [bankSubmitted, setBankSubmitted] = useState(false);
+  const [bankRequested, setBankRequested] = useState(false);
+  const [savingBank, setSavingBank] = useState(false);
 
   const checkReportGate = async (onPass) => {
     // Get events assigned to this staff in Post-Event or Execution phase
@@ -1567,6 +1572,16 @@ const VendorManagerDashboard = ({ user }) => {
 
 
   const VENDOR_TYPES = ["Event Lighting","Events Ushering","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
+
+  const saveVMBankDetails = async () => {
+    if (!bankForm.bank_name || !bankForm.bank_account_number) { alert("Bank name and account number required."); return; }
+    setSavingBank(true);
+    await supabase.from("profiles").update({ bank_name:bankForm.bank_name, bank_branch:bankForm.bank_branch, bank_account_name:bankForm.bank_account_name, bank_account_number:bankForm.bank_account_number, mobile_money_number:bankForm.mobile_money_number }).eq("id", user.id);
+    const { data: fms } = await supabase.from("profiles").select("id").eq("role","Finance Manager");
+    for (const fm of fms||[]) await supabase.from("notifications").insert({ user_id:fm.id, title:"Bank Details Submitted — "+user.name, message:user.name+" submitted bank details: "+bankForm.bank_name+" · "+bankForm.bank_account_number, type:"finance" });
+    setBankSubmitted(true); setShowBankForm(false); setSavingBank(false);
+    alert("✓ Bank details saved and Finance notified.");
+  };
 
   const loadVM = () => {
     Promise.all([
@@ -1592,12 +1607,12 @@ const VendorManagerDashboard = ({ user }) => {
           setUnreadBroadcasts((broadcasts||[]).filter(b => !readIds.has(b.id)));
         }
       });
-      // Load broadcasts
-      supabase.from("ceo_broadcasts").select("*").order("created_at", { ascending: false }).then(async ({ data: broadcasts }) => {
-        if (broadcasts && broadcasts.length > 0) {
-          const { data: reads } = await supabase.from("ceo_broadcast_reads").select("broadcast_id").eq("user_id", user.id);
-          const readIds = new Set((reads||[]).map(r => r.broadcast_id));
-          setUnreadBroadcasts((broadcasts||[]).filter(b => !readIds.has(b.id)));
+      // Load bank details
+      supabase.from("profiles").select("bank_name,bank_account_number,bank_branch,bank_account_name,mobile_money_number,bank_details_requested").eq("id", user.id).single().then(({ data: bp }) => {
+        if (bp) {
+          setBankRequested(!!bp.bank_details_requested);
+          setBankSubmitted(!!(bp.bank_name && bp.bank_account_number));
+          if (bp.bank_name) setBankForm({ bank_name:bp.bank_name||"", bank_branch:bp.bank_branch||"", bank_account_name:bp.bank_account_name||"", bank_account_number:bp.bank_account_number||"", mobile_money_number:bp.mobile_money_number||"" });
         }
       });
     });
@@ -1633,6 +1648,39 @@ const VendorManagerDashboard = ({ user }) => {
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
+
+      {/* ── BANK DETAILS BANNER ── */}
+      {bankRequested && !bankSubmitted && (
+        <div style={{ background:`linear-gradient(135deg,${T.amber}15,${T.amber}05)`, border:`1px solid ${T.amber}40`, borderRadius:12, padding:"16px 20px", marginBottom:16 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <div>
+              <div style={{ color:T.amber, fontWeight:800, fontSize:14, marginBottom:4 }}>🏦 Bank Details Required</div>
+              <div style={{ color:T.textMuted, fontSize:13 }}>Finance has requested your bank details for payment processing.</div>
+            </div>
+            <button onClick={() => setShowBankForm(!showBankForm)} style={{ background:`linear-gradient(135deg,${T.amber},#F59E0B)`, border:"none", color:"#060B14", padding:"8px 18px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13, flexShrink:0, marginLeft:16 }}>{showBankForm?"Close":"Add Bank Details"}</button>
+          </div>
+          {showBankForm && (
+            <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:10 }}>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Bank Name *</label>
+                <input value={bankForm.bank_name} onChange={e=>setBankForm(f=>({...f,bank_name:e.target.value}))} placeholder="e.g. GCB Bank" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:"1px solid "+T.border, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Branch</label>
+                <input value={bankForm.bank_branch} onChange={e=>setBankForm(f=>({...f,bank_branch:e.target.value}))} placeholder="Branch name" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:"1px solid "+T.border, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              </div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Account Name *</label>
+              <input value={bankForm.bank_account_name} onChange={e=>setBankForm(f=>({...f,bank_account_name:e.target.value}))} placeholder="Name on account" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:"1px solid "+T.border, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Account Number *</label>
+              <input value={bankForm.bank_account_number} onChange={e=>setBankForm(f=>({...f,bank_account_number:e.target.value}))} placeholder="Account number" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:"1px solid "+T.border, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Mobile Money Number</label>
+              <input value={bankForm.mobile_money_number} onChange={e=>setBankForm(f=>({...f,mobile_money_number:e.target.value}))} placeholder="e.g. 0244000000" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:"1px solid "+T.border, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              <button onClick={saveVMBankDetails} disabled={savingBank} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{savingBank?"Saving...":"Save Bank Details"}</button>
+            </div>
+          )}
+        </div>
+      )}
+      {bankSubmitted && (
+        <div style={{ background:T.teal+"12", border:"1px solid "+T.teal+"30", borderRadius:10, padding:"10px 16px", marginBottom:12, color:T.teal, fontSize:13, fontWeight:700 }}>✓ Bank details submitted to Finance</div>
+      )}
 
       {/* ── HERO GREETING ── */}
       <div style={{ background: `linear-gradient(135deg, ${T.bgDeep} 0%, #0D1F36 60%, ${T.bgDeep} 100%)`, border: `1px solid ${T.border}`, borderRadius: 16, padding: "32px 36px", marginBottom: 24, position: "relative", overflow: "hidden" }}>

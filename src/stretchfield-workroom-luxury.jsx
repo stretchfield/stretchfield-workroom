@@ -9420,7 +9420,7 @@ const FinanceDashboard = ({ user, onTab }) => {
             <SignatureInput label="Your Signature (Finance Manager)" canvasRef={voucherCanvasRef} onSignatureChange={setVoucherSignature} savedSignature={savedSigFM||user.saved_signature} isDrawing={vIsDrawing} setIsDrawing={setVIsDrawing} lastPos={vLastPos} setLastPos={setVLastPos} />
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={async () => {
-                const sig = voucherSignature || voucherCanvasRef.current?.toDataURL() || "";
+                const sig = voucherSignature || savedSigFM || user.saved_signature || voucherCanvasRef.current?.toDataURL() || "";
                 setVoucherSignSaving(true);
                 await supabase.from("payment_vouchers").update({ fm_signature: sig, fm_signed_at: new Date().toISOString(), fm_signed_by: user.name }).eq("id", fmSignModal.id);
                 setVoucherSignSaving(false);
@@ -18721,8 +18721,8 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
             </div>
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={async () => {
-                const sig = voucherSig || voucherSigRef.current?.toDataURL() || "";
-                if (!sig || sig === "data:,") { alert("Please sign or select your saved signature."); setVoucherSigSaving(false); return; }
+                const sig = voucherSig || savedSig || user.saved_signature || voucherSigRef.current?.toDataURL() || "";
+                if (!sig || sig === "data:,") { alert("Please sign or select your saved signature first."); return; }
                 setVoucherSigSaving(true);
                 await supabase.from("payment_vouchers").update({ status:"approved", approved_by:user.id, approved_at:new Date().toISOString(), ceo_signature:sig, ceo_signed_at:new Date().toISOString() }).eq("id", voucherSignModal.id);
                 // Notify Finance

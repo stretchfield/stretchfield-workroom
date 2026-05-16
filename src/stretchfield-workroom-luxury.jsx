@@ -18409,6 +18409,8 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
   const voucherSigRef = React.useRef(null);
   const [vIsDrawing, setVIsDrawing] = useState(false);
   const [vLastPos, setVLastPos] = useState(null);
+  const [savedSig, setSavedSig] = useState(user.saved_signature || null);
+  React.useEffect(() => { supabase.from("profiles").select("saved_signature").eq("id", user.id).single().then(({ data }) => { if (data?.saved_signature) setSavedSig(data.saved_signature); }); }, [user.id]);
   const [form, setForm] = useState({
     payee_id: "", payee_type: "vendor", rff_id: "", invoice_id: "",
     agreed_amount: "", payment_method: "bank_transfer",

@@ -9412,7 +9412,7 @@ const FinanceDashboard = ({ user, onTab }) => {
             <div style={{ color:T.textMuted, fontSize:13, marginBottom:6 }}>{ceoVoucherSignModal.voucher_number} — {ceoVoucherSignModal.payee}</div>
             <div style={{ color:T.teal, fontWeight:800, fontSize:18, marginBottom:20 }}>GHS {parseFloat(ceoVoucherSignModal.amount||0).toLocaleString()}</div>
             <div style={{ marginBottom:16 }}>
-              <SignatureInput label="CEO Authorisation Signature" canvasRef={voucherCanvasRef} onSignatureChange={setVoucherSignature} savedSignature={savedSig||user.saved_signature} isDrawing={vIsDrawing} setIsDrawing={setVIsDrawing} lastPos={vLastPos} setLastPos={setVLastPos} />
+              <SignatureInput label="CEO Authorisation Signature" canvasRef={voucherCanvasRef} onSignatureChange={setVoucherSignature} savedSignature={savedSigFM||user.saved_signature} isDrawing={vIsDrawing} setIsDrawing={setVIsDrawing} lastPos={vLastPos} setLastPos={setVLastPos} />
             </div>
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={async () => {

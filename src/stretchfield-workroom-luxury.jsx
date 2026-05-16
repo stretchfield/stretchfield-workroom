@@ -9153,10 +9153,10 @@ const FinanceDashboard = ({ user, onTab }) => {
                         account_number: staffProfile?.bank_account_number || "",
                         mobile_money: staffProfile?.mobile_money_number || "",
                         raised_by: user.id,
-                        status: "approved",
+                        status: "pending_approval",
                         staff_request_id: req.id,
                       });
-                      await supabase.from("staff_payment_requests").update({ status:"paid" }).eq("id", req.id);
+                      await supabase.from("staff_payment_requests").update({ status:"voucher_created" }).eq("id", req.id);
                       await supabase.from("notifications").insert({ user_id: req.staff_id, title:"Payment Being Processed — "+req.staff_name, message:"Finance is processing your payment of GHS "+parseFloat(req.amount).toLocaleString()+". A payment voucher has been raised.", type:"finance" });
                       const { data: sr } = await supabase.from("staff_payment_requests").select("*").order("submitted_at", { ascending:false });
                       setStaffRequests(sr||[]);

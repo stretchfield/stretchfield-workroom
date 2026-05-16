@@ -8574,6 +8574,12 @@ const FinanceDashboard = ({ user, onTab }) => {
 
   useEffect(() => { load(); }, []);
 
+  useEffect(() => {
+    if (financeTab === 'staff-requests') {
+      supabase.from("staff_payment_requests").select("*").order("submitted_at", { ascending: false }).then(({ data }) => setStaffRequests(data || []));
+    }
+  }, [financeTab]);
+
   // Auto-generate voucher number
   const genVoucherNumber = async (type) => {
     const prefixes = { project: 'PV', cheque: 'CHQ', petty_cash: 'PC', staff_welfare: 'SW', administrative: 'ADM', statutory: 'STAT' };

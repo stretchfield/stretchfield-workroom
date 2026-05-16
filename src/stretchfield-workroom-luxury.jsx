@@ -10441,6 +10441,54 @@ const ContractAwardApprovalView = ({ user }) => {
       });
       if (vm.email) await sendEmail(vm.email, `Contract Award Confirmed — ${award.vendor_name}`, notifEmailHtml({ name: vm.name, title: "Contract Award Confirmed", message: `CEO has approved and confirmed <strong>${award.vendor_name}</strong> for the gig. Finance has been notified to create a Purchase Order.`, actionUrl: BASE_URL, actionLabel: "View in WorkRoom" }));
     }
+    // Auto-create invoice from quote if vendor has submitted one unchanged
+    const { data: assignment } = await supabase.from("rff_vendor_assignments").select("*").eq("rff_id", award.rff_id).eq("vendor_id", award.vendor_id).single();
+    if (assignment?.quote_document_url && assignment?.quote_amount) {
+      // Check if invoice already exists for this vendor+rff
+      const { data: existingInv } = await supabase.from("vendor_invoices").select("id").eq("vendor_id", award.vendor_id).eq("invoice_number", "INV-QUOTE-"+award.rff_id.slice(0,8)).maybeSingle();
+      if (!existingInv) {
+        // Get RFF and event details
+        const { data: rff } = await supabase.from("rffs").select("rff_code,event_name,project_id").eq("id", award.rff_id).single();
+        const invNum = "INV/" + (rff?.rff_code || award.rff_id.slice(0,8));
+        await supabase.from("vendor_invoices").insert({
+          vendor_id: award.vendor_id,
+          vendor_name: award.vendor_name,
+          event_name: rff?.event_name || "",
+          amount: assignment.quote_amount,
+          invoice_url: assignment.quote_document_url,
+          invoice_filename: assignment.quote_notes || "Quote document",
+          invoice_number: invNum,
+          status: "submitted",
+          notes: "Auto-generated from approved quote — no revision requested",
+          created_at: new Date().toISOString(),
+        });
+        // Notify Finance about auto-invoice
+        for (const fm of fms || []) {
+          await supabase.from("notifications").insert({
+            user_id: fm.id,
+            title: "Invoice Auto-Created — " + award.vendor_name,
+            message: award.vendor_name + "'s approved quote has been automatically submitted as invoice " + invNum + " for GHS " + parseFloat(assignment.quote_amount).toLocaleString() + ". Go to Vendor Invoices to review.",
+            type: "finance",
+          });
+        }
+        // Notify vendor that their quote is being used as invoice
+        await supabase.from("notifications").insert({
+          user_id: award.vendor_id,
+          title: "Quote Accepted as Invoice",
+          message: "Your quote of GHS " + parseFloat(assignment.quote_amount).toLocaleString() + " has been approved and automatically submitted as your invoice " + invNum + ". Finance will process payment shortly.",
+          type: "finance",
+        });
+        // Notify VM
+        for (const vm of vms || []) {
+          await supabase.from("notifications").insert({
+            user_id: vm.id,
+            title: "Auto-Invoice Created — " + award.vendor_name,
+            message: award.vendor_name + "'s quote used as invoice " + invNum + ". No revision was requested so the original quote stands.",
+            type: "rff",
+          });
+        }
+      }
+    }
     setSaving(false); setPreviewAward(null); setCeoNotes(""); load();
   };
 

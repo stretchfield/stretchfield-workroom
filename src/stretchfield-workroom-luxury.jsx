@@ -8333,7 +8333,7 @@ const FinanceManagerDashboard = ({ user, onTab }) => {
     const [v, est, pc, db, ci, vi, po, ev] = await Promise.all([
       supabase.from('payment_vouchers').select('*').order('created_at', { ascending: false }),
       supabase.from('estimates').select('*').order('created_at', { ascending: false }),
-      supabase.from('petty_cash').select('*').limit(1).maybeSingle().catch(()=>({data:null})),
+      supabase.from('petty_cash').select('*').limit(1).maybeSingle(),
       supabase.from('daily_balances').select('*').order('report_date', { ascending: false }).limit(1),
       supabase.from('client_payments').select('*').order('created_at', { ascending: false }),
       supabase.from('vendor_invoices').select('*').order('created_at', { ascending: false }),
@@ -8544,8 +8544,8 @@ const FinanceDashboard = ({ user, onTab }) => {
     const [v, est, pc, pcv, db, ev, cl, po, ci, vi] = await Promise.all([
       supabase.from('payment_vouchers').select('*').order('created_at', { ascending: false }),
       supabase.from('estimates').select('*').order('created_at', { ascending: false }),
-      supabase.from('petty_cash').select('*').limit(1).maybeSingle().catch(()=>({data:null})),
-      supabase.from('petty_cash_vouchers').select('*').order('created_at', { ascending: false }).catch(()=>({data:[]})),
+      supabase.from('petty_cash').select('*').limit(1).maybeSingle(),
+      supabase.from('petty_cash_vouchers').select('*').order('created_at', { ascending: false }),
       supabase.from('daily_balances').select('*').order('report_date', { ascending: false }),
       supabase.from('projects').select('*').order('name'),
       supabase.from('profiles').select('*').eq('role', 'Client'),
@@ -8577,6 +8577,9 @@ const FinanceDashboard = ({ user, onTab }) => {
   useEffect(() => {
     if (financeTab === 'staff-requests') {
       supabase.from("staff_payment_requests").select("*").order("submitted_at", { ascending: false }).then(({ data }) => setStaffRequests(data || []));
+    }
+    if (financeTab === 'vouchers') {
+      supabase.from("payment_vouchers").select("*").order("created_at", { ascending: false }).then(({ data }) => setVouchers(data || []));
     }
   }, [financeTab]);
 

@@ -8494,6 +8494,8 @@ const FinanceDashboard = ({ user, onTab }) => {
   const [clientInvoices, setClientInvoices] = useState([]);
   const [vendorInvoices, setVendorInvoices] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [staffList, setStaffList] = useState([]);
+  const [vendors, setVendors] = useState([]);
 
   // Voucher form
   const [voucherModal, setVoucherModal] = useState(null);

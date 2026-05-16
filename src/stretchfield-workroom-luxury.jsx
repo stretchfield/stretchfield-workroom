@@ -18428,7 +18428,7 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
       const [au, sr, pv, vp, sp, aw, rf, inv, va] = await Promise.all([
         supabase.from("payment_authorisations").select("*").order("created_at", { ascending: false }),
         supabase.from("staff_payment_requests").select("*").eq("status","pending_ceo").order("submitted_at", { ascending: false }),
-        supabase.from("payment_vouchers").select("*,profiles!payment_vouchers_raised_by_fkey(name)").or("status.eq.pending_approval,and(status.eq.approved,ceo_signature.is.null)").order("created_at", { ascending: false }),
+        supabase.from("payment_vouchers").select("*").or("status.eq.pending_approval,status.eq.approved,status.eq.fm_signed").order("created_at", { ascending: false }),
         supabase.from("profiles").select("*").eq("role", "Vendor"),
         supabase.from("profiles").select("*").in("role", ["Finance Manager","Vendor Manager","Strategy & Events Lead","CEO","Board of Directors","Sales & Marketing","Country Manager"]),
         supabase.from("rff_awards").select("*"),
@@ -18679,17 +18679,18 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
             <div style={{ color:T.textMuted, fontSize:13, marginBottom:4 }}>{voucherSignModal.voucher_number} — {voucherSignModal.payee}</div>
             <div style={{ color:T.teal, fontWeight:900, fontSize:20, marginBottom:20 }}>GHS {parseFloat(voucherSignModal.amount||0).toLocaleString()}</div>
             <div style={{ marginBottom:16 }}>
-              <SignatureInput label="CEO Authorisation Signature" canvasRef={voucherSigRef} onSignatureChange={setVoucherSig} savedSignature={user.saved_signature} isDrawing={vIsDrawing} setIsDrawing={setVIsDrawing} lastPos={vLastPos} setLastPos={setVLastPos} />
+              <SignatureInput label="CEO Authorisation Signature" canvasRef={voucherSigRef} onSignatureChange={setVoucherSig} savedSignature={savedSig||user.saved_signature} isDrawing={vIsDrawing} setIsDrawing={setVIsDrawing} lastPos={vLastPos} setLastPos={setVLastPos} />
             </div>
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={async () => {
-                const sig = voucherSigRef.current?.toDataURL() || "";
+                const sig = voucherSig || voucherSigRef.current?.toDataURL() || "";
+                if (!sig || sig === "data:,") { alert("Please sign or select your saved signature."); setVoucherSigSaving(false); return; }
                 setVoucherSigSaving(true);
                 await supabase.from("payment_vouchers").update({ status:"approved", approved_by:user.id, approved_at:new Date().toISOString(), ceo_signature:sig, ceo_signed_at:new Date().toISOString() }).eq("id", voucherSignModal.id);
                 // Notify Finance
                 const { data: fms } = await supabase.from("profiles").select("id,email,name").eq("role","Finance Manager");
                 for (const fm of fms||[]) {
-                  await supabase.from("notifications").insert({ user_id:fm.id, title:"Voucher Approved", message:`Voucher ${voucherSignModal.voucher_number} has been approved and signed by CEO. Proceed with payment.`, type:"rff" });
+                  await supabase.from("notifications").insert({ user_id:fm.id, title:"Voucher Approved", message:"Voucher "+voucherSignModal.voucher_number+" has been approved and signed by CEO. Proceed with payment.", type:"finance" });
                 }
                 setVoucherSigSaving(false);
                 setVoucherSignModal(null);

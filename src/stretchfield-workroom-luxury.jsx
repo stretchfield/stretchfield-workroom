@@ -8502,6 +8502,8 @@ const FinanceDashboard = ({ user, onTab }) => {
   const [voucherSignature, setVoucherSignature] = useState("");
   const [voucherSignSaving, setVoucherSignSaving] = useState(false);
   const voucherCanvasRef = React.useRef(null);
+  const [savedSigFM, setSavedSigFM] = React.useState(user.saved_signature || null);
+  React.useEffect(() => { supabase.from("profiles").select("saved_signature").eq("id", user.id).single().then(({ data }) => { if (data?.saved_signature) setSavedSigFM(data.saved_signature); }); }, [user.id]);
   const [vIsDrawing, setVIsDrawing] = useState(false);
   const [vLastPos, setVLastPos] = useState(null);
   const [vForm, setVForm] = useState({ payment_type: 'project', payee: '', description: '', amount: '', currency: 'GHS', project_id: '', event_name: '', invoice_ref: '', department: '', welfare_type: '', admin_type: '', statutory_type: '', due_date: '', notes: '' });
@@ -9383,7 +9385,7 @@ const FinanceDashboard = ({ user, onTab }) => {
             <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>Finance Manager Signature</div>
             <div style={{ color:T.textMuted, fontSize:13, marginBottom:6 }}>{fmSignModal.voucher_number} — {fmSignModal.payee}</div>
             <div style={{ color:T.amber, fontWeight:800, fontSize:18, marginBottom:20 }}>GHS {parseFloat(fmSignModal.amount||0).toLocaleString()}</div>
-            <SignatureInput label="Your Signature (Finance Manager)" canvasRef={voucherCanvasRef} onSignatureChange={setVoucherSignature} savedSignature={user.saved_signature} isDrawing={vIsDrawing} setIsDrawing={setVIsDrawing} lastPos={vLastPos} setLastPos={setVLastPos} />
+            <SignatureInput label="Your Signature (Finance Manager)" canvasRef={voucherCanvasRef} onSignatureChange={setVoucherSignature} savedSignature={savedSigFM||user.saved_signature} isDrawing={vIsDrawing} setIsDrawing={setVIsDrawing} lastPos={vLastPos} setLastPos={setVLastPos} />
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={async () => {
                 const sig = voucherSignature || voucherCanvasRef.current?.toDataURL() || "";
@@ -9410,7 +9412,7 @@ const FinanceDashboard = ({ user, onTab }) => {
             <div style={{ color:T.textMuted, fontSize:13, marginBottom:6 }}>{ceoVoucherSignModal.voucher_number} — {ceoVoucherSignModal.payee}</div>
             <div style={{ color:T.teal, fontWeight:800, fontSize:18, marginBottom:20 }}>GHS {parseFloat(ceoVoucherSignModal.amount||0).toLocaleString()}</div>
             <div style={{ marginBottom:16 }}>
-              <SignatureInput label="CEO Authorisation Signature" canvasRef={voucherCanvasRef} onSignatureChange={setVoucherSignature} savedSignature={user.saved_signature} isDrawing={vIsDrawing} setIsDrawing={setVIsDrawing} lastPos={vLastPos} setLastPos={setVLastPos} />
+              <SignatureInput label="CEO Authorisation Signature" canvasRef={voucherCanvasRef} onSignatureChange={setVoucherSignature} savedSignature={savedSig||user.saved_signature} isDrawing={vIsDrawing} setIsDrawing={setVIsDrawing} lastPos={vLastPos} setLastPos={setVLastPos} />
             </div>
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={async () => {
@@ -10946,6 +10948,13 @@ const PurchaseOrderView = ({ user }) => {
   const sigCanvas = React.useRef(null);
   const [sigDrawing, setSigDrawing] = useState(false);
   const [sigData, setSigData] = useState("");
+  const [savedSig, setSavedSig] = useState(user.saved_signature || null);
+
+  React.useEffect(() => {
+    supabase.from("profiles").select("saved_signature").eq("id", user.id).single().then(({ data }) => {
+      if (data?.saved_signature) setSavedSig(data.saved_signature);
+    });
+  }, [user.id]);
 
   const load = async () => {
     const [{ data: aw }, { data: po }, { data: rf }, { data: ev }, { data: vp }, { data: va }] = await Promise.all([
@@ -11332,16 +11341,16 @@ const PurchaseOrderView = ({ user }) => {
               <button onClick={() => { const c=sigCanvas.current; c.getContext("2d").clearRect(0,0,c.width,c.height); setSigData(""); }} style={{ position:"absolute", top:6, right:6, background:T.surface, border:"1px solid "+T.border, color:T.textMuted, padding:"2px 8px", borderRadius:5, cursor:"pointer", fontSize:10 }}>Clear</button>
             </div>
             {/* Saved signature option */}
-            {(user.saved_signature) && !sigData && (
+            {savedSig && !sigData && (
               <div style={{ background:T.teal+"10", border:"1px solid "+T.teal+"30", borderRadius:8, padding:"10px 14px", marginBottom:12, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                 <div>
                   <div style={{ color:T.teal, fontSize:11, fontWeight:700, marginBottom:4 }}>✓ Use Saved Signature</div>
-                  <img src={user.saved_signature} style={{ height:48, maxWidth:200, objectFit:"contain", background:"#fff", padding:4, borderRadius:4 }} alt="saved" />
+                  <img src={savedSig} style={{ height:48, maxWidth:200, objectFit:"contain", background:"#fff", padding:4, borderRadius:4 }} alt="saved" />
                 </div>
-                <button onClick={() => setSigData(user.saved_signature)} style={{ background:"linear-gradient(135deg,"+T.teal+","+T.cyan+")", border:"none", color:"#fff", padding:"7px 14px", borderRadius:7, cursor:"pointer", fontSize:12, fontWeight:700 }}>Use This</button>
+                <button onClick={() => setSigData(savedSig)} style={{ background:"linear-gradient(135deg,"+T.teal+","+T.cyan+")", border:"none", color:"#fff", padding:"7px 14px", borderRadius:7, cursor:"pointer", fontSize:12, fontWeight:700 }}>Use This</button>
               </div>
             )}
-            {user.saved_signature && sigData === user.saved_signature && (
+            {savedSig && sigData === savedSig && (
               <div style={{ background:T.teal+"12", border:"1px solid "+T.teal+"30", borderRadius:8, padding:"8px 14px", marginBottom:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                 <span style={{ color:T.teal, fontSize:12, fontWeight:700 }}>✓ Using saved signature</span>
                 <button onClick={() => setSigData("")} style={{ background:"none", border:"none", color:T.textMuted, fontSize:11, cursor:"pointer" }}>Draw instead</button>

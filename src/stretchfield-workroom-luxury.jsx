@@ -403,10 +403,18 @@ const SignatureInput = ({ label, canvasRef, onSignatureChange, savedSignature, i
     if (mode === "saved" && savedSignature) {
       onSignatureChange(savedSignature);
       setUsingSaved(true);
-    } else {
+    } else if (mode === "draw") {
       setUsingSaved(false);
     }
-  }, [mode]);
+  }, [mode, savedSignature]);
+
+  // Auto-set saved signature on mount if available
+  React.useEffect(() => {
+    if (savedSignature) {
+      onSignatureChange(savedSignature);
+      setUsingSaved(true);
+    }
+  }, []);
 
   return (
     <div style={{ marginBottom: 16 }}>

@@ -2071,6 +2071,19 @@ const StaffDashboard = ({ user }) => {
   const [savingBank, setSavingBank] = useState(false);
   const [bankSubmitted, setBankSubmitted] = useState(false);
   const [bankRequested, setBankRequested] = useState(false);
+  const [pendingReportEvents, setPendingReportEvents] = useState([]);
+  const [reportGateModal, setReportGateModal] = useState(false);
+
+  const checkReportGate = async (onPass) => {
+    const { data: myEvents } = await supabase.from("projects").select("id,name,phase,assigned_to").eq("assigned_to", user.id).in("phase",["Post-Event","Execution","Completed"]);
+    if (!myEvents || myEvents.length === 0) { onPass(); return; }
+    const { data: debriefs } = await supabase.from("event_debrief").select("project_id").eq("submitted_by", user.id);
+    const submittedIds = new Set((debriefs||[]).map(d => d.project_id));
+    const missing = myEvents.filter(e => !submittedIds.has(e.id));
+    if (missing.length === 0) { onPass(); return; }
+    setPendingReportEvents(missing);
+    setReportGateModal(true);
+  };
 
   useEffect(() => {
     // Check bank details status

@@ -2062,7 +2062,7 @@ const StaffDashboard = ({ user }) => {
   const [internalPortalEvent, setInternalPortalEvent] = useState(null);
   const [paymentRequests, setPaymentRequests] = useState([]);
   const [payReqModal, setPayReqModal] = useState(false);
-  const [payReqForm, setPayReqForm] = useState({ project_id:"", amount:"", description:"", request_type:"project_fee", supporting_doc_url:"" });
+  const [payReqForm, setPayReqForm] = useState({ project_id:"", description:"", _rates:null, selectedTypes:{ project_fee:false, per_diem:false, transport:false }, customAmount:"", customType:"", _receipt:null });
   const [savingPayReq, setSavingPayReq] = useState(false);
   const [events, setEvents] = useState([]);
   const [notifs, setNotifs] = useState([]);
@@ -11534,7 +11534,8 @@ const VendorInvoiceView = ({ user }) => {
     load();
   };
 
-  const statusColor = { submitted: T.amber, reviewed: T.cyan, voucher_created: T.teal, paid: "#10B981" };
+  const statusColor = { submitted: T.amber, reviewed: T.cyan, voucher_created: T.teal, paid: "#10B981", approved: T.teal, rejected: T.red };
+  const statusLabel = { submitted: "Under Review", reviewed: "Reviewed", voucher_created: "Payment Processing", paid: "Paid ✓", approved: "Approved", rejected: "Rejected" };
 
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
@@ -11559,12 +11560,15 @@ const VendorInvoiceView = ({ user }) => {
             <div key={inv.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderLeft: `3px solid ${statusColor[inv.status] || T.textMuted}`, borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{inv.event_name}</div>
-                <div style={{ color: T.amber, fontWeight: 700, fontSize: 13, marginTop: 3 }}>GHS {(inv.amount||0).toLocaleString()}</div>
-                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{new Date(inv.created_at).toLocaleDateString("en-GB")}</div>
+                {inv.invoice_number && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2, fontWeight: 600 }}>{inv.invoice_number}</div>}
+                <div style={{ color: T.amber, fontWeight: 700, fontSize: 13, marginTop: 3 }}>GHS {parseFloat(inv.amount||0).toLocaleString()}</div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Submitted {new Date(inv.created_at).toLocaleDateString("en-GB", {day:"numeric",month:"short",year:"numeric"})}</div>
+                {inv.paid_at && <div style={{ color:"#10B981", fontSize:11, fontWeight:700, marginTop:2 }}>✓ Paid {new Date(inv.paid_at).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}</div>}
+                {inv.notes && inv.status === "rejected" && <div style={{ color:T.red, fontSize:11, marginTop:4, background:T.red+"10", padding:"4px 8px", borderRadius:6 }}>Reason: {inv.notes}</div>}
               </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                {inv.invoice_url && <a href={inv.invoice_url} target="_blank" rel="noopener noreferrer" style={{ color: T.cyan, fontSize: 12, fontWeight: 700 }}>📄 View</a>}
-                <span style={{ background: (statusColor[inv.status]||T.textMuted)+"18", color: statusColor[inv.status]||T.textMuted, border: `1px solid ${(statusColor[inv.status]||T.textMuted)}30`, borderRadius: 20, padding: "3px 12px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{inv.status}</span>
+              <div style={{ display: "flex", flexDirection:"column", gap: 8, alignItems: "flex-end" }}>
+                <span style={{ background: (statusColor[inv.status]||T.textMuted)+"18", color: statusColor[inv.status]||T.textMuted, border: `1px solid ${(statusColor[inv.status]||T.textMuted)}30`, borderRadius: 20, padding: "3px 12px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{statusLabel[inv.status]||inv.status}</span>
+                {inv.invoice_url && <a href={inv.invoice_url} target="_blank" rel="noopener noreferrer" style={{ color: T.cyan, fontSize: 12, fontWeight: 700 }}>📄 View Invoice</a>}
               </div>
             </div>
           ))}

@@ -461,6 +461,13 @@ const AccountSettingsModal = ({ user, onClose, onUpdate }) => {
   const fileRef = React.useRef();
   const sigFileRef = React.useRef();
 
+  // Load fresh signature from DB on mount
+  React.useEffect(() => {
+    supabase.from("profiles").select("saved_signature").eq("id", user.id).single().then(({ data }) => {
+      if (data?.saved_signature) setSavedSignature(data.saved_signature);
+    });
+  }, [user.id]);
+
   const handleAvatarChange = (e) => {
     const f = e.target.files[0];
     if (!f) return;
@@ -513,7 +520,7 @@ const AccountSettingsModal = ({ user, onClose, onUpdate }) => {
 
     setSaving(false);
     setMsg("Profile updated successfully.");
-    onUpdate({ ...user, phone, avatar_url });
+    onUpdate({ ...user, phone, avatar_url, saved_signature });
   };
 
   const initials = user.name ? user.name.split(" ").map(n => n[0]).join("").slice(0,2).toUpperCase() : "?";
@@ -7665,8 +7672,10 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
         <AccountSettingsModal
           user={currentUser}
           onClose={() => setShowAccountSettings(false)}
-          onUpdate={(updated) => {
-            setCurrentUser(updated);
+          onUpdate={async (updated) => {
+            // Re-fetch fresh profile from DB to get saved_signature
+            const { data: freshProfile } = await supabase.from("profiles").select("*").eq("id", updated.id).single();
+            setCurrentUser(freshProfile ? { ...updated, ...freshProfile } : updated);
             setShowAccountSettings(false);
           }}
         />
@@ -11323,13 +11332,19 @@ const PurchaseOrderView = ({ user }) => {
               <button onClick={() => { const c=sigCanvas.current; c.getContext("2d").clearRect(0,0,c.width,c.height); setSigData(""); }} style={{ position:"absolute", top:6, right:6, background:T.surface, border:"1px solid "+T.border, color:T.textMuted, padding:"2px 8px", borderRadius:5, cursor:"pointer", fontSize:10 }}>Clear</button>
             </div>
             {/* Saved signature option */}
-            {user.saved_signature && !sigData && (
+            {(user.saved_signature) && !sigData && (
               <div style={{ background:T.teal+"10", border:"1px solid "+T.teal+"30", borderRadius:8, padding:"10px 14px", marginBottom:12, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                 <div>
-                  <div style={{ color:T.teal, fontSize:11, fontWeight:700, marginBottom:4 }}>Use Saved Signature</div>
-                  <img src={user.saved_signature} style={{ height:36, maxWidth:180, objectFit:"contain" }} alt="saved" />
+                  <div style={{ color:T.teal, fontSize:11, fontWeight:700, marginBottom:4 }}>✓ Use Saved Signature</div>
+                  <img src={user.saved_signature} style={{ height:48, maxWidth:200, objectFit:"contain", background:"#fff", padding:4, borderRadius:4 }} alt="saved" />
                 </div>
-                <button onClick={() => setSigData(user.saved_signature)} style={{ background:"linear-gradient(135deg,"+T.teal+","+T.cyan+")", border:"none", color:"#fff", padding:"7px 14px", borderRadius:7, cursor:"pointer", fontSize:12, fontWeight:700 }}>Use</button>
+                <button onClick={() => setSigData(user.saved_signature)} style={{ background:"linear-gradient(135deg,"+T.teal+","+T.cyan+")", border:"none", color:"#fff", padding:"7px 14px", borderRadius:7, cursor:"pointer", fontSize:12, fontWeight:700 }}>Use This</button>
+              </div>
+            )}
+            {user.saved_signature && sigData === user.saved_signature && (
+              <div style={{ background:T.teal+"12", border:"1px solid "+T.teal+"30", borderRadius:8, padding:"8px 14px", marginBottom:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <span style={{ color:T.teal, fontSize:12, fontWeight:700 }}>✓ Using saved signature</span>
+                <button onClick={() => setSigData("")} style={{ background:"none", border:"none", color:T.textMuted, fontSize:11, cursor:"pointer" }}>Draw instead</button>
               </div>
             )}
             <div style={{ display:"flex", gap:10, marginTop:8 }}>

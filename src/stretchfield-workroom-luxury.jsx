@@ -8320,7 +8320,7 @@ const FinanceManagerDashboard = ({ user, onTab }) => {
     const [v, est, pc, db, ci, vi, po, ev] = await Promise.all([
       supabase.from('payment_vouchers').select('*').order('created_at', { ascending: false }),
       supabase.from('estimates').select('*').order('created_at', { ascending: false }),
-      supabase.from('petty_cash').select('*').limit(1).single(),
+      supabase.from('petty_cash').select('*').limit(1).maybeSingle().catch(()=>({data:null})),
       supabase.from('daily_balances').select('*').order('report_date', { ascending: false }).limit(1),
       supabase.from('client_payments').select('*').order('created_at', { ascending: false }),
       supabase.from('vendor_invoices').select('*').order('created_at', { ascending: false }),
@@ -8531,8 +8531,8 @@ const FinanceDashboard = ({ user, onTab }) => {
     const [v, est, pc, pcv, db, ev, cl, po, ci, vi] = await Promise.all([
       supabase.from('payment_vouchers').select('*').order('created_at', { ascending: false }),
       supabase.from('estimates').select('*').order('created_at', { ascending: false }),
-      supabase.from('petty_cash').select('*').limit(1).single(),
-      supabase.from('petty_cash_vouchers').select('*').order('created_at', { ascending: false }),
+      supabase.from('petty_cash').select('*').limit(1).maybeSingle().catch(()=>({data:null})),
+      supabase.from('petty_cash_vouchers').select('*').order('created_at', { ascending: false }).catch(()=>({data:[]})),
       supabase.from('daily_balances').select('*').order('report_date', { ascending: false }),
       supabase.from('projects').select('*').order('name'),
       supabase.from('profiles').select('*').eq('role', 'Client'),
@@ -18594,7 +18594,7 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
                 </div>
                 <div style={{ textAlign:"right", flexShrink:0, marginLeft:16 }}>
                   <div style={{ color:T.teal, fontWeight:900, fontSize:18 }}>GHS {parseFloat(v.amount||0).toLocaleString()}</div>
-                  <button onClick={() => { setVoucherSignModal(v); setVoucherSig(""); }} style={{ background:`linear-gradient(135deg,${T.teal},#10B981)`, border:"none", color:"#fff", padding:"7px 16px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:800, marginTop:8 }}>✍ Sign & Approve</button>
+                  <button onClick={e => { e.stopPropagation(); setVoucherSignModal(v); setVoucherSig(""); }} style={{ background:`linear-gradient(135deg,${T.teal},#10B981)`, border:"none", color:"#fff", padding:"7px 16px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:800, marginTop:8 }}>✍ Sign & Approve</button>
                 </div>
               </div>
             ))}
@@ -18677,7 +18677,7 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
 
       {/* ── CEO VOUCHER SIGN MODAL ── */}
       {voucherSignModal && (
-        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setVoucherSignModal(null)}>
+        <div style={{ position:"fixed", inset:0, zIndex:9999, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setVoucherSignModal(null)}>
           <div style={{ background:T.surface, border:`1px solid ${T.teal}30`, borderRadius:16, width:"100%", maxWidth:500, padding:28 }} onClick={e=>e.stopPropagation()}>
             <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>Sign & Approve Voucher</div>
             <div style={{ color:T.textMuted, fontSize:13, marginBottom:4 }}>{voucherSignModal.voucher_number} — {voucherSignModal.payee}</div>

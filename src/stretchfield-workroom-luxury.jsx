@@ -18721,21 +18721,27 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
             </div>
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={async () => {
-                const sig = voucherSig || savedSig || user.saved_signature || voucherSigRef.current?.toDataURL() || "";
-                if (!sig || sig === "data:,") { alert("Please sign or select your saved signature first."); return; }
-                setVoucherSigSaving(true);
-                await supabase.from("payment_vouchers").update({ status:"approved", approved_by:user.id, approved_at:new Date().toISOString(), ceo_signature:sig, ceo_signed_at:new Date().toISOString() }).eq("id", voucherSignModal.id);
-                // Notify Finance
-                const { data: fms } = await supabase.from("profiles").select("id,email,name").eq("role","Finance Manager");
-                for (const fm of fms||[]) {
-                  await supabase.from("notifications").insert({ user_id:fm.id, title:"Voucher Approved", message:"Voucher "+voucherSignModal.voucher_number+" has been approved and signed by CEO. Proceed with payment.", type:"finance" });
-                }
-                setVoucherSigSaving(false);
-                setVoucherSignModal(null);
-                setVoucherSig("");
-                const ctx = voucherSigRef.current?.getContext("2d");
-                if (ctx) ctx.clearRect(0,0,440,120);
-                load();
+                try {
+                  const sig = voucherSig || savedSig || user.saved_signature || "";
+                  if (!sig) { alert("No signature found. Please upload a signature in Settings first."); return; }
+                  setVoucherSigSaving(true);
+                  const { error: upErr } = await supabase.from("payment_vouchers").update({ 
+                    status: "approved", 
+                    approved_by: user.id, 
+                    approved_at: new Date().toISOString(), 
+                    ceo_signature: sig, 
+                    ceo_signed_at: new Date().toISOString() 
+                  }).eq("id", voucherSignModal.id);
+                  if (upErr) { alert("Error: " + upErr.message); setVoucherSigSaving(false); return; }
+                  const { data: fms } = await supabase.from("profiles").select("id,email,name").eq("role","Finance Manager");
+                  for (const fm of fms||[]) {
+                    await supabase.from("notifications").insert({ user_id:fm.id, title:"Voucher CEO Approved — "+voucherSignModal.voucher_number, message:"CEO has approved and signed voucher "+voucherSignModal.voucher_number+" for GHS "+parseFloat(voucherSignModal.amount||0).toLocaleString()+" — "+voucherSignModal.payee+". Proceed with payment.", type:"finance" });
+                  }
+                  setVoucherSigSaving(false);
+                  setVoucherSignModal(null);
+                  setVoucherSig("");
+                  load();
+                } catch(e) { alert("Error: "+e.message); setVoucherSigSaving(false); }
               }} disabled={voucherSigSaving} style={{ flex:1, background:`linear-gradient(135deg,${T.teal},#10B981)`, border:"none", color:"#fff", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{voucherSigSaving?"Saving...":"✓ Sign & Approve"}</button>
               <button onClick={()=>{ setVoucherSignModal(null); setVoucherSig(""); const ctx=voucherSigRef.current?.getContext("2d"); if(ctx) ctx.clearRect(0,0,440,120); }} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
             </div>

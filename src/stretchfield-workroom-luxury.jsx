@@ -18628,7 +18628,7 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
                 </div>
                 <div style={{ textAlign:"right", flexShrink:0, marginLeft:16 }}>
                   <div style={{ color:T.teal, fontWeight:900, fontSize:18 }}>GHS {parseFloat(v.amount||0).toLocaleString()}</div>
-                  <button onClick={e => { e.stopPropagation(); setVoucherSignModal(v); setVoucherSig(""); }} style={{ background:`linear-gradient(135deg,${T.teal},#10B981)`, border:"none", color:"#fff", padding:"7px 16px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:800, marginTop:8 }}>✍ Sign & Approve</button>
+                  <button onClick={e => { e.stopPropagation(); setVoucherSignModal(v); setVoucherSig(savedSig||user.saved_signature||""); }} style={{ background:`linear-gradient(135deg,${T.teal},#10B981)`, border:"none", color:"#fff", padding:"7px 16px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:800, marginTop:8 }}>✍ Sign & Approve</button>
                 </div>
               </div>
             ))}

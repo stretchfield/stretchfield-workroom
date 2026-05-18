@@ -1142,6 +1142,7 @@ const CEODashboard = ({ onTab, user }) => {
   const [clientPayments, setClientPayments] = useState([]);
   const [loading, setLoading] = React.useState(true);
   const [internalPortalEvent, setInternalPortalEvent] = useState(null);
+  const [viewCountry, setViewCountry] = useState(user.role === 'Country Manager' ? user.country : 'All');
   const [bankRequested, setBankRequested] = useState(false);
   const [bankSubmitted, setBankSubmitted] = useState(false);
   const [showBankForm, setShowBankForm] = useState(false);
@@ -1226,11 +1227,15 @@ const CEODashboard = ({ onTab, user }) => {
   const totalClientRevenue = clientPayments.reduce((s,p) => s+parseFloat(p.amount||0), 0);
   const pendingPayments = paymentAuths.filter(p => p.status === "pending_ceo");
   const pendingTasks = tasks.filter(t => t.status !== "completed");
-  const avgRating = scorecards.length > 0 ? (scorecards.reduce((s,sc) => s+(sc.total_pct||0), 0)/scorecards.length).toFixed(0) : 0;
+  // Filter by viewCountry for CEO country switcher
+  const filteredVendorProfiles = viewCountry === 'All' ? vendorProfiles : vendorProfiles.filter(v => (v.country||'Ghana') === viewCountry);
+  const filteredScorecards = viewCountry === 'All' ? scorecards : scorecards.filter(sc => filteredVendorProfiles.some(v => v.id === sc.vendor_id));
+  const filteredEvents = viewCountry === 'All' ? events : events.filter(e => (e.country||'Ghana') === viewCountry);
+  const filteredClients = viewCountry === 'All' ? clients : clients.filter(c => (c.country||'Ghana') === viewCountry);
+  const filteredPayments = viewCountry === 'All' ? clientPayments : clientPayments.filter(p => (p.country||'Ghana') === viewCountry);
+  const avgRating = filteredScorecards.length > 0 ? (filteredScorecards.reduce((s,sc) => s+(sc.total_pct||0), 0)/filteredScorecards.length).toFixed(0) : 0;
   const recentFeedback = feedback.slice(0,3);
-  // Total business = sum of agreed client budgets
   const totalBusiness = awards.reduce((s,a) => s+(parseFloat(a.agreed_amount)||0), 0);
-  // Rename label to clarify it's vendor spend
   const totalVendorSpend = totalBusiness;
 
   if (loading) return (
@@ -1303,15 +1308,32 @@ const CEODashboard = ({ onTab, user }) => {
               {pendingPayments.length > 0 && <span style={{ color: T.amber, fontWeight: 700 }}> · {pendingPayments.length} payment{pendingPayments.length !== 1 ? "s" : ""} awaiting your signature</span>}
             </div>
           </div>
-          <div style={{ display: "flex", gap: 12 }}>
-            {pendingPayments.length > 0 && (
-              <button onClick={() => onTab("payment-authorisation")} style={{ background: T.amber+"15", border: "1px solid "+T.amber+"40", color: T.amber, padding: "10px 18px", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>
-                ✍ Sign Payments ({pendingPayments.length})
-              </button>
+          <div style={{ display: "flex", flexDirection:"column", gap: 10, alignItems:"flex-end" }}>
+            {user.role === 'CEO' && (
+              <div style={{ display:"flex", gap:6 }}>
+                {["All","Ghana","Nigeria"].map(c => (
+                  <button key={c} onClick={() => setViewCountry(c)} style={{ padding:"5px 14px", borderRadius:20, border:"1px solid "+(viewCountry===c?T.cyan:T.border), background:viewCountry===c?T.cyan+"20":"none", color:viewCountry===c?T.cyan:T.textMuted, fontSize:11, fontWeight:700, cursor:"pointer" }}>
+                    {c==="All"?"🌍 All":c==="Ghana"?"🇬🇭 Ghana":"🇳🇬 Nigeria"}
+                  </button>
+                ))}
+              </div>
             )}
-            <button onClick={() => onTab("events")} style={{ background: "linear-gradient(135deg,"+T.cyan+","+T.teal+")", border: "none", color: "#060B14", padding: "10px 20px", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>
-              View All Events →
-            </button>
+            {user.role === 'Country Manager' && (
+              <div style={{ background:T.cyan+"15", border:"1px solid "+T.cyan+"30", borderRadius:20, padding:"5px 14px", display:"flex", alignItems:"center", gap:6 }}>
+                <span style={{ fontSize:14 }}>{user.country==="Nigeria"?"🇳🇬":"🇬🇭"}</span>
+                <span style={{ color:T.cyan, fontSize:11, fontWeight:800 }}>{user.country} Operations</span>
+              </div>
+            )}
+            <div style={{ display:"flex", gap:10 }}>
+              {pendingPayments.length > 0 && (
+                <button onClick={() => onTab("payment-authorisation")} style={{ background: T.amber+"15", border: "1px solid "+T.amber+"40", color: T.amber, padding: "10px 18px", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>
+                  ✍ Sign Payments ({pendingPayments.length})
+                </button>
+              )}
+              <button onClick={() => onTab("events")} style={{ background: "linear-gradient(135deg,"+T.cyan+","+T.teal+")", border: "none", color: "#060B14", padding: "10px 20px", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>
+                View All Events →
+              </button>
+            </div>
           </div>
         </div>
 

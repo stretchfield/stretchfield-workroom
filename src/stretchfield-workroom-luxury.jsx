@@ -1153,20 +1153,20 @@ const CEODashboard = ({ onTab, user }) => {
     const loadAll = async () => {
       setLoading(true);
       const [ev, inv, tk, cl, fb, op, tg, rf, vp, sc, pa, vo, aw, cp] = await Promise.all([
-        supabase.from('projects').select('*').order('event_date', { ascending: true }),
+        user.role==='Country Manager' ? supabase.from('projects').select('*').eq('country',user.country).order('event_date',{ascending:true}) : supabase.from('projects').select('*').order('event_date',{ascending:true}),
         supabase.from('invoices').select('*').order('created_at', { ascending: false }),
         supabase.from('tasks').select('*').order('created_at', { ascending: false }),
-        supabase.from('clients').select('*'),
+        user.role==='Country Manager' ? supabase.from('clients').select('*').eq('country',user.country) : supabase.from('clients').select('*'),
         supabase.from('feedback').select('*').order('created_at', { ascending: false }),
-        supabase.from('opportunities').select('*').order('created_at', { ascending: false }),
+        user.role==='Country Manager' ? supabase.from('opportunities').select('*').eq('country',user.country).order('created_at',{ascending:false}) : supabase.from('opportunities').select('*').order('created_at',{ascending:false}),
         supabase.from('sales_targets').select('*'),
-        supabase.from('rffs').select('*'),
-        supabase.from('profiles').select('*').eq('role', 'Vendor'),
+        user.role==='Country Manager' ? supabase.from('rffs').select('*').eq('country',user.country) : supabase.from('rffs').select('*'),
+        user.role==='Country Manager' ? supabase.from('profiles').select('*').eq('role','Vendor').eq('country',user.country) : supabase.from('profiles').select('*').eq('role','Vendor'),
         supabase.from('vendor_scorecards').select('*').order('created_at', { ascending: false }),
         supabase.from('payment_authorisations').select('*').order('created_at', { ascending: false }),
-        supabase.from('payment_vouchers').select('*').order('created_at', { ascending: false }),
+        user.role==='Country Manager' ? supabase.from('payment_vouchers').select('*').eq('country',user.country).order('created_at',{ascending:false}) : supabase.from('payment_vouchers').select('*').order('created_at',{ascending:false}),
         supabase.from('rff_awards').select('*'),
-        supabase.from('client_payments').select('*'),
+        user.role==='Country Manager' ? supabase.from('client_payments').select('*').eq('country',user.country) : supabase.from('client_payments').select('*'),
       ]);
       setEvents(ev.data || []);
       setInvoices(inv.data || []);

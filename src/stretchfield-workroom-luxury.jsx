@@ -1600,7 +1600,9 @@ const VendorManagerDashboard = ({ user }) => {
 
   const loadVM = () => {
     Promise.all([
-      supabase.from("profiles").select("*").eq("role", "Vendor").order("name"),
+      user.role === 'Country Manager'
+        ? supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", user.country).order("name")
+        : supabase.from("profiles").select("*").eq("role", "Vendor").order("name"),
       supabase.from("tasks").select("*").eq("assignee_id", user.id),
       supabase.from("projects").select("*").eq("status", "active"),
       supabase.from("notifications").select("*").eq("user_id", user.id).eq("read", false).limit(5),
@@ -6654,7 +6656,9 @@ const ClientPaymentsView = ({ user }) => {
 
   const load = async () => {
     const [{ data: p }, { data: c }, { data: e }, { data: sr }] = await Promise.all([
-      supabase.from("client_payments").select("*").order("payment_date", { ascending: false }),
+      user.role === 'Country Manager'
+        ? supabase.from("client_payments").select("*").eq("country", user.country).order("payment_date", { ascending: false })
+        : supabase.from("client_payments").select("*").order("payment_date", { ascending: false }),
       supabase.from("clients").select("*").order("name"),
       supabase.from("projects").select("*").order("name"),
       supabase.from("profiles").select("id,name,role").or('role.in.("CEO","Sales & Marketing"),has_sm_access.eq.true'),
@@ -7093,6 +7097,8 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
     avatar_url: p.avatar_url || null,
     phone: p.phone || "",
     has_sm_access: p.has_sm_access || false,
+    country: p.country || 'Ghana',
+    saved_signature: p.saved_signature || null,
   } : null;
 
   const [currentUser, setCurrentUser] = useState(() => buildUser(propProfile));
@@ -7719,7 +7725,9 @@ const CRMDashboardCEO = ({ user }) => {
 
   const load = async () => {
     const [l, t, m, cp] = await Promise.all([
-      supabase.from("opportunities").select("*"),
+      user.role === 'Country Manager'
+        ? supabase.from("opportunities").select("*").eq("country", user.country)
+        : supabase.from("opportunities").select("*"),
       supabase.from("sales_targets").select("*").order("created_at", { ascending: false }),
       supabase.from("profiles").select("*").or('role.in.("CEO","Country Manager","Sales & Marketing"),has_sm_access.eq.true'),
       supabase.from("client_payments").select("*").order("created_at", { ascending: false }),
@@ -13114,7 +13122,9 @@ const VendorApprovalsPanel = ({ user, onLoginCreated }) => {
   const load = async () => {
     const [{ data: appData }, { data: vpData }] = await Promise.all([
       supabase.from("vendor_applications").select("*").order("created_at", { ascending: false }),
-      supabase.from("profiles").select("*").eq("role", "Vendor").order("name"),
+      user.role === 'Country Manager'
+        ? supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", user.country).order("name")
+        : supabase.from("profiles").select("*").eq("role", "Vendor").order("name"),
     ]);
     setApps(appData || []);
     setVendorProfiles(vpData || []);
@@ -13698,7 +13708,9 @@ const VendorOnboardingView = ({ user }) => {
   const load = async () => {
     const [{ data: appData }, { data: vpData }] = await Promise.all([
       supabase.from("vendor_applications").select("*").order("created_at", { ascending: false }),
-      supabase.from("profiles").select("*").eq("role", "Vendor").order("name"),
+      user.role === 'Country Manager'
+        ? supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", user.country).order("name")
+        : supabase.from("profiles").select("*").eq("role", "Vendor").order("name"),
     ]);
     setApps(appData || []);
     setVendorProfiles(vpData || []);
@@ -19132,7 +19144,9 @@ const SalesDashboardView = ({ user }) => {
 
   const load = async () => {
     const [{ data: p }, { data: t }, { data: r }] = await Promise.all([
-      supabase.from("client_payments").select("*").order("payment_date", { ascending: false }),
+      user.role === 'Country Manager'
+        ? supabase.from("client_payments").select("*").eq("country", user.country).order("payment_date", { ascending: false })
+        : supabase.from("client_payments").select("*").order("payment_date", { ascending: false }),
       supabase.from("sales_targets").select("*"),
       supabase.from("profiles").select("id,name,role,has_sm_access").or('role.in.("CEO","Sales & Marketing"),has_sm_access.eq.true'),
     ]);
@@ -19320,7 +19334,9 @@ const CashFlowView = ({ user }) => {
     const load = async () => {
       const [{ data: ev }, { data: cp }, { data: vi }, { data: sp }, { data: vo }] = await Promise.all([
         supabase.from("projects").select("*").order("event_date", { ascending: false }),
-        supabase.from("client_payments").select("*").order("payment_date", { ascending: false }),
+        user.role === 'Country Manager'
+        ? supabase.from("client_payments").select("*").eq("country", user.country).order("payment_date", { ascending: false })
+        : supabase.from("client_payments").select("*").order("payment_date", { ascending: false }),
         supabase.from("vendor_invoices").select("*").eq("status","paid").order("created_at", { ascending: false }),
         supabase.from("staff_payment_requests").select("*").eq("status","paid").order("submitted_at", { ascending: false }),
         supabase.from("payment_vouchers").select("*").in("status",["paid","approved"]).order("created_at", { ascending: false }),
@@ -20533,7 +20549,9 @@ const BoardReportView = ({ user }) => {
       const [{ data: ev }, { data: cl }, { data: op }, { data: cp }, { data: sat }, { data: go }, { data: aw }] = await Promise.all([
         supabase.from("projects").select("*").order("event_date", { ascending: false }),
         supabase.from("clients").select("*"),
-        supabase.from("opportunities").select("*"),
+        user.role === 'Country Manager'
+        ? supabase.from("opportunities").select("*").eq("country", user.country)
+        : supabase.from("opportunities").select("*"),
         supabase.from("client_payments").select("*"),
         supabase.from("client_satisfaction").select("*"),
         supabase.from("company_goals").select("*").eq("status","active"),
@@ -23175,7 +23193,9 @@ const VendorAnalyticsView = ({ user }) => {
   const load = async () => {
     setLoading(true);
     const [vp, asn, aw, inv, sc] = await Promise.all([
-      supabase.from("profiles").select("*").eq("role", "Vendor").order("name"),
+      user.role === 'Country Manager'
+        ? supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", user.country).order("name")
+        : supabase.from("profiles").select("*").eq("role", "Vendor").order("name"),
       supabase.from("rff_vendor_assignments").select("*"),
       supabase.from("rff_awards").select("*"),
       supabase.from("vendor_invoices").select("*"),
@@ -23981,12 +24001,17 @@ const EventsView = ({ user, userRole }) => {
   const [internalPortalEvent, setInternalPortalEvent] = useState(null);
 
   const canManage = ['CEO','Country Manager'].includes(user?.role);
+  const userCountry = user?.country || 'Ghana';
   const canSeeTasks = ['CEO','Country Manager','Strategy & Events Lead','Vendor Manager'].includes(user?.role);
 
   const load = async () => {
     const [p, c, t, sl] = await Promise.all([
-      supabase.from('projects').select('*').order('created_at', { ascending: false }),
-      supabase.from('clients').select('*').order('name'),
+      user.role === 'Country Manager' 
+        ? supabase.from('projects').select('*').eq('country', user.country).order('created_at', { ascending: false })
+        : supabase.from('projects').select('*').order('created_at', { ascending: false }),
+      user.role === 'Country Manager'
+        ? supabase.from('clients').select('*').eq('country', user.country).order('name')
+        : supabase.from('clients').select('*').order('name'),
       supabase.from('tasks').select('*').order('created_at', { ascending: false }),
       supabase.from('profiles').select('id, name, email, avatar').eq('role', 'Strategy & Events Lead'),
     ]);
@@ -24014,7 +24039,7 @@ const EventsView = ({ user, userRole }) => {
       tasks: 0,
       completed: 0,
       event_category: form.event_category,
-      country: form.country || 'Ghana',
+      country: form.country || user.country || 'Ghana',
       assigned_to: form.assigned_to || null,
       assigned_to_name: form.assigned_to_name || null,
     });

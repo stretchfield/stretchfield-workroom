@@ -1602,7 +1602,7 @@ const VendorManagerDashboard = ({ user }) => {
     Promise.all([
       user.role === 'Country Manager'
         ? supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", user.country).order("name")
-        : supabase.from("profiles").select("*").eq("role", "Vendor").order("name"),
+        : supabase.from("profiles").select("*").eq("role", "Vendor").order("name"), // FM & VM see all vendors
       supabase.from("tasks").select("*").eq("assignee_id", user.id),
       supabase.from("projects").select("*").eq("status", "active"),
       supabase.from("notifications").select("*").eq("user_id", user.id).eq("read", false).limit(5),
@@ -7135,7 +7135,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "dashboard":
         if (role === "CEO") return <CEODashboard onTab={setActiveTab} user={currentUser} />;
         if (role === "Board of Directors") return <BoardDashboard user={currentUser} />;
-        if (role === "Country Manager") return <StaffDashboard user={currentUser} />;
+        if (role === "Country Manager") return <CEODashboard onTab={setActiveTab} user={currentUser} />;
         if (role === "Vendor") return <VendorDashboard user={currentUser} />;
         if (role === "Client") return <ClientDashboard user={currentUser} />;
         if (role === "Finance Manager") return <FinanceManagerDashboard user={currentUser} onTab={setActiveTab} />;
@@ -8525,6 +8525,7 @@ const FinanceDashboard = ({ user, onTab }) => {
   const [saving, setSaving] = useState(false);
   const [staffList, setStaffList] = useState([]);
   const [vendors, setVendors] = useState([]);
+  const [countryFilter, setCountryFilter] = useState("All");
 
   // Voucher form
   const [voucherModal, setVoucherModal] = useState(null);
@@ -13124,7 +13125,7 @@ const VendorApprovalsPanel = ({ user, onLoginCreated }) => {
       supabase.from("vendor_applications").select("*").order("created_at", { ascending: false }),
       user.role === 'Country Manager'
         ? supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", user.country).order("name")
-        : supabase.from("profiles").select("*").eq("role", "Vendor").order("name"),
+        : supabase.from("profiles").select("*").eq("role", "Vendor").order("name"), // FM & VM see all vendors
     ]);
     setApps(appData || []);
     setVendorProfiles(vpData || []);
@@ -13710,7 +13711,7 @@ const VendorOnboardingView = ({ user }) => {
       supabase.from("vendor_applications").select("*").order("created_at", { ascending: false }),
       user.role === 'Country Manager'
         ? supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", user.country).order("name")
-        : supabase.from("profiles").select("*").eq("role", "Vendor").order("name"),
+        : supabase.from("profiles").select("*").eq("role", "Vendor").order("name"), // FM & VM see all vendors
     ]);
     setApps(appData || []);
     setVendorProfiles(vpData || []);
@@ -23195,7 +23196,7 @@ const VendorAnalyticsView = ({ user }) => {
     const [vp, asn, aw, inv, sc] = await Promise.all([
       user.role === 'Country Manager'
         ? supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", user.country).order("name")
-        : supabase.from("profiles").select("*").eq("role", "Vendor").order("name"),
+        : supabase.from("profiles").select("*").eq("role", "Vendor").order("name"), // FM & VM see all vendors
       supabase.from("rff_vendor_assignments").select("*"),
       supabase.from("rff_awards").select("*"),
       supabase.from("vendor_invoices").select("*"),
@@ -24006,7 +24007,7 @@ const EventsView = ({ user, userRole }) => {
 
   const load = async () => {
     const [p, c, t, sl] = await Promise.all([
-      user.role === 'Country Manager' 
+      ['Country Manager','Strategy & Events Lead'].includes(user.role)
         ? supabase.from('projects').select('*').eq('country', user.country).order('created_at', { ascending: false })
         : supabase.from('projects').select('*').order('created_at', { ascending: false }),
       user.role === 'Country Manager'

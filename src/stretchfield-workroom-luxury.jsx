@@ -6786,7 +6786,7 @@ const ClientPaymentsView = ({ user, activeCountry = "All" }) => {
           { label:"Total Received", value:fmtMoney(totalReceived, activeCountry==="All"?"Ghana":activeCountry), color:T.teal },
           { label:"Revenue YTD", value:fmtMoney(ytd, activeCountry==="All"?"Ghana":activeCountry), color:T.cyan },
           { label:"Payments Recorded", value:payments.length, color:T.amber },
-          { label:"This Month", value:"GHS "+payments.filter(p => { const d = new Date(p.payment_date); const n = new Date(); return d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear(); }).reduce((s,p)=>s+parseFloat(p.amount||0),0).toLocaleString(), color:T.magenta },
+          { label:"This Month", value:fmtMoney(payments.filter(p => { const d = new Date(p.payment_date); const n = new Date(); return d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear(); }).reduce((s,p)=>s+parseFloat(p.amount||0),0), activeCountry==="All"?"Ghana":activeCountry), color:T.magenta },
         ].map(k => (
           <div key={k.label} style={{ padding:"14px 16px", background:T.surface, border:`1px solid ${T.border}`, borderTop:`2px solid ${k.color}`, borderRadius:10 }}>
             <div style={{ color:k.color, fontSize:18, fontWeight:900 }}>{k.value}</div>
@@ -9221,7 +9221,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
                     <div style={{ color:T.textMuted, fontSize:11, marginTop:3 }}>{new Date(req.submitted_at).toLocaleDateString("en-GB", { day:"numeric", month:"short", year:"numeric" })}</div>
                   </div>
                   <div style={{ textAlign:"right" }}>
-                    <div style={{ color:T.amber, fontWeight:900, fontSize:18 }}>GHS {parseFloat(req.amount||0).toLocaleString()}</div>
+                    <div style={{ color:T.amber, fontWeight:900, fontSize:18 }}>{fmtMoney(req.amount||0, req.country||"Ghana")}</div>
                     <span style={{ color:statusColors[req.status]||T.textMuted, fontSize:10, fontWeight:800, background:(statusColors[req.status]||T.textMuted)+"15", padding:"2px 8px", borderRadius:20 }}>{req.status}</span>
                   </div>
                 </div>
@@ -9523,7 +9523,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
           <div style={{ background:T.surface, border:`1px solid ${T.amber}30`, borderRadius:16, width:"100%", maxWidth:500, padding:28 }} onClick={e=>e.stopPropagation()}>
             <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>Finance Manager Signature</div>
             <div style={{ color:T.textMuted, fontSize:13, marginBottom:6 }}>{fmSignModal.voucher_number} — {fmSignModal.payee}</div>
-            <div style={{ color:T.amber, fontWeight:800, fontSize:18, marginBottom:20 }}>GHS {parseFloat(fmSignModal.amount||0).toLocaleString()}</div>
+            <div style={{ color:T.amber, fontWeight:800, fontSize:18, marginBottom:20 }}>{fmtMoney(fmSignModal.amount||0, fmSignModal.country||"Ghana")}</div>
             <SignatureInput label="Your Signature (Finance Manager)" canvasRef={voucherCanvasRef} onSignatureChange={setVoucherSignature} savedSignature={savedSigFM||user.saved_signature} isDrawing={vIsDrawing} setIsDrawing={setVIsDrawing} lastPos={vLastPos} setLastPos={setVLastPos} />
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={async () => {
@@ -18754,7 +18754,7 @@ const PaymentAuthorisationView = ({ user, onNavigate, activeCountry = "All" }) =
                   </div>
                 </div>
                 <div style={{ textAlign:"right", flexShrink:0, marginLeft:16 }}>
-                  <div style={{ color:T.teal, fontWeight:900, fontSize:18 }}>GHS {parseFloat(v.amount||0).toLocaleString()}</div>
+                  <div style={{ color:T.teal, fontWeight:900, fontSize:18 }}>{fmtMoney(v.amount||0, v.country||"Ghana")}</div>
                   <button onClick={e => { e.stopPropagation(); setVoucherSignModal(v); setVoucherSig(savedSig||user.saved_signature||""); }} style={{ background:`linear-gradient(135deg,${T.teal},#10B981)`, border:"none", color:"#fff", padding:"7px 16px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:800, marginTop:8 }}> Sign & Approve</button>
                 </div>
               </div>
@@ -18784,7 +18784,7 @@ const PaymentAuthorisationView = ({ user, onNavigate, activeCountry = "All" }) =
                     </div>
                   </div>
                   <div style={{ textAlign:"right", minWidth:160 }}>
-                    <div style={{ color:T.teal, fontWeight:900, fontSize:18 }}>GHS {parseFloat(req.amount||0).toLocaleString()}</div>
+                    <div style={{ color:T.teal, fontWeight:900, fontSize:18 }}>{fmtMoney(req.amount||0, req.country||"Ghana")}</div>
                     {isCEO && (
                       <div style={{ display:"flex", gap:8, marginTop:10, justifyContent:"flex-end" }}>
                         <button onClick={async () => {
@@ -19561,7 +19561,7 @@ const CashFlowView = ({ user, activeCountry = "All" }) => {
               {filteredVouchers.filter(v=>v.event_name===drillDown.name).map(v=>(
                 <div key={v.id} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:`1px solid ${T.border}22` }}>
                   <div><div style={{ color:T.textPrimary, fontSize:13, fontWeight:600 }}>{v.payee}</div><div style={{ color:T.textMuted, fontSize:11 }}>{v.voucher_number} · {v.description?.slice(0,40)}</div></div>
-                  <div style={{ color:T.amber, fontWeight:700 }}>GHS {parseFloat(v.amount||0).toLocaleString()}</div>
+                  <div style={{ color:T.amber, fontWeight:700 }}>{fmtMoney(v.amount||0, v.country||"Ghana")}</div>
                 </div>
               ))}
             </div>
@@ -19705,7 +19705,7 @@ const ZohoSyncStatusView = ({ user }) => {
             {unsyncedVouchers.slice(0,5).map(v => (
               <div key={v.id} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:`1px solid ${T.border}22` }}>
                 <span style={{ color:T.textPrimary, fontSize:12 }}>{v.voucher_number} — {v.payee}</span>
-                <span style={{ color:T.amber, fontSize:12, fontWeight:700 }}>GHS {parseFloat(v.amount||0).toLocaleString()}</span>
+                <span style={{ color:T.amber, fontSize:12, fontWeight:700 }}>{fmtMoney(v.amount||0, v.country||"Ghana")}</span>
               </div>
             ))}
           </div>
@@ -19741,7 +19741,7 @@ const ZohoSyncStatusView = ({ user }) => {
               <tr key={v.id} style={{ borderBottom:i<vouchers.length-1?`1px solid ${T.border}44`:"none" }}>
                 <td style={{ padding:"10px 12px", color:T.cyan, fontWeight:700, fontSize:12 }}>{v.voucher_number}</td>
                 <td style={{ padding:"10px 12px", color:T.textPrimary, fontSize:12 }}>{v.payee}</td>
-                <td style={{ padding:"10px 12px", color:T.amber, fontWeight:700, fontSize:12 }}>GHS {parseFloat(v.amount||0).toLocaleString()}</td>
+                <td style={{ padding:"10px 12px", color:T.amber, fontWeight:700, fontSize:12 }}>{fmtMoney(v.amount||0, v.country||"Ghana")}</td>
                 <td style={{ padding:"10px 12px" }}><span style={{ background:v.status==="paid"?"#10B98118":T.amber+"18", color:v.status==="paid"?"#10B981":T.amber, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700 }}>{v.status}</span></td>
                 <td style={{ padding:"10px 12px" }}><span style={{ background:v.zoho_id?T.teal+"18":T.red+"18", color:v.zoho_id?T.teal:T.red, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700 }}>{v.zoho_id?" In Zoho":"Not Synced"}</span></td>
               </tr>
@@ -22792,7 +22792,7 @@ const BudgetVsActualsView = ({ user }) => {
                     <div style={{ color:T.textMuted, fontSize:11 }}>{v.description}</div>
                   </div>
                   <div style={{ textAlign:"right" }}>
-                    <div style={{ color:T.amber, fontWeight:700, fontSize:13 }}>GHS {parseFloat(v.amount||0).toLocaleString()}</div>
+                    <div style={{ color:T.amber, fontWeight:700, fontSize:13 }}>{fmtMoney(v.amount||0, v.country||"Ghana")}</div>
                     <div style={{ color:v.status==="paid"?T.teal:T.amber, fontSize:10, fontWeight:700 }}>{v.status}</div>
                   </div>
                 </div>

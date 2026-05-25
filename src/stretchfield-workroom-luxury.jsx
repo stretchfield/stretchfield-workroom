@@ -4042,7 +4042,7 @@ const CRMView = ({ user }) => {
       supabase.from("crm_activities").select("*").order("created_at", { ascending: false }),
       supabase.from("proposals").select("*").order("created_at", { ascending: false }),
       supabase.from("profiles").select("*").not("role", "in", '("Client","Vendor")'),
-      supabase.from("clients").select("*"),
+      activeCountry === "All" ? supabase.from("clients").select("*") : supabase.from("clients").select("*").eq("country",activeCountry),
     ]);
     setLeads(l.data || []);
     setActivities(a.data || []);
@@ -4466,7 +4466,7 @@ const SMTasksView = ({ user }) => {
     const [t, m] = await Promise.all([
       supabase.from("tasks").select("*").eq("task_type", "sm").order("created_at", { ascending: false }),
       supabase.from("profiles").select("*").or('role.in.("CEO","Country Manager","Sales & Marketing"),has_sm_access.eq.true'),
-      supabase.from("client_payments").select("*").order("created_at", { ascending: false }),
+      activeCountry === "All" ? supabase.from("client_payments").select("*").order("created_at",{ascending:false}) : supabase.from("client_payments").select("*").eq("country",activeCountry).order("created_at",{ascending:false}),
     ]);
     setTasks(t.data || []);
     setMembers(m.data || []);
@@ -5049,9 +5049,9 @@ const EventTypeAnalysisView = ({ user }) => {
   const load = async () => {
     setLoading(true);
     const [{ data: rf }, { data: po }, { data: inv }] = await Promise.all([
-      supabase.from("rffs").select("*").not("event_type", "is", null),
-      supabase.from("purchase_orders").select("*"),
-      supabase.from("vendor_invoices").select("*"),
+      activeCountry === "All" ? supabase.from("rffs").select("*").not("event_type","is",null) : supabase.from("rffs").select("*").not("event_type","is",null).eq("country",activeCountry),
+      activeCountry === "All" ? supabase.from("purchase_orders").select("*") : supabase.from("purchase_orders").select("*").eq("country",activeCountry),
+      activeCountry === "All" ? supabase.from("vendor_invoices").select("*") : supabase.from("vendor_invoices").select("*").eq("country",activeCountry),
     ]);
     setRffs(rf || []);
     setPOs(po || []);
@@ -5253,7 +5253,7 @@ const StrategyMapView = ({ user }) => {
   const [loading, setLoading] = useState(false);
 
   const load = async () => {
-    const { data: ev } = await supabase.from("projects").select("*").order("event_date", { ascending: false });
+    const { data: ev } = await (activeCountry === "All" ? supabase.from("projects").select("*").order("event_date",{ascending:false}) : supabase.from("projects").select("*").eq("country",activeCountry).order("event_date",{ascending:false})) });
     setEvents(ev || []);
   };
 
@@ -5775,7 +5775,7 @@ const ZohoBooksView = ({ user }) => {
 
   const loadLocalData = async () => {
     const [{ data: cl }, { data: vn }] = await Promise.all([
-      supabase.from("clients").select("*").order("name"),
+      activeCountry === "All" ? supabase.from("clients").select("*").order("name") : supabase.from("clients").select("*").eq("country",activeCountry).order("name"),
       supabase.from("profiles").select("*").eq("role", "Vendor"),
     ]);
     setClients(cl || []);
@@ -10371,9 +10371,9 @@ const VendorScorecardsView = ({ user, activeCountry = "All" }) => {
   const load = async () => {
     const [v, e, s, aw] = await Promise.all([
       supabase.from("profiles").select("*").eq("role", "Vendor"),
-      supabase.from("projects").select("*"),
+      activeCountry === "All" ? supabase.from("projects").select("*") : supabase.from("projects").select("*").eq("country", activeCountry),
       supabase.from("vendor_scorecards").select("*").order("created_at", { ascending: false }),
-      supabase.from("rff_awards").select("*, rffs(project_id, event_name)"),
+      activeCountry === "All" ? supabase.from("rff_awards").select("*, rffs(project_id, event_name)") : supabase.from("rff_awards").select("*, rffs(project_id, event_name)").eq("country", activeCountry),
     ]);
     setVendors(v.data || []);
     setEvents(e.data || []);
@@ -10570,8 +10570,8 @@ const VendorRatingsView = ({ user }) => {
     const [v, s, r, e] = await Promise.all([
       supabase.from("profiles").select("*").eq("role", "Vendor"),
       supabase.from("vendor_scorecards").select("*").order("created_at", { ascending: false }),
-      supabase.from("rffs").select("*").eq("status", "quote-approved"),
-      supabase.from("projects").select("*").order("created_at", { ascending: false }),
+      activeCountry === "All" ? supabase.from("rffs").select("*").eq("status","quote-approved") : supabase.from("rffs").select("*").eq("status","quote-approved").eq("country",activeCountry),
+      activeCountry === "All" ? supabase.from("projects").select("*").order("created_at",{ascending:false}) : supabase.from("projects").select("*").eq("country",activeCountry).order("created_at",{ascending:false}),
     ]);
     setVendors(v.data || []);
     setScorecards(s.data || []);
@@ -11411,10 +11411,10 @@ const PurchaseOrderView = ({ user, activeCountry = "All" }) => {
 
   const load = async () => {
     const [{ data: aw }, { data: po }, { data: rf }, { data: ev }, { data: vp }, { data: va }] = await Promise.all([
-      supabase.from("rff_awards").select("*").in("status", ["confirmed","po_created","invoiced","paid"]),
+      activeCountry === "All" ? supabase.from("rff_awards").select("*").in("status",["confirmed","po_created","invoiced","paid"]) : supabase.from("rff_awards").select("*").in("status",["confirmed","po_created","invoiced","paid"]).eq("country",activeCountry),
       activeCountry === "All" ? supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }) : supabase.from("purchase_orders").select("*").eq("country", activeCountry).order("created_at", { ascending: false }),
-      supabase.from("rffs").select("*"),
-      supabase.from("projects").select("*"),
+      activeCountry === "All" ? supabase.from("rffs").select("*") : supabase.from("rffs").select("*").eq("country",activeCountry),
+      activeCountry === "All" ? supabase.from("projects").select("*") : supabase.from("projects").select("*").eq("country",activeCountry),
       supabase.from("profiles").select("id,name,email,phone,company_name,service_category").eq("role","Vendor"),
       supabase.from("vendor_applications").select("*").eq("status","login-created"),
     ]);
@@ -12149,8 +12149,8 @@ const QuotesReceivedView = ({ user, activeCountry = "All" }) => {
 
   const load = async () => {
     const [{ data: ev }, { data: rf }, { data: asn }] = await Promise.all([
-      supabase.from("projects").select("*").order("name"),
-      supabase.from("rffs").select("*").eq("approved", true).order("created_at", { ascending: false }),
+      activeCountry === "All" ? supabase.from("projects").select("*").order("name") : supabase.from("projects").select("*").eq("country",activeCountry).order("name"),
+      activeCountry === "All" ? supabase.from("rffs").select("*").eq("approved",true).order("created_at",{ascending:false}) : supabase.from("rffs").select("*").eq("approved",true).eq("country",activeCountry).order("created_at",{ascending:false}),
       supabase.from("rff_vendor_assignments").select("*").order("created_at", { ascending: false }),
     ]);
     setEvents(ev || []);
@@ -12327,8 +12327,8 @@ const QuoteComparisonView = ({ user, activeCountry = "All" }) => {
 
   const load = async () => {
     const [{ data: ev }, { data: aw }, { data: co }, { data: vp }, { data: va }] = await Promise.all([
-      supabase.from("projects").select("*").order("name"),
-      supabase.from("rff_awards").select("*"),
+      activeCountry === "All" ? supabase.from("projects").select("*").order("name") : supabase.from("projects").select("*").eq("country",activeCountry).order("name"),
+      activeCountry === "All" ? supabase.from("rff_awards").select("*") : supabase.from("rff_awards").select("*").eq("country",activeCountry),
       supabase.from("change_orders").select("*"),
       supabase.from("profiles").select("*").eq("role", "Vendor"),
       supabase.from("vendor_applications").select("*").eq("status", "login-created"),
@@ -19787,11 +19787,11 @@ const CashFlowView = ({ user, activeCountry = "All" }) => {
   useEffect(() => {
     const load = async () => {
       const [{ data: ev }, { data: cp }, { data: vi }, { data: sp }, { data: vo }] = await Promise.all([
-        supabase.from("projects").select("*").order("event_date", { ascending: false }),
+        activeCountry === "All" ? supabase.from("projects").select("*").order("event_date",{ascending:false}) : supabase.from("projects").select("*").eq("country",activeCountry).order("event_date",{ascending:false}),
         activeCountry === "All" ? supabase.from("client_payments").select("*").order("payment_date", { ascending: false }) : supabase.from("client_payments").select("*").eq("country", activeCountry).order("payment_date", { ascending: false }),
-        supabase.from("vendor_invoices").select("*").eq("status","paid").order("created_at", { ascending: false }),
-        supabase.from("staff_payment_requests").select("*").eq("status","paid").order("submitted_at", { ascending: false }),
-        supabase.from("payment_vouchers").select("*").in("status",["paid","approved"]).order("created_at", { ascending: false }),
+        activeCountry === "All" ? supabase.from("vendor_invoices").select("*").eq("status","paid").order("created_at",{ascending:false}) : supabase.from("vendor_invoices").select("*").eq("status","paid").eq("country",activeCountry).order("created_at",{ascending:false}),
+        activeCountry === "All" ? supabase.from("staff_payment_requests").select("*").eq("status","paid").order("submitted_at",{ascending:false}) : supabase.from("staff_payment_requests").select("*").eq("status","paid").eq("country",activeCountry).order("submitted_at",{ascending:false}),
+        activeCountry === "All" ? supabase.from("payment_vouchers").select("*").in("status",["paid","approved"]).order("created_at",{ascending:false}) : supabase.from("payment_vouchers").select("*").in("status",["paid","approved"]).eq("country",activeCountry).order("created_at",{ascending:false}), ascending: false }),
       ]);
       setEvents(ev||[]);
       setClientPayments(cp||[]);
@@ -19996,9 +19996,9 @@ const ZohoSyncStatusView = ({ user }) => {
   useEffect(() => {
     const load = async () => {
       const [{ data: vo }, { data: cp }, { data: vi }] = await Promise.all([
-        supabase.from("payment_vouchers").select("*").order("created_at", { ascending: false }),
-        supabase.from("client_payments").select("*").order("created_at", { ascending: false }),
-        supabase.from("vendor_invoices").select("*").order("created_at", { ascending: false }),
+        activeCountry === "All" ? supabase.from("payment_vouchers").select("*").order("created_at",{ascending:false}) : supabase.from("payment_vouchers").select("*").eq("country",activeCountry).order("created_at",{ascending:false}),
+        activeCountry === "All" ? supabase.from("client_payments").select("*").order("created_at",{ascending:false}) : supabase.from("client_payments").select("*").eq("country",activeCountry).order("created_at",{ascending:false}),
+        activeCountry === "All" ? supabase.from("vendor_invoices").select("*").order("created_at",{ascending:false}) : supabase.from("vendor_invoices").select("*").eq("country",activeCountry).order("created_at",{ascending:false}),
       ]);
       setVouchers(vo||[]);
       setClientPayments(cp||[]);
@@ -20109,10 +20109,10 @@ const AuditTrailView = ({ user }) => {
     const load = async () => {
       const [{ data: no }, { data: vo }, { data: sr }, { data: po }, { data: cp }] = await Promise.all([
         supabase.from("notifications").select("*").order("created_at", { ascending: false }).limit(200),
-        supabase.from("payment_vouchers").select("*").order("created_at", { ascending: false }),
-        supabase.from("staff_payment_requests").select("*").order("submitted_at", { ascending: false }),
+        activeCountry === "All" ? supabase.from("payment_vouchers").select("*").order("created_at",{ascending:false}) : supabase.from("payment_vouchers").select("*").eq("country",activeCountry).order("created_at",{ascending:false}),
+        activeCountry === "All" ? supabase.from("staff_payment_requests").select("*").order("submitted_at",{ascending:false}) : supabase.from("staff_payment_requests").select("*").eq("country",activeCountry).order("submitted_at",{ascending:false}),
         activeCountry === "All" ? supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }) : supabase.from("purchase_orders").select("*").eq("country", activeCountry).order("created_at", { ascending: false }),
-        supabase.from("client_payments").select("*").order("created_at", { ascending: false }),
+        activeCountry === "All" ? supabase.from("client_payments").select("*").order("created_at",{ascending:false}) : supabase.from("client_payments").select("*").eq("country",activeCountry).order("created_at",{ascending:false}),
       ]);
       setNotifications(no||[]);
       setVouchers(vo||[]);
@@ -20388,8 +20388,8 @@ const ApprovalQueueView = ({ user, onNavigate }) => {
 
   const load = async () => {
     const [{ data: rf }, { data: po }, { data: sr }] = await Promise.all([
-      supabase.from("rffs").select("*,projects(name)").eq("approved", false).order("created_at", { ascending: false }),
-      supabase.from("purchase_orders").select("*").in("status",["vm_signed","finance_signed","fully_signed","pending_ceo"]).order("created_at", { ascending: false }),
+      activeCountry === "All" ? supabase.from("rffs").select("*,projects(name)").eq("approved",false).order("created_at",{ascending:false}) : supabase.from("rffs").select("*,projects(name)").eq("approved",false).eq("country",activeCountry).order("created_at",{ascending:false}),
+      activeCountry === "All" ? supabase.from("purchase_orders").select("*").in("status",["vm_signed","finance_signed","fully_signed", : supabase.from("purchase_orders").select("*").eq("country",activeCountry).in("status",["vm_signed","finance_signed","fully_signed","pending_ceo"]).order("created_at", { ascending: false }),
       activeCountry === "All"
         ? supabase.from("staff_payment_requests").select("*").eq("status","pending_ceo").order("submitted_at", { ascending: false })
         : supabase.from("staff_payment_requests").select("*").eq("country", activeCountry).eq("status","pending_ceo").order("submitted_at", { ascending: false }),

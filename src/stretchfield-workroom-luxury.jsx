@@ -7214,9 +7214,12 @@ const PublicVendorApplicationForm = () => {
         {/* Header */}
         <div style={{ background:"#060B14", borderRadius:"16px 16px 0 0", padding:"28px 36px", marginBottom:0 }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-            <div>
-              <div style={{ color:"#00C8FF", fontSize:18, fontWeight:900, letterSpacing:"0.05em" }}>STRETCHFIELD</div>
-              <div style={{ color:"#5A6E8A", fontSize:11, marginTop:2 }}>Vendor Registration Form</div>
+            <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+              <img src="/stretchfield-logo.png" alt="Stretchfield" style={{ height:44, objectFit:"contain" }} />
+              <div>
+                <div style={{ color:"#00C8FF", fontSize:18, fontWeight:900, letterSpacing:"0.05em" }}>STRETCHFIELD</div>
+                <div style={{ color:"#5A6E8A", fontSize:11, marginTop:2 }}>Vendor Registration Form</div>
+              </div>
             </div>
             <div style={{ color:"#5A6E8A", fontSize:11, textAlign:"right" }}>
               <div style={{ color:"#E8F0FF", fontWeight:700 }}>Step {step} of 3</div>

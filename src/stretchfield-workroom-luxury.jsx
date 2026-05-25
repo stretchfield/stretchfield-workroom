@@ -13068,8 +13068,14 @@ const RFFApprovalsView = ({ user, activeCountry = "All" }) => {
   const [allRffs, setAllRffs] = useState([]);
 
   const load = () => {
-      (!activeCountry || activeCountry === "All") ? supabase.from("rffs").select("*").order("created_at", { ascending: false }) : supabase.from("rffs").select("*").eq("country", activeCountry).order("created_at", { ascending: false }),
-    supabase.from("rffs").select("*").eq("approved", true).order("created_at", { ascending: false }).then(({ data }) => setAllRffs(data || []));
+    const rffsQuery = (!activeCountry || activeCountry === "All")
+      ? supabase.from("rffs").select("*").order("created_at", { ascending: false })
+      : supabase.from("rffs").select("*").eq("country", activeCountry).order("created_at", { ascending: false });
+    rffsQuery.then(({ data }) => setRffs(data || []));
+    const allRffsQuery = (!activeCountry || activeCountry === "All")
+      ? supabase.from("rffs").select("*").eq("approved", true).order("created_at", { ascending: false })
+      : supabase.from("rffs").select("*").eq("approved", true).eq("country", activeCountry).order("created_at", { ascending: false });
+    allRffsQuery.then(({ data }) => setAllRffs(data || []));
     supabase.from("rff_budgets").select("*").then(({ data }) => setExistingBudgets(data || []));
   };
 

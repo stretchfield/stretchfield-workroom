@@ -7448,13 +7448,6 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
 
           {/* Right — controls */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, justifyContent: "flex-end" }}>
-            {["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) && (
-              <div style={{ display:"flex", gap:4, background:T.surface, border:"1px solid "+T.border, borderRadius:20, padding:"3px 4px" }}>
-                {["All","Ghana","Nigeria"].map(c => (
-                  <button key={c} onClick={() => setActiveCountry(c)} style={{ padding:"3px 10px", borderRadius:16, border:"none", background:activeCountry===c?T.cyan:"none", color:activeCountry===c?"#060B14":T.textMuted, fontSize:10, fontWeight:700, cursor:"pointer", transition:"all 0.15s" }}>{c}</button>
-                ))}
-              </div>
-            )}
             {currentUser.role === "Country Manager" && (
               <div style={{ background:T.cyan+"15", border:"1px solid "+T.cyan+"30", borderRadius:20, padding:"3px 10px" }}>
                 <span style={{ color:T.cyan, fontSize:10, fontWeight:800 }}>{currentUser.country} Only</span>

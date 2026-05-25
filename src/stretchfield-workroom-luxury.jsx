@@ -5253,7 +5253,8 @@ const StrategyMapView = ({ user }) => {
   const [loading, setLoading] = useState(false);
 
   const load = async () => {
-    const { data: ev } = await (activeCountry === "All" ? supabase.from("projects").select("*").order("event_date",{ascending:false}) : supabase.from("projects").select("*").eq("country",activeCountry).order("event_date",{ascending:false})) });
+    const evQ = activeCountry === "All" ? supabase.from("projects").select("*").order("event_date",{ascending:false}) : supabase.from("projects").select("*").eq("country",activeCountry).order("event_date",{ascending:false});
+    const { data: ev } = await evQ;
     setEvents(ev || []);
   };
 

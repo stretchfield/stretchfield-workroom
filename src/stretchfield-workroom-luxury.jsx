@@ -888,15 +888,41 @@ const getNavItems = (role, user) => {
     base.push({ id: "vendors", label: "Vendors & RFFs", icon: "" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "" }, { id: "rff-approvals", label: "RFF Approvals", icon: "" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "" }, { id: "quotes-received", label: "Quotes Received", icon: "" }, { id: "quote-comparison", label: "Quote Comparison", icon: "" }, { id: "contract-awards", label: "Contract Awards", icon: "" }, { id: "scorecards", label: "Vendor Scorecards", icon: "" }, { id: "vendor-analytics", label: "Vendor Analytics", icon: "" }, { id: "purchase-orders", label: "Sign Purchase Orders", icon: "" }, { id: "event-reports", label: "Event Reports", icon: "" });
   }
   if (role === "Country Manager") {
-    base.push(
-      { id: "finance", label: "Finance Operations", icon: "" },
-      { id: "payment-authorisation", label: "Payment Authorisation", icon: "" },
-      { id: "client-payments", label: "Client Payments", icon: "" },
-      { id: "vendor-invoices", label: "Vendor Invoices", icon: "" },
-      { id: "cash-flow", label: "Cash Flow", icon: "" },
-      { id: "sales-dashboard", label: "Sales Dashboard", icon: "" },
-      { id: "client-health", label: "Client Health", icon: "" },
-    );
+    return [
+      { id: "dashboard", label: "Dashboard", group: true },
+      { id: "grp-events", label: "Events & Operations", group: true, children: [
+        { id: "events", label: "Events" },
+        { id: "event-reports", label: "Event Reports" },
+      ]},
+      { id: "grp-crm", label: "CRM & Sales", group: true, children: [
+        { id: "opportunities", label: "Opportunities" },
+        { id: "crm", label: "CRM / Leads" },
+        { id: "crm-insights", label: "CRM Insights" },
+        { id: "sm-tasks", label: "S&M Tasks" },
+      ]},
+      { id: "grp-vendors", label: "Vendors & Procurement", group: true, children: [
+        { id: "vendors", label: "Vendors & RFFs" },
+        { id: "vendor-onboarding", label: "Vendor Applications" },
+        { id: "rff-approvals", label: "RFF Approvals" },
+        { id: "vendor-assignment", label: "Vendor Assignment" },
+        { id: "quotes-received", label: "Quotes Received" },
+        { id: "quote-comparison", label: "Quote Comparison" },
+        { id: "contract-awards", label: "Contract Awards" },
+        { id: "scorecards", label: "Vendor Scorecards" },
+        { id: "purchase-orders", label: "Sign Purchase Orders" },
+      ]},
+      { id: "grp-finance", label: "Finance", group: true, children: [
+        { id: "finance", label: "Finance Operations" },
+        { id: "payment-authorisation", label: "Payment Authorisation" },
+        { id: "client-payments", label: "Client Payments" },
+        { id: "vendor-invoices", label: "Vendor Invoices" },
+        { id: "cash-flow", label: "Cash Flow" },
+        { id: "sales-dashboard", label: "Sales Dashboard" },
+        { id: "client-health", label: "Client Health" },
+      ]},
+      { id: "notifications", label: "Notifications", group: true },
+      { id: "calendar", label: "Calendar", group: true },
+    ];
   }
   if (role === "CEO") {
     base.push({ id: "vendor-onboarding", label: "Vendor Applications", icon: "" });
@@ -3271,7 +3297,7 @@ const UsersView = ({ user }) => {
   );
 };
 
-const ClientsView = ({ user }) => {
+const ClientsView = ({ user, activeCountry = "All" }) => {
   const [selectedClientPortal, setSelectedClientPortal] = useState(null);
   const [clients, setClients] = useState([]);
   const [profileEmails, setProfileEmails] = useState([]);
@@ -7491,7 +7517,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "sm-tasks": return <SMTasksView user={currentUser} />;
       case "strategy-overview": return <StrategyOverviewView />;
       case "opportunities": return <OpportunitiesView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
-      case "client-financials": return <CEOClientFinanceView user={currentUser} />;
+      case "client-financials": return <CEOClientFinanceView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "client-finance": return <ClientFinanceView user={currentUser} />;
       case "feedback-summary": return <FeedbackView userRole={currentUser.role} />;
       case "finance": return <FinanceDashboard user={currentUser} onTab={setActiveTab} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
@@ -7502,13 +7528,13 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "staff-payment-rates": return <StaffPaymentRatesView user={currentUser} />;
       case "client-payments": return <ClientPaymentsView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "payment-directory": return <PaymentDirectoryView user={currentUser} />;
-      case "budget-vs-actuals": return <BudgetVsActualsView user={currentUser} />;
+      case "budget-vs-actuals": return <BudgetVsActualsView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "cash-flow": return <CashFlowView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "zoho-sync-status": return <ZohoSyncStatusView user={currentUser} />;
-      case "audit-trail": return <AuditTrailView user={currentUser} />;
+      case "audit-trail": return <AuditTrailView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "board-report": return <BoardReportView user={currentUser} />;
       case "strategic-goals": return <StrategicGoalsView user={currentUser} />;
-      case "client-health": return <ClientHealthView user={currentUser} />;
+      case "client-health": return <ClientHealthView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "team-performance": return <TeamPerformanceView user={currentUser} />;
       case "risk-register": return <RiskRegisterView user={currentUser} />;
       case "decision-log": return <DecisionLogView user={currentUser} />;
@@ -17487,7 +17513,7 @@ const EventImpactView = ({ user, project }) => {
 
 
 
-const CEOClientFinanceView = ({ user }) => {
+const CEOClientFinanceView = ({ user, activeCountry = "All" }) => {
   const [clients, setClients] = useState([]);
   const [events, setEvents] = useState([]);
   const [budgets, setBudgets] = useState([]);
@@ -20096,7 +20122,7 @@ const ZohoSyncStatusView = ({ user }) => {
   );
 };
 
-const AuditTrailView = ({ user }) => {
+const AuditTrailView = ({ user, activeCountry = "All" }) => {
   const [notifications, setNotifications] = useState([]);
   const [vouchers, setVouchers] = useState([]);
   const [staffRequests, setStaffRequests] = useState([]);
@@ -21263,7 +21289,7 @@ const StrategicGoalsView = ({ user }) => {
   );
 };
 
-const ClientHealthView = ({ user }) => {
+const ClientHealthView = ({ user, activeCountry = "All" }) => {
   const [clients, setClients] = useState([]);
   const [events, setEvents] = useState([]);
   const [satisfaction, setSatisfaction] = useState([]);
@@ -22953,7 +22979,7 @@ const OutreachPlannerView = ({ user }) => {
   );
 };
 
-const BudgetVsActualsView = ({ user }) => {
+const BudgetVsActualsView = ({ user, activeCountry = "All" }) => {
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [budgets, setBudgets] = useState([]);

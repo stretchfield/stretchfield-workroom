@@ -1124,7 +1124,7 @@ const PageHeader = ({ title, subtitle }) => (
 );
 
 //  DASHBOARDS 
-const CEODashboard = ({ onTab, user }) => {
+const CEODashboard = ({ onTab, user, activeCountry = "All" }) => {
   const [events, setEvents] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -1142,7 +1142,10 @@ const CEODashboard = ({ onTab, user }) => {
   const [clientPayments, setClientPayments] = useState([]);
   const [loading, setLoading] = React.useState(true);
   const [internalPortalEvent, setInternalPortalEvent] = useState(null);
-  const [viewCountry, setViewCountry] = useState(user.role === 'Country Manager' ? user.country : 'All');
+  const [viewCountry, setViewCountry] = useState(user.role === 'Country Manager' ? user.country : (activeCountry||'All'));
+
+  // Sync with parent activeCountry
+  React.useEffect(() => { if (activeCountry && user.role !== 'Country Manager') setViewCountry(activeCountry); }, [activeCountry]);
   const [bankRequested, setBankRequested] = useState(false);
   const [bankSubmitted, setBankSubmitted] = useState(false);
   const [showBankForm, setShowBankForm] = useState(false);
@@ -6679,7 +6682,7 @@ const ClientPaymentsView = ({ user, activeCountry = "All" }) => {
   const load = async () => {
     const [{ data: p }, { data: c }, { data: e }, { data: sr }] = await Promise.all([
       user.role === 'Country Manager'
-        ? supabase.from("client_payments").select("*").eq("country", user.country).order("payment_date", { ascending: false })
+        ? supabase.from("client_payments").select("*").eq("country", activeCountry).order("payment_date", { ascending: false })
         : supabase.from("client_payments").select("*").order("payment_date", { ascending: false }),
       supabase.from("clients").select("*").order("name"),
       supabase.from("projects").select("*").order("name"),
@@ -7156,9 +7159,9 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
     const role = currentUser.role;
     switch (activeTab) {
       case "dashboard":
-        if (role === "CEO") return <CEODashboard onTab={setActiveTab} user={currentUser} />;
+        if (role === "CEO") return <CEODashboard onTab={setActiveTab} user={currentUser} activeCountry={activeCountry} />;
         if (role === "Board of Directors") return <BoardDashboard user={currentUser} />;
-        if (role === "Country Manager") return <CEODashboard onTab={setActiveTab} user={currentUser} />;
+        if (role === "Country Manager") return <CEODashboard onTab={setActiveTab} user={currentUser} activeCountry={user.country} />;
         if (role === "Vendor") return <VendorDashboard user={currentUser} />;
         if (role === "Client") return <ClientDashboard user={currentUser} />;
         if (role === "Finance Manager") return <FinanceManagerDashboard user={currentUser} onTab={setActiveTab} />;
@@ -7761,7 +7764,7 @@ const CRMDashboardCEO = ({ user, activeCountry = "All" }) => {
   const load = async () => {
     const [l, t, m, cp] = await Promise.all([
       user.role === 'Country Manager'
-        ? supabase.from("opportunities").select("*").eq("country", user.country)
+      activeCountry === "All" ? supabase.from("opportunities").select("*") : supabase.from("opportunities").select("*").eq("country", activeCountry),
         : supabase.from("opportunities").select("*"),
       supabase.from("sales_targets").select("*").order("created_at", { ascending: false }),
       supabase.from("profiles").select("*").or('role.in.("CEO","Country Manager","Sales & Marketing"),has_sm_access.eq.true'),
@@ -19207,7 +19210,7 @@ const SalesDashboardView = ({ user, activeCountry = "All" }) => {
   const load = async () => {
     const [{ data: p }, { data: t }, { data: r }] = await Promise.all([
       user.role === 'Country Manager'
-        ? supabase.from("client_payments").select("*").eq("country", user.country).order("payment_date", { ascending: false })
+      activeCountry === "All" ? supabase.from("client_payments").select("*").order("payment_date", { ascending: false }) : supabase.from("client_payments").select("*").eq("country", activeCountry).order("payment_date", { ascending: false }),
         : supabase.from("client_payments").select("*").order("payment_date", { ascending: false }),
       supabase.from("sales_targets").select("*"),
       supabase.from("profiles").select("id,name,role,has_sm_access").or('role.in.("CEO","Sales & Marketing"),has_sm_access.eq.true'),
@@ -19397,7 +19400,7 @@ const CashFlowView = ({ user, activeCountry = "All" }) => {
       const [{ data: ev }, { data: cp }, { data: vi }, { data: sp }, { data: vo }] = await Promise.all([
         supabase.from("projects").select("*").order("event_date", { ascending: false }),
         user.role === 'Country Manager'
-        ? supabase.from("client_payments").select("*").eq("country", user.country).order("payment_date", { ascending: false })
+      activeCountry === "All" ? supabase.from("client_payments").select("*").order("payment_date", { ascending: false }) : supabase.from("client_payments").select("*").eq("country", activeCountry).order("payment_date", { ascending: false }),
         : supabase.from("client_payments").select("*").order("payment_date", { ascending: false }),
         supabase.from("vendor_invoices").select("*").eq("status","paid").order("created_at", { ascending: false }),
         supabase.from("staff_payment_requests").select("*").eq("status","paid").order("submitted_at", { ascending: false }),

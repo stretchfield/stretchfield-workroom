@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, getUserProfile } from './supabase';
 import Login from './Login';
-import StretchfieldWorkRoom from './stretchfield-workroom-luxury';
+import StretchfieldWorkRoom, { PublicVendorApplicationForm } from './stretchfield-workroom-luxury';
 
 const T = {
   bg: "#060B14", cyan: "#00C8FF", teal: "#00E5C8", border: "#0D1F36",
@@ -22,7 +22,6 @@ function SetPasswordForm({ onDone }) {
     setError('');
     const { error: err } = await supabase.auth.updateUser({ password });
     if (err) { setError(err.message); setSaving(false); return; }
-    // Save password hash to profile
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
       await supabase.from('profiles').update({ password_hash: password }).eq('id', session.user.id);
@@ -35,14 +34,10 @@ function SetPasswordForm({ onDone }) {
   return (
     <div style={{ minHeight: '100vh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ background: T.surface, border: '1px solid ' + T.border, borderRadius: 16, width: '100%', maxWidth: 420, padding: 36 }}>
-        {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
           <img src="/logo512.png" alt="Stretchfield" style={{ height: 36, width: 36 }} />
-          <div>
-            <div style={{ color: T.cyan, fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>Stretchfield WorkRoom</div>
-          </div>
+          <div style={{ color: T.cyan, fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>Stretchfield WorkRoom</div>
         </div>
-
         {success ? (
           <div style={{ textAlign: 'center', padding: '20px 0' }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>✓</div>
@@ -53,37 +48,16 @@ function SetPasswordForm({ onDone }) {
           <>
             <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 22, marginBottom: 6 }}>Set Your Password</div>
             <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 24 }}>Choose a secure password for your WorkRoom account.</div>
-
             <div style={{ marginBottom: 14 }}>
               <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: 5 }}>New Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="Min 8 characters"
-                style={{ width: '100%', padding: '11px 14px', background: T.bg, border: '1px solid ' + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 14, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
-              />
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 8 characters" style={{ width: '100%', padding: '11px 14px', background: T.bg, border: '1px solid ' + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 14, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
             </div>
-
             <div style={{ marginBottom: 20 }}>
               <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: 5 }}>Confirm Password</label>
-              <input
-                type="password"
-                value={confirm}
-                onChange={e => setConfirm(e.target.value)}
-                placeholder="Repeat password"
-                onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-                style={{ width: '100%', padding: '11px 14px', background: T.bg, border: '1px solid ' + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 14, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
-              />
+              <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Repeat password" onKeyDown={e => e.key === 'Enter' && handleSubmit()} style={{ width: '100%', padding: '11px 14px', background: T.bg, border: '1px solid ' + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 14, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
             </div>
-
             {error && <div style={{ background: '#EF444415', border: '1px solid #EF444430', borderRadius: 8, padding: '10px 14px', color: '#EF4444', fontSize: 13, marginBottom: 16 }}>{error}</div>}
-
-            <button
-              onClick={handleSubmit}
-              disabled={saving || !password || !confirm}
-              style={{ width: '100%', padding: '13px', background: 'linear-gradient(135deg,#00C8FF,#00E5C8)', border: 'none', borderRadius: 8, color: '#060B14', fontWeight: 800, fontSize: 15, cursor: saving ? 'not-allowed' : 'pointer', opacity: (!password || !confirm) ? 0.6 : 1 }}
-            >
+            <button onClick={handleSubmit} disabled={saving || !password || !confirm} style={{ width: '100%', padding: '13px', background: 'linear-gradient(135deg,#00C8FF,#00E5C8)', border: 'none', borderRadius: 8, color: '#060B14', fontWeight: 800, fontSize: 15, cursor: saving ? 'not-allowed' : 'pointer', opacity: (!password || !confirm) ? 0.6 : 1 }}>
               {saving ? 'Setting Password...' : 'Set Password & Log In →'}
             </button>
           </>
@@ -99,39 +73,28 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
+  // Public routes - no auth required
+  const path = window.location.pathname;
+  const search = window.location.search;
+  if (path === '/applyvendor' || search.includes('apply=vendor')) {
+    return <PublicVendorApplicationForm />;
+  }
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) {
-        getUserProfile(session.user.id).then(p => {
-          setProfile(p);
-          setLoading(false);
-        });
-      } else {
-        setLoading(false);
-      }
+        getUserProfile(session.user.id).then(p => { setProfile(p); setLoading(false); });
+      } else { setLoading(false); }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setIsPasswordRecovery(true);
-        setSession(session);
-        setLoading(false);
-        return;
-      }
-      if (event === 'USER_UPDATED') {
-        setIsPasswordRecovery(false);
-      }
+      if (event === 'PASSWORD_RECOVERY') { setIsPasswordRecovery(true); setSession(session); setLoading(false); return; }
+      if (event === 'USER_UPDATED') { setIsPasswordRecovery(false); }
       setSession(session);
       if (session) {
-        getUserProfile(session.user.id).then(p => {
-          setProfile(p);
-          setLoading(false);
-        });
-      } else {
-        setProfile(null);
-        setLoading(false);
-      }
+        getUserProfile(session.user.id).then(p => { setProfile(p); setLoading(false); });
+      } else { setProfile(null); setLoading(false); }
     });
 
     return () => subscription.unsubscribe();
@@ -152,12 +115,8 @@ function App() {
     </div>
   );
 
-  // Show password reset form
   if (isPasswordRecovery && session) {
-    return <SetPasswordForm onDone={() => {
-      setIsPasswordRecovery(false);
-      getUserProfile(session.user.id).then(p => setProfile(p));
-    }} />;
+    return <SetPasswordForm onDone={() => { setIsPasswordRecovery(false); getUserProfile(session.user.id).then(p => setProfile(p)); }} />;
   }
 
   if (!session) return <Login />;

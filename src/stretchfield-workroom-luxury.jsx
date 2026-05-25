@@ -1740,7 +1740,7 @@ const VendorManagerDashboard = ({ user, activeCountry = "All" }) => {
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <button onClick={() => {}} style={{ background: `linear-gradient(135deg,${T.cyan},${T.teal})`, border: "none", color: "#060B14", padding: "10px 20px", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>Vendor Assignment →</button>
-            <button onClick={() => { const link = window.location.origin + "/?apply=vendor"; navigator.clipboard.writeText(link); alert("Link copied! Share via WhatsApp or Email:\n\n" + link); }} style={{ background:T.surface, border:"1px solid "+T.border, color:T.textMuted, padding:"10px 18px", borderRadius:10, cursor:"pointer", fontWeight:700, fontSize:12 }}>Copy Vendor Form Link</button>
+            <button onClick={() => { const link = window.location.origin + "/applyvendor"; navigator.clipboard.writeText(link); alert("Link copied! Share via WhatsApp or Email:\n\n" + link); }} style={{ background:T.surface, border:"1px solid "+T.border, color:T.textMuted, padding:"10px 18px", borderRadius:10, cursor:"pointer", fontWeight:700, fontSize:12 }}>Copy Vendor Form Link</button>
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginTop: 24, paddingTop: 20, borderTop: `1px solid ${T.border}44` }}>
@@ -7356,6 +7356,7 @@ const PublicVendorApplicationForm = () => {
   );
 };
 
+export { PublicVendorApplicationForm };
 export default function StretchfieldWorkRoom({ user: propUser, profile: propProfile, onLogout }) {
   // Public vendor application route
   if (typeof window !== 'undefined' && window.location.search.includes('apply=vendor')) {

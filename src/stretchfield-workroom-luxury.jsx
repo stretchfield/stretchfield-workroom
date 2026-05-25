@@ -8915,7 +8915,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
   React.useEffect(() => { supabase.from("profiles").select("saved_signature").eq("id", user.id).single().then(({ data }) => { if (data?.saved_signature) setSavedSigFM(data.saved_signature); }); }, [user.id]);
   const [vIsDrawing, setVIsDrawing] = useState(false);
   const [vLastPos, setVLastPos] = useState(null);
-  const [vForm, setVForm] = useState({ payment_type: 'project', payee: '', description: '', amount: '', currency: activeCountry === 'Nigeria' ? 'NGN' : getCurrency(activeCountry), project_id: '', event_name: '', invoice_ref: '', department: '', welfare_type: '', admin_type: '', statutory_type: '', due_date: '', notes: '' });
+  const [vForm, setVForm] = useState({ payment_type: 'project', payee: '', description: '', amount: '', currency: 'GHS', project_id: '', event_name: '', invoice_ref: '', department: '', welfare_type: '', admin_type: '', statutory_type: '', due_date: '', notes: '' });
 
   // Estimate form
   const [estimateModal, setEstimateModal] = useState(null);
@@ -19710,7 +19710,6 @@ const SalesDashboardView = ({ user, activeCountry = "All" }) => {
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
                 <div>
                   <div style={{ color:T.textPrimary, fontWeight:900, fontSize:16 }}>{rep.name}</div>
-                  <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{rep.role}</div>
                 </div>
                 <div style={{ textAlign:"right" }}>
                   <div style={{ color:perfColor, fontWeight:900, fontSize:24 }}>{rep.pct}%</div>
@@ -19771,7 +19770,7 @@ const SalesDashboardView = ({ user, activeCountry = "All" }) => {
                 <td style={{ padding:"12px 14px", color:T.textPrimary, fontWeight:700, fontSize:13 }}>{p.client_name}</td>
                 <td style={{ padding:"12px 14px", color:T.textMuted, fontSize:12 }}>{p.event_name||"—"}</td>
                 <td style={{ padding:"12px 14px", color:T.teal, fontWeight:800, fontSize:13 }}>{fmtMoney(p.amount||0, p.country||activeCountry)}</td>
-                <td style={{ padding:"12px 14px" }}>{p.sales_rep_name?<span style={{ color:T.cyan, fontWeight:700, fontSize:12 }}>{p.sales_rep_name}</span>:<span style={{ color:T.red, fontSize:11 }}>Unassigned</span>}</td>
+                <td style={{ padding:"12px 14px" }}><span style={{ color:T.cyan, fontWeight:700, fontSize:12 }}>{p.sales_rep_name ? "Rep Assigned" : "—"}</span></td>
                 <td style={{ padding:"12px 14px", color:T.textMuted, fontSize:12, textAlign:"center" }}>{p.commission_rate||5}%</td>
                 <td style={{ padding:"12px 14px", color:T.amber, fontWeight:800, fontSize:13 }}>{fmtMoney(p.commission_amount||0, p.country||activeCountry)}</td>
                 <td style={{ padding:"12px 14px" }}><span style={{ background:T.cyan+"18", color:T.cyan, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700 }}>{p.payment_method||"—"}</span></td>

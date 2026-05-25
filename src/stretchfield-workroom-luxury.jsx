@@ -7456,7 +7456,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
             <span style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.04em" }}>{currentUser.name}</span>
             <div style={{ background: T.cyan + "18", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "3px 12px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>{currentUser.role}</div>
             <button onClick={() => setActiveTab("notifications")} style={{ position: "relative", background: activeTab === "notifications" ? T.cyan + "18" : "none", border: "1px solid " + (activeTab === "notifications" ? T.cyan + "40" : T.border), color: activeTab === "notifications" ? T.cyan : T.textMuted, width: 34, height: 34, borderRadius: 8, cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}>
-              
+              🔔
               {unreadCount > 0 && (
                 <span style={{ position: "absolute", top: -5, right: -5, background: T.red, color: "#fff", fontSize: 9, fontWeight: 900, borderRadius: "50%", width: 17, height: 17, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid " + T.bgDeep, boxShadow: `0 0 8px ${T.red}80` }}>
                   {unreadCount > 9 ? "9+" : unreadCount}

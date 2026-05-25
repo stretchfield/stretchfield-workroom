@@ -7183,7 +7183,7 @@ const PublicVendorApplicationForm = () => {
     // Notify VM
     const { data: vms } = await supabase.from("profiles").select("id").eq("role","Vendor Manager");
     for (const vm of vms||[]) {
-      await supabase.from("notifications").insert({ user_id: vm.id, title: "New Vendor Application — "+form.vendor_name, message: form.vendor_name+" has submitted a vendor application for "+form.vendor_type+". Review in Vendor Applications.", type: "rff" });
+      await supabase.from("notifications").insert({ user_id: vm.id, title: "New Vendor Application — "+form.vendor_name, message: form.vendor_name+" has submitted a vendor application for "+form.vendor_type+". Review in Vendor Applications.", type: "vendor_application" });
     }
     setSaving(false); setSubmitted(true);
   };
@@ -8365,7 +8365,7 @@ const NotificationsView = ({ user, onNavigate }) => {
 
       // Vendor onboarding
       } else if (t.includes("vendor application") || t.includes("vendor approved") || t.includes("portal login")) {
-        resolvedTarget = isCEORole ? "vendor-onboarding" : "vendors";
+        resolvedTarget = "vendor-onboarding";
 
       // Fallback by type
       } else if (note.type === "rff") {
@@ -14020,7 +14020,7 @@ const VendorAssignmentPanel = ({ rffId, quoteDeadline }) => {
 const VendorOnboardingView = ({ user, activeCountry = "All" }) => {
   const getDefaultTab = () => {
     if (user?.role === "CEO") return "applications";
-    if (user?.role === "Vendor Manager") return "approved";
+    if (user?.role === "Vendor Manager") return "external";
     return "form";
   };
   const [tab, setTab] = useState(getDefaultTab());
@@ -14044,7 +14044,7 @@ const VendorOnboardingView = ({ user, activeCountry = "All" }) => {
   const tabs = user?.role === "CEO"
     ? [{ id: "applications", label: "Applications" }, { id: "active-vendors", label: "Active Vendors" }]
     : user?.role === "Vendor Manager"
-    ? [{ id: "form", label: "New Vendor Form" }, { id: "submitted", label: "Submitted" }, { id: "approved", label: "Approved — Create Login" }]
+    ? [{ id: "external", label: "New Applications" }, { id: "form", label: "Add Vendor Manually" }, { id: "approved", label: "Approved — Create Login" }]
     : [{ id: "form", label: "New Vendor Form" }, { id: "submitted", label: "Submitted Applications" }];
   const [vendorProfiles, setVendorProfiles] = useState([]);
   const [editVendorModal, setEditVendorModal] = useState(null);
@@ -14238,6 +14238,60 @@ const VendorOnboardingView = ({ user, activeCountry = "All" }) => {
       )}
 
       {/* Submitted Applications — Vendor Manager */}
+      {tab === "external" && user?.role === "Vendor Manager" && (
+        <div>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+            <div>
+              <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16 }}>New External Applications</div>
+              <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>Vendors who submitted via the public registration link</div>
+            </div>
+            <button onClick={() => { const link = window.location.origin + "/applyvendor"; navigator.clipboard.writeText(link); alert("Link copied!\n\n" + link); }} style={{ background:T.surface, border:"1px solid "+T.border, color:T.textMuted, padding:"8px 14px", borderRadius:8, cursor:"pointer", fontSize:11, fontWeight:700 }}>Copy Form Link</button>
+          </div>
+          {apps.filter(a => a.status === "submitted").length === 0 ? (
+            <div style={{ textAlign:"center", padding:40, color:T.textMuted, fontSize:13 }}>No new external applications yet.</div>
+          ) : apps.filter(a => a.status === "submitted").map(app => (
+            <div key={app.id} style={{ background:T.surface, border:"1px solid "+T.amber+"30", borderLeft:"3px solid "+T.amber, borderRadius:10, padding:"16px 18px", marginBottom:10 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
+                <div>
+                  <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15 }}>{app.vendor_name}</div>
+                  <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{app.vendor_type} · {app.contact_person}</div>
+                  <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>{app.country} · {app.contact_email} · {app.phone}</div>
+                  <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>Submitted {new Date(app.created_at).toLocaleDateString("en-GB", {day:"numeric",month:"short",year:"numeric"})}</div>
+                </div>
+                <span style={{ background:T.amber+"18", color:T.amber, border:"1px solid "+T.amber+"30", borderRadius:20, padding:"3px 12px", fontSize:10, fontWeight:800 }}>NEW</span>
+              </div>
+              {/* Bank details */}
+              {app.bank_name && (
+                <div style={{ background:T.bg, border:"1px solid "+T.border, borderRadius:8, padding:"10px 14px", marginBottom:10, display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
+                  <div><div style={{ color:T.textMuted, fontSize:10, fontWeight:700 }}>BANK</div><div style={{ color:T.textPrimary, fontSize:12 }}>{app.bank_name}</div></div>
+                  <div><div style={{ color:T.textMuted, fontSize:10, fontWeight:700 }}>ACCOUNT NAME</div><div style={{ color:T.textPrimary, fontSize:12 }}>{app.bank_account_name||"—"}</div></div>
+                  <div><div style={{ color:T.textMuted, fontSize:10, fontWeight:700 }}>ACCOUNT NO</div><div style={{ color:T.textPrimary, fontSize:12 }}>{app.account_no||"—"}</div></div>
+                </div>
+              )}
+              <div style={{ display:"flex", gap:8 }}>
+                <button onClick={async () => {
+                  await supabase.from("vendor_applications").update({ status:"pending", submitted_by: user.id }).eq("id", app.id);
+                  // Notify CEO
+                  const { data: ceos } = await supabase.from("profiles").select("id").eq("role","CEO");
+                  for (const ceo of ceos||[]) {
+                    await supabase.from("notifications").insert({ user_id:ceo.id, title:"Vendor Application — "+app.vendor_name, message:"VM has reviewed and approved "+app.vendor_name+" ("+app.vendor_type+") for onboarding. Awaiting your final approval.", type:"vendor_application", resource_id:app.id });
+                  }
+                  load();
+                  alert(app.vendor_name + " approved and sent to CEO for final approval.");
+                }} style={{ background:"linear-gradient(135deg,"+T.teal+",#10B981)", border:"none", color:"#fff", padding:"8px 18px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:12 }}>Approve & Send to CEO</button>
+                <button onClick={() => setEditApp(app)} style={{ background:T.cyan+"15", border:"1px solid "+T.cyan+"30", color:T.cyan, padding:"8px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700 }}>Edit Details</button>
+                <button onClick={async () => {
+                  const reason = window.prompt("Reason for rejection:");
+                  if (!reason) return;
+                  await supabase.from("vendor_applications").update({ status:"declined", ceo_notes:reason }).eq("id", app.id);
+                  load();
+                }} style={{ background:T.red+"15", border:"1px solid "+T.red+"30", color:T.red, padding:"8px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700 }}>Reject</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {tab === "submitted" && (
         <div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

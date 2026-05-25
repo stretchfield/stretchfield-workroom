@@ -4096,7 +4096,8 @@ const CRMView = ({ user, activeCountry = "All" }) => {
     await supabase.from("leads").insert({
       company: form.company, contact_name: form.contact_name, email: form.email,
       phone: form.phone, source: form.source, value: parseFloat(form.value) || 0,
-      notes: form.notes, status: form.status || "new", created_by: user.id,
+      notes: form.notes, status: form.status || "new", created_by: user?.id,
+      country: user?.country || activeCountry || 'Ghana',
       assigned_to: form.assigned_to || null, assigned_name: form.assigned_name || "",
       event_name: form.event_name || null, event_type: form.event_type || null,
       event_date: form.event_date || null,
@@ -7553,7 +7554,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "esl-performance": return <ESLPerformanceView user={currentUser} />;
       case "outreach-planner": return <OutreachPlannerView user={currentUser} />;
       case "ceo-broadcast": return <CEOBroadcastView user={currentUser} />;
-      case "approval-queue": return <ApprovalQueueView user={currentUser} onNavigate={setActiveTab} />;
+      case "approval-queue": return <ApprovalQueueView user={currentUser} onNavigate={setActiveTab} activeCountry={activeCountry} />;
       case "vendor-ratings": return <VendorRatingsView user={currentUser} />;
       case "rff-approvals": return <RFFApprovalsView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "vendor-assignment": return <VendorAssignmentView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
@@ -20418,7 +20419,7 @@ const CEOBroadcastView = ({ user }) => {
   );
 };
 
-const ApprovalQueueView = ({ user, onNavigate }) => {
+const ApprovalQueueView = ({ user, onNavigate, activeCountry = "All" }) => {
   const [rffs, setRffs] = useState([]);
   const [pos, setPOs] = useState([]);
   const [staffRequests, setStaffRequests] = useState([]);
@@ -20435,7 +20436,7 @@ const ApprovalQueueView = ({ user, onNavigate }) => {
     setRffs(rf||[]); setPOs(po||[]); setStaffRequests(sr||[]);
     setLoading(false);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeCountry]);
 
   const totalPending = rffs.length + pos.filter(p=>["vm_signed","finance_signed","fully_signed"].includes(p.status)).length + staffRequests.length;
 
@@ -20467,7 +20468,10 @@ const ApprovalQueueView = ({ user, onNavigate }) => {
           {rffs.slice(0,3).map(r => (
             <div key={r.id} style={{ background:T.surface, border:`1px solid ${T.amber}30`, borderLeft:`3px solid ${T.amber}`, borderRadius:10, padding:"14px 18px", marginBottom:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
               <div>
-                <div style={{ color:T.textPrimary, fontWeight:700, fontSize:13 }}>{r.title}</div>
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <div style={{ color:T.textPrimary, fontWeight:700, fontSize:13 }}>{r.title}</div>
+                  <span style={{ background:(r.country||"Ghana")==="Nigeria"?"#10B98120":T.amber+"20", color:(r.country||"Ghana")==="Nigeria"?"#10B981":T.amber, borderRadius:20, padding:"1px 8px", fontSize:10, fontWeight:800 }}>{(r.country||"Ghana")==="Nigeria"?"NG":"GH"}</span>
+                </div>
                 <div style={{ color:T.textMuted, fontSize:12 }}>{r.projects?.name} · {r.event_name}</div>
                 <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>{new Date(r.created_at).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}</div>
               </div>
@@ -24482,7 +24486,7 @@ const EventsView = ({ user, userRole, activeCountry = "All" }) => {
   const [clients, setClients] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ name: '', client: '', client_id: '', event_date: '', event_end_date: '', deadline: '', phase: 'Planning', event_category: '', country: 'Ghana', assigned_to: '', assigned_to_name: '' });
+  const [form, setForm] = useState({ name: '', client: '', client_id: '', event_date: '', event_end_date: '', deadline: '', phase: 'Planning', event_category: '', country: user?.country || activeCountry || 'Ghana', assigned_to: '', assigned_to_name: '' });
   const [saving, setSaving] = useState(false);
   const [taskModalEvent, setTaskModalEvent] = useState(null);
   const [impactEvent, setImpactEvent] = useState(null);
@@ -24532,7 +24536,7 @@ const EventsView = ({ user, userRole, activeCountry = "All" }) => {
       tasks: 0,
       completed: 0,
       event_category: form.event_category,
-      country: form.country || user.country || 'Ghana',
+      country: form.country || user?.country || activeCountry || 'Ghana',
       assigned_to: form.assigned_to || null,
       assigned_to_name: form.assigned_to_name || null,
     });

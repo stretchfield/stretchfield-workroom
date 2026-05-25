@@ -1233,7 +1233,7 @@ const CEODashboard = ({ onTab, user, activeCountry = "All" }) => {
       if (allBroadcasts && allBroadcasts.length > 0) {
         const { data: reads } = await supabase.from("ceo_broadcast_reads").select("broadcast_id").eq("user_id", user.id);
         const readIds = new Set((reads||[]).map(r => r.broadcast_id));
-        setUnreadBroadcasts((allBroadcasts||[]).filter(b => b.sent_by !== user.id && !readIds.has(b.id)));
+        setUnreadBroadcasts((allBroadcasts||[]).filter(b => b.sent_by !== user?.id && !readIds.has(b.id)));
       }
       // Check bank details
       const { data: bp } = await supabase.from("profiles").select("bank_name,bank_account_number,bank_branch,bank_account_name,mobile_money_number,bank_details_requested").eq("id", user.id).single();
@@ -1352,10 +1352,10 @@ const CEODashboard = ({ onTab, user, activeCountry = "All" }) => {
             </div>
           </div>
           <div style={{ display: "flex", flexDirection:"column", gap: 10, alignItems:"flex-end" }}>
-            {user.role === 'Country Manager' && (
+            {user?.role === 'Country Manager' && (
               <div style={{ background:T.cyan+"15", border:"1px solid "+T.cyan+"30", borderRadius:20, padding:"5px 14px", display:"flex", alignItems:"center", gap:6 }}>
-                <span style={{ fontSize:14 }}>{user.country==="Nigeria"?"NG":"GH"}</span>
-                <span style={{ color:T.cyan, fontSize:11, fontWeight:800 }}>{user.country} Operations</span>
+                <span style={{ fontSize:14 }}>{user?.country==="Nigeria"?"NG":"GH"}</span>
+                <span style={{ color:T.cyan, fontSize:11, fontWeight:800 }}>{user?.country} Operations</span>
               </div>
             )}
             <div style={{ display:"flex", gap:10 }}>
@@ -1691,7 +1691,7 @@ const VendorManagerDashboard = ({ user, activeCountry = "All" }) => {
     });
   };
 
-  useEffect(() => { loadVM(); }, [user.id, activeCountry]);
+  useEffect(() => { loadVM(); }, [user?.id, activeCountry]);
 
 
 
@@ -1761,7 +1761,7 @@ const VendorManagerDashboard = ({ user, activeCountry = "All" }) => {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
           <div>
             <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>{dateStr}</div>
-            <h1 style={{ margin: "0 0 6px", fontSize: 28, fontWeight: 900, color: T.textPrimary, letterSpacing: "-0.03em" }}>{greeting}, {user.name.split(" ")[0]}.</h1>
+            <h1 style={{ margin: "0 0 6px", fontSize: 28, fontWeight: 900, color: T.textPrimary, letterSpacing: "-0.03em" }}>{greeting}, {user?.name.split(" ")[0]}.</h1>
             <div style={{ color: T.textMuted, fontSize: 14 }}>Vendor network · {vendors.length} vendors · {events.length} active events</div>
           </div>
           <div style={{ display: "flex", gap: 10 }}>

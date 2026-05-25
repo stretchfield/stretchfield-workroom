@@ -7416,9 +7416,21 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{ padding: "0 24px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${T.border}`, background: T.bgDeep, flexShrink: 0, position: "relative" }}>
-          {/* Left — breadcrumb */}
+          {/* Left — country toggle or breadcrumb */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
-            <span style={{ color: T.textMuted, fontSize: 11, letterSpacing: "0.04em", whiteSpace: "nowrap" }}>Stretchfield / {currentUser.name.split(" ")[0]}</span>
+            {["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? (
+              <div style={{ display:"flex", gap:3, alignItems:"center" }}>
+                <button onClick={() => setActiveCountry("All")} style={{ padding:"4px 10px", borderRadius:16, border:"1px solid "+(activeCountry==="All"?T.cyan:T.border), background:activeCountry==="All"?T.cyan:"none", color:activeCountry==="All"?"#060B14":T.textMuted, fontSize:10, fontWeight:700, cursor:"pointer" }}>All</button>
+                <button onClick={() => setActiveCountry("Ghana")} title="Ghana" style={{ padding:"4px 8px", borderRadius:16, border:"1px solid "+(activeCountry==="Ghana"?T.cyan:T.border), background:activeCountry==="Ghana"?T.cyan+"20":"none", fontSize:14, cursor:"pointer" }}>🇬🇭</button>
+                <button onClick={() => setActiveCountry("Nigeria")} title="Nigeria" style={{ padding:"4px 8px", borderRadius:16, border:"1px solid "+(activeCountry==="Nigeria"?T.cyan:T.border), background:activeCountry==="Nigeria"?T.cyan+"20":"none", fontSize:14, cursor:"pointer" }}>🇳🇬</button>
+              </div>
+            ) : currentUser.role === "Country Manager" ? (
+              <div style={{ background:T.cyan+"15", border:"1px solid "+T.cyan+"30", borderRadius:20, padding:"4px 12px" }}>
+                <span style={{ color:T.cyan, fontSize:11, fontWeight:800 }}>{currentUser.country === "Nigeria" ? "🇳🇬" : "🇬🇭"} {currentUser.country}</span>
+              </div>
+            ) : (
+              <span style={{ color: T.textMuted, fontSize: 11, letterSpacing: "0.04em", whiteSpace: "nowrap" }}>Stretchfield / {currentUser.name.split(" ")[0]}</span>
+            )}
           </div>
 
           {/* Centre — tagline */}
@@ -8547,7 +8559,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
   const [saving, setSaving] = useState(false);
   const [staffList, setStaffList] = useState([]);
   const [vendors, setVendors] = useState([]);
-  const [countryFilter, setCountryFilter] = useState("All");
+
 
   // Voucher form
   const [voucherModal, setVoucherModal] = useState(null);

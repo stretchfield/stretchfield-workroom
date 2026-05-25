@@ -1622,9 +1622,9 @@ const VendorManagerDashboard = ({ user }) => {
 
   const loadVM = () => {
     Promise.all([
-      user.role === 'Country Manager'
-        ? supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", user.country).order("name")
-        : supabase.from("profiles").select("*").eq("role", "Vendor").order("name"), // FM & VM see all vendors
+      vmCountryFilter === "All"
+        ? supabase.from("profiles").select("*").eq("role", "Vendor").order("name")
+        : supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", vmCountryFilter).order("name"),
       supabase.from("tasks").select("*").eq("assignee_id", user.id),
       supabase.from("projects").select("*").eq("status", "active"),
       supabase.from("notifications").select("*").eq("user_id", user.id).eq("read", false).limit(5),
@@ -1657,7 +1657,7 @@ const VendorManagerDashboard = ({ user }) => {
     });
   };
 
-  useEffect(() => { loadVM(); }, [user.id]);
+  useEffect(() => { loadVM(); }, [user.id, vmCountryFilter]);
 
 
 
@@ -6664,7 +6664,7 @@ const PaymentDirectoryView = ({ user }) => {
   );
 };
 
-const ClientPaymentsView = ({ user }) => {
+const ClientPaymentsView = ({ user, activeCountry = "All" }) => {
   const [payments, setPayments] = useState([]);
   const [clients, setClients] = useState([]);
   const [events, setEvents] = useState([]);
@@ -7108,6 +7108,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
   const [unreadCount, setUnreadCount] = useState(0);
   const [pendingResourceId, setPendingResourceId] = useState(null);
   const [showAccountSettings, setShowAccountSettings] = useState(false);
+  const [activeCountry, setActiveCountry] = useState("All");
   const isMobile = useIsMobile();
 
   const buildUser = (p) => p ? {
@@ -7165,32 +7166,32 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
         if (role === "Strategy & Events Lead") return <StaffDashboard user={currentUser} />;
         if (role === "Vendor Manager") return <VendorManagerDashboard user={currentUser} />;
         return <StaffDashboard user={currentUser} />;
-      case "events": return <EventsView user={currentUser} userRole={currentUser.role} />;
-      case "tasks": return <EventsView user={currentUser} userRole={currentUser.role} />;
+      case "events": return <EventsView user={currentUser} userRole={currentUser.role} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
+      case "tasks": return <EventsView user={currentUser} userRole={currentUser.role} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "vendors": return <VendorsView />;
       case "invoices": return <InvoicesView />;
-      case "clients": return <ClientsView user={currentUser} />;
+      case "clients": return <ClientsView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "users": return <UsersView user={currentUser} />;
       case "email-test": return <EmailTestPanel user={currentUser} />;
-      case "crm": return <CRMView user={currentUser} />;
-      case "crm-insights": return ["CEO","Country Manager"].includes(currentUser.role) ? <CRMDashboardCEO user={currentUser} /> : <CRMDashboardSM user={currentUser} />;
-      case "sales-dashboard": return <SalesDashboardView user={currentUser} />;
+      case "crm": return <CRMView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
+      case "crm-insights": return ["CEO","Country Manager"].includes(currentUser.role) ? <CRMDashboardCEO user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} /> : <CRMDashboardSM user={currentUser} />;
+      case "sales-dashboard": return <SalesDashboardView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "sm-tasks": return <SMTasksView user={currentUser} />;
       case "strategy-overview": return <StrategyOverviewView />;
-      case "opportunities": return <OpportunitiesView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
+      case "opportunities": return <OpportunitiesView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "client-financials": return <CEOClientFinanceView user={currentUser} />;
       case "client-finance": return <ClientFinanceView user={currentUser} />;
       case "feedback-summary": return <FeedbackView userRole={currentUser.role} />;
-      case "finance": return <FinanceDashboard user={currentUser} onTab={setActiveTab} />;
+      case "finance": return <FinanceDashboard user={currentUser} onTab={setActiveTab} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "finance-approvals": return <FinanceApprovalsView user={currentUser} />;
       case "scorecards": return <VendorScorecardsView user={currentUser} />;
       case "vendor-analytics": return <VendorAnalyticsView user={currentUser} />;
-      case "payment-authorisation": return <PaymentAuthorisationView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
+      case "payment-authorisation": return <PaymentAuthorisationView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "staff-payment-rates": return <StaffPaymentRatesView user={currentUser} />;
-      case "client-payments": return <ClientPaymentsView user={currentUser} />;
+      case "client-payments": return <ClientPaymentsView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "payment-directory": return <PaymentDirectoryView user={currentUser} />;
       case "budget-vs-actuals": return <BudgetVsActualsView user={currentUser} />;
-      case "cash-flow": return <CashFlowView user={currentUser} />;
+      case "cash-flow": return <CashFlowView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "zoho-sync-status": return <ZohoSyncStatusView user={currentUser} />;
       case "audit-trail": return <AuditTrailView user={currentUser} />;
       case "board-report": return <BoardReportView user={currentUser} />;
@@ -7234,9 +7235,9 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "quote-comparison": return <QuoteComparisonView user={currentUser} />;
       case "contract-awards": return <ContractAwardApprovalView user={currentUser} />;
       case "gig-confirmation": return <GigConfirmationView user={currentUser} />;
-      case "purchase-orders": return <PurchaseOrderView user={currentUser} />;
+      case "purchase-orders": return <PurchaseOrderView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "po-signing": return <PurchaseOrderView user={currentUser} />;
-      case "vendor-invoices": return <FinanceInvoicesView user={currentUser} />;
+      case "vendor-invoices": return <FinanceInvoicesView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "vendor-invoices-submit": return <VendorInvoiceView user={currentUser} />;
       case "notifications": return <NotificationsView user={currentUser} onNavigate={(tab, resourceId) => { setActiveTab(tab); if (resourceId) setPendingResourceId(resourceId); }} />;
       case "rffs": return <VendorRFFsView user={currentUser} />;
@@ -7444,6 +7445,18 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
 
           {/* Right — controls */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, justifyContent: "flex-end" }}>
+            {["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) && (
+              <div style={{ display:"flex", gap:4, background:T.surface, border:"1px solid "+T.border, borderRadius:20, padding:"3px 4px" }}>
+                {["All","Ghana","Nigeria"].map(c => (
+                  <button key={c} onClick={() => setActiveCountry(c)} style={{ padding:"3px 10px", borderRadius:16, border:"none", background:activeCountry===c?T.cyan:"none", color:activeCountry===c?"#060B14":T.textMuted, fontSize:10, fontWeight:700, cursor:"pointer", transition:"all 0.15s" }}>{c}</button>
+                ))}
+              </div>
+            )}
+            {currentUser.role === "Country Manager" && (
+              <div style={{ background:T.cyan+"15", border:"1px solid "+T.cyan+"30", borderRadius:20, padding:"3px 10px" }}>
+                <span style={{ color:T.cyan, fontSize:10, fontWeight:800 }}>{currentUser.country} Only</span>
+              </div>
+            )}
             <span style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.04em" }}>{currentUser.name}</span>
             <div style={{ background: T.cyan + "18", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "3px 12px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>{currentUser.role}</div>
             <button onClick={() => setActiveTab("notifications")} style={{ position: "relative", background: activeTab === "notifications" ? T.cyan + "18" : "none", border: "1px solid " + (activeTab === "notifications" ? T.cyan + "40" : T.border), color: activeTab === "notifications" ? T.cyan : T.textMuted, width: 34, height: 34, borderRadius: 8, cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}>
@@ -7734,7 +7747,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
   );
 }
 
-const CRMDashboardCEO = ({ user }) => {
+const CRMDashboardCEO = ({ user, activeCountry = "All" }) => {
   const [opportunities, setOpportunitys] = useState([]);
   const [targets, setTargets] = useState([]);
   const [members, setMembers] = useState([]);
@@ -8370,9 +8383,9 @@ const FinanceManagerDashboard = ({ user, onTab }) => {
 
   const load = async () => {
     const [v, est, pc, db, ci, vi, po, ev] = await Promise.all([
-      ['Country Manager'].includes(user.role)
-        ? supabase.from('payment_vouchers').select('*').eq('country', user.country).order('created_at', { ascending: false })
-        : supabase.from('payment_vouchers').select('*').order('created_at', { ascending: false }),
+      activeCountry === "All"
+        ? supabase.from('payment_vouchers').select('*').order('created_at', { ascending: false })
+        : supabase.from('payment_vouchers').select('*').eq('country', activeCountry).order('created_at', { ascending: false }),
       supabase.from('estimates').select('*').order('created_at', { ascending: false }),
       supabase.from('petty_cash').select('*').limit(1).maybeSingle(),
       supabase.from('daily_balances').select('*').order('report_date', { ascending: false }).limit(1),
@@ -8539,7 +8552,7 @@ const FinanceManagerDashboard = ({ user, onTab }) => {
 
 
 
-const FinanceDashboard = ({ user, onTab }) => {
+const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
   const [financeTab, setFinanceTab] = useState("overview");
   const [staffRequests, setStaffRequests] = useState([]);
   const [vouchers, setVouchers] = useState([]);
@@ -8610,9 +8623,9 @@ const FinanceDashboard = ({ user, onTab }) => {
     setPOs(po.data || []);
     setClientInvoices(ci.data || []);
     setVendorInvoices(vi.data || []);
-    const srQuery = ['Country Manager'].includes(user.role)
-      ? supabase.from("staff_payment_requests").select("*").eq("country", user.country).order("submitted_at", { ascending: false })
-      : supabase.from("staff_payment_requests").select("*").order("submitted_at", { ascending: false });
+    const srQuery = activeCountry === "All"
+      ? supabase.from("staff_payment_requests").select("*").order("submitted_at", { ascending: false })
+      : supabase.from("staff_payment_requests").select("*").eq("country", activeCountry).order("submitted_at", { ascending: false });
     const { data: sr } = await srQuery;
     setStaffRequests(sr || []);
     const { data: sl } = await supabase.from("profiles").select("id,name,role").in("role",["Finance Manager","Vendor Manager","Strategy & Events Lead","CEO","Board of Directors","Sales & Marketing"]);
@@ -8622,16 +8635,22 @@ const FinanceDashboard = ({ user, onTab }) => {
     setFinanceLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeCountry]);
 
   useEffect(() => {
     if (financeTab === 'staff-requests') {
-      supabase.from("staff_payment_requests").select("*").order("submitted_at", { ascending: false }).then(({ data }) => setStaffRequests(data || []));
+      const q = activeCountry === "All"
+        ? supabase.from("staff_payment_requests").select("*").order("submitted_at", { ascending: false })
+        : supabase.from("staff_payment_requests").select("*").eq("country", activeCountry).order("submitted_at", { ascending: false });
+      q.then(({ data }) => setStaffRequests(data || []));
     }
     if (financeTab === 'vouchers') {
-      supabase.from("payment_vouchers").select("*").order("created_at", { ascending: false }).then(({ data }) => setVouchers(data || []));
+      const q = activeCountry === "All"
+        ? supabase.from("payment_vouchers").select("*").order("created_at", { ascending: false })
+        : supabase.from("payment_vouchers").select("*").eq("country", activeCountry).order("created_at", { ascending: false });
+      q.then(({ data }) => setVouchers(data || []));
     }
-  }, [financeTab]);
+  }, [financeTab, activeCountry]);
 
   // Auto-generate voucher number
   const genVoucherNumber = async (type) => {
@@ -11055,7 +11074,7 @@ const generateVoucherPDF = (voucher, approver, financeManager) => {
   return html;
 };
 
-const PurchaseOrderView = ({ user }) => {
+const PurchaseOrderView = ({ user, activeCountry = "All" }) => {
   const [awards, setAwards] = useState([]);
   const [pos, setPOs] = useState([]);
   const [rffs, setRffs] = useState([]);
@@ -11083,7 +11102,7 @@ const PurchaseOrderView = ({ user }) => {
   const load = async () => {
     const [{ data: aw }, { data: po }, { data: rf }, { data: ev }, { data: vp }, { data: va }] = await Promise.all([
       supabase.from("rff_awards").select("*").in("status", ["confirmed","po_created","invoiced","paid"]),
-      supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }),
+      activeCountry === "All" ? supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }) : supabase.from("purchase_orders").select("*").eq("country", activeCountry).order("created_at", { ascending: false }),
       supabase.from("rffs").select("*"),
       supabase.from("projects").select("*"),
       supabase.from("profiles").select("id,name,email,phone,company_name,service_category").eq("role","Vendor"),
@@ -11684,7 +11703,7 @@ const VendorInvoiceView = ({ user }) => {
   );
 };
 
-const FinanceInvoicesView = ({ user }) => {
+const FinanceInvoicesView = ({ user, activeCountry = "All" }) => {
   const [invoices, setInvoices] = useState([]);
   const [saving, setSaving] = useState(false);
   const [rejectModal, setRejectModal] = useState(null);
@@ -11692,7 +11711,10 @@ const FinanceInvoicesView = ({ user }) => {
   const [rejecting, setRejecting] = useState(false);
 
   const load = async () => {
-    const { data } = await supabase.from("vendor_invoices").select("*").order("created_at", { ascending: false });
+    const invQuery = activeCountry === "All"
+      ? supabase.from("vendor_invoices").select("*").order("created_at", { ascending: false })
+      : supabase.from("vendor_invoices").select("*").eq("country", activeCountry).order("created_at", { ascending: false });
+    const { data } = await invQuery;
     setInvoices(data || []);
   };
 
@@ -13158,9 +13180,9 @@ const VendorApprovalsPanel = ({ user, onLoginCreated }) => {
   const load = async () => {
     const [{ data: appData }, { data: vpData }] = await Promise.all([
       supabase.from("vendor_applications").select("*").order("created_at", { ascending: false }),
-      user.role === 'Country Manager'
-        ? supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", user.country).order("name")
-        : supabase.from("profiles").select("*").eq("role", "Vendor").order("name"), // FM & VM see all vendors
+      vmCountryFilter === "All"
+        ? supabase.from("profiles").select("*").eq("role", "Vendor").order("name")
+        : supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", vmCountryFilter).order("name"),
     ]);
     setApps(appData || []);
     setVendorProfiles(vpData || []);
@@ -13744,9 +13766,9 @@ const VendorOnboardingView = ({ user }) => {
   const load = async () => {
     const [{ data: appData }, { data: vpData }] = await Promise.all([
       supabase.from("vendor_applications").select("*").order("created_at", { ascending: false }),
-      user.role === 'Country Manager'
-        ? supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", user.country).order("name")
-        : supabase.from("profiles").select("*").eq("role", "Vendor").order("name"), // FM & VM see all vendors
+      vmCountryFilter === "All"
+        ? supabase.from("profiles").select("*").eq("role", "Vendor").order("name")
+        : supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", vmCountryFilter).order("name"),
     ]);
     setApps(appData || []);
     setVendorProfiles(vpData || []);
@@ -14513,7 +14535,7 @@ const FinanceApprovalsView = ({ user }) => {
 };
 
 
-const OpportunitiesView = ({ user, onNavigate }) => {
+const OpportunitiesView = ({ user, onNavigate, activeCountry = "All" }) => {
   const [opportunities, setOpportunities] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [search, setSearch] = useState("");
@@ -18469,7 +18491,7 @@ Use professional, consultative language that positions Stretchfield as a strateg
   );
 };
 
-const PaymentAuthorisationView = ({ user, onNavigate }) => {
+const PaymentAuthorisationView = ({ user, onNavigate, activeCountry = "All" }) => {
   const [auths, setAuths] = useState([]);
   const [staffRequests, setStaffRequests] = useState([]);
   const [expandedReq, setExpandedReq] = useState(null);
@@ -18513,12 +18535,12 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
     try {
       const [au, sr, pv, vp, sp, aw, rf, inv, va] = await Promise.all([
         supabase.from("payment_authorisations").select("*").order("created_at", { ascending: false }),
-        user.role === 'Country Manager'
-        ? supabase.from("staff_payment_requests").select("*").eq("country", user.country).eq("status","pending_ceo").order("submitted_at", { ascending: false })
-        : supabase.from("staff_payment_requests").select("*").eq("status","pending_ceo").order("submitted_at", { ascending: false }),
-        user.role === 'Country Manager'
-        ? supabase.from("payment_vouchers").select("*").eq("country", user.country).or("status.eq.pending_approval,status.eq.approved,status.eq.fm_signed").order("created_at", { ascending: false })
-        : supabase.from("payment_vouchers").select("*").or("status.eq.pending_approval,status.eq.approved,status.eq.fm_signed").order("created_at", { ascending: false }),
+        activeCountry === "All"
+        ? supabase.from("staff_payment_requests").select("*").eq("status","pending_ceo").order("submitted_at", { ascending: false })
+        : supabase.from("staff_payment_requests").select("*").eq("country", activeCountry).eq("status","pending_ceo").order("submitted_at", { ascending: false }),
+        activeCountry === "All"
+        ? supabase.from("payment_vouchers").select("*").or("status.eq.pending_approval,status.eq.approved,status.eq.fm_signed").order("created_at", { ascending: false })
+        : supabase.from("payment_vouchers").select("*").eq("country", activeCountry).or("status.eq.pending_approval,status.eq.approved,status.eq.fm_signed").order("created_at", { ascending: false }),
         supabase.from("profiles").select("*").eq("role", "Vendor"),
         supabase.from("profiles").select("*").in("role", ["Finance Manager","Vendor Manager","Strategy & Events Lead","CEO","Board of Directors","Sales & Marketing","Country Manager"]),
         supabase.from("rff_awards").select("*"),
@@ -18538,7 +18560,7 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
     } catch(e) { console.error("PaymentAuth load error:", e); }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeCountry]);
 
   // Get payee details based on selection
   const getPayeeDetails = (payeeId, payeeType) => {
@@ -19173,7 +19195,7 @@ const EmailTestPanel = ({ user }) => {
 };
 
 
-const SalesDashboardView = ({ user }) => {
+const SalesDashboardView = ({ user, activeCountry = "All" }) => {
   const [payments, setPayments] = useState([]);
   const [targets, setTargets] = useState([]);
   const [reps, setReps] = useState([]);
@@ -19359,7 +19381,7 @@ const SalesDashboardView = ({ user }) => {
   );
 };
 
-const CashFlowView = ({ user }) => {
+const CashFlowView = ({ user, activeCountry = "All" }) => {
   const [events, setEvents] = useState([]);
   const [clientPayments, setClientPayments] = useState([]);
   const [vendorInvoices, setVendorInvoices] = useState([]);
@@ -19699,7 +19721,7 @@ const AuditTrailView = ({ user }) => {
         supabase.from("notifications").select("*").order("created_at", { ascending: false }).limit(200),
         supabase.from("payment_vouchers").select("*").order("created_at", { ascending: false }),
         supabase.from("staff_payment_requests").select("*").order("submitted_at", { ascending: false }),
-        supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }),
+        activeCountry === "All" ? supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }) : supabase.from("purchase_orders").select("*").eq("country", activeCountry).order("created_at", { ascending: false }),
         supabase.from("client_payments").select("*").order("created_at", { ascending: false }),
       ]);
       setNotifications(no||[]);
@@ -19978,9 +20000,9 @@ const ApprovalQueueView = ({ user, onNavigate }) => {
     const [{ data: rf }, { data: po }, { data: sr }] = await Promise.all([
       supabase.from("rffs").select("*,projects(name)").eq("approved", false).order("created_at", { ascending: false }),
       supabase.from("purchase_orders").select("*").in("status",["vm_signed","finance_signed","fully_signed","pending_ceo"]).order("created_at", { ascending: false }),
-      user.role === 'Country Manager'
-        ? supabase.from("staff_payment_requests").select("*").eq("country", user.country).eq("status","pending_ceo").order("submitted_at", { ascending: false })
-        : supabase.from("staff_payment_requests").select("*").eq("status","pending_ceo").order("submitted_at", { ascending: false }),
+      activeCountry === "All"
+        ? supabase.from("staff_payment_requests").select("*").eq("status","pending_ceo").order("submitted_at", { ascending: false })
+        : supabase.from("staff_payment_requests").select("*").eq("country", activeCountry).eq("status","pending_ceo").order("submitted_at", { ascending: false }),
     ]);
     setRffs(rf||[]); setPOs(po||[]); setStaffRequests(sr||[]);
     setLoading(false);
@@ -23125,7 +23147,7 @@ const BoardDashboard = ({ user }) => {
       setLoading(true);
       const [ev, op, inv] = await Promise.all([
         supabase.from("projects").select("*").order("event_date", { ascending: true }),
-        supabase.from("opportunities").select("*").order("created_at", { ascending: false }),
+        activeCountry === "All" ? supabase.from("opportunities").select("*").order("created_at", { ascending: false }) : supabase.from("opportunities").select("*").eq("country", activeCountry).order("created_at", { ascending: false }),
         supabase.from("invoices").select("*").order("created_at", { ascending: false }),
       ]);
       setEvents(ev.data || []);
@@ -23235,9 +23257,9 @@ const VendorAnalyticsView = ({ user }) => {
   const load = async () => {
     setLoading(true);
     const [vp, asn, aw, inv, sc] = await Promise.all([
-      user.role === 'Country Manager'
-        ? supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", user.country).order("name")
-        : supabase.from("profiles").select("*").eq("role", "Vendor").order("name"), // FM & VM see all vendors
+      vmCountryFilter === "All"
+        ? supabase.from("profiles").select("*").eq("role", "Vendor").order("name")
+        : supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", vmCountryFilter).order("name"),
       supabase.from("rff_vendor_assignments").select("*"),
       supabase.from("rff_awards").select("*"),
       supabase.from("vendor_invoices").select("*"),
@@ -24026,7 +24048,7 @@ Format: Use clear section headers matching the names above. Write in flowing par
   );
 };
 
-const EventsView = ({ user, userRole }) => {
+const EventsView = ({ user, userRole, activeCountry = "All" }) => {
   const [events, setEvents] = useState([]);
   const [clients, setClients] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -24048,12 +24070,12 @@ const EventsView = ({ user, userRole }) => {
 
   const load = async () => {
     const [p, c, t, sl] = await Promise.all([
-      ['Country Manager','Strategy & Events Lead'].includes(user.role)
-        ? supabase.from('projects').select('*').eq('country', user.country).order('created_at', { ascending: false })
-        : supabase.from('projects').select('*').order('created_at', { ascending: false }),
-      user.role === 'Country Manager'
-        ? supabase.from('clients').select('*').eq('country', user.country).order('name')
-        : supabase.from('clients').select('*').order('name'),
+      activeCountry === "All"
+        ? supabase.from('projects').select('*').order('created_at', { ascending: false })
+        : supabase.from('projects').select('*').eq('country', activeCountry).order('created_at', { ascending: false }),
+      activeCountry === "All"
+        ? supabase.from('clients').select('*').order('name')
+        : supabase.from('clients').select('*').eq('country', activeCountry).order('name'),
       supabase.from('tasks').select('*').order('created_at', { ascending: false }),
       supabase.from('profiles').select('id, name, email, avatar').eq('role', 'Strategy & Events Lead'),
     ]);
@@ -24063,7 +24085,7 @@ const EventsView = ({ user, userRole }) => {
     setStrategyLeads(sl.data || []);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeCountry]);
 
   const handleCreate = async () => {
     if (!form.name) { alert('Event name is required'); return; }

@@ -1197,20 +1197,20 @@ const CEODashboard = ({ onTab, user, activeCountry = "All" }) => {
     const loadAll = async () => {
       setLoading(true);
       const [ev, inv, tk, cl, fb, op, tg, rf, vp, sc, pa, vo, aw, cp] = await Promise.all([
-        user.role==='Country Manager' ? supabase.from('projects').select('*').eq('country',user.country).order('event_date',{ascending:true}) : supabase.from('projects').select('*').order('event_date',{ascending:true}),
+        viewCountry === "All" ? supabase.from('projects').select('*').order('event_date',{ascending:true}) : supabase.from('projects').select('*').eq('country',viewCountry).order('event_date',{ascending:true}),
         supabase.from('invoices').select('*').order('created_at', { ascending: false }),
         supabase.from('tasks').select('*').order('created_at', { ascending: false }),
-        user.role==='Country Manager' ? supabase.from('clients').select('*').eq('country',user.country) : supabase.from('clients').select('*'),
+        viewCountry === "All" ? supabase.from('clients').select('*') : supabase.from('clients').select('*').eq('country',viewCountry),
         supabase.from('feedback').select('*').order('created_at', { ascending: false }),
-        user.role==='Country Manager' ? supabase.from('opportunities').select('*').eq('country',user.country).order('created_at',{ascending:false}) : supabase.from('opportunities').select('*').order('created_at',{ascending:false}),
+        viewCountry === "All" ? supabase.from('opportunities').select('*').order('created_at',{ascending:false}) : supabase.from('opportunities').select('*').eq('country',viewCountry).order('created_at',{ascending:false}),
         supabase.from('sales_targets').select('*'),
-        user.role==='Country Manager' ? supabase.from('rffs').select('*').eq('country',user.country) : supabase.from('rffs').select('*'),
-        user.role==='Country Manager' ? supabase.from('profiles').select('*').eq('role','Vendor').eq('country',user.country) : supabase.from('profiles').select('*').eq('role','Vendor'),
+        viewCountry === "All" ? supabase.from('rffs').select('*') : supabase.from('rffs').select('*').eq('country',viewCountry),
+        viewCountry === "All" ? supabase.from('profiles').select('*').eq('role','Vendor') : supabase.from('profiles').select('*').eq('role','Vendor').eq('country',viewCountry),
         supabase.from('vendor_scorecards').select('*').order('created_at', { ascending: false }),
         supabase.from('payment_authorisations').select('*').order('created_at', { ascending: false }),
-        user.role==='Country Manager' ? supabase.from('payment_vouchers').select('*').eq('country',user.country).order('created_at',{ascending:false}) : supabase.from('payment_vouchers').select('*').order('created_at',{ascending:false}),
-        supabase.from('rff_awards').select('*'),
-        user.role==='Country Manager' ? supabase.from('client_payments').select('*').eq('country',user.country) : supabase.from('client_payments').select('*'),
+        viewCountry === "All" ? supabase.from('payment_vouchers').select('*').order('created_at',{ascending:false}) : supabase.from('payment_vouchers').select('*').eq('country',viewCountry).order('created_at',{ascending:false}),
+        viewCountry === "All" ? supabase.from('rff_awards').select('*') : supabase.from('rff_awards').select('*').eq('country',viewCountry),
+        viewCountry === "All" ? supabase.from('client_payments').select('*') : supabase.from('client_payments').select('*').eq('country',viewCountry),
       ]);
       setEvents(ev.data || []);
       setInvoices(inv.data || []);
@@ -7638,9 +7638,9 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
         <nav style={{ flex: 1, padding: "10px 8px", overflowY: "auto" }}>
           {(() => {
             const navItems = getNavItems(currentUser.role, currentUser);
-            const isCEONav = currentUser.role === "CEO";
+            const isGroupedNav = ["CEO","Country Manager"].includes(currentUser.role);
 
-            if (!isCEONav) {
+            if (!isGroupedNav) {
               return navItems.map(item => {
                 const active = activeTab === item.id;
                 return (
@@ -7665,7 +7665,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
               });
             }
 
-            // CEO grouped nav
+            // Grouped nav (CEO + Country Manager)
             return navItems.map(item => {
               if (!item.children) {
                 // Top level single item (Dashboard, Notifications, Calendar)

@@ -19792,7 +19792,7 @@ const CashFlowView = ({ user, activeCountry = "All" }) => {
         activeCountry === "All" ? supabase.from("client_payments").select("*").order("payment_date", { ascending: false }) : supabase.from("client_payments").select("*").eq("country", activeCountry).order("payment_date", { ascending: false }),
         activeCountry === "All" ? supabase.from("vendor_invoices").select("*").eq("status","paid").order("created_at",{ascending:false}) : supabase.from("vendor_invoices").select("*").eq("status","paid").eq("country",activeCountry).order("created_at",{ascending:false}),
         activeCountry === "All" ? supabase.from("staff_payment_requests").select("*").eq("status","paid").order("submitted_at",{ascending:false}) : supabase.from("staff_payment_requests").select("*").eq("status","paid").eq("country",activeCountry).order("submitted_at",{ascending:false}),
-        activeCountry === "All" ? supabase.from("payment_vouchers").select("*").in("status",["paid","approved"]).order("created_at",{ascending:false}) : supabase.from("payment_vouchers").select("*").in("status",["paid","approved"]).eq("country",activeCountry).order("created_at",{ascending:false}), ascending: false }),
+        activeCountry === "All" ? supabase.from("payment_vouchers").select("*").in("status",["paid","approved"]).order("created_at",{ascending:false}) : supabase.from("payment_vouchers").select("*").in("status",["paid","approved"]).eq("country",activeCountry).order("created_at",{ascending:false}),
       ]);
       setEvents(ev||[]);
       setClientPayments(cp||[]);

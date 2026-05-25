@@ -8772,7 +8772,7 @@ const FinanceManagerDashboard = ({ user, onTab, activeCountry = "All" }) => {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
           <div>
             <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>{now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
-            <h1 style={{ margin: "0 0 6px", fontSize: 28, fontWeight: 900, color: T.textPrimary, letterSpacing: "-0.03em" }}>{now.getHours() < 12 ? "Good Morning" : now.getHours() < 17 ? "Good Afternoon" : "Good Evening"}, {user.name.split(" ")[0]}.</h1>
+            <h1 style={{ margin: "0 0 6px", fontSize: 28, fontWeight: 900, color: T.textPrimary, letterSpacing: "-0.03em" }}>{now.getHours() < 12 ? "Good Morning" : now.getHours() < 17 ? "Good Afternoon" : "Good Evening"}, {user?.name.split(" ")[0]}.</h1>
             <div style={{ color: T.textMuted, fontSize: 14 }}>Finance Manager · Financial operations overview</div>
           </div>
           <div style={{ display:"flex", gap:8, alignItems:"center" }}>
@@ -9012,11 +9012,11 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
       ...vForm,
       voucher_number: voucherNumber,
       amount: parseFloat(vForm.amount) || 0,
-      raised_by: user.id,
+      raised_by: user?.id,
       status: 'pending_approval',
       fm_signature: voucherSignature || null,
       fm_signed_at: voucherSignature ? new Date().toISOString() : null,
-      fm_signed_by: user.name,
+      fm_signed_by: user?.name,
     });
     setVoucherSignature("");
     // Notify CEO for approval
@@ -9074,7 +9074,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
       subtotal, tax_pct: parseFloat(eForm.tax_pct)||0,
       total, notes: eForm.notes,
       status: 'draft',
-      created_by: user.id,
+      created_by: user?.id,
     });
     setSaving(false);
     setEstimateModal(null);
@@ -9093,7 +9093,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
       event_name: est.event_name,
       amount: est.total,
       status: 'pending',
-      created_by: user.id,
+      created_by: user?.id,
     }).select().single();
     await supabase.from('estimates').update({ status: 'converted', converted_invoice_id: inv?.id }).eq('id', est.id);
     load();

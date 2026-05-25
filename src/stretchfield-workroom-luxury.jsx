@@ -1156,7 +1156,7 @@ const CEODashboard = ({ onTab, user, activeCountry = "All" }) => {
   const [clientPayments, setClientPayments] = useState([]);
   const [loading, setLoading] = React.useState(true);
   const [internalPortalEvent, setInternalPortalEvent] = useState(null);
-  const [viewCountry, setViewCountry] = useState(user.role === 'Country Manager' ? user.country : (activeCountry||'All'));
+  const [viewCountry, setViewCountry] = useState(user.role === 'Country Manager' ? user.country : (activeCountry||'Ghana'));
 
   // Sync with parent activeCountry
   React.useEffect(() => { if (activeCountry && user.role !== 'Country Manager') setViewCountry(activeCountry); }, [activeCountry]);
@@ -1349,11 +1349,11 @@ const CEODashboard = ({ onTab, user, activeCountry = "All" }) => {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginTop: 24, paddingTop: 20, borderTop: "1px solid "+T.border+"44" }}>
           {[
             { label: "Active Events", value: activeEvents.length, color: T.cyan, tab: "events" },
-            { label: "Pipeline Value", value: getCurrency(viewCountry==="All"?"Ghana":viewCountry)+" "+Math.round(pipelineValue/1000)+"k", color: T.teal, tab: "opportunities" },
-            { label: "Revenue YTD", value: getCurrency(viewCountry==="All"?"Ghana":viewCountry)+" "+Math.round(revenueYTD/1000)+"k", color: "#10B981", tab: "opportunities" },
+            { label: "Pipeline Value", value: getCurrency(viewCountry)+" "+Math.round(pipelineValue/1000)+"k", color: T.teal, tab: "opportunities" },
+            { label: "Revenue YTD", value: getCurrency(viewCountry)+" "+Math.round(revenueYTD/1000)+"k", color: "#10B981", tab: "opportunities" },
             { label: "Open Tasks", value: pendingTasks.length, color: pendingTasks.length > 5 ? T.amber : T.textMuted, tab: "events" },
             { label: "Vendor Rating", value: avgRating+"%", color: parseInt(avgRating) >= 70 ? T.teal : T.amber, tab: "scorecards" },
-            { label: "Vendor Spend", value: getCurrency(viewCountry==="All"?"Ghana":viewCountry)+" "+Math.round(totalBusiness/1000)+"k", color: T.amber, tab: "vendors" },
+            { label: "Vendor Spend", value: getCurrency(viewCountry)+" "+Math.round(totalBusiness/1000)+"k", color: T.amber, tab: "vendors" },
           ].map(k => (
             <div key={k.label} onClick={() => onTab(k.tab)} style={{ cursor: "pointer", padding: "12px 14px", background: T.bg+"80", border: "1px solid "+T.border+"44", borderRadius: 10, transition: "border-color 0.15s" }}
               onMouseEnter={e => e.currentTarget.style.borderColor = k.color+"60"}
@@ -1428,8 +1428,8 @@ const CEODashboard = ({ onTab, user, activeCountry = "All" }) => {
                   <div style={{ height: "100%", width: pct+"%", background: "linear-gradient(90deg,"+T.cyan+","+T.teal+")", borderRadius: 4, transition: "width 0.8s ease" }} />
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
-                  <span style={{ color: T.teal, fontSize: 11, fontWeight: 700 }}>{fmtMoney(revenueYTD, viewCountry==="All"?"Ghana":viewCountry)}</span>
-                  <span style={{ color: T.textMuted, fontSize: 11 }}>Target: {fmtMoney(target?.target_amount||0, viewCountry==="All"?"Ghana":viewCountry)}</span>
+                  <span style={{ color: T.teal, fontSize: 11, fontWeight: 700 }}>{fmtMoney(revenueYTD, viewCountry)}</span>
+                  <span style={{ color: T.textMuted, fontSize: 11 }}>Target: {fmtMoney(target?.target_amount||0, viewCountry)}</span>
                 </div>
               </div>
             );
@@ -1442,7 +1442,7 @@ const CEODashboard = ({ onTab, user, activeCountry = "All" }) => {
                 <div style={{ color: T.textMuted, fontSize: 11 }}>{o.event_type||o.stage}</div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>{fmtMoney(o.value||0, o.country||viewCountry==="All"?"Ghana":viewCountry)}</div>
+                <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>{fmtMoney(o.value||0, o.country||viewCountry)}</div>
                 <div style={{ color: T.textMuted, fontSize: 10, textTransform: "uppercase" }}>{o.status}</div>
               </div>
             </div>
@@ -1551,9 +1551,9 @@ const CEODashboard = ({ onTab, user, activeCountry = "All" }) => {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px,1fr))", gap: 12 }}>
           {[
-            { label: "Total Vendor Spend", value: fmtMoney(totalBusiness, viewCountry==="All"?"Ghana":viewCountry), color: T.amber, tab: "vendor-analytics" },
-            { label: "Pending Payments", value: fmtMoney(paymentAuths.filter(p=>p.status==="pending_ceo").reduce((s,p)=>s+(p.agreed_amount||0),0), viewCountry==="All"?"Ghana":viewCountry), color: T.amber, tab: "payment-authorisation" },
-            { label: "Approved Payments", value: fmtMoney(paymentAuths.filter(p=>p.status==="approved").reduce((s,p)=>s+(p.agreed_amount||0),0), viewCountry==="All"?"Ghana":viewCountry), color: T.teal, tab: "payment-authorisation" },
+            { label: "Total Vendor Spend", value: fmtMoney(totalBusiness, viewCountry), color: T.amber, tab: "vendor-analytics" },
+            { label: "Pending Payments", value: fmtMoney(paymentAuths.filter(p=>p.status==="pending_ceo").reduce((s,p)=>s+(p.agreed_amount||0),0), viewCountry), color: T.amber, tab: "payment-authorisation" },
+            { label: "Approved Payments", value: fmtMoney(paymentAuths.filter(p=>p.status==="approved").reduce((s,p)=>s+(p.agreed_amount||0),0), viewCountry), color: T.teal, tab: "payment-authorisation" },
             { label: "Vouchers Pending", value: vouchers.filter(v=>v.status==="pending_approval").length, color: T.cyan, tab: "finance" },
           ].map(k => (
             <div key={k.label} onClick={() => onTab(k.tab)} style={{ background: T.bg+"60", border: "1px solid "+T.border+"44", borderRadius: 10, padding: "14px 16px", cursor: "pointer" }}
@@ -6783,10 +6783,10 @@ const ClientPaymentsView = ({ user, activeCountry = "All" }) => {
       {/* KPI Strip */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(160px,1fr))", gap:12, marginBottom:24 }}>
         {[
-          { label:"Total Received", value:fmtMoney(totalReceived, activeCountry==="All"?"Ghana":activeCountry), color:T.teal },
-          { label:"Revenue YTD", value:fmtMoney(ytd, activeCountry==="All"?"Ghana":activeCountry), color:T.cyan },
+          { label:"Total Received", value:fmtMoney(totalReceived, activeCountry), color:T.teal },
+          { label:"Revenue YTD", value:fmtMoney(ytd, activeCountry), color:T.cyan },
           { label:"Payments Recorded", value:payments.length, color:T.amber },
-          { label:"This Month", value:fmtMoney(payments.filter(p => { const d = new Date(p.payment_date); const n = new Date(); return d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear(); }).reduce((s,p)=>s+parseFloat(p.amount||0),0), activeCountry==="All"?"Ghana":activeCountry), color:T.magenta },
+          { label:"This Month", value:fmtMoney(payments.filter(p => { const d = new Date(p.payment_date); const n = new Date(); return d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear(); }).reduce((s,p)=>s+parseFloat(p.amount||0),0), activeCountry), color:T.magenta },
         ].map(k => (
           <div key={k.label} style={{ padding:"14px 16px", background:T.surface, border:`1px solid ${T.border}`, borderTop:`2px solid ${k.color}`, borderRadius:10 }}>
             <div style={{ color:k.color, fontSize:18, fontWeight:900 }}>{k.value}</div>
@@ -7155,7 +7155,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
   const [unreadCount, setUnreadCount] = useState(0);
   const [pendingResourceId, setPendingResourceId] = useState(null);
   const [showAccountSettings, setShowAccountSettings] = useState(false);
-  const [activeCountry, setActiveCountry] = useState("All");
+  const [activeCountry, setActiveCountry] = useState("Ghana");
   const isMobile = useIsMobile();
 
   const buildUser = (p) => p ? {
@@ -7473,9 +7473,8 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
           <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
             {["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? (
               <div style={{ display:"flex", gap:3, alignItems:"center" }}>
-                <button onClick={() => setActiveCountry("All")} style={{ padding:"4px 10px", borderRadius:16, border:"1px solid "+(activeCountry==="All"?T.cyan:T.border), background:activeCountry==="All"?T.cyan:"none", color:activeCountry==="All"?"#060B14":T.textMuted, fontSize:10, fontWeight:700, cursor:"pointer" }}>All</button>
-                <button onClick={() => setActiveCountry("Ghana")} title="Ghana" style={{ padding:"4px 8px", borderRadius:16, border:"1px solid "+(activeCountry==="Ghana"?T.cyan:T.border), background:activeCountry==="Ghana"?T.cyan+"20":"none", fontSize:14, cursor:"pointer" }}>🇬🇭</button>
-                <button onClick={() => setActiveCountry("Nigeria")} title="Nigeria" style={{ padding:"4px 8px", borderRadius:16, border:"1px solid "+(activeCountry==="Nigeria"?T.cyan:T.border), background:activeCountry==="Nigeria"?T.cyan+"20":"none", fontSize:14, cursor:"pointer" }}>🇳🇬</button>
+                <button onClick={() => setActiveCountry("Ghana")} style={{ padding:"4px 10px", borderRadius:16, border:"1px solid "+(activeCountry==="Ghana"?T.cyan:T.border), background:activeCountry==="Ghana"?T.cyan:"none", color:activeCountry==="Ghana"?"#060B14":T.textMuted, fontSize:10, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:4 }}><span style={{fontSize:13}}>🇬🇭</span> Ghana</button>
+                <button onClick={() => setActiveCountry("Nigeria")} style={{ padding:"4px 10px", borderRadius:16, border:"1px solid "+(activeCountry==="Nigeria"?T.cyan:T.border), background:activeCountry==="Nigeria"?T.cyan:"none", color:activeCountry==="Nigeria"?"#060B14":T.textMuted, fontSize:10, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:4 }}><span style={{fontSize:13}}>🇳🇬</span> Nigeria</button>
               </div>
             ) : currentUser.role === "Country Manager" ? (
               <div style={{ background:T.cyan+"15", border:"1px solid "+T.cyan+"30", borderRadius:20, padding:"4px 12px" }}>
@@ -7812,7 +7811,7 @@ const CRMDashboardCEO = ({ user, activeCountry = "All" }) => {
 
   const load = async () => {
     const [l, t, m, cp] = await Promise.all([
-      activeCountry === "All" ? supabase.from("opportunities").select("*") : supabase.from("opportunities").select("*").eq("country", activeCountry),
+      supabase.from("opportunities").select("*").eq("country", activeCountry),
       supabase.from("sales_targets").select("*").order("created_at", { ascending: false }),
       supabase.from("profiles").select("*").or('role.in.("CEO","Country Manager","Sales & Marketing"),has_sm_access.eq.true'),
       supabase.from("client_payments").select("*").order("created_at", { ascending: false }),
@@ -8491,8 +8490,8 @@ const FinanceManagerDashboard = ({ user, onTab, activeCountry = "All" }) => {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px,1fr))", gap: 12, marginTop: 24, paddingTop: 20, borderTop: `1px solid ${T.border}44` }}>
           {[
-            { label: "Total Revenue", value: getCurrency(activeCountry==="All"?"Ghana":activeCountry)+" "+Math.round(totalRevenue/1000)+"k", color: T.teal },
-            { label: "Outstanding", value: getCurrency(activeCountry==="All"?"Ghana":activeCountry)+" "+Math.round(outstanding/1000)+"k", color: outstanding > 0 ? T.amber : T.textMuted },
+            { label: "Total Revenue", value: getCurrency(activeCountry)+" "+Math.round(totalRevenue/1000)+"k", color: T.teal },
+            { label: "Outstanding", value: getCurrency(activeCountry)+" "+Math.round(outstanding/1000)+"k", color: outstanding > 0 ? T.amber : T.textMuted },
             { label: "Vendor Invoices", value: vendorInvoices.length, color: T.cyan },
             { label: "Pending Vouchers", value: pendingVouchers.length, color: pendingVouchers.length > 0 ? T.amber : T.textMuted },
             { label: "Active Events", value: events.length, color: T.teal },
@@ -10541,7 +10540,7 @@ const ContractAwardApprovalView = ({ user, activeCountry = "All" }) => {
   const load = async () => {
     const awQuery = activeCountry === "All" ? supabase.from("rff_awards").select("*").order("created_at", { ascending: false }) : supabase.from("rff_awards").select("*").eq("country", activeCountry).order("created_at", { ascending: false });
     const { data: aw } = await awQuery;
-    const rfQuery = activeCountry === "All" ? supabase.from("rffs").select("*") : supabase.from("rffs").select("*").eq("country", activeCountry);
+    const rfQuery = supabase.from("rffs").select("*").eq("country", activeCountry);
     const { data: rf } = await rfQuery;
     const { data: bud } = await supabase.from("rff_budgets").select("*");
     setAwards(aw || []);
@@ -10752,7 +10751,7 @@ const GigConfirmationView = ({ user }) => {
 
   const load = async () => {
     const { data: aw } = await supabase.from("rff_awards").select("*").in("status", ["approved_ceo","confirmed"]).order("created_at", { ascending: false });
-    const rfQuery = activeCountry === "All" ? supabase.from("rffs").select("*") : supabase.from("rffs").select("*").eq("country", activeCountry);
+    const rfQuery = supabase.from("rffs").select("*").eq("country", activeCountry);
     const { data: rf } = await rfQuery;
     setAwards(aw || []);
     setRffs(rf || []);
@@ -14132,7 +14131,7 @@ const VendorAssignmentView = ({ user, activeCountry = "All" }) => {
   const load = async () => {
     const [r, e, v, a] = await Promise.all([
       activeCountry === "All" ? supabase.from("rffs").select("*").order("created_at", { ascending: false }) : supabase.from("rffs").select("*").eq("country", activeCountry).order("created_at", { ascending: false }),
-      activeCountry === "All" ? supabase.from("projects").select("*") : supabase.from("projects").select("*").eq("country", activeCountry),
+      supabase.from("projects").select("*").eq("country", activeCountry),
       activeCountry === "All" ? supabase.from("profiles").select("*").eq("role", "Vendor") : supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", activeCountry),
       supabase.from("rff_vendor_assignments").select("*"),
     ]);
@@ -19312,8 +19311,8 @@ const SalesDashboardView = ({ user, activeCountry = "All" }) => {
 
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:12, marginBottom:24 }}>
         {[
-          { label:"Total Revenue", value:fmtMoney(totalRevenue, activeCountry==="All"?"Ghana":activeCountry), color:T.teal },
-          { label:"Total Commission", value:fmtMoney(totalCommission, activeCountry==="All"?"Ghana":activeCountry), color:T.amber },
+          { label:"Total Revenue", value:fmtMoney(totalRevenue, activeCountry), color:T.teal },
+          { label:"Total Commission", value:fmtMoney(totalCommission, activeCountry), color:T.amber },
           { label:"Payments", value:filteredPayments.length, color:T.cyan },
           { label:"Active Reps", value:repStats.length, color:T.magenta },
           { label:"Unattributed", value:filteredPayments.filter(p=>!p.sales_rep_id).length, color:filteredPayments.filter(p=>!p.sales_rep_id).length>0?T.red:T.teal },
@@ -19572,9 +19571,9 @@ const CashFlowView = ({ user, activeCountry = "All" }) => {
       {/* Summary KPIs */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:12, marginBottom:24 }}>
         {[
-          { label:"Total Inflows", value:fmtMoney(totalInflows, activeCountry==="All"?"Ghana":activeCountry), color:T.teal, sub:"Client payments received" },
-          { label:"Total Outflows", value:fmtMoney(totalOutflows, activeCountry==="All"?"Ghana":activeCountry), color:T.red, sub:"Vendors + Staff + Vouchers" },
-          { label:"Net Cash Flow", value:fmtMoney(Math.abs(netCashFlow), activeCountry==="All"?"Ghana":activeCountry), color:netCashFlow>=0?T.teal:T.red, sub:netCashFlow>=0?"Surplus":"Deficit" },
+          { label:"Total Inflows", value:fmtMoney(totalInflows, activeCountry), color:T.teal, sub:"Client payments received" },
+          { label:"Total Outflows", value:fmtMoney(totalOutflows, activeCountry), color:T.red, sub:"Vendors + Staff + Vouchers" },
+          { label:"Net Cash Flow", value:fmtMoney(Math.abs(netCashFlow), activeCountry), color:netCashFlow>=0?T.teal:T.red, sub:netCashFlow>=0?"Surplus":"Deficit" },
           { label:"Vendor Payments", value:"GHS "+totalVendorOut.toLocaleString(), color:T.amber, sub:"Paid invoices" },
           { label:"Staff Payments", value:"GHS "+(totalStaffOut+totalVoucherOut).toLocaleString(), color:T.cyan, sub:"Approved requests" },
         ].map(k => (

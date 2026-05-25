@@ -3195,8 +3195,7 @@ const UsersView = ({ user }) => {
                   const result = await res.json();
                   if (result.success || res.ok) {
                     await supabase.from("profiles").update({ temp_password: newTempPwd }).eq("id", resetPwdModal.id);
-                    navigator.clipboard.writeText("Email: " + resetPwdModal.email + "
-Password: " + newTempPwd);
+                    navigator.clipboard.writeText("Email: " + resetPwdModal.email + " | Password: " + newTempPwd);
                     alert("Password reset! Details copied to clipboard.");
                     setResetPwdModal(null);
                   } else { alert("Error: " + (result.error || "Failed")); }

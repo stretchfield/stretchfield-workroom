@@ -9022,8 +9022,8 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
     // Notify CEO for approval
     const { data: ceos } = await supabase.from('profiles').select('id, email, name').eq('role', 'CEO');
     for (const ceo of ceos || []) {
-      await supabase.from('notifications').insert({ user_id: ceo.id, title: 'Payment Voucher Raised', message: `${user.name} raised voucher ${voucherNumber} for GHS ${parseFloat(vForm.amount).toLocaleString()} — ${vForm.description}`, type: 'rff' });
-      if (ceo.email) await sendEmail(ceo.email, `Payment Voucher — ${voucherNumber}`, notifEmailHtml({ name: ceo.name, title: 'Payment Voucher Raised', message: `Finance Manager raised voucher <strong>${voucherNumber}</strong> for <strong>GHS ${parseFloat(vForm.amount).toLocaleString()}</strong>.<br><br>Payee: ${vForm.payee}<br>Description: ${vForm.description}<br>Type: ${vForm.payment_type}`, actionUrl: 'https://workroom.stretchfield.com', actionLabel: 'Review Voucher' }));
+      await supabase.from('notifications').insert({ user_id: ceo.id, title: 'Payment Voucher Raised', message: `${user.name} raised voucher ${voucherNumber} for ${getCurrency(activeCountry)} ${parseFloat(vForm.amount).toLocaleString()} — ${vForm.description}`, type: 'rff' });
+      if (ceo.email) await sendEmail(ceo.email, `Payment Voucher — ${voucherNumber}`, notifEmailHtml({ name: ceo.name, title: 'Payment Voucher Raised', message: `Finance Manager raised voucher <strong>${voucherNumber}</strong> for <strong>${getCurrency(activeCountry)} ${parseFloat(vForm.amount).toLocaleString()}</strong>.<br><br>Payee: ${vForm.payee}<br>Description: ${vForm.description}<br>Type: ${vForm.payment_type}`, actionUrl: 'https://workroom.stretchfield.com', actionLabel: 'Review Voucher' }));
     }
     setSaving(false);
     setVoucherModal(null);
@@ -9038,7 +9038,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
     const { data: fms } = await supabase.from('profiles').select('id, email, name').eq('role', 'Finance Manager');
     for (const fm of fms || []) {
       await supabase.from('notifications').insert({ user_id: fm.id, title: 'Voucher Approved', message: `Voucher ${v.voucher_number} has been approved. Proceed with payment.`, type: 'rff' });
-      if (fm.email) await sendEmail(fm.email, `Voucher Approved — ${v.voucher_number}`, notifEmailHtml({ name: fm.name, title: 'Voucher Approved — Action Required', message: `Voucher <strong>${v.voucher_number}</strong> for <strong>GHS ${(v.amount||0).toLocaleString()}</strong> has been approved by CEO. Please proceed with payment within 3 working days.`, actionUrl: 'https://workroom.stretchfield.com', actionLabel: 'View Voucher' }));
+      if (fm.email) await sendEmail(fm.email, `Voucher Approved — ${v.voucher_number}`, notifEmailHtml({ name: fm.name, title: 'Voucher Approved — Action Required', message: `Voucher <strong>${v.voucher_number}</strong> for <strong>${getCurrency(activeCountry)} ${(v.amount||0).toLocaleString()}</strong> has been approved by CEO. Please proceed with payment within 3 working days.`, actionUrl: 'https://workroom.stretchfield.com', actionLabel: 'View Voucher' }));
     }
     load();
   };
@@ -9217,9 +9217,9 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
           {/* KPI strip */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 24 }}>
             {[
-              { label: 'Total Inflows', value: `GHS ${totalClientInflows.toLocaleString()}`, sub: `${clientInvoices.length} client invoices`, color: '#10B981', icon: '' },
-              { label: 'Total Paid Out', value: `GHS ${totalVouchersPaid.toLocaleString()}`, sub: `${paidVouchers.length} vouchers paid`, color: T.red, icon: '' },
-              { label: 'Pending Approval', value: `GHS ${totalPendingAmt.toLocaleString()}`, sub: `${pendingVouchers.length} vouchers`, color: T.amber, icon: '⏳' },
+              { label: 'Total Inflows', value: `${getCurrency(activeCountry)} ${totalClientInflows.toLocaleString()}`, sub: `${clientInvoices.length} client invoices`, color: '#10B981', icon: '' },
+              { label: 'Total Paid Out', value: `${getCurrency(activeCountry)} ${totalVouchersPaid.toLocaleString()}`, sub: `${paidVouchers.length} vouchers paid`, color: T.red, icon: '' },
+              { label: 'Pending Approval', value: `${getCurrency(activeCountry)} ${totalPendingAmt.toLocaleString()}`, sub: `${pendingVouchers.length} vouchers`, color: T.amber, icon: '⏳' },
               { label: 'Petty Cash Float', value: `GHS ${pcBalance.toLocaleString()}`, sub: `${pcPct}% remaining`, color: pcPct < 10 ? T.red : T.cyan, icon: '' },
             ].map((k,i) => (
               <div key={i} style={{ padding: '16px 18px', background: T.surface, border: `1px solid ${T.border}`, borderTop: `3px solid ${k.color}`, borderRadius: 12 }}>
@@ -9251,7 +9251,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
                   ['Closing Balance', todayBalance.closing_balance, todayBalance.closing_balance >= 0 ? T.teal : T.red],
                 ].map(([label, val, color]) => (
                   <div key={label} style={{ textAlign: 'center' }}>
-                    <div style={{ color, fontWeight: 900, fontSize: 18 }}>GHS {(val||0).toLocaleString()}</div>
+                    <div style={{ color, fontWeight: 900, fontSize: 18 }}>{getCurrency(activeCountry)+" "}{(val||0).toLocaleString()}</div>
                     <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 600, marginTop: 3 }}>{label}</div>
                   </div>
                 ))}
@@ -9288,7 +9288,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
                     <td style={{ padding: '10px 14px', color: T.cyan, fontWeight: 700, fontSize: 12 }}>{v.voucher_number}</td>
                     <td style={{ padding: '10px 14px' }}>{typeBadge(v.payment_type)}</td>
                     <td style={{ padding: '10px 14px', color: T.textPrimary, fontSize: 12 }}>{v.payee}</td>
-                    <td style={{ padding: '10px 14px', color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>GHS {(v.amount||0).toLocaleString()}</td>
+                    <td style={{ padding: '10px 14px', color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>{getCurrency(activeCountry)+" "}{(v.amount||0).toLocaleString()}</td>
                     <td style={{ padding: '10px 14px' }}>{statusBadge(v.status)}</td>
                     <td style={{ padding: '10px 14px', color: T.textMuted, fontSize: 11 }}>{new Date(v.created_at).toLocaleDateString('en-GB')}</td>
                   </tr>
@@ -9422,7 +9422,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
                     <td style={{ padding: '10px 14px', color: T.cyan, fontWeight: 700, fontSize: 12 }}>{est.estimate_number}</td>
                     <td style={{ padding: '10px 14px', color: T.textPrimary, fontSize: 12 }}>{est.client_name}</td>
                     <td style={{ padding: '10px 14px', color: T.textMuted, fontSize: 11 }}>{est.event_name || '—'}</td>
-                    <td style={{ padding: '10px 14px', color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>GHS {(est.total||0).toLocaleString()}</td>
+                    <td style={{ padding: '10px 14px', color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{getCurrency(activeCountry)+" "}{(est.total||0).toLocaleString()}</td>
                     <td style={{ padding: '10px 14px' }}>
                       <span style={{ background: est.status==='converted' ? '#10B98118' : est.status==='approved' ? T.teal+'18' : T.amber+'18', color: est.status==='converted' ? '#10B981' : est.status==='approved' ? T.teal : T.amber, borderRadius: 20, padding: '2px 8px', fontSize: 10, fontWeight: 700 }}>{est.status}</span>
                     </td>
@@ -9592,7 +9592,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div>
                 <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Current Float Balance</div>
-                <div style={{ color: pcPct < 10 ? T.red : '#10B981', fontWeight: 900, fontSize: 36 }}>GHS {pcBalance.toLocaleString()}</div>
+                <div style={{ color: pcPct < 10 ? T.red : '#10B981', fontWeight: 900, fontSize: 36 }}>{getCurrency(activeCountry)+" "}{pcBalance.toLocaleString()}</div>
                 <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>of GHS {pcTotal.toLocaleString()} total float · {pcPct}% remaining</div>
               </div>
               <div style={{ textAlign: 'right' }}>
@@ -9624,7 +9624,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
                     <td style={{ padding: '10px 14px', color: T.teal, fontWeight: 700, fontSize: 12 }}>{v.voucher_number}</td>
                     <td style={{ padding: '10px 14px', color: T.textPrimary, fontSize: 12 }}>{v.payee}</td>
                     <td style={{ padding: '10px 14px', color: T.textMuted, fontSize: 11 }}>{v.purpose}</td>
-                    <td style={{ padding: '10px 14px', color: T.textPrimary, fontWeight: 700 }}>GHS {(v.amount||0).toLocaleString()}</td>
+                    <td style={{ padding: '10px 14px', color: T.textPrimary, fontWeight: 700 }}>{getCurrency(activeCountry)+" "}{(v.amount||0).toLocaleString()}</td>
                     <td style={{ padding: '10px 14px' }}><span style={{ color: v.status==='approved' ? '#10B981' : T.amber, fontWeight: 700, fontSize: 11 }}>{v.status}</span></td>
                     <td style={{ padding: '10px 14px', color: T.textMuted, fontSize: 11 }}>{new Date(v.created_at).toLocaleDateString('en-GB')}</td>
                   </tr>
@@ -9663,7 +9663,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
                     ['Actual Payments', db.actual_payments, T.red],
                   ].map(([label, val, color]) => (
                     <div key={label} style={{ textAlign: 'center', background: T.bg, borderRadius: 8, padding: '10px 8px' }}>
-                      <div style={{ color, fontWeight: 800, fontSize: 16 }}>GHS {(val||0).toLocaleString()}</div>
+                      <div style={{ color, fontWeight: 800, fontSize: 16 }}>{getCurrency(activeCountry)+" "}{(val||0).toLocaleString()}</div>
                       <div style={{ color: T.textMuted, fontSize: 10, marginTop: 3 }}>{label}</div>
                     </div>
                   ))}
@@ -19643,7 +19643,7 @@ const SalesDashboardView = ({ user, activeCountry = "All" }) => {
     setPayments(p||[]); setTargets(t||[]); setReps((r||[]).filter((m,i,s)=>s.findIndex(x=>x.id===m.id)===i));
     setLoading(false);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeCountry]);
 
   const now = new Date();
   const filterByPeriod = (items, dateField) => {

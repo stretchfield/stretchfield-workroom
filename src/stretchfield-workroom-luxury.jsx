@@ -9103,7 +9103,8 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
   const savePCVoucher = async () => {
     if (!pcForm.payee || !pcForm.amount) { alert('Payee and amount required.'); return; }
     const amt = parseFloat(pcForm.amount);
-    if (amt > 200) { alert('Single petty cash payment cannot exceed GHS 200. Use cheque payment for amounts over GHS 200.'); return; }
+    const pettyLimit = activeCountry === 'Nigeria' ? 200000 : 200;
+    if (amt > pettyLimit) { alert(`Single petty cash payment cannot exceed ${getCurrency(activeCountry)} ${pettyLimit.toLocaleString()}. Use cheque payment for amounts over ${getCurrency(activeCountry)} ${pettyLimit.toLocaleString()}.`); return; }
     setSaving(true);
     const year = new Date().getFullYear().toString().slice(-2);
     const count = pettyCashVouchers.length + 1;

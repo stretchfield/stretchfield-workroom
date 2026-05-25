@@ -1182,7 +1182,7 @@ const CEODashboard = ({ onTab, user, activeCountry = "All" }) => {
   const [clientPayments, setClientPayments] = useState([]);
   const [loading, setLoading] = React.useState(true);
   const [internalPortalEvent, setInternalPortalEvent] = useState(null);
-  const [viewCountry, setViewCountry] = useState(user.role === 'Country Manager' ? user.country : (activeCountry||'Ghana'));
+  const [viewCountry, setViewCountry] = useState(user?.role === 'Country Manager' ? (user?.country||'Nigeria') : 'Ghana');
 
   // Sync with parent activeCountry
   React.useEffect(() => { if (activeCountry && user.role !== 'Country Manager') setViewCountry(activeCountry); }, [activeCountry]);
@@ -19734,8 +19734,8 @@ const SalesDashboardView = ({ user, activeCountry = "All" }) => {
               )}
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:12 }}>
                 {[
-                  { label:"Revenue", value:"GHS "+Math.round(rep.repRevenue/1000)+"k", color:T.teal },
-                  { label:"Commission", value:"GHS "+Math.round(rep.repCommission/1000)+"k", color:T.amber },
+                  { label:"Revenue", value:fmtMoney(Math.round(rep.repRevenue/1000)+"k", activeCountry), color:T.teal },
+                  { label:"Commission", value:fmtMoney(Math.round(rep.repCommission/1000)+"k", activeCountry), color:T.amber },
                   { label:"Deals", value:rep.repPayments.length, color:T.cyan },
                 ].map(k => (
                   <div key={k.label} style={{ background:T.bg, borderRadius:8, padding:"10px 12px", textAlign:"center" }}>
@@ -19770,10 +19770,10 @@ const SalesDashboardView = ({ user, activeCountry = "All" }) => {
                 <td style={{ padding:"12px 14px", color:T.textMuted, fontSize:12 }}>{p.payment_date?new Date(p.payment_date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):"—"}</td>
                 <td style={{ padding:"12px 14px", color:T.textPrimary, fontWeight:700, fontSize:13 }}>{p.client_name}</td>
                 <td style={{ padding:"12px 14px", color:T.textMuted, fontSize:12 }}>{p.event_name||"—"}</td>
-                <td style={{ padding:"12px 14px", color:T.teal, fontWeight:800, fontSize:13 }}>GHS {parseFloat(p.amount||0).toLocaleString()}</td>
+                <td style={{ padding:"12px 14px", color:T.teal, fontWeight:800, fontSize:13 }}>{fmtMoney(p.amount||0, p.country||activeCountry)}</td>
                 <td style={{ padding:"12px 14px" }}>{p.sales_rep_name?<span style={{ color:T.cyan, fontWeight:700, fontSize:12 }}>{p.sales_rep_name}</span>:<span style={{ color:T.red, fontSize:11 }}>Unassigned</span>}</td>
                 <td style={{ padding:"12px 14px", color:T.textMuted, fontSize:12, textAlign:"center" }}>{p.commission_rate||5}%</td>
-                <td style={{ padding:"12px 14px", color:T.amber, fontWeight:800, fontSize:13 }}>GHS {parseFloat(p.commission_amount||0).toLocaleString()}</td>
+                <td style={{ padding:"12px 14px", color:T.amber, fontWeight:800, fontSize:13 }}>{fmtMoney(p.commission_amount||0, p.country||activeCountry)}</td>
                 <td style={{ padding:"12px 14px" }}><span style={{ background:T.cyan+"18", color:T.cyan, padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:700 }}>{p.payment_method||"—"}</span></td>
               </tr>
             ))}
@@ -19926,7 +19926,7 @@ const CashFlowView = ({ user, activeCountry = "All" }) => {
               {filteredVendor.map(i=>(
                 <div key={i.id} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:`1px solid ${T.border}22` }}>
                   <div><div style={{ color:T.textPrimary, fontSize:13, fontWeight:600 }}>{i.vendor_name}</div><div style={{ color:T.textMuted, fontSize:11 }}>{i.invoice_number||"Invoice"}</div></div>
-                  <div style={{ color:T.red, fontWeight:700 }}>GHS {parseFloat(i.amount||0).toLocaleString()}</div>
+                  <div style={{ color:T.red, fontWeight:700 }}>{fmtMoney(i.amount||0, activeCountry)}</div>
                 </div>
               ))}
             </div>
@@ -19952,8 +19952,8 @@ const CashFlowView = ({ user, activeCountry = "All" }) => {
           { label:"Total Inflows", value:fmtMoney(totalInflows, activeCountry), color:T.teal, sub:"Client payments received" },
           { label:"Total Outflows", value:fmtMoney(totalOutflows, activeCountry), color:T.red, sub:"Vendors + Staff + Vouchers" },
           { label:"Net Cash Flow", value:fmtMoney(Math.abs(netCashFlow), activeCountry), color:netCashFlow>=0?T.teal:T.red, sub:netCashFlow>=0?"Surplus":"Deficit" },
-          { label:"Vendor Payments", value:"GHS "+totalVendorOut.toLocaleString(), color:T.amber, sub:"Paid invoices" },
-          { label:"Staff Payments", value:"GHS "+(totalStaffOut+totalVoucherOut).toLocaleString(), color:T.cyan, sub:"Approved requests" },
+          { label:"Vendor Payments", value:fmtMoney(totalVendorOut, activeCountry).toLocaleString(), color:T.amber, sub:"Paid invoices" },
+          { label:"Staff Payments", value:fmtMoney((totalStaffOut+totalVoucherOut), activeCountry).toLocaleString(), color:T.cyan, sub:"Approved requests" },
         ].map(k => (
           <div key={k.label} style={{ padding:"14px 16px", background:T.surface, border:`1px solid ${T.border}`, borderTop:`2px solid ${k.color}`, borderRadius:10 }}>
             <div style={{ color:k.color, fontSize:18, fontWeight:900 }}>{k.value}</div>

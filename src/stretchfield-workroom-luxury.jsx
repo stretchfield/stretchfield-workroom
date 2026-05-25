@@ -874,15 +874,26 @@ const getNavItems = (role, user) => {
   if (["Sales & Marketing"].includes(role)) {
     base.push({ id: "events", label: "Events", icon: "" });
   }
-  if (["CEO","Sales & Marketing"].includes(role)) {
+  if (["CEO","Sales & Marketing","Country Manager"].includes(role)) {
     base.push({ id: "opportunities", label: "Opportunities", icon: "" });
   }
-  if (["CEO","Sales & Marketing"].includes(role)) {
+  if (["CEO","Sales & Marketing","Country Manager"].includes(role)) {
     base.push({ id: "crm", label: "CRM / Leads", icon: "" }, { id: "crm-insights", label: "CRM Insights", icon: "" }, { id: "sm-tasks", label: "S&M Tasks", icon: "" });
   }
   // ESL nav handled by return [] below
   if (["CEO","Country Manager"].includes(role)) {
-    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "" }, { id: "rff-approvals", label: "RFF Approvals", icon: "" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "" }, { id: "quotes-received", label: "Quotes Received", icon: "" }, { id: "quote-comparison", label: "Quote Comparison", icon: "" }, { id: "scorecards", label: "Vendor Scorecards", icon: "" }, { id: "vendor-analytics", label: "Vendor Analytics", icon: "" }, { id: "purchase-orders", label: "Sign Purchase Orders", icon: "" }, { id: "event-reports", label: "Event Reports", icon: "" });
+    base.push({ id: "vendors", label: "Vendors & RFFs", icon: "" }, { id: "vendor-onboarding", label: "Add New Vendor", icon: "" }, { id: "rff-approvals", label: "RFF Approvals", icon: "" }, { id: "vendor-assignment", label: "Vendor Assignment", icon: "" }, { id: "quotes-received", label: "Quotes Received", icon: "" }, { id: "quote-comparison", label: "Quote Comparison", icon: "" }, { id: "contract-awards", label: "Contract Awards", icon: "" }, { id: "scorecards", label: "Vendor Scorecards", icon: "" }, { id: "vendor-analytics", label: "Vendor Analytics", icon: "" }, { id: "purchase-orders", label: "Sign Purchase Orders", icon: "" }, { id: "event-reports", label: "Event Reports", icon: "" });
+  }
+  if (role === "Country Manager") {
+    base.push(
+      { id: "finance", label: "Finance Operations", icon: "" },
+      { id: "payment-authorisation", label: "Payment Authorisation", icon: "" },
+      { id: "client-payments", label: "Client Payments", icon: "" },
+      { id: "vendor-invoices", label: "Vendor Invoices", icon: "" },
+      { id: "cash-flow", label: "Cash Flow", icon: "" },
+      { id: "sales-dashboard", label: "Sales Dashboard", icon: "" },
+      { id: "client-health", label: "Client Health", icon: "" },
+    );
   }
   if (role === "CEO") {
     base.push({ id: "vendor-onboarding", label: "Vendor Applications", icon: "" });
@@ -2955,6 +2966,9 @@ const UsersView = ({ user }) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loginDetailsModal, setLoginDetailsModal] = useState(null);
+  const [resetPwdModal, setResetPwdModal] = useState(null);
+  const [newTempPwd, setNewTempPwd] = useState("");
+  const [resetSaving, setResetSaving] = useState(false);
   const [modal, setModal] = useState(false);
   const [editModal, setEditModal] = useState(null);
   const [editForm, setEditForm] = useState({ name: '', role: '', country: '', phone: '', newPassword: '' });
@@ -3057,6 +3071,7 @@ const UsersView = ({ user }) => {
                   <div style={{ display: "flex", gap: 4 }}>
                     <button onClick={() => openEdit(u)} style={{ background: T.cyan+"18", border: `1px solid ${T.cyan}40`, color: T.cyan, width: 28, height: 28, borderRadius: 6, cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}></button>
                     <button onClick={() => setLoginDetailsModal(u)} style={{ background: T.cyan+"15", border: "1px solid "+T.cyan+"30", color: T.cyan, padding: "3px 8px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>Login</button>
+                    <button onClick={() => { setResetPwdModal(u); setNewTempPwd("Stretch@" + u.name.split(" ")[0] + "2026"); }} style={{ background: T.amber+"15", border: "1px solid "+T.amber+"30", color: T.amber, padding: "3px 8px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>Reset Pwd</button>
                     <button onClick={() => handleDelete(u.id)} style={{ background: 'none', border: 'none', color: T.textMuted, cursor: 'pointer', fontSize: 18, padding: '2px 6px' }}>×</button>
                   </div>
                 )}
@@ -3157,6 +3172,43 @@ const UsersView = ({ user }) => {
         </Modal>
       )}
 
+      {resetPwdModal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setResetPwdModal(null)}>
+          <div style={{ background:T.surface, border:"1px solid "+T.amber+"30", borderRadius:16, width:"100%", maxWidth:420, padding:28 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>Reset Password</div>
+            <div style={{ color:T.textMuted, fontSize:13, marginBottom:20 }}>{resetPwdModal.name} — {resetPwdModal.email}</div>
+            <div style={{ marginBottom:16 }}>
+              <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:6 }}>New Temporary Password</label>
+              <input value={newTempPwd} onChange={e=>setNewTempPwd(e.target.value)} style={{ width:"100%", padding:"10px 12px", background:T.bg, border:"1px solid "+T.border, borderRadius:8, color:T.textPrimary, fontSize:14, fontFamily:"monospace", outline:"none", boxSizing:"border-box" }} />
+            </div>
+            <div style={{ background:T.bg, border:"1px solid "+T.border, borderRadius:8, padding:"12px 16px", marginBottom:16 }}>
+              <div style={{ color:T.textMuted, fontSize:11, marginBottom:4 }}>Share these details with the user:</div>
+              <div style={{ color:T.textPrimary, fontSize:13, fontFamily:"monospace" }}>Email: {resetPwdModal.email}</div>
+              <div style={{ color:T.cyan, fontSize:13, fontFamily:"monospace", fontWeight:700 }}>Password: {newTempPwd}</div>
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={async () => {
+                if (!newTempPwd) { alert("Enter a password"); return; }
+                setResetSaving(true);
+                try {
+                  const res = await fetch("/api/reset-password", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ userId: resetPwdModal.id, email: resetPwdModal.email, newPassword: newTempPwd, name: resetPwdModal.name }) });
+                  const result = await res.json();
+                  if (result.success || res.ok) {
+                    await supabase.from("profiles").update({ temp_password: newTempPwd }).eq("id", resetPwdModal.id);
+                    navigator.clipboard.writeText("Email: " + resetPwdModal.email + "
+Password: " + newTempPwd);
+                    alert("Password reset! Details copied to clipboard.");
+                    setResetPwdModal(null);
+                  } else { alert("Error: " + (result.error || "Failed")); }
+                } catch(e) { alert("Error: " + e.message); }
+                setResetSaving(false);
+              }} disabled={resetSaving} style={{ flex:1, background:"linear-gradient(135deg,"+T.amber+",#F59E0B)", border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{resetSaving?"Resetting...":"Reset & Copy"}</button>
+              <button onClick={()=>setResetPwdModal(null)} style={{ background:"none", border:"1px solid "+T.border, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {loginDetailsModal && (
         <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setLoginDetailsModal(null)}>
           <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 440, padding: 28 }} onClick={e => e.stopPropagation()}>
@@ -3176,15 +3228,14 @@ const UsersView = ({ user }) => {
                 </div>
                 <div>
                   <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>Password</div>
-                  {loginDetailsModal.password_hash ? (
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ color: T.cyan, fontWeight: 700, fontSize: 14, fontFamily: "monospace" }}>{loginDetailsModal.password_hash}</div>
-                      <span style={{ color: T.teal, fontSize: 10, fontWeight: 700, background: T.teal+"15", padding: "1px 6px", borderRadius: 10 }}> User set</span>
+                  {loginDetailsModal.temp_password ? (
+                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                      <div style={{ color:T.cyan, fontWeight:700, fontSize:14, fontFamily:"monospace" }}>{loginDetailsModal.temp_password}</div>
+                      <button onClick={() => { navigator.clipboard.writeText(loginDetailsModal.temp_password); alert("Copied!"); }} style={{ background:T.cyan+"15", border:"1px solid "+T.cyan+"30", color:T.cyan, padding:"2px 8px", borderRadius:6, cursor:"pointer", fontSize:10, fontWeight:700 }}>Copy</button>
                     </div>
                   ) : (
                     <div>
-                      <div style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>Not yet set by user</div>
-                      <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>User has not set their password yet. Send a reset link.</div>
+                      <div style={{ color:T.amber, fontWeight:700, fontSize:13 }}>Click Reset Pwd to set a new password</div>
                     </div>
                   )}
                 </div>

@@ -454,16 +454,16 @@ const SignatureInput = ({ label, canvasRef, onSignatureChange, savedSignature, i
 
 
 const AccountSettingsModal = ({ user, onClose, onUpdate }) => {
-  const [phone, setPhone] = React.useState(user.phone || "");
+  const [phone, setPhone] = React.useState(user?.phone || "");
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
   const [avatarFile, setAvatarFile] = React.useState(null);
-  const [avatarPreview, setAvatarPreview] = React.useState(user.avatar_url || null);
+  const [avatarPreview, setAvatarPreview] = React.useState(user?.avatar_url || null);
   const [saving, setSaving] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
   const [msg, setMsg] = React.useState("");
   const [error, setError] = React.useState("");
-  const [savedSignature, setSavedSignature] = React.useState(user.saved_signature || null);
+  const [savedSignature, setSavedSignature] = React.useState(user?.saved_signature || null);
   const [sigFile, setSigFile] = React.useState(null);
   const [sigUploading, setSigUploading] = React.useState(false);
   const fileRef = React.useRef();
@@ -3304,7 +3304,7 @@ const ClientsView = ({ user, activeCountry = "All" }) => {
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
   const [loginModal, setLoginModal] = useState(null);
-  const [form, setForm] = useState({ name: '', company: '', email: '', phone: '', notes: '' });
+  const [form, setForm] = useState({ name: '', company: '', email: '', phone: '', notes: '', country: activeCountry || 'Ghana' });
   const [loginForm, setLoginForm] = useState({ password: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -3352,6 +3352,7 @@ const ClientsView = ({ user, activeCountry = "All" }) => {
     await supabase.from('clients').insert({
       name: form.name, company: form.company, email: form.email,
       phone: form.phone, notes: form.notes,
+      country: form.country || activeCountry || 'Ghana',
     });
     setModal(false);
     setForm({ name: '', company: '', email: '', phone: '', notes: '' });
@@ -4429,8 +4430,10 @@ const CRMView = ({ user, activeCountry = "All" }) => {
                 const contact = clientForm.contact_name || approvalModal.contact_name;
 
                 // 1. Create client in clients table
+                const oppCountry = approvalModal.country || user?.country || activeCountry || 'Ghana';
                 const { data: newClient } = await supabase.from("clients").insert({
                   name: contact || name, company: name, email, phone,
+                  country: oppCountry,
                 }).select().single();
 
                 // 2. Create event if name provided
@@ -4439,6 +4442,7 @@ const CRMView = ({ user, activeCountry = "All" }) => {
                     name: eventForm.name, client: name, client_id: newClient.id,
                     event_date: eventForm.deadline || null, phase: eventForm.phase || "Planning",
                     status: "active", event_category: approvalModal.event_type || "Conference/Seminar",
+                    country: oppCountry,
                   });
                 }
 
@@ -4447,7 +4451,7 @@ const CRMView = ({ user, activeCountry = "All" }) => {
                   try {
                     const { data: authUser } = await supabase.auth.admin.createUser({ email, password: loginPassword || "Stretch@2026", email_confirm: true });
                     if (authUser?.user) {
-                      await supabase.from("profiles").insert({ id: authUser.user.id, name, email, phone, role: "Client", company_name: name });
+                      await supabase.from("profiles").insert({ id: authUser.user.id, name, email, phone, role: "Client", company_name: name, country: oppCountry });
                     }
                   } catch(e) { console.error("Login creation error:", e); }
                 }
@@ -7533,14 +7537,14 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "cash-flow": return <CashFlowView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "zoho-sync-status": return <ZohoSyncStatusView user={currentUser} />;
       case "audit-trail": return <AuditTrailView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
-      case "board-report": return <BoardReportView user={currentUser} />;
+      case "board-report": return <BoardReportView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "strategic-goals": return <StrategicGoalsView user={currentUser} />;
       case "client-health": return <ClientHealthView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "team-performance": return <TeamPerformanceView user={currentUser} />;
       case "risk-register": return <RiskRegisterView user={currentUser} />;
       case "decision-log": return <DecisionLogView user={currentUser} />;
       case "competitor-intel": return <CompetitorIntelView user={currentUser} />;
-      case "revenue-forecast": return <RevenueForecastView user={currentUser} />;
+      case "revenue-forecast": return <RevenueForecastView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "vendor-performance": return <VendorPerformanceView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "vendor-contracts": return <VendorContractsView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "preferred-vendors": return <PreferredVendorsView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
@@ -8912,7 +8916,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
   const [voucherSignature, setVoucherSignature] = useState("");
   const [voucherSignSaving, setVoucherSignSaving] = useState(false);
   const voucherCanvasRef = React.useRef(null);
-  const [savedSigFM, setSavedSigFM] = React.useState(user.saved_signature || null);
+  const [savedSigFM, setSavedSigFM] = React.useState(user?.saved_signature || null);
   React.useEffect(() => { supabase.from("profiles").select("saved_signature").eq("id", user.id).single().then(({ data }) => { if (data?.saved_signature) setSavedSigFM(data.saved_signature); }); }, [user.id]);
   const [vIsDrawing, setVIsDrawing] = useState(false);
   const [vLastPos, setVLastPos] = useState(null);
@@ -11431,7 +11435,7 @@ const PurchaseOrderView = ({ user, activeCountry = "All" }) => {
   const sigCanvas = React.useRef(null);
   const [sigDrawing, setSigDrawing] = useState(false);
   const [sigData, setSigData] = useState("");
-  const [savedSig, setSavedSig] = useState(user.saved_signature || null);
+  const [savedSig, setSavedSig] = useState(user?.saved_signature || null);
 
   React.useEffect(() => {
     supabase.from("profiles").select("saved_signature").eq("id", user.id).single().then(({ data }) => {
@@ -18947,7 +18951,7 @@ const PaymentAuthorisationView = ({ user, onNavigate, activeCountry = "All" }) =
   const voucherSigRef = React.useRef(null);
   const [vIsDrawing, setVIsDrawing] = useState(false);
   const [vLastPos, setVLastPos] = useState(null);
-  const [savedSig, setSavedSig] = useState(user.saved_signature || null);
+  const [savedSig, setSavedSig] = useState(user?.saved_signature || null);
   React.useEffect(() => { supabase.from("profiles").select("saved_signature").eq("id", user.id).single().then(({ data }) => { if (data?.saved_signature) setSavedSig(data.saved_signature); }); }, [user.id]);
   const [form, setForm] = useState({
     payee_id: "", payee_type: "vendor", rff_id: "", invoice_id: "",
@@ -19503,7 +19507,7 @@ const PaymentAuthorisationView = ({ user, onNavigate, activeCountry = "All" }) =
 const EmailTestPanel = ({ user }) => {
   const [sending, setSending] = useState({});
   const [results, setResults] = useState({});
-  const [testEmail, setTestEmail] = useState(user.email || "");
+  const [testEmail, setTestEmail] = useState(user?.email || "");
 
   const send = async (templateId, subject, html) => {
     if (!testEmail) { alert("Enter a test email address"); return; }
@@ -20693,7 +20697,7 @@ const DecisionLogView = ({ user }) => {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("all");
-  const [form, setForm] = useState({ project_id:"", event_name:"", title:"", decision:"", rationale:"", alternatives_considered:"", made_by_name:user.name, decision_date:new Date().toISOString().slice(0,10), category:"operational" });
+  const [form, setForm] = useState({ project_id:"", event_name:"", title:"", decision:"", rationale:"", alternatives_considered:"", made_by_name:user?.name, decision_date:new Date().toISOString().slice(0,10), category:"operational" });
 
   const CATEGORIES = ["operational","financial","vendor","client","strategic","hr","marketing"];
   const catColors = { operational:T.cyan, financial:T.amber, vendor:T.teal, client:T.magenta, strategic:"#8B5CF6", hr:"#F59E0B", marketing:T.blue };
@@ -20911,7 +20915,7 @@ const CompetitorIntelView = ({ user }) => {
   );
 };
 
-const RevenueForecastView = ({ user }) => {
+const RevenueForecastView = ({ user, activeCountry = "All" }) => {
   const [opportunities, setOpportunities] = useState([]);
   const [forecasts, setForecasts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20919,14 +20923,14 @@ const RevenueForecastView = ({ user }) => {
   useEffect(() => {
     const load = async () => {
       const [{ data: op }, { data: fc }] = await Promise.all([
-        supabase.from("opportunities").select("*").not("status","in","(won,lost,Converted)").order("company"),
+        (activeCountry && activeCountry !== "All") ? supabase.from("opportunities").select("*").not("status","in","(won,lost,Converted)").eq("country",activeCountry).order("company") : supabase.from("opportunities").select("*").not("status","in","(won,lost,Converted)").order("company"),
         supabase.from("revenue_forecast").select("*"),
       ]);
       setOpportunities(op||[]); setForecasts(fc||[]);
       setLoading(false);
     };
     load();
-  }, []);
+  }, [activeCountry]);
 
   const updateForecast = async (oppId, company, field, value) => {
     const existing = forecasts.find(f => f.opportunity_id === oppId);
@@ -21028,7 +21032,7 @@ const RevenueForecastView = ({ user }) => {
   );
 };
 
-const BoardReportView = ({ user }) => {
+const BoardReportView = ({ user, activeCountry = "All" }) => {
   const [events, setEvents] = useState([]);
   const [clients, setClients] = useState([]);
   const [opportunities, setOpportunities] = useState([]);
@@ -21043,22 +21047,20 @@ const BoardReportView = ({ user }) => {
   useEffect(() => {
     const load = async () => {
       const [{ data: ev }, { data: cl }, { data: op }, { data: cp }, { data: sat }, { data: go }, { data: aw }] = await Promise.all([
-        supabase.from("projects").select("*").order("event_date", { ascending: false }),
-        supabase.from("clients").select("*"),
-        user.role === 'Country Manager'
-        ? supabase.from("opportunities").select("*").eq("country", user.country)
-        : supabase.from("opportunities").select("*"),
-        supabase.from("client_payments").select("*"),
+        (activeCountry && activeCountry !== "All") ? supabase.from("projects").select("*").eq("country",activeCountry).order("event_date",{ascending:false}) : supabase.from("projects").select("*").order("event_date",{ascending:false}),
+        (activeCountry && activeCountry !== "All") ? supabase.from("clients").select("*").eq("country",activeCountry) : supabase.from("clients").select("*"),
+        (activeCountry && activeCountry !== "All") ? supabase.from("opportunities").select("*").eq("country",activeCountry) : supabase.from("opportunities").select("*"),
+        (activeCountry && activeCountry !== "All") ? supabase.from("client_payments").select("*").eq("country",activeCountry) : supabase.from("client_payments").select("*"),
         supabase.from("client_satisfaction").select("*"),
         supabase.from("company_goals").select("*").eq("status","active"),
-        supabase.from("rff_awards").select("*"),
+        (activeCountry && activeCountry !== "All") ? supabase.from("rff_awards").select("*").eq("country",activeCountry) : supabase.from("rff_awards").select("*"),
       ]);
       setEvents(ev||[]); setClients(cl||[]); setOpportunities(op||[]);
       setClientPayments(cp||[]); setSatisfaction(sat||[]); setGoals(go||[]); setAwards(aw||[]);
       setLoading(false);
     };
     load();
-  }, []);
+  }, [activeCountry]);
 
   const now = new Date();
   const activeEvents = events.filter(e => !["Completed","Cancelled","completed","cancelled"].includes(e.phase||""));

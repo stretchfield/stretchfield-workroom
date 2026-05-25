@@ -4033,7 +4033,7 @@ const LeadPanel = ({ lead, activities, canEdit, canApprove, addActivity, updateS
   );
 };
 
-const CRMView = ({ user }) => {
+const CRMView = ({ user, activeCountry = "All" }) => {
   const [leads, setLeads] = useState([]);
   const [activities, setActivities] = useState([]);
   const [proposals, setProposals] = useState([]);
@@ -4063,7 +4063,7 @@ const CRMView = ({ user }) => {
   const load = async () => {
     const [l, a, p, m, c] = await Promise.all([
       ["CEO", "Country Manager", "Sales & Marketing"].includes(user?.role)
-        ? supabase.from("leads").select("*").order("created_at", { ascending: false })
+        ? (activeCountry && activeCountry !== "All" ? supabase.from("leads").select("*").eq("country",activeCountry).order("created_at",{ascending:false}) : supabase.from("leads").select("*").order("created_at",{ascending:false}))
         : supabase.from("leads").select("*").or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`).order("created_at", { ascending: false }),
       supabase.from("crm_activities").select("*").order("created_at", { ascending: false }),
       supabase.from("proposals").select("*").order("created_at", { ascending: false }),
@@ -4077,7 +4077,7 @@ const CRMView = ({ user }) => {
     setExistingClients(c.data || []);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeCountry]);
 
   const filteredLeads = leads.filter(l => {
     if (filter !== "all" && l.status !== filter) return false;
@@ -8102,10 +8102,10 @@ const CRMDashboardCEO = ({ user, activeCountry = "All" }) => {
 
   const load = async () => {
     const [l, t, m, cp] = await Promise.all([
-      supabase.from("opportunities").select("*").eq("country", activeCountry),
+      (activeCountry && activeCountry !== "All") ? supabase.from("opportunities").select("*").eq("country",activeCountry) : supabase.from("opportunities").select("*"),
       supabase.from("sales_targets").select("*").order("created_at", { ascending: false }),
       supabase.from("profiles").select("*").or('role.in.("CEO","Country Manager","Sales & Marketing"),has_sm_access.eq.true'),
-      supabase.from("client_payments").select("*").order("created_at", { ascending: false }),
+      (activeCountry && activeCountry !== "All") ? supabase.from("client_payments").select("*").eq("country",activeCountry).order("created_at",{ascending:false}) : supabase.from("client_payments").select("*").order("created_at",{ascending:false}),
     ]);
     setOpportunitys(l.data || []);
     setTargets(t.data || []);
@@ -9179,7 +9179,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
             <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em' }}>Finance Operations</h2>
             <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>
               Vouchers · Estimates · Petty Cash · Daily Balances
-              {user?.role === 'Country Manager' && <span style={{ marginLeft: 8, background: userCountry === 'Nigeria' ? '#10B98120' : T.amber+'20', color: userCountry === 'Nigeria' ? '#10B981' : T.amber, borderRadius: 20, padding: '1px 8px', fontSize: 10, fontWeight: 700 }}>{userCountry === 'Nigeria' ? 'NG' : 'GH'} {userCountry} only</span>}
+              {user?.role === 'Country Manager' && <span style={{ marginLeft: 8, background: (user?.country||'Ghana') === 'Nigeria' ? '#10B98120' : T.amber+'20', color: (user?.country||'Ghana') === 'Nigeria' ? '#10B981' : T.amber, borderRadius: 20, padding: '1px 8px', fontSize: 10, fontWeight: 700 }}>{(user?.country||'Ghana') === 'Nigeria' ? 'NG' : 'GH'} {user?.country||'Ghana'} only</span>}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -14976,9 +14976,10 @@ const OpportunitiesView = ({ user, onNavigate, activeCountry = "All" }) => {
   const canManage = ["CEO", "Sales & Marketing"].includes(user?.role) || user?.has_sm_access;
 
   const load = async () => {
-    let query = supabase.from("opportunities").select("*").order("company");
+    const acFilter = activeCountry && activeCountry !== "All";
+    let query = acFilter ? supabase.from("opportunities").select("*").eq("country",activeCountry).order("company") : supabase.from("opportunities").select("*").order("company");
     // Kofi (has_sm_access but not CEO/S&M) only sees assigned or created by him
-    if (user?.has_sm_access && !["CEO","Sales & Marketing"].includes(user?.role)) {
+    if (user?.has_sm_access && !["CEO","Sales & Marketing","Country Manager"].includes(user?.role)) {
       query = supabase.from("opportunities").select("*").or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`).order("company");
     }
     const { data } = await query;
@@ -15035,7 +15036,7 @@ const OpportunitiesView = ({ user, onNavigate, activeCountry = "All" }) => {
     loadActivities(oppId);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeCountry]);
 
   useEffect(() => {
     let f = [...opportunities];
@@ -15419,9 +15420,9 @@ const VendorsView = ({ user, activeCountry = "All" }) => {
 
   const load = async () => {
     const [r, e, c, apps] = await Promise.all([
-      supabase.from('rffs').select('*').order('created_at', { ascending: false }),
-      supabase.from('projects').select('*'),
-      supabase.from('clients').select('*'),
+      (activeCountry && activeCountry !== "All") ? supabase.from('rffs').select('*').eq('country',activeCountry).order('created_at',{ascending:false}) : supabase.from('rffs').select('*').order('created_at',{ascending:false}),
+      (activeCountry && activeCountry !== "All") ? supabase.from('projects').select('*').eq('country',activeCountry) : supabase.from('projects').select('*'),
+      (activeCountry && activeCountry !== "All") ? supabase.from('clients').select('*').eq('country',activeCountry) : supabase.from('clients').select('*'),
       supabase.from('vendor_applications').select('*').order('created_at', { ascending: false }),
     ]);
     // Show all RFFs for Vendor Manager/CEO/Admin
@@ -17533,9 +17534,10 @@ const CEOClientFinanceView = ({ user, activeCountry = "All" }) => {
   const [invoiceForm, setInvoiceForm] = useState({ title: "", file_url: "" });
 
   const load = async () => {
+    const acF = activeCountry && activeCountry !== "All";
     const [cl, ev, bud, exp, inv] = await Promise.all([
-      supabase.from("clients").select("*").order("name"),
-      supabase.from("projects").select("*").order("name"),
+      acF ? supabase.from("clients").select("*").eq("country",activeCountry).order("name") : supabase.from("clients").select("*").order("name"),
+      acF ? supabase.from("projects").select("*").eq("country",activeCountry).order("name") : supabase.from("projects").select("*").order("name"),
       supabase.from("client_budgets").select("*"),
       supabase.from("client_expenses").select("*").order("created_at", { ascending: false }),
       supabase.from("client_invoices").select("*").order("created_at", { ascending: false }),
@@ -21302,11 +21304,12 @@ const ClientHealthView = ({ user, activeCountry = "All" }) => {
 
   useEffect(() => {
     const load = async () => {
+      const acFilter = activeCountry && activeCountry !== "All";
       const [{ data: cl }, { data: ev }, { data: sat }, { data: cp }, { data: hs }] = await Promise.all([
-        supabase.from("clients").select("*").order("name"),
-        supabase.from("projects").select("*"),
+        acFilter ? supabase.from("clients").select("*").eq("country",activeCountry).order("name") : supabase.from("clients").select("*").order("name"),
+        acFilter ? supabase.from("projects").select("*").eq("country",activeCountry) : supabase.from("projects").select("*"),
         supabase.from("client_satisfaction").select("*"),
-        supabase.from("client_payments").select("*"),
+        acFilter ? supabase.from("client_payments").select("*").eq("country",activeCountry) : supabase.from("client_payments").select("*"),
         supabase.from("client_health_scores").select("*"),
       ]);
       setClients(cl||[]); setEvents(ev||[]); setSatisfaction(sat||[]);
@@ -21314,7 +21317,7 @@ const ClientHealthView = ({ user, activeCountry = "All" }) => {
       setLoading(false);
     };
     load();
-  }, []);
+  }, [activeCountry]);
 
   const getClientMetrics = (client) => {
     const clientEvents = events.filter(e => e.client_id === client.id);

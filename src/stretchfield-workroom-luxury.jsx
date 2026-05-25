@@ -20390,7 +20390,7 @@ const ApprovalQueueView = ({ user, onNavigate }) => {
   const load = async () => {
     const [{ data: rf }, { data: po }, { data: sr }] = await Promise.all([
       activeCountry === "All" ? supabase.from("rffs").select("*,projects(name)").eq("approved",false).order("created_at",{ascending:false}) : supabase.from("rffs").select("*,projects(name)").eq("approved",false).eq("country",activeCountry).order("created_at",{ascending:false}),
-      activeCountry === "All" ? supabase.from("purchase_orders").select("*").in("status",["vm_signed","finance_signed","fully_signed", : supabase.from("purchase_orders").select("*").eq("country",activeCountry).in("status",["vm_signed","finance_signed","fully_signed","pending_ceo"]).order("created_at", { ascending: false }),
+      activeCountry === "All" ? supabase.from("purchase_orders").select("*").in("status",["vm_signed","finance_signed","fully_signed","pending_ceo"]).order("created_at",{ascending:false}) : supabase.from("purchase_orders").select("*").eq("country",activeCountry).in("status",["vm_signed","finance_signed","fully_signed","pending_ceo"]).order("created_at",{ascending:false}),
       activeCountry === "All"
         ? supabase.from("staff_payment_requests").select("*").eq("status","pending_ceo").order("submitted_at", { ascending: false })
         : supabase.from("staff_payment_requests").select("*").eq("country", activeCountry).eq("status","pending_ceo").order("submitted_at", { ascending: false }),

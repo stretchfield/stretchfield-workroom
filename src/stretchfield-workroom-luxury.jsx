@@ -7179,7 +7179,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "finance": return <FinanceDashboard user={currentUser} onTab={setActiveTab} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "finance-approvals": return <FinanceApprovalsView user={currentUser} />;
       case "scorecards": return <VendorScorecardsView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
-      case "vendor-analytics": return <VendorAnalyticsView user={currentUser} />;
+      case "vendor-analytics": return <VendorAnalyticsView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "payment-authorisation": return <PaymentAuthorisationView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "staff-payment-rates": return <StaffPaymentRatesView user={currentUser} />;
       case "client-payments": return <ClientPaymentsView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
@@ -7198,11 +7198,11 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "revenue-forecast": return <RevenueForecastView user={currentUser} />;
       case "vendor-performance": return <VendorPerformanceView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "vendor-contracts": return <VendorContractsView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
-      case "preferred-vendors": return <PreferredVendorsView user={currentUser} />;
-      case "vendor-watchlist": return <VendorWatchlistView user={currentUser} />;
-      case "vendor-comms": return <VendorCommsView user={currentUser} />;
-      case "vendor-sla": return <VendorSLAView user={currentUser} />;
-      case "market-rates": return <MarketRatesView user={currentUser} />;
+      case "preferred-vendors": return <PreferredVendorsView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
+      case "vendor-watchlist": return <VendorWatchlistView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
+      case "vendor-comms": return <VendorCommsView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
+      case "vendor-sla": return <VendorSLAView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
+      case "market-rates": return <MarketRatesView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "procurement-report": return <ProcurementReportView user={currentUser} />;
       case "event-briefs": return <EventBriefsView user={currentUser} />;
       case "event-milestones": return <EventMilestonesView user={currentUser} />;
@@ -21356,7 +21356,7 @@ const VendorContractsView = ({ user, activeCountry = "All" }) => {
   );
 };
 
-const PreferredVendorsView = ({ user }) => {
+const PreferredVendorsView = ({ user, activeCountry = "All" }) => {
   const [preferred, setPreferred] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [modal, setModal] = useState(false);
@@ -21373,7 +21373,7 @@ const PreferredVendorsView = ({ user }) => {
     ]);
     setPreferred(p||[]); setVendors(v||[]);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeCountry]);
 
   const handleSave = async () => {
     if (!form.vendor_id) { alert("Select a vendor."); return; }
@@ -21452,7 +21452,7 @@ const PreferredVendorsView = ({ user }) => {
   );
 };
 
-const VendorWatchlistView = ({ user }) => {
+const VendorWatchlistView = ({ user, activeCountry = "All" }) => {
   const [watchlist, setWatchlist] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [modal, setModal] = useState(false);
@@ -21469,7 +21469,7 @@ const VendorWatchlistView = ({ user }) => {
     ]);
     setWatchlist(w||[]); setVendors(v||[]);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeCountry]);
 
   const active = watchlist.filter(w => w.status === "active");
   const resolved = watchlist.filter(w => w.status === "resolved");
@@ -21561,7 +21561,7 @@ const VendorWatchlistView = ({ user }) => {
   );
 };
 
-const VendorCommsView = ({ user }) => {
+const VendorCommsView = ({ user, activeCountry = "All" }) => {
   const [comms, setComms] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [events, setEvents] = useState([]);
@@ -21581,7 +21581,7 @@ const VendorCommsView = ({ user }) => {
     ]);
     setComms(c||[]); setVendors(v||[]); setEvents(e||[]);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeCountry]);
 
   const filtered = filter === "all" ? comms : comms.filter(c => c.type === filter);
   const followUps = comms.filter(c => c.follow_up_date && new Date(c.follow_up_date) >= new Date());
@@ -21684,7 +21684,7 @@ const VendorCommsView = ({ user }) => {
   );
 };
 
-const VendorSLAView = ({ user }) => {
+const VendorSLAView = ({ user, activeCountry = "All" }) => {
   const [slas, setSlas] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [events, setEvents] = useState([]);
@@ -21702,7 +21702,7 @@ const VendorSLAView = ({ user }) => {
     ]);
     setSlas(s||[]); setVendors(v||[]); setEvents(e||[]);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeCountry]);
 
   const breaches = slas.filter(s => s.status === "breached");
   const met = slas.filter(s => s.status === "met");
@@ -21797,7 +21797,7 @@ const VendorSLAView = ({ user }) => {
   );
 };
 
-const MarketRatesView = ({ user }) => {
+const MarketRatesView = ({ user, activeCountry = "All" }) => {
   const [rates, setRates] = useState([]);
   const [modal, setModal] = useState(false);
   const [editModal, setEditModal] = useState(null);
@@ -21806,7 +21806,7 @@ const MarketRatesView = ({ user }) => {
   const CATEGORIES = ["Event Lighting","Events Ushering","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Security Service","Transportation","Venue Provider","Other"];
 
   const load = async () => { const { data } = await supabase.from("vendor_market_rates").select("*").order("category"); setRates(data||[]); };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeCountry]);
 
   const handleSave = async () => {
     if (!form.category) { alert("Category required."); return; }
@@ -23239,7 +23239,7 @@ const BoardDashboard = ({ user }) => {
   );
 };
 
-const VendorAnalyticsView = ({ user }) => {
+const VendorAnalyticsView = ({ user, activeCountry = "All" }) => {
   const [vendors, setVendors] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [awards, setAwards] = useState([]);
@@ -23269,7 +23269,7 @@ const VendorAnalyticsView = ({ user }) => {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeCountry]);
 
   const getVendorStats = (vendor) => {
     const vAssignments = assignments.filter(a => a.vendor_id === vendor.id);

@@ -8369,7 +8369,9 @@ const FinanceManagerDashboard = ({ user, onTab }) => {
 
   const load = async () => {
     const [v, est, pc, db, ci, vi, po, ev] = await Promise.all([
-      supabase.from('payment_vouchers').select('*').order('created_at', { ascending: false }),
+      ['Country Manager'].includes(user.role)
+        ? supabase.from('payment_vouchers').select('*').eq('country', user.country).order('created_at', { ascending: false })
+        : supabase.from('payment_vouchers').select('*').order('created_at', { ascending: false }),
       supabase.from('estimates').select('*').order('created_at', { ascending: false }),
       supabase.from('petty_cash').select('*').limit(1).maybeSingle(),
       supabase.from('daily_balances').select('*').order('report_date', { ascending: false }).limit(1),
@@ -8602,7 +8604,10 @@ const FinanceDashboard = ({ user, onTab }) => {
     setPOs(po.data || []);
     setClientInvoices(ci.data || []);
     setVendorInvoices(vi.data || []);
-    const { data: sr } = await supabase.from("staff_payment_requests").select("*").order("submitted_at", { ascending: false });
+    const srQuery = ['Country Manager'].includes(user.role)
+      ? supabase.from("staff_payment_requests").select("*").eq("country", user.country).order("submitted_at", { ascending: false })
+      : supabase.from("staff_payment_requests").select("*").order("submitted_at", { ascending: false });
+    const { data: sr } = await srQuery;
     setStaffRequests(sr || []);
     const { data: sl } = await supabase.from("profiles").select("id,name,role").in("role",["Finance Manager","Vendor Manager","Strategy & Events Lead","CEO","Board of Directors","Sales & Marketing"]);
     setStaffList(sl || []);
@@ -9131,9 +9136,10 @@ const FinanceDashboard = ({ user, onTab }) => {
           {(() => {
             return null; // Bank details shown in separate section below
           })()}
-          {(staffRequests||[]).length === 0 ? (
-            <div style={{ color:T.textMuted, fontSize:13, textAlign:"center", padding:"40px 0" }}>No staff payment requests yet</div>
-          ) : (staffRequests||[]).map(req => {
+          {(() => {
+            const displayRequests = countryFilter === "All" ? (staffRequests||[]) : (staffRequests||[]).filter(r => (r.country||"Ghana") === countryFilter);
+            if (displayRequests.length === 0) return <div style={{ color:T.textMuted, fontSize:13, textAlign:"center", padding:"40px 0" }}>No staff payment requests{countryFilter !== "All" ? " for "+countryFilter : ""} yet</div>;
+            return displayRequests.map(req => {
             const statusColors = { pending:T.amber, pending_ceo:T.cyan, approved:T.teal, rejected:T.red, paid:"#10B981" };
             const statusLabels = { pending:"Pending Finance Review", pending_ceo:"Sent to CEO — Awaiting Approval", approved:"CEO Approved — Ready to Pay", rejected:"Rejected", paid:"Paid ✓" };
             return (
@@ -9208,7 +9214,8 @@ const FinanceDashboard = ({ user, onTab }) => {
                 )}
               </div>
             );
-          })}
+          });
+          })()}
         </div>
       )}
 
@@ -18500,8 +18507,12 @@ const PaymentAuthorisationView = ({ user, onNavigate }) => {
     try {
       const [au, sr, pv, vp, sp, aw, rf, inv, va] = await Promise.all([
         supabase.from("payment_authorisations").select("*").order("created_at", { ascending: false }),
-        supabase.from("staff_payment_requests").select("*").eq("status","pending_ceo").order("submitted_at", { ascending: false }),
-        supabase.from("payment_vouchers").select("*").or("status.eq.pending_approval,status.eq.approved,status.eq.fm_signed").order("created_at", { ascending: false }),
+        user.role === 'Country Manager'
+        ? supabase.from("staff_payment_requests").select("*").eq("country", user.country).eq("status","pending_ceo").order("submitted_at", { ascending: false })
+        : supabase.from("staff_payment_requests").select("*").eq("status","pending_ceo").order("submitted_at", { ascending: false }),
+        user.role === 'Country Manager'
+        ? supabase.from("payment_vouchers").select("*").eq("country", user.country).or("status.eq.pending_approval,status.eq.approved,status.eq.fm_signed").order("created_at", { ascending: false })
+        : supabase.from("payment_vouchers").select("*").or("status.eq.pending_approval,status.eq.approved,status.eq.fm_signed").order("created_at", { ascending: false }),
         supabase.from("profiles").select("*").eq("role", "Vendor"),
         supabase.from("profiles").select("*").in("role", ["Finance Manager","Vendor Manager","Strategy & Events Lead","CEO","Board of Directors","Sales & Marketing","Country Manager"]),
         supabase.from("rff_awards").select("*"),
@@ -19961,7 +19972,9 @@ const ApprovalQueueView = ({ user, onNavigate }) => {
     const [{ data: rf }, { data: po }, { data: sr }] = await Promise.all([
       supabase.from("rffs").select("*,projects(name)").eq("approved", false).order("created_at", { ascending: false }),
       supabase.from("purchase_orders").select("*").in("status",["vm_signed","finance_signed","fully_signed","pending_ceo"]).order("created_at", { ascending: false }),
-      supabase.from("staff_payment_requests").select("*").eq("status","pending_ceo").order("submitted_at", { ascending: false }),
+      user.role === 'Country Manager'
+        ? supabase.from("staff_payment_requests").select("*").eq("country", user.country).eq("status","pending_ceo").order("submitted_at", { ascending: false })
+        : supabase.from("staff_payment_requests").select("*").eq("status","pending_ceo").order("submitted_at", { ascending: false }),
     ]);
     setRffs(rf||[]); setPOs(po||[]); setStaffRequests(sr||[]);
     setLoading(false);

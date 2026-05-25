@@ -1185,7 +1185,7 @@ const CEODashboard = ({ onTab, user, activeCountry = "All" }) => {
   const [viewCountry, setViewCountry] = useState(user?.role === 'Country Manager' ? (user?.country||'Nigeria') : 'Ghana');
 
   // Sync with parent activeCountry
-  React.useEffect(() => { if (activeCountry && user.role !== 'Country Manager') setViewCountry(activeCountry); }, [activeCountry]);
+  React.useEffect(() => { if (activeCountry && user?.role !== 'Country Manager') setViewCountry(activeCountry); }, [activeCountry]);
   const [bankRequested, setBankRequested] = useState(false);
   const [bankSubmitted, setBankSubmitted] = useState(false);
   const [showBankForm, setShowBankForm] = useState(false);
@@ -19638,9 +19638,11 @@ const SalesDashboardView = ({ user, activeCountry = "All" }) => {
     const [{ data: p }, { data: t }, { data: r }] = await Promise.all([
       (!activeCountry || activeCountry === "All") ? supabase.from("client_payments").select("*").order("payment_date", { ascending: false }) : supabase.from("client_payments").select("*").eq("country", activeCountry).order("payment_date", { ascending: false }),
       supabase.from("sales_targets").select("*"),
-      supabase.from("profiles").select("id,name,role,has_sm_access").or('role.in.("CEO","Sales & Marketing"),has_sm_access.eq.true'),
+      supabase.from("profiles").select("id,name,role,has_sm_access,country").or('role.in.("CEO","Sales & Marketing"),has_sm_access.eq.true'),
     ]);
-    setPayments(p||[]); setTargets(t||[]); setReps((r||[]).filter((m,i,s)=>s.findIndex(x=>x.id===m.id)===i));
+    setPayments(p||[]); setTargets(t||[]); 
+    const countryReps = (r||[]).filter(rep => !activeCountry || activeCountry === "All" || (rep.country||"Ghana") === activeCountry);
+    setReps(countryReps.filter((m,i,s)=>s.findIndex(x=>x.id===m.id)===i));
     setLoading(false);
   };
   useEffect(() => { load(); }, [activeCountry]);

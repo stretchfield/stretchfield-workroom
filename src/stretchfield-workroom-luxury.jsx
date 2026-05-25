@@ -7148,7 +7148,215 @@ const ClientEventsView = ({ user }) => {
   );
 };
 
+
+const PublicVendorApplicationForm = () => {
+  const [form, setForm] = React.useState({
+    vendor_name: "", vendor_type: "", contact_person: "", contact_email: "",
+    phone: "", address: "", country: "Ghana",
+    bank_name: "", bank_address: "", bank_account_name: "", account_no: "",
+    swift_code: "", bank_phone: "", bank_email: "", payment_terms: "",
+    form_completed_by: "", position_in_company: "", date_submitted: new Date().toISOString().slice(0,10),
+  });
+  const [saving, setSaving] = React.useState(false);
+  const [submitted, setSubmitted] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const [step, setStep] = React.useState(1);
+
+  const VENDOR_TYPES = ["Event Lighting","Events Ushering","Photography","Videography","Catering",
+    "Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company",
+    "Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier",
+    "Health & Safety Provider","Printing Company","Registration & Badging Service",
+    "Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Audio Visual","Other"];
+
+  const handleSubmit = async () => {
+    if (!form.vendor_name || !form.contact_email || !form.vendor_type || !form.country) {
+      setError("Company name, email, vendor type and country are required."); return;
+    }
+    setSaving(true); setError("");
+    const { error: err } = await supabase.from("vendor_applications").insert({
+      ...form,
+      status: "submitted",
+      date_submitted: new Date().toISOString().slice(0,10),
+    });
+    if (err) { setError("Submission failed: " + err.message); setSaving(false); return; }
+    // Notify VM
+    const { data: vms } = await supabase.from("profiles").select("id").eq("role","Vendor Manager");
+    for (const vm of vms||[]) {
+      await supabase.from("notifications").insert({ user_id: vm.id, title: "New Vendor Application — "+form.vendor_name, message: form.vendor_name+" has submitted a vendor application for "+form.vendor_type+". Review in Vendor Applications.", type: "rff" });
+    }
+    setSaving(false); setSubmitted(true);
+  };
+
+  const inputStyle = { width:"100%", padding:"10px 14px", background:"#F8FAFC", border:"1px solid #E2E8F0", borderRadius:8, color:"#0F172A", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" };
+  const labelStyle = { color:"#64748B", fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.06em", display:"block", marginBottom:5 };
+  const sectionStyle = { marginBottom:28 };
+  const sectionTitle = { color:"#00C8FF", fontSize:12, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:14, paddingBottom:8, borderBottom:"2px solid #00C8FF20" };
+
+  if (submitted) return (
+    <div style={{ minHeight:"100vh", background:"#F1F5F9", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+      <div style={{ background:"#fff", borderRadius:20, padding:"48px 40px", maxWidth:480, width:"100%", textAlign:"center", boxShadow:"0 20px 60px rgba(0,0,0,0.1)" }}>
+        <div style={{ width:64, height:64, background:"#10B98115", borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 20px", fontSize:28 }}></div>
+        <h2 style={{ color:"#0F172A", fontWeight:900, fontSize:24, marginBottom:12 }}>Application Submitted!</h2>
+        <p style={{ color:"#64748B", fontSize:15, lineHeight:1.6, marginBottom:24 }}>Thank you <strong>{form.vendor_name}</strong>. Your application has been received and is under review. Our team will contact you at <strong>{form.contact_email}</strong> within 2-3 business days.</p>
+        <div style={{ background:"#F8FAFC", borderRadius:10, padding:"14px 18px", marginBottom:24 }}>
+          <div style={{ color:"#64748B", fontSize:12 }}>Reference</div>
+          <div style={{ color:"#00C8FF", fontWeight:800, fontSize:16, fontFamily:"monospace" }}>APP-{Date.now().toString().slice(-6)}</div>
+        </div>
+        <p style={{ color:"#94A3B8", fontSize:12 }}>Stretchfield WorkRoom · workroom.stretchfield.com</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ minHeight:"100vh", background:"#F1F5F9", padding:"32px 20px" }}>
+      <div style={{ maxWidth:680, margin:"0 auto" }}>
+        {/* Header */}
+        <div style={{ background:"#060B14", borderRadius:"16px 16px 0 0", padding:"28px 36px", marginBottom:0 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <div>
+              <div style={{ color:"#00C8FF", fontSize:18, fontWeight:900, letterSpacing:"0.05em" }}>STRETCHFIELD</div>
+              <div style={{ color:"#5A6E8A", fontSize:11, marginTop:2 }}>Vendor Registration Form</div>
+            </div>
+            <div style={{ color:"#5A6E8A", fontSize:11, textAlign:"right" }}>
+              <div style={{ color:"#E8F0FF", fontWeight:700 }}>Step {step} of 3</div>
+              <div style={{ width:120, height:4, background:"#1A2E4A", borderRadius:2, marginTop:6 }}>
+                <div style={{ width:(step/3*100)+"%", height:"100%", background:"linear-gradient(90deg,#00C8FF,#00E5C8)", borderRadius:2, transition:"width 0.3s" }} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Form Body */}
+        <div style={{ background:"#fff", borderRadius:"0 0 16px 16px", padding:"36px", boxShadow:"0 10px 40px rgba(0,0,0,0.08)" }}>
+          {error && <div style={{ background:"#FEF2F2", border:"1px solid #FCA5A5", borderRadius:8, padding:"10px 14px", color:"#DC2626", fontSize:13, marginBottom:20 }}>{error}</div>}
+
+          {step === 1 && (
+            <div>
+              <h3 style={{ color:"#0F172A", fontWeight:900, fontSize:18, marginBottom:6 }}>Company Information</h3>
+              <p style={{ color:"#64748B", fontSize:13, marginBottom:24 }}>Tell us about your business</p>
+              <div style={sectionStyle}>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+                  <div style={{ gridColumn:"1/-1" }}>
+                    <label style={labelStyle}>Company / Vendor Name *</label>
+                    <input value={form.vendor_name} onChange={e=>setForm(f=>({...f,vendor_name:e.target.value}))} style={inputStyle} placeholder="e.g. Acme Events Ltd" />
+                  </div>
+                  <div style={{ gridColumn:"1/-1" }}>
+                    <label style={labelStyle}>Service Category *</label>
+                    <select value={form.vendor_type} onChange={e=>setForm(f=>({...f,vendor_type:e.target.value}))} style={inputStyle}>
+                      <option value="">Select your service category...</option>
+                      {VENDOR_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Country *</label>
+                    <select value={form.country} onChange={e=>setForm(f=>({...f,country:e.target.value}))} style={inputStyle}>
+                      <option value="Ghana">Ghana</option>
+                      <option value="Nigeria">Nigeria</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Phone Number *</label>
+                    <input value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} style={inputStyle} placeholder="+233 XX XXX XXXX" />
+                  </div>
+                  <div style={{ gridColumn:"1/-1" }}>
+                    <label style={labelStyle}>Address</label>
+                    <input value={form.address} onChange={e=>setForm(f=>({...f,address:e.target.value}))} style={inputStyle} placeholder="Street, City" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div>
+              <h3 style={{ color:"#0F172A", fontWeight:900, fontSize:18, marginBottom:6 }}>Contact Details</h3>
+              <p style={{ color:"#64748B", fontSize:13, marginBottom:24 }}>Primary contact information</p>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+                <div>
+                  <label style={labelStyle}>Contact Person *</label>
+                  <input value={form.contact_person} onChange={e=>setForm(f=>({...f,contact_person:e.target.value}))} style={inputStyle} placeholder="Full name" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Position in Company</label>
+                  <input value={form.position_in_company} onChange={e=>setForm(f=>({...f,position_in_company:e.target.value}))} style={inputStyle} placeholder="e.g. CEO, Manager" />
+                </div>
+                <div style={{ gridColumn:"1/-1" }}>
+                  <label style={labelStyle}>Email Address *</label>
+                  <input type="email" value={form.contact_email} onChange={e=>setForm(f=>({...f,contact_email:e.target.value}))} style={inputStyle} placeholder="email@company.com" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div>
+              <h3 style={{ color:"#0F172A", fontWeight:900, fontSize:18, marginBottom:6 }}>Bank Details</h3>
+              <p style={{ color:"#64748B", fontSize:13, marginBottom:24 }}>Payment information (optional — can be completed later)</p>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+                <div>
+                  <label style={labelStyle}>Bank Name</label>
+                  <input value={form.bank_name} onChange={e=>setForm(f=>({...f,bank_name:e.target.value}))} style={inputStyle} placeholder="e.g. GCB Bank" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Account Number</label>
+                  <input value={form.account_no} onChange={e=>setForm(f=>({...f,account_no:e.target.value}))} style={inputStyle} placeholder="Account number" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Account Name</label>
+                  <input value={form.bank_account_name} onChange={e=>setForm(f=>({...f,bank_account_name:e.target.value}))} style={inputStyle} placeholder="Name on account" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Payment Terms</label>
+                  <select value={form.payment_terms} onChange={e=>setForm(f=>({...f,payment_terms:e.target.value}))} style={inputStyle}>
+                    <option value="">Select...</option>
+                    <option value="Immediate">Immediate</option>
+                    <option value="Net 7 days">Net 7 days</option>
+                    <option value="Net 14 days">Net 14 days</option>
+                    <option value="Net 30 days">Net 30 days</option>
+                    <option value="50% upfront, balance on completion">50% upfront, balance on completion</option>
+                    <option value="100% upfront">100% upfront</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Form Completed By</label>
+                  <input value={form.form_completed_by} onChange={e=>setForm(f=>({...f,form_completed_by:e.target.value}))} style={inputStyle} placeholder="Full name" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Date</label>
+                  <input type="date" value={form.date_submitted} onChange={e=>setForm(f=>({...f,date_submitted:e.target.value}))} style={inputStyle} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Navigation */}
+          <div style={{ display:"flex", gap:12, marginTop:32, paddingTop:24, borderTop:"1px solid #E2E8F0" }}>
+            {step > 1 && (
+              <button onClick={() => setStep(s => s-1)} style={{ padding:"12px 24px", borderRadius:8, border:"1px solid #E2E8F0", background:"none", color:"#64748B", fontWeight:700, fontSize:14, cursor:"pointer" }}>Back</button>
+            )}
+            {step < 3 ? (
+              <button onClick={() => {
+                if (step === 1 && (!form.vendor_name || !form.vendor_type || !form.country)) { setError("Please fill in all required fields."); return; }
+                if (step === 2 && (!form.contact_person || !form.contact_email)) { setError("Contact person and email are required."); return; }
+                setError(""); setStep(s => s+1);
+              }} style={{ flex:1, padding:"12px", borderRadius:8, border:"none", background:"linear-gradient(135deg,#00C8FF,#00E5C8)", color:"#060B14", fontWeight:800, fontSize:14, cursor:"pointer" }}>Continue</button>
+            ) : (
+              <button onClick={handleSubmit} disabled={saving} style={{ flex:1, padding:"12px", borderRadius:8, border:"none", background:"linear-gradient(135deg,#00C8FF,#00E5C8)", color:"#060B14", fontWeight:800, fontSize:14, cursor:saving?"not-allowed":"pointer", opacity:saving?0.7:1 }}>{saving?"Submitting...":"Submit Application"}</button>
+            )}
+          </div>
+        </div>
+
+        <p style={{ textAlign:"center", color:"#94A3B8", fontSize:11, marginTop:16 }}>Stretchfield WorkRoom · workroom.stretchfield.com · Secure submission</p>
+      </div>
+    </div>
+  );
+};
+
 export default function StretchfieldWorkRoom({ user: propUser, profile: propProfile, onLogout }) {
+  // Public vendor application route
+  if (typeof window !== 'undefined' && window.location.search.includes('apply=vendor')) {
+    return <PublicVendorApplicationForm />;
+  }
   const [activeTab, setActiveTab] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);

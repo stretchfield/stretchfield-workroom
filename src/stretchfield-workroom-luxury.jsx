@@ -7763,9 +7763,7 @@ const CRMDashboardCEO = ({ user, activeCountry = "All" }) => {
 
   const load = async () => {
     const [l, t, m, cp] = await Promise.all([
-      user.role === 'Country Manager'
       activeCountry === "All" ? supabase.from("opportunities").select("*") : supabase.from("opportunities").select("*").eq("country", activeCountry),
-        : supabase.from("opportunities").select("*"),
       supabase.from("sales_targets").select("*").order("created_at", { ascending: false }),
       supabase.from("profiles").select("*").or('role.in.("CEO","Country Manager","Sales & Marketing"),has_sm_access.eq.true'),
       supabase.from("client_payments").select("*").order("created_at", { ascending: false }),

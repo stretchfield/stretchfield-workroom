@@ -19207,9 +19207,7 @@ const SalesDashboardView = ({ user, activeCountry = "All" }) => {
 
   const load = async () => {
     const [{ data: p }, { data: t }, { data: r }] = await Promise.all([
-      user.role === 'Country Manager'
       activeCountry === "All" ? supabase.from("client_payments").select("*").order("payment_date", { ascending: false }) : supabase.from("client_payments").select("*").eq("country", activeCountry).order("payment_date", { ascending: false }),
-        : supabase.from("client_payments").select("*").order("payment_date", { ascending: false }),
       supabase.from("sales_targets").select("*"),
       supabase.from("profiles").select("id,name,role,has_sm_access").or('role.in.("CEO","Sales & Marketing"),has_sm_access.eq.true'),
     ]);
@@ -19397,9 +19395,7 @@ const CashFlowView = ({ user, activeCountry = "All" }) => {
     const load = async () => {
       const [{ data: ev }, { data: cp }, { data: vi }, { data: sp }, { data: vo }] = await Promise.all([
         supabase.from("projects").select("*").order("event_date", { ascending: false }),
-        user.role === 'Country Manager'
-      activeCountry === "All" ? supabase.from("client_payments").select("*").order("payment_date", { ascending: false }) : supabase.from("client_payments").select("*").eq("country", activeCountry).order("payment_date", { ascending: false }),
-        : supabase.from("client_payments").select("*").order("payment_date", { ascending: false }),
+        activeCountry === "All" ? supabase.from("client_payments").select("*").order("payment_date", { ascending: false }) : supabase.from("client_payments").select("*").eq("country", activeCountry).order("payment_date", { ascending: false }),
         supabase.from("vendor_invoices").select("*").eq("status","paid").order("created_at", { ascending: false }),
         supabase.from("staff_payment_requests").select("*").eq("status","paid").order("submitted_at", { ascending: false }),
         supabase.from("payment_vouchers").select("*").in("status",["paid","approved"]).order("created_at", { ascending: false }),

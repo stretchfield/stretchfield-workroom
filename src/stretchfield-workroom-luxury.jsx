@@ -1312,15 +1312,6 @@ const CEODashboard = ({ onTab, user, activeCountry = "All" }) => {
             </div>
           </div>
           <div style={{ display: "flex", flexDirection:"column", gap: 10, alignItems:"flex-end" }}>
-            {user.role === 'CEO' && (
-              <div style={{ display:"flex", gap:6 }}>
-                {["All","Ghana","Nigeria"].map(c => (
-                  <button key={c} onClick={() => setViewCountry(c)} style={{ padding:"5px 14px", borderRadius:20, border:"1px solid "+(viewCountry===c?T.cyan:T.border), background:viewCountry===c?T.cyan+"20":"none", color:viewCountry===c?T.cyan:T.textMuted, fontSize:11, fontWeight:700, cursor:"pointer" }}>
-                    {c==="All"?" All":c==="Ghana"?"GH Ghana":"NG Nigeria"}
-                  </button>
-                ))}
-              </div>
-            )}
             {user.role === 'Country Manager' && (
               <div style={{ background:T.cyan+"15", border:"1px solid "+T.cyan+"30", borderRadius:20, padding:"5px 14px", display:"flex", alignItems:"center", gap:6 }}>
                 <span style={{ fontSize:14 }}>{user.country==="Nigeria"?"NG":"GH"}</span>
@@ -1576,7 +1567,7 @@ const CEODashboard = ({ onTab, user, activeCountry = "All" }) => {
 };
 
 
-const VendorManagerDashboard = ({ user }) => {
+const VendorManagerDashboard = ({ user, activeCountry = "All" }) => {
   const [vendors, setVendors] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [events, setEvents] = useState([]);
@@ -1625,9 +1616,9 @@ const VendorManagerDashboard = ({ user }) => {
 
   const loadVM = () => {
     Promise.all([
-      vmCountryFilter === "All"
+      activeCountry === "All"
         ? supabase.from("profiles").select("*").eq("role", "Vendor").order("name")
-        : supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", vmCountryFilter).order("name"),
+        : supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", activeCountry).order("name"),
       supabase.from("tasks").select("*").eq("assignee_id", user.id),
       supabase.from("projects").select("*").eq("status", "active"),
       supabase.from("notifications").select("*").eq("user_id", user.id).eq("read", false).limit(5),
@@ -1660,7 +1651,7 @@ const VendorManagerDashboard = ({ user }) => {
     });
   };
 
-  useEffect(() => { loadVM(); }, [user.id, vmCountryFilter]);
+  useEffect(() => { loadVM(); }, [user.id, activeCountry]);
 
 
 
@@ -7164,10 +7155,10 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
         if (role === "Country Manager") return <CEODashboard onTab={setActiveTab} user={currentUser} activeCountry={user.country} />;
         if (role === "Vendor") return <VendorDashboard user={currentUser} />;
         if (role === "Client") return <ClientDashboard user={currentUser} />;
-        if (role === "Finance Manager") return <FinanceManagerDashboard user={currentUser} onTab={setActiveTab} />;
+        if (role === "Finance Manager") return <FinanceManagerDashboard user={currentUser} onTab={setActiveTab} activeCountry={activeCountry} />;
         if (role === "Sales & Marketing") return <CRMDashboardSM user={currentUser} />;
         if (role === "Strategy & Events Lead") return <StaffDashboard user={currentUser} />;
-        if (role === "Vendor Manager") return <VendorManagerDashboard user={currentUser} />;
+        if (role === "Vendor Manager") return <VendorManagerDashboard user={currentUser} activeCountry={activeCountry} />;
         return <StaffDashboard user={currentUser} />;
       case "events": return <EventsView user={currentUser} userRole={currentUser.role} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "tasks": return <EventsView user={currentUser} userRole={currentUser.role} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
@@ -8358,9 +8349,8 @@ const CRMDashboardSM = ({ user }) => {
 
 //  FINANCE DASHBOARD 
 
-const FinanceManagerDashboard = ({ user, onTab }) => {
+const FinanceManagerDashboard = ({ user, onTab, activeCountry = "All" }) => {
   const [vouchers, setVouchers] = useState([]);
-  const [fmDashCountry, setFmDashCountry] = useState("All");
   const [estimates, setEstimates] = useState([]);
   const [pettyCash, setPettyCash] = useState(null);
   const [dailyBalances, setDailyBalances] = useState([]);
@@ -8430,13 +8420,8 @@ const FinanceManagerDashboard = ({ user, onTab }) => {
             <h1 style={{ margin: "0 0 6px", fontSize: 28, fontWeight: 900, color: T.textPrimary, letterSpacing: "-0.03em" }}>{now.getHours() < 12 ? "Good Morning" : now.getHours() < 17 ? "Good Afternoon" : "Good Evening"}, {user.name.split(" ")[0]}.</h1>
             <div style={{ color: T.textMuted, fontSize: 14 }}>Finance Manager · Financial operations overview</div>
           </div>
-          <div style={{ display:"flex", flexDirection:"column", gap:8, alignItems:"flex-end" }}>
-            <div style={{ display:"flex", gap:6 }}>
-              {["All","Ghana","Nigeria"].map(c => (
-                <button key={c} onClick={() => setFmDashCountry(c)} style={{ padding:"4px 12px", borderRadius:20, border:"1px solid "+(fmDashCountry===c?T.amber:T.border), background:fmDashCountry===c?T.amber+"20":"none", color:fmDashCountry===c?T.amber:T.textMuted, fontSize:11, fontWeight:700, cursor:"pointer" }}>{c==="All"?"All Countries":c}</button>
-              ))}
-            </div>
-            {pendingVouchers.length > 0 && <button onClick={() => onTab && onTab("finance")} style={{ background: `${T.amber}15`, border: `1px solid ${T.amber}40`, color: T.amber, padding: "10px 18px", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{pendingVouchers.length} Voucher{pendingVouchers.length!==1?"s":""} Pending</button>}
+          <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+            {pendingVouchers.length > 0 && <button onClick={() => onTab && onTab("finance")} style={{ background: T.amber+"15", border: "1px solid "+T.amber+"40", color: T.amber, padding: "10px 18px", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{pendingVouchers.length} Voucher{pendingVouchers.length!==1?"s":""} Pending</button>}
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px,1fr))", gap: 12, marginTop: 24, paddingTop: 20, borderTop: `1px solid ${T.border}44` }}>
@@ -9156,8 +9141,8 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
             return null; // Bank details shown in separate section below
           })()}
           {(() => {
-            const displayRequests = countryFilter === "All" ? (staffRequests||[]) : (staffRequests||[]).filter(r => (r.country||"Ghana") === countryFilter);
-            if (displayRequests.length === 0) return <div style={{ color:T.textMuted, fontSize:13, textAlign:"center", padding:"40px 0" }}>No staff payment requests{countryFilter !== "All" ? " for "+countryFilter : ""} yet</div>;
+            const displayRequests = activeCountry === "All" ? (staffRequests||[]) : (staffRequests||[]).filter(r => (r.country||"Ghana") === activeCountry);
+            if (displayRequests.length === 0) return <div style={{ color:T.textMuted, fontSize:13, textAlign:"center", padding:"40px 0" }}>No staff payment requests{activeCountry !== "All" ? " for "+activeCountry : ""} yet</div>;
             return displayRequests.map(req => {
             const statusColors = { pending:T.amber, pending_ceo:T.cyan, approved:T.teal, rejected:T.red, paid:"#10B981" };
             const statusLabels = { pending:"Pending Finance Review", pending_ceo:"Sent to CEO — Awaiting Approval", approved:"CEO Approved — Ready to Pay", rejected:"Rejected", paid:"Paid " };
@@ -13174,9 +13159,9 @@ const VendorApprovalsPanel = ({ user, onLoginCreated }) => {
   const load = async () => {
     const [{ data: appData }, { data: vpData }] = await Promise.all([
       supabase.from("vendor_applications").select("*").order("created_at", { ascending: false }),
-      vmCountryFilter === "All"
+      activeCountry === "All"
         ? supabase.from("profiles").select("*").eq("role", "Vendor").order("name")
-        : supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", vmCountryFilter).order("name"),
+        : supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", activeCountry).order("name"),
     ]);
     setApps(appData || []);
     setVendorProfiles(vpData || []);
@@ -13760,9 +13745,9 @@ const VendorOnboardingView = ({ user }) => {
   const load = async () => {
     const [{ data: appData }, { data: vpData }] = await Promise.all([
       supabase.from("vendor_applications").select("*").order("created_at", { ascending: false }),
-      vmCountryFilter === "All"
+      activeCountry === "All"
         ? supabase.from("profiles").select("*").eq("role", "Vendor").order("name")
-        : supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", vmCountryFilter).order("name"),
+        : supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", activeCountry).order("name"),
     ]);
     setApps(appData || []);
     setVendorProfiles(vpData || []);
@@ -23247,9 +23232,9 @@ const VendorAnalyticsView = ({ user }) => {
   const load = async () => {
     setLoading(true);
     const [vp, asn, aw, inv, sc] = await Promise.all([
-      vmCountryFilter === "All"
+      activeCountry === "All"
         ? supabase.from("profiles").select("*").eq("role", "Vendor").order("name")
-        : supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", vmCountryFilter).order("name"),
+        : supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", activeCountry).order("name"),
       supabase.from("rff_vendor_assignments").select("*"),
       supabase.from("rff_awards").select("*"),
       supabase.from("vendor_invoices").select("*"),

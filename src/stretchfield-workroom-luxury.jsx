@@ -7183,22 +7183,22 @@ const PublicVendorApplicationForm = () => {
     if (busRegFile) {
       setUploadProgress("Uploading business registration...");
       const ext = busRegFile.name.split('.').pop();
-      const path = `vendor-docs/${Date.now()}-busreg.${ext}`;
-      const { error: upErr } = await supabase.storage.from('avatars').upload(path, busRegFile, { upsert: true });
+      const path = `${Date.now()}-busreg.${ext}`;
+      const { error: upErr } = await supabase.storage.from('vendor-docs').upload(path, busRegFile, { upsert: true });
       if (!upErr) {
-        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
+        const { data: urlData } = supabase.storage.from('vendor-docs').getPublicUrl(path);
         busRegUrl = urlData.publicUrl;
-      }
+      } else { console.error('Business reg upload error:', upErr.message); }
     }
     if (vatFile) {
       setUploadProgress("Uploading VAT certificate...");
       const ext = vatFile.name.split('.').pop();
-      const path = `vendor-docs/${Date.now()}-vat.${ext}`;
-      const { error: upErr } = await supabase.storage.from('avatars').upload(path, vatFile, { upsert: true });
+      const path = `${Date.now()}-vat.${ext}`;
+      const { error: upErr } = await supabase.storage.from('vendor-docs').upload(path, vatFile, { upsert: true });
       if (!upErr) {
-        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
+        const { data: urlData } = supabase.storage.from('vendor-docs').getPublicUrl(path);
         vatUrl = urlData.publicUrl;
-      }
+      } else { console.error('VAT upload error:', upErr.message); }
     }
     setUploadProgress("Submitting application...");
     const { error: err } = await supabase.from("vendor_applications").insert({
@@ -14302,14 +14302,31 @@ const VendorOnboardingView = ({ user, activeCountry = "All" }) => {
             <div style={{ textAlign:"center", padding:40, color:T.textMuted, fontSize:13 }}>No new external applications yet.</div>
           ) : apps.filter(a => a.status === "submitted").map(app => (
             <div key={app.id} style={{ background:T.surface, border:"1px solid "+T.amber+"30", borderLeft:"3px solid "+T.amber, borderRadius:10, padding:"16px 18px", marginBottom:10 }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12 }}>
                 <div>
                   <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15 }}>{app.vendor_name}</div>
-                  <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{app.vendor_type} · {app.contact_person}</div>
-                  <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>{app.country} · {app.contact_email} · {app.phone}</div>
+                  <div style={{ color:T.cyan, fontSize:12, marginTop:2, fontWeight:600 }}>{app.vendor_type}</div>
                   <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>Submitted {new Date(app.created_at).toLocaleDateString("en-GB", {day:"numeric",month:"short",year:"numeric"})}</div>
                 </div>
                 <span style={{ background:T.amber+"18", color:T.amber, border:"1px solid "+T.amber+"30", borderRadius:20, padding:"3px 12px", fontSize:10, fontWeight:800 }}>NEW</span>
+              </div>
+              {/* Full details grid */}
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))", gap:10, marginBottom:12 }}>
+                {[
+                  ["Contact Person", app.contact_person],
+                  ["Email", app.contact_email],
+                  ["Phone", app.phone],
+                  ["Country", app.country],
+                  ["Address", app.address],
+                  ["Position", app.position_in_company],
+                  ["Form Completed By", app.form_completed_by],
+                  ["Payment Terms", app.payment_terms],
+                ].filter(([,v])=>v).map(([label,val]) => (
+                  <div key={label} style={{ background:T.bg, borderRadius:6, padding:"8px 10px" }}>
+                    <div style={{ color:T.textMuted, fontSize:9, fontWeight:700, textTransform:"uppercase", marginBottom:3 }}>{label}</div>
+                    <div style={{ color:T.textPrimary, fontSize:12, fontWeight:600 }}>{val}</div>
+                  </div>
+                ))}
               </div>
               {/* Bank details */}
               {app.bank_name && (

@@ -8915,7 +8915,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
   React.useEffect(() => { supabase.from("profiles").select("saved_signature").eq("id", user.id).single().then(({ data }) => { if (data?.saved_signature) setSavedSigFM(data.saved_signature); }); }, [user.id]);
   const [vIsDrawing, setVIsDrawing] = useState(false);
   const [vLastPos, setVLastPos] = useState(null);
-  const [vForm, setVForm] = useState({ payment_type: 'project', payee: '', description: '', amount: '', currency: 'GHS', project_id: '', event_name: '', invoice_ref: '', department: '', welfare_type: '', admin_type: '', statutory_type: '', due_date: '', notes: '' });
+  const [vForm, setVForm] = useState({ payment_type: 'project', payee: '', description: '', amount: '', currency: activeCountry === 'Nigeria' ? 'NGN' : getCurrency(activeCountry), project_id: '', event_name: '', invoice_ref: '', department: '', welfare_type: '', admin_type: '', statutory_type: '', due_date: '', notes: '' });
 
   // Estimate form
   const [estimateModal, setEstimateModal] = useState(null);
@@ -9027,7 +9027,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
     }
     setSaving(false);
     setVoucherModal(null);
-    setVForm({ payment_type: 'project', payee: '', description: '', amount: '', currency: 'GHS', project_id: '', event_name: '', invoice_ref: '', department: '', welfare_type: '', admin_type: '', statutory_type: '', due_date: '', notes: '' });
+    setVForm({ payment_type: 'project', payee: '', description: '', amount: '', currency: getCurrency(activeCountry), project_id: '', event_name: '', invoice_ref: '', department: '', welfare_type: '', admin_type: '', statutory_type: '', due_date: '', notes: '' });
     load();
   };
 
@@ -10398,7 +10398,7 @@ const VendorScorecardsView = ({ user, activeCountry = "All" }) => {
 
   const load = async () => {
     const [v, e, s, aw] = await Promise.all([
-      supabase.from("profiles").select("*").eq("role", "Vendor"),
+      (!activeCountry || activeCountry === "All") ? supabase.from("profiles").select("*").eq("role","Vendor") : supabase.from("profiles").select("*").eq("role","Vendor").eq("country",activeCountry),
       (!activeCountry || activeCountry === "All") ? supabase.from("projects").select("*") : supabase.from("projects").select("*").eq("country", activeCountry),
       supabase.from("vendor_scorecards").select("*").order("created_at", { ascending: false }),
       (!activeCountry || activeCountry === "All") ? supabase.from("rff_awards").select("*, rffs(project_id, event_name)") : supabase.from("rff_awards").select("*, rffs(project_id, event_name)").eq("country", activeCountry),

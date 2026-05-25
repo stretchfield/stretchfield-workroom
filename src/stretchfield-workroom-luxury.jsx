@@ -1622,7 +1622,7 @@ const VendorManagerDashboard = ({ user, activeCountry = "All" }) => {
       supabase.from("tasks").select("*").eq("assignee_id", user.id),
       supabase.from("projects").select("*").eq("status", "active"),
       supabase.from("notifications").select("*").eq("user_id", user.id).eq("read", false).limit(5),
-      supabase.from("rffs").select("*").order("created_at", { ascending: false }),
+      activeCountry === "All" ? supabase.from("rffs").select("*").order("created_at", { ascending: false }) : supabase.from("rffs").select("*").eq("country", activeCountry).order("created_at", { ascending: false }),
       supabase.from("rff_awards").select("*").in("status", ["confirmed","po_created"]),
     ]).then(([v, t, ev, n, r, aw]) => {
       setVendors(v.data || []);
@@ -7162,7 +7162,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
         return <StaffDashboard user={currentUser} />;
       case "events": return <EventsView user={currentUser} userRole={currentUser.role} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "tasks": return <EventsView user={currentUser} userRole={currentUser.role} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
-      case "vendors": return <VendorsView />;
+      case "vendors": return <VendorsView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "invoices": return <InvoicesView />;
       case "clients": return <ClientsView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "users": return <UsersView user={currentUser} />;
@@ -7178,7 +7178,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "feedback-summary": return <FeedbackView userRole={currentUser.role} />;
       case "finance": return <FinanceDashboard user={currentUser} onTab={setActiveTab} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "finance-approvals": return <FinanceApprovalsView user={currentUser} />;
-      case "scorecards": return <VendorScorecardsView user={currentUser} />;
+      case "scorecards": return <VendorScorecardsView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "vendor-analytics": return <VendorAnalyticsView user={currentUser} />;
       case "payment-authorisation": return <PaymentAuthorisationView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "staff-payment-rates": return <StaffPaymentRatesView user={currentUser} />;
@@ -7196,8 +7196,8 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "decision-log": return <DecisionLogView user={currentUser} />;
       case "competitor-intel": return <CompetitorIntelView user={currentUser} />;
       case "revenue-forecast": return <RevenueForecastView user={currentUser} />;
-      case "vendor-performance": return <VendorPerformanceView user={currentUser} />;
-      case "vendor-contracts": return <VendorContractsView user={currentUser} />;
+      case "vendor-performance": return <VendorPerformanceView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
+      case "vendor-contracts": return <VendorContractsView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "preferred-vendors": return <PreferredVendorsView user={currentUser} />;
       case "vendor-watchlist": return <VendorWatchlistView user={currentUser} />;
       case "vendor-comms": return <VendorCommsView user={currentUser} />;
@@ -7211,8 +7211,8 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "ceo-broadcast": return <CEOBroadcastView user={currentUser} />;
       case "approval-queue": return <ApprovalQueueView user={currentUser} onNavigate={setActiveTab} />;
       case "vendor-ratings": return <VendorRatingsView user={currentUser} />;
-      case "rff-approvals": return <RFFApprovalsView user={currentUser} />;
-      case "vendor-assignment": return <VendorAssignmentView user={currentUser} />;
+      case "rff-approvals": return <RFFApprovalsView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
+      case "vendor-assignment": return <VendorAssignmentView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "budgets": return <BudgetView user={currentUser} />;
       case "expenses": return <ExpenseView user={currentUser} />;
       case "finance-reports": return <FinanceReportsView user={currentUser} />;
@@ -7220,14 +7220,14 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "feedback": return <FeedbackView userRole={currentUser.role} />;
       case "calendar": return <CalendarView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
       case "zoho-books": return <ZohoBooksView user={currentUser} />;
-      case "vendor-onboarding": return <VendorOnboardingView user={currentUser} />;
+      case "vendor-onboarding": return <VendorOnboardingView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "event-analysis": return <EventTypeAnalysisView user={currentUser} />;
       case "impact-intelligence": return <ImpactIntelligenceSummary user={currentUser} />;
       case "hr": return <HRView user={currentUser} />;
       case "strategy-map": return <StrategyMapView user={currentUser} />;
-      case "quotes-received": return <QuotesReceivedView user={currentUser} />;
-      case "quote-comparison": return <QuoteComparisonView user={currentUser} />;
-      case "contract-awards": return <ContractAwardApprovalView user={currentUser} />;
+      case "quotes-received": return <QuotesReceivedView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
+      case "quote-comparison": return <QuoteComparisonView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
+      case "contract-awards": return <ContractAwardApprovalView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "gig-confirmation": return <GigConfirmationView user={currentUser} />;
       case "purchase-orders": return <PurchaseOrderView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "po-signing": return <PurchaseOrderView user={currentUser} />;
@@ -10041,7 +10041,7 @@ const VendorScorecardModal = ({ vendor, events, user, onClose, onSaved }) => {
   );
 };
 
-const VendorScorecardsView = ({ user }) => {
+const VendorScorecardsView = ({ user, activeCountry = "All" }) => {
   const [vendors, setVendors] = useState([]);
   const [events, setEvents] = useState([]);
   const [scorecards, setScorecards] = useState([]);
@@ -10065,7 +10065,7 @@ const VendorScorecardsView = ({ user }) => {
     setAwards(aw.data || []);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeCountry]);
 
   const getTierBadge = (tier, score) => {
     const t = tier ? getTier(score) : { label: "Unrated", color: T.textMuted, bg: T.bg };
@@ -10477,7 +10477,7 @@ const VendorRatingsView = ({ user }) => {
 //  RFF APPROVAL QUEUE (CEO) 
 
 
-const ContractAwardApprovalView = ({ user }) => {
+const ContractAwardApprovalView = ({ user, activeCountry = "All" }) => {
   const [awards, setAwards] = useState([]);
   const [previewAward, setPreviewAward] = useState(null);
   const [ceoNotes, setCeoNotes] = useState("");
@@ -10486,15 +10486,17 @@ const ContractAwardApprovalView = ({ user }) => {
   const [budgets, setBudgets] = useState([]);
 
   const load = async () => {
-    const { data: aw } = await supabase.from("rff_awards").select("*").order("created_at", { ascending: false });
-    const { data: rf } = await supabase.from("rffs").select("*");
+    const awQuery = activeCountry === "All" ? supabase.from("rff_awards").select("*").order("created_at", { ascending: false }) : supabase.from("rff_awards").select("*").eq("country", activeCountry).order("created_at", { ascending: false });
+    const { data: aw } = await awQuery;
+    const rfQuery = activeCountry === "All" ? supabase.from("rffs").select("*") : supabase.from("rffs").select("*").eq("country", activeCountry);
+    const { data: rf } = await rfQuery;
     const { data: bud } = await supabase.from("rff_budgets").select("*");
     setAwards(aw || []);
     setRffs(rf || []);
     setBudgets(bud || []);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeCountry]);
 
   const handleApprove = async (award) => {
     setSaving(true);
@@ -10697,7 +10699,8 @@ const GigConfirmationView = ({ user }) => {
 
   const load = async () => {
     const { data: aw } = await supabase.from("rff_awards").select("*").in("status", ["approved_ceo","confirmed"]).order("created_at", { ascending: false });
-    const { data: rf } = await supabase.from("rffs").select("*");
+    const rfQuery = activeCountry === "All" ? supabase.from("rffs").select("*") : supabase.from("rffs").select("*").eq("country", activeCountry);
+    const { data: rf } = await rfQuery;
     setAwards(aw || []);
     setRffs(rf || []);
   };
@@ -11821,7 +11824,7 @@ const FinanceInvoicesView = ({ user, activeCountry = "All" }) => {
     </div>
   );
 };
-const QuotesReceivedView = ({ user }) => {
+const QuotesReceivedView = ({ user, activeCountry = "All" }) => {
   const [events, setEvents] = useState([]);
   const [rffs, setRffs] = useState([]);
   const [assignments, setAssignments] = useState([]);
@@ -11839,7 +11842,7 @@ const QuotesReceivedView = ({ user }) => {
     setAssignments(asn || []);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeCountry]);
 
   const filteredRffs = selectedEvent === "all" ? rffs : rffs.filter(r => r.project_id === selectedEvent);
   const rffsWithQuotes = filteredRffs.filter(r => {
@@ -11984,7 +11987,7 @@ const QuotesReceivedView = ({ user }) => {
   );
 };
 
-const QuoteComparisonView = ({ user }) => {
+const QuoteComparisonView = ({ user, activeCountry = "All" }) => {
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState("");
   const [rffs, setRffs] = useState([]);
@@ -12020,10 +12023,10 @@ const QuoteComparisonView = ({ user }) => {
     setVendorApps(va || []);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeCountry]);
 
   const loadRffs = async (eventId) => {
-    const { data } = await supabase.from("rffs").select("*").eq("project_id", eventId).eq("approved", true);
+      activeCountry === "All" ? supabase.from("rffs").select("*").order("created_at", { ascending: false }) : supabase.from("rffs").select("*").eq("country", activeCountry).order("created_at", { ascending: false }),
     setRffs(data || []);
     setSelectedRff("");
     setAssignments([]);
@@ -12710,7 +12713,7 @@ const QuoteComparisonView = ({ user }) => {
   );
 };
 
-const RFFApprovalsView = ({ user }) => {
+const RFFApprovalsView = ({ user, activeCountry = "All" }) => {
   const [rffs, setRffs] = useState([]);
   const [actionModal, setActionModal] = useState(null);
   const [notes, setNotes] = useState("");
@@ -12721,12 +12724,12 @@ const RFFApprovalsView = ({ user }) => {
   const [allRffs, setAllRffs] = useState([]);
 
   const load = () => {
-    supabase.from("rffs").select("*").in("status", ["pending", "declined"]).eq("approved", false).order("created_at", { ascending: false }).then(({ data }) => setRffs(data || []));
+      activeCountry === "All" ? supabase.from("rffs").select("*").order("created_at", { ascending: false }) : supabase.from("rffs").select("*").eq("country", activeCountry).order("created_at", { ascending: false }),
     supabase.from("rffs").select("*").eq("approved", true).order("created_at", { ascending: false }).then(({ data }) => setAllRffs(data || []));
     supabase.from("rff_budgets").select("*").then(({ data }) => setExistingBudgets(data || []));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeCountry]);
 
   const handleApprove = async (rff) => {
     setSaving(true);
@@ -13099,7 +13102,13 @@ const VendorApplicationModal = ({ user, onClose, onSubmitted }) => {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
           <div><label style={labelStyle}>Phone Number</label><input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} style={inputStyle} placeholder="+233 XX XXX XXXX" /></div>
-          <div><label style={labelStyle}>Country</label><input value={form.country} onChange={e => setForm({...form, country: e.target.value})} style={inputStyle} placeholder="Ghana" /></div>
+          <div><label style={labelStyle}>Country *</label>
+            <select value={form.country} onChange={e => setForm({...form, country: e.target.value})} style={inputStyle}>
+              <option value="">Select country...</option>
+              <option value="Ghana">Ghana</option>
+              <option value="Nigeria">Nigeria</option>
+            </select>
+          </div>
         </div>
         <div style={{ marginBottom: 14 }}><label style={labelStyle}>Address</label><textarea value={form.address} onChange={e => setForm({...form, address: e.target.value})} rows={2} style={{...inputStyle, resize: "vertical"}} placeholder="Full address" /></div>
 
@@ -13688,7 +13697,7 @@ const ApprovedVendorsTab = ({ apps, user, load }) => {
                   const res = await fetch("https://okbduzenceoknkjqnrha.supabase.co/functions/v1/create-vendor-login", {
                     method: "POST",
                     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
-                    body: JSON.stringify({ email: loginModal.contact_email, password: loginPwd, name: loginModal.vendor_name, role: "Vendor", company_name: loginModal.vendor_name, service_category: loginModal.vendor_type, application_id: loginModal.id }),
+                    body: JSON.stringify({ email: loginModal.contact_email, password: loginPwd, name: loginModal.vendor_name, role: "Vendor", company_name: loginModal.vendor_name, service_category: loginModal.vendor_type, application_id: loginModal.id, country: loginModal.country || activeCountry || "Ghana" }),
                   });
                   const result = await res.json();
                   if (result.error) { alert("Failed: " + result.error); setLoginSaving(false); return; }
@@ -13743,7 +13752,7 @@ const VendorAssignmentPanel = ({ rffId, quoteDeadline }) => {
   );
 };
 
-const VendorOnboardingView = ({ user }) => {
+const VendorOnboardingView = ({ user, activeCountry = "All" }) => {
   const getDefaultTab = () => {
     if (user?.role === "CEO") return "applications";
     if (user?.role === "Vendor Manager") return "approved";
@@ -14021,7 +14030,7 @@ const VendorOnboardingView = ({ user }) => {
   );
 };
 
-const VendorAssignmentView = ({ user }) => {
+const VendorAssignmentView = ({ user, activeCountry = "All" }) => {
   const [rffs, setRffs] = useState([]);
   const [events, setEvents] = useState([]);
   const [vendors, setVendors] = useState([]);
@@ -14069,9 +14078,9 @@ const VendorAssignmentView = ({ user }) => {
 
   const load = async () => {
     const [r, e, v, a] = await Promise.all([
-      supabase.from("rffs").select("*").eq("approved", true).order("created_at", { ascending: false }),
-      supabase.from("projects").select("*"),
-      supabase.from("profiles").select("*").eq("role", "Vendor"),
+      activeCountry === "All" ? supabase.from("rffs").select("*").order("created_at", { ascending: false }) : supabase.from("rffs").select("*").eq("country", activeCountry).order("created_at", { ascending: false }),
+      activeCountry === "All" ? supabase.from("projects").select("*") : supabase.from("projects").select("*").eq("country", activeCountry),
+      activeCountry === "All" ? supabase.from("profiles").select("*").eq("role", "Vendor") : supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", activeCountry),
       supabase.from("rff_vendor_assignments").select("*"),
     ]);
     setRffs(r.data || []);
@@ -14081,7 +14090,7 @@ const VendorAssignmentView = ({ user }) => {
     setAssignments(a.data || []);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeCountry]);
 
   //  Upcoming Events Assignment Dashboard 
   const today = new Date().toISOString().slice(0,10);
@@ -14967,7 +14976,7 @@ const OpportunitiesView = ({ user, onNavigate, activeCountry = "All" }) => {
 
 
 
-const VendorsView = ({ user }) => {
+const VendorsView = ({ user, activeCountry = "All" }) => {
   const [rffs, setRffs] = useState([]);
   const [events, setEvents] = useState([]);
   const [clients, setClients] = useState([]);
@@ -15000,7 +15009,7 @@ const VendorsView = ({ user }) => {
     setVendorApps(apps.data || []);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeCountry]);
 
   const generateRffCode = async (eventType) => {
     const typeMap = { "Conference/Seminar": "CS", "Product Launch": "PL", "Awards Ceremony": "AWD", "Corporate Party": "CP", "Other": "OTH" };
@@ -21113,7 +21122,7 @@ const TeamPerformanceView = ({ user }) => {
 };
 
 
-const VendorPerformanceView = ({ user }) => {
+const VendorPerformanceView = ({ user, activeCountry = "All" }) => {
   const [vendors, setVendors] = useState([]);
   const [scorecards, setScorecards] = useState([]);
   const [awards, setAwards] = useState([]);
@@ -21124,7 +21133,7 @@ const VendorPerformanceView = ({ user }) => {
   useEffect(() => {
     const load = async () => {
       const [{ data: v }, { data: sc }, { data: aw }, { data: wl }] = await Promise.all([
-        supabase.from("profiles").select("*").eq("role","Vendor").order("name"),
+        activeCountry === "All" ? supabase.from("profiles").select("*").eq("role","Vendor").order("name") : supabase.from("profiles").select("*").eq("role","Vendor").eq("country", activeCountry).order("name"),
         supabase.from("vendor_scorecards").select("*").order("created_at", { ascending: false }),
         supabase.from("rff_awards").select("*"),
         supabase.from("vendor_watchlist").select("*").eq("status","active"),
@@ -21212,7 +21221,7 @@ const VendorPerformanceView = ({ user }) => {
   );
 };
 
-const VendorContractsView = ({ user }) => {
+const VendorContractsView = ({ user, activeCountry = "All" }) => {
   const [contracts, setContracts] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [modal, setModal] = useState(false);

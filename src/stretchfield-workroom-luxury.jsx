@@ -7162,6 +7162,9 @@ const PublicVendorApplicationForm = () => {
   const [submitted, setSubmitted] = React.useState(false);
   const [error, setError] = React.useState("");
   const [step, setStep] = React.useState(1);
+  const [busRegFile, setBusRegFile] = React.useState(null);
+  const [vatFile, setVatFile] = React.useState(null);
+  const [uploadProgress, setUploadProgress] = React.useState("");
 
   const VENDOR_TYPES = ["Event Lighting","Events Ushering","Photography","Videography","Catering",
     "Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company",
@@ -7174,10 +7177,36 @@ const PublicVendorApplicationForm = () => {
       setError("Company name, email, vendor type and country are required."); return;
     }
     setSaving(true); setError("");
+    let busRegUrl = null;
+    let vatUrl = null;
+    // Upload business registration
+    if (busRegFile) {
+      setUploadProgress("Uploading business registration...");
+      const ext = busRegFile.name.split('.').pop();
+      const path = `vendor-docs/${Date.now()}-busreg.${ext}`;
+      const { error: upErr } = await supabase.storage.from('avatars').upload(path, busRegFile, { upsert: true });
+      if (!upErr) {
+        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
+        busRegUrl = urlData.publicUrl;
+      }
+    }
+    if (vatFile) {
+      setUploadProgress("Uploading VAT certificate...");
+      const ext = vatFile.name.split('.').pop();
+      const path = `vendor-docs/${Date.now()}-vat.${ext}`;
+      const { error: upErr } = await supabase.storage.from('avatars').upload(path, vatFile, { upsert: true });
+      if (!upErr) {
+        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
+        vatUrl = urlData.publicUrl;
+      }
+    }
+    setUploadProgress("Submitting application...");
     const { error: err } = await supabase.from("vendor_applications").insert({
       ...form,
       status: "submitted",
       date_submitted: new Date().toISOString().slice(0,10),
+      business_reg_url: busRegUrl,
+      vat_cert_url: vatUrl,
     });
     if (err) { setError("Submission failed: " + err.message); setSaving(false); return; }
     // Notify VM
@@ -7330,6 +7359,28 @@ const PublicVendorApplicationForm = () => {
                   <input type="date" value={form.date_submitted} onChange={e=>setForm(f=>({...f,date_submitted:e.target.value}))} style={inputStyle} />
                 </div>
               </div>
+              {/* Document uploads */}
+              <div style={{ marginTop:20, paddingTop:20, borderTop:"1px solid #E2E8F0" }}>
+                <div style={{ color:"#0F172A", fontWeight:800, fontSize:14, marginBottom:14 }}>Supporting Documents</div>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+                  <div>
+                    <label style={labelStyle}>Business Registration Certificate</label>
+                    <div style={{ border:"2px dashed #CBD5E1", borderRadius:8, padding:"16px", textAlign:"center", cursor:"pointer", background:"#F8FAFC" }}
+                      onClick={() => document.getElementById('busreg-upload').click()}>
+                      <div style={{ color:"#64748B", fontSize:12 }}>{busRegFile ? busRegFile.name : "Click to upload PDF or image"}</div>
+                      <input id="busreg-upload" type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display:"none" }} onChange={e=>setBusRegFile(e.target.files[0])} />
+                    </div>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>VAT Certificate (optional)</label>
+                    <div style={{ border:"2px dashed #CBD5E1", borderRadius:8, padding:"16px", textAlign:"center", cursor:"pointer", background:"#F8FAFC" }}
+                      onClick={() => document.getElementById('vat-upload').click()}>
+                      <div style={{ color:"#64748B", fontSize:12 }}>{vatFile ? vatFile.name : "Click to upload PDF or image"}</div>
+                      <input id="vat-upload" type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display:"none" }} onChange={e=>setVatFile(e.target.files[0])} />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -7345,7 +7396,7 @@ const PublicVendorApplicationForm = () => {
                 setError(""); setStep(s => s+1);
               }} style={{ flex:1, padding:"12px", borderRadius:8, border:"none", background:"linear-gradient(135deg,#00C8FF,#00E5C8)", color:"#060B14", fontWeight:800, fontSize:14, cursor:"pointer" }}>Continue</button>
             ) : (
-              <button onClick={handleSubmit} disabled={saving} style={{ flex:1, padding:"12px", borderRadius:8, border:"none", background:"linear-gradient(135deg,#00C8FF,#00E5C8)", color:"#060B14", fontWeight:800, fontSize:14, cursor:saving?"not-allowed":"pointer", opacity:saving?0.7:1 }}>{saving?"Submitting...":"Submit Application"}</button>
+              <button onClick={handleSubmit} disabled={saving} style={{ flex:1, padding:"12px", borderRadius:8, border:"none", background:"linear-gradient(135deg,#00C8FF,#00E5C8)", color:"#060B14", fontWeight:800, fontSize:14, cursor:saving?"not-allowed":"pointer", opacity:saving?0.7:1 }}>{saving?(uploadProgress||"Submitting..."):"Submit Application"}</button>
             )}
           </div>
         </div>
@@ -14266,6 +14317,13 @@ const VendorOnboardingView = ({ user, activeCountry = "All" }) => {
                   <div><div style={{ color:T.textMuted, fontSize:10, fontWeight:700 }}>BANK</div><div style={{ color:T.textPrimary, fontSize:12 }}>{app.bank_name}</div></div>
                   <div><div style={{ color:T.textMuted, fontSize:10, fontWeight:700 }}>ACCOUNT NAME</div><div style={{ color:T.textPrimary, fontSize:12 }}>{app.bank_account_name||"—"}</div></div>
                   <div><div style={{ color:T.textMuted, fontSize:10, fontWeight:700 }}>ACCOUNT NO</div><div style={{ color:T.textPrimary, fontSize:12 }}>{app.account_no||"—"}</div></div>
+                </div>
+              )}
+              {/* Documents */}
+              {(app.business_reg_url || app.vat_cert_url) && (
+                <div style={{ display:"flex", gap:8, marginBottom:10 }}>
+                  {app.business_reg_url && <a href={app.business_reg_url} target="_blank" rel="noreferrer" style={{ background:T.cyan+"15", border:"1px solid "+T.cyan+"30", color:T.cyan, padding:"5px 12px", borderRadius:8, fontSize:11, fontWeight:700, textDecoration:"none" }}>View Business Reg</a>}
+                  {app.vat_cert_url && <a href={app.vat_cert_url} target="_blank" rel="noreferrer" style={{ background:T.teal+"15", border:"1px solid "+T.teal+"30", color:T.teal, padding:"5px 12px", borderRadius:8, fontSize:11, fontWeight:700, textDecoration:"none" }}>View VAT Certificate</a>}
                 </div>
               )}
               <div style={{ display:"flex", gap:8 }}>

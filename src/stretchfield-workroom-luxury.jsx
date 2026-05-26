@@ -7799,11 +7799,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
 
           {/* Right — controls */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, justifyContent: "flex-end" }}>
-            {currentUser.role === "Country Manager" && (
-              <div style={{ background:T.cyan+"15", border:"1px solid "+T.cyan+"30", borderRadius:20, padding:"3px 10px" }}>
-                <span style={{ color:T.cyan, fontSize:10, fontWeight:800 }}>{currentUser.country} Only</span>
-              </div>
-            )}
+
             <span style={{ color: T.textMuted, fontSize: 11, fontWeight: 600, letterSpacing: "0.04em" }}>{currentUser.name}</span>
             <div style={{ background: T.cyan + "18", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "3px 12px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>{currentUser.role}</div>
             <button onClick={() => setActiveTab("notifications")} style={{ position: "relative", background: activeTab === "notifications" ? T.cyan + "18" : "none", border: "1px solid " + (activeTab === "notifications" ? T.cyan + "40" : T.border), color: activeTab === "notifications" ? T.cyan : T.textMuted, width: 34, height: 34, borderRadius: 8, cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}>
@@ -8763,8 +8759,9 @@ const FinanceManagerDashboard = ({ user, onTab, activeCountry = "All" }) => {
   const totalInflows = clientInvoices.reduce((s,i) => s + (i.amount||0), 0);
   const totalPaidOut = paidVouchers.reduce((s,v) => s + (v.amount||0), 0);
   const pendingVendorInvoices = vendorInvoices.filter(i => i.status !== 'paid');
-  const pcBalance = pettyCash?.float_balance ?? pettyCash?.total_float ?? 200;
-  const pcTotal = pettyCash?.total_float || 200;
+  const pcDefault = activeCountry === 'Nigeria' ? 20000 : 200;
+  const pcBalance = pettyCash?.float_balance ?? pettyCash?.total_float ?? pcDefault;
+  const pcTotal = pettyCash?.total_float || pcDefault;
   const pcPct = pcTotal > 0 ? Math.round((pcBalance/pcTotal)*100) : 100;
   const todayBalance = dailyBalances[0];
   const upcomingEvents = events.filter(e => e.event_date && new Date(e.event_date) >= now).slice(0,3);
@@ -9157,8 +9154,9 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
   const totalVouchersPaid = paidVouchers.reduce((s,v) => s + (v.amount||0), 0);
   const totalPendingAmt = pendingVouchers.reduce((s,v) => s + (v.amount||0), 0);
   const totalClientInflows = clientInvoices.reduce((s,i) => s + (i.amount||0), 0);
-  const pcBalance = pettyCash?.float_balance ?? pettyCash?.total_float ?? 200;
-  const pcTotal = pettyCash?.total_float || 200;
+  const pcDefault = activeCountry === 'Nigeria' ? 20000 : 200;
+  const pcBalance = pettyCash?.float_balance ?? pettyCash?.total_float ?? pcDefault;
+  const pcTotal = pettyCash?.total_float || pcDefault;
   const pcPct = pcTotal > 0 ? Math.round((pcBalance / pcTotal) * 100) : 100;
   const todayBalance = dailyBalances[0];
 
@@ -12210,7 +12208,7 @@ const QuotesReceivedView = ({ user, activeCountry = "All" }) => {
         <div>
           <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>Procurement</div>
           <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Quotes Received</h2>
-          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{totalQuotes} quotes received across {rffsWithQuotes.length} RFFs</div>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>Quotes received across active RFFs</div>
         </div>
         <select value={selectedEvent} onChange={e => setSelectedEvent(e.target.value)} style={{ padding: "9px 14px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
           <option value="all">All Events</option>

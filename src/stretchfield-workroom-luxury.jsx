@@ -9221,6 +9221,53 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
   // Mark voucher paid
   const markPaid = async (v) => {
     await supabase.from('payment_vouchers').update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', v.id);
+    
+    // Send payment confirmation email to payee
+    const currency = getCurrency(v.country || activeCountry || 'Ghana');
+    const paymentDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    
+    // Find payee email from vendor profiles or staff
+    const payeeVendor = vendors.find(vn => vn.name === v.payee);
+    const payeeStaff = staffList.find(s => s.name === v.payee);
+    const payeeEmail = payeeVendor?.email || payeeStaff?.email || null;
+    
+    if (payeeEmail) {
+      const emailHtml = `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+          <div style="height:6px;background:linear-gradient(90deg,#00C8FF,#00E5C8);"></div>
+          <div style="background:#060B14;padding:24px 32px;">
+            <div style="color:#00C8FF;font-size:13px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;">STRETCHFIELD</div>
+            <div style="color:#5A6E8A;font-size:11px;margin-top:4px;">Payment Confirmation</div>
+          </div>
+          <div style="padding:32px;background:#F4F6FB;">
+            <p style="color:#0A1628;font-size:15px;font-weight:700;">Dear ${v.payee},</p>
+            <p style="color:#0A1628;font-size:14px;">We are pleased to confirm that payment has been processed for the following:</p>
+            <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:20px;margin:20px 0;">
+              <table style="width:100%;border-collapse:collapse;">
+                <tr><td style="padding:8px 0;color:#64748B;font-size:13px;">Voucher Number</td><td style="padding:8px 0;color:#0A1628;font-weight:700;font-size:13px;text-align:right;">${v.voucher_number}</td></tr>
+                <tr style="border-top:1px solid #E2E8F0;"><td style="padding:8px 0;color:#64748B;font-size:13px;">Amount Paid</td><td style="padding:8px 0;color:#00C8FF;font-weight:800;font-size:15px;text-align:right;">${currency} ${parseFloat(v.amount||0).toLocaleString()}</td></tr>
+                <tr style="border-top:1px solid #E2E8F0;"><td style="padding:8px 0;color:#64748B;font-size:13px;">Payment Date</td><td style="padding:8px 0;color:#0A1628;font-weight:700;font-size:13px;text-align:right;">${paymentDate}</td></tr>
+                <tr style="border-top:1px solid #E2E8F0;"><td style="padding:8px 0;color:#64748B;font-size:13px;">Description</td><td style="padding:8px 0;color:#0A1628;font-size:13px;text-align:right;">${v.description||'—'}</td></tr>
+                ${v.bank_name ? `<tr style="border-top:1px solid #E2E8F0;"><td style="padding:8px 0;color:#64748B;font-size:13px;">Bank</td><td style="padding:8px 0;color:#0A1628;font-size:13px;text-align:right;">${v.bank_name}</td></tr>` : ''}
+                ${v.account_number ? `<tr style="border-top:1px solid #E2E8F0;"><td style="padding:8px 0;color:#64748B;font-size:13px;">Account</td><td style="padding:8px 0;color:#0A1628;font-size:13px;text-align:right;">${v.account_name||''} · ${v.account_number}</td></tr>` : ''}
+              </table>
+            </div>
+            <p style="color:#64748B;font-size:13px;">Please allow 1-3 business days for the funds to reflect in your account. If you have any queries, contact us at finance@stretchfield.com.</p>
+            <p style="color:#0A1628;font-size:13px;font-weight:700;margin-top:20px;">Thank you for working with Stretchfield.</p>
+          </div>
+          <div style="background:#060B14;padding:16px 32px;text-align:center;">
+            <p style="color:#5A6E8A;font-size:11px;margin:0;">Stretchfield · workroom.stretchfield.com · finance@stretchfield.com</p>
+          </div>
+        </div>`;
+      
+      try {
+        await sendEmail(payeeEmail, `Payment Confirmation — ${v.voucher_number} | ${currency} ${parseFloat(v.amount||0).toLocaleString()}`, emailHtml);
+        console.log('Payment confirmation sent to', payeeEmail);
+      } catch(e) {
+        console.error('Email send error:', e);
+      }
+    }
+    
     load();
   };
 

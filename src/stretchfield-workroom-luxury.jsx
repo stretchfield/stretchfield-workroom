@@ -15276,6 +15276,11 @@ const OpportunitiesView = ({ user, onNavigate, activeCountry = "All" }) => {
       contact_name: editModal.contact_name || "",
       contact_email: editModal.contact_email || "",
       contact_phone: editModal.contact_phone || "",
+      contact_title: editModal.contact_title || "",
+      city: editModal.city || "",
+      value: parseFloat(editModal.value) || 0,
+      event_type: editModal.event_type || "",
+      website: editModal.website || "",
       updated_at: new Date().toISOString(),
     }).eq("id", editModal.id);
     if (user.role !== "CEO") {
@@ -15439,6 +15444,7 @@ const OpportunitiesView = ({ user, onNavigate, activeCountry = "All" }) => {
                     </td>
                     <td style={{ padding: "12px 16px" }}>
                       <span style={{ color: T.textMuted, fontSize: 12 }}>{o.sector}</span>
+                      {o.city && <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{o.city}</div>}
                     </td>
                     <td style={{ padding: "12px 16px" }}>
                       <PresencePills presence={o.presence} />
@@ -15612,14 +15618,30 @@ const OpportunitiesView = ({ user, onNavigate, activeCountry = "All" }) => {
         <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setEditModal(null)}>
           <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 540, padding: 28, boxShadow: `0 24px 80px rgba(0,0,0,0.4)`, animation: "fadeUp 0.25s ease" }} onClick={e => e.stopPropagation()}>
             <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 20 }}>Edit — {editModal.company}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
               <div><label style={labelStyle}>Company Name</label><input value={editModal.company} onChange={e => setEditModal({ ...editModal, company: e.target.value })} style={inputStyle} /></div>
-              <div><label style={labelStyle}>Sector</label><input value={editModal.sector || ""} onChange={e => setEditModal({ ...editModal, sector: e.target.value })} style={inputStyle} /></div>
+              <div><label style={labelStyle}>Sector</label>
+                <select value={editModal.sector || ""} onChange={e => setEditModal({ ...editModal, sector: e.target.value })} style={inputStyle}>
+                  <option value="">Select sector...</option>
+                  {["Banking & Finance","Insurance","Oil & Gas","Telecoms","FMCG","Healthcare","Technology","Real Estate","Aviation","Government & Public Sector","NGO & Development","Manufacturing","Retail","Education","Professional Services","Media & Entertainment","Agriculture","Other"].map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div><label style={labelStyle}>Contact Person</label><input value={editModal.contact_name || ""} onChange={e => setEditModal({ ...editModal, contact_name: e.target.value })} style={inputStyle} placeholder="Full name" /></div>
+              <div><label style={labelStyle}>Title / Position</label><input value={editModal.contact_title || ""} onChange={e => setEditModal({ ...editModal, contact_title: e.target.value })} style={inputStyle} placeholder="e.g. Head of Events" /></div>
+              <div><label style={labelStyle}>Email</label><input value={editModal.contact_email || ""} onChange={e => setEditModal({ ...editModal, contact_email: e.target.value })} style={inputStyle} /></div>
+              <div><label style={labelStyle}>Phone</label><input value={editModal.contact_phone || ""} onChange={e => setEditModal({ ...editModal, contact_phone: e.target.value })} style={inputStyle} /></div>
+              <div><label style={labelStyle}>City</label>
+                <select value={editModal.city || ""} onChange={e => setEditModal({ ...editModal, city: e.target.value })} style={inputStyle}>
+                  {(editModal.country === "Nigeria" ? ["Lagos","Abuja","Port Harcourt","Kano","Ibadan","Other"] : ["Accra","Kumasi","Takoradi","Tamale","Other"]).map(c => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div><label style={labelStyle}>Estimated Value</label><input type="number" value={editModal.value || ""} onChange={e => setEditModal({ ...editModal, value: e.target.value })} style={inputStyle} /></div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
               <div><label style={labelStyle}>Presence</label>
                 <select value={editModal.presence || "GH"} onChange={e => setEditModal({ ...editModal, presence: e.target.value })} style={inputStyle}>
                   <option value="GH">GH Only</option>
+                  <option value="NG">NG Only</option>
                   <option value="GH+NG">GH + NG</option>
                   <option value="GH+KE">GH + KE</option>
                   <option value="GH+NG+KE">GH + NG + KE</option>

@@ -8114,7 +8114,9 @@ const CRMDashboardCEO = ({ user, activeCountry = "All" }) => {
     ]);
     setOpportunitys(l.data || []);
     setTargets(t.data || []);
-    setMembers((m.data || []).filter((mem, idx, self) => self.findIndex(x => x.id === mem.id) === idx));
+    const allMembers = (m.data || []).filter((mem, i, self) => self.findIndex(x => x.id === mem.id) === i);
+    const countryMembers = (activeCountry && activeCountry !== "All") ? allMembers.filter(mem => (mem.country||"Ghana") === activeCountry) : allMembers;
+    setMembers(countryMembers);
     setCrmPayments(cp.data || []);
   };
 
@@ -8190,8 +8192,8 @@ const CRMDashboardCEO = ({ user, activeCountry = "All" }) => {
       {/* KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 24 }}>
         {[
-          { label: "Total Revenue", value: "GHS " + totalRevenue.toLocaleString(), color: T.teal },
-          { label: "YTD Revenue", value: "GHS " + ytdRevenue.toLocaleString(), color: T.cyan },
+          { label: "Total Revenue", value: getCurrency(activeCountry)+" " + totalRevenue.toLocaleString(), color: T.teal },
+          { label: "YTD Revenue", value: getCurrency(activeCountry)+" " + ytdRevenue.toLocaleString(), color: T.cyan },
           { label: "Closing Rate", value: closingPct + "%", color: T.blue },
           { label: "Avg Cycle", value: avgCycle + "d", color: T.amber },
           { label: "Deals Won", value: wonOpportunitys.length + " / " + opportunities.length, color: T.magenta },
@@ -8216,12 +8218,12 @@ const CRMDashboardCEO = ({ user, activeCountry = "All" }) => {
               <div key={rep.id} style={{ marginBottom: 18, paddingBottom: 18, borderBottom: `1px solid ${T.border}44` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <div>
-                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>{i === 0 && <span style={{ color: T.amber }}> </span>}{rep.name}</div>
+                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>{i === 0 && <span style={{ color: T.amber }}> </span>}Sales Rep {i+1}</div>
                     <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>{rep.repWon.length} won · {rep.closingPct}% close · {rep.repCycle}d</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ color: T.teal, fontWeight: 800, fontSize: 13 }}>GHS {rep.repRevenue.toLocaleString()}</div>
-                    {target > 0 && <div style={{ color: T.textMuted, fontSize: 10 }}>of GHS {target.toLocaleString()}</div>}
+                    <div style={{ color: T.teal, fontWeight: 800, fontSize: 13 }}>{getCurrency(activeCountry)+" "+rep.repRevenue.toLocaleString()}</div>
+                    {target > 0 && <div style={{ color: T.textMuted, fontSize: 10 }}>{`of ${getCurrency(activeCountry)} ${target.toLocaleString()}`}</div>}
                   </div>
                 </div>
                 {target > 0 && (
@@ -8244,7 +8246,7 @@ const CRMDashboardCEO = ({ user, activeCountry = "All" }) => {
             <div key={company} style={{ marginBottom: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                 <div style={{ color: T.textPrimary, fontSize: 12, fontWeight: 600 }}>{company}</div>
-                <div style={{ color: T.amber, fontWeight: 800, fontSize: 12 }}>GHS {amount.toLocaleString()}</div>
+                <div style={{ color: T.amber, fontWeight: 800, fontSize: 12 }}>{getCurrency(activeCountry)+" "+amount.toLocaleString()}</div>
               </div>
               <div style={{ height: 3, background: T.border + "44", borderRadius: 2 }}>
                 <div style={{ height: "100%", width: Math.round((amount / totalRevenue) * 100) + "%", background: `linear-gradient(90deg, ${T.cyan}, ${T.teal})`, borderRadius: 2 }} />
@@ -8275,7 +8277,7 @@ const CRMDashboardCEO = ({ user, activeCountry = "All" }) => {
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ color: T.amber, fontWeight: 800, fontSize: 13 }}>GHS {t.target_amount.toLocaleString()}</div>
+                <div style={{ color: T.amber, fontWeight: 800, fontSize: 13 }}>{getCurrency(activeCountry)+" "+t.target_amount.toLocaleString()}</div>
                 <div style={{ color: pct >= 100 ? T.teal : T.textMuted, fontSize: 10, marginTop: 2 }}>{pct}% achieved</div>
               </div>
             </div>
@@ -8284,7 +8286,7 @@ const CRMDashboardCEO = ({ user, activeCountry = "All" }) => {
       </div>
       {editTarget && (
         <Modal title="Edit Sales Target" onClose={() => setEditTarget(null)}>
-          <Input label="Target Amount (GHS)" type="number" value={editTargetForm.target_amount} onChange={v => setEditTargetForm({...editTargetForm, target_amount: v})} />
+          <Input label={`Target Amount (${getCurrency(activeCountry)})`} type="number" value={editTargetForm.target_amount} onChange={v => setEditTargetForm({...editTargetForm, target_amount: v})} />
           <Select label="Period" options={[{ value: "monthly", label: "Monthly" }, { value: "quarterly", label: "Quarterly" }, { value: "yearly", label: "Yearly" }]} value={editTargetForm.period} onChange={v => setEditTargetForm({...editTargetForm, period: v})} />
           <Input label="Start Date" type="date" value={editTargetForm.start_date} onChange={v => setEditTargetForm({...editTargetForm, start_date: v})} />
           <Input label="End Date" type="date" value={editTargetForm.end_date} onChange={v => setEditTargetForm({...editTargetForm, end_date: v})} />
@@ -8299,7 +8301,7 @@ const CRMDashboardCEO = ({ user, activeCountry = "All" }) => {
         <Modal title="Set Sales Target" onClose={() => setModal(false)}>
           <Select label="Sales Rep" options={[{ value: "", label: "Select rep..." }, ...members.map(m => ({ value: m.id, label: m.name + " — " + m.role }))]}
             value={form.rep_id} onChange={v => { const m = members.find(x => x.id === v); setForm({ ...form, rep_id: v, rep_name: m ? m.name : "" }); }} />
-          <Input label="Target Amount (GHS )" type="number" placeholder="0" value={form.target_amount} onChange={v => setForm({ ...form, target_amount: v })} />
+          <Input label={`Target Amount (${getCurrency(activeCountry)})`} type="number" placeholder="0" value={form.target_amount} onChange={v => setForm({ ...form, target_amount: v })} />
           <Select label="Period" options={[{ value: "monthly", label: "Monthly" }, { value: "quarterly", label: "Quarterly" }, { value: "yearly", label: "Yearly" }]}
             value={form.period} onChange={v => setForm({ ...form, period: v })} />
           <Input label="Start Date" type="date" value={form.start_date} onChange={v => setForm({ ...form, start_date: v })} />
@@ -23892,7 +23894,7 @@ const EventReportField = ({ label, field, rows=3, placeholder="", form, setForm 
   );
 };
 
-const EventReportsView = ({ user }) => {
+const EventReportsView = ({ user, activeCountry = "All" }) => {
   const [events, setEvents] = useState([]);
   const [reports, setReports] = useState([]);
   const [scorecards, setScorecards] = useState([]);
@@ -23916,7 +23918,7 @@ const EventReportsView = ({ user }) => {
 
   const load = async () => {
     const [{ data: ev }, { data: rp }, { data: sc }] = await Promise.all([
-      supabase.from("projects").select("*").order("event_date", { ascending: false }),
+      (activeCountry && activeCountry !== "All") ? supabase.from("projects").select("*").eq("country",activeCountry).order("event_date",{ascending:false}) : supabase.from("projects").select("*").order("event_date",{ascending:false}),
       supabase.from("event_intelligence_reports").select("*"),
       supabase.from("vendor_scorecards").select("*").order("created_at", { ascending: false }),
     ]);

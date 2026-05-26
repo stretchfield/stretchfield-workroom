@@ -15156,7 +15156,7 @@ const OpportunitiesView = ({ user, onNavigate, activeCountry = "All" }) => {
   const [actForm, setActForm] = useState({ type: "note", content: "", scheduled_date: "", scheduled_time: "" });
   const [addingAct, setAddingAct] = useState(false);
 
-  const canManage = ["CEO", "Sales & Marketing"].includes(user?.role) || user?.has_sm_access;
+  const canManage = ["CEO", "Sales & Marketing", "Country Manager"].includes(user?.role) || user?.has_sm_access;
 
   const load = async () => {
     const acFilter = activeCountry && activeCountry !== "All";

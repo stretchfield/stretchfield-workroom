@@ -10019,20 +10019,19 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
             <div style={{ color:T.textMuted, fontSize:13, marginBottom:6 }}>{ceoVoucherSignModal.voucher_number} — {ceoVoucherSignModal.payee}</div>
             <div style={{ color:T.teal, fontWeight:800, fontSize:18, marginBottom:20 }}>GHS {parseFloat(ceoVoucherSignModal.amount||0).toLocaleString()}</div>
             <div style={{ marginBottom:16 }}>
-              <SignatureInput label="CEO Authorisation Signature" canvasRef={voucherCanvasRef} onSignatureChange={setVoucherSignature} savedSignature={savedSigFM||user.saved_signature} isDrawing={vIsDrawing} setIsDrawing={setVIsDrawing} lastPos={vLastPos} setLastPos={setVLastPos} />
+              <SignatureInput label="CEO Authorisation Signature" canvasRef={voucherCanvasRef} onSignatureChange={setVoucherSignature} savedSignature={user?.saved_signature||savedSigFM} isDrawing={vIsDrawing} setIsDrawing={setVIsDrawing} lastPos={vLastPos} setLastPos={setVLastPos} />
             </div>
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={async () => {
-                if (!voucherSignature || voucherSignature === voucherCanvasRef.current?.toDataURL()) {
-                  const sig = voucherCanvasRef.current?.toDataURL() || "";
-                  setVoucherSignSaving(true);
-                  await approveVoucherWithSignature(ceoVoucherSignModal, sig);
-                  setVoucherSignSaving(false);
-                  setCeoVoucherSignModal(null);
-                  setVoucherSignature("");
-                  const ctx = voucherCanvasRef.current?.getContext("2d");
-                  if (ctx) ctx.clearRect(0,0,440,120);
-                }
+                const sig = voucherSignature || savedSigFM || user?.saved_signature || voucherCanvasRef.current?.toDataURL() || "";
+                if (!sig || sig === "data:,") { alert("Please select or draw your signature first."); return; }
+                setVoucherSignSaving(true);
+                await approveVoucherWithSignature(ceoVoucherSignModal, sig);
+                setVoucherSignSaving(false);
+                setCeoVoucherSignModal(null);
+                setVoucherSignature("");
+                const ctx = voucherCanvasRef.current?.getContext("2d");
+                if (ctx) ctx.clearRect(0,0,440,120);
               }} disabled={voucherSignSaving} style={{ flex:1, background:`linear-gradient(135deg,${T.teal},#10B981)`, border:"none", color:"#fff", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{voucherSignSaving?"Saving...":" Sign & Approve"}</button>
               <button onClick={()=>{ setCeoVoucherSignModal(null); setVoucherSignature(""); const ctx=voucherCanvasRef.current?.getContext("2d"); if(ctx) ctx.clearRect(0,0,440,120); }} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
             </div>

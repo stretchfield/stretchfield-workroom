@@ -1037,7 +1037,7 @@ const getNavItems = (role, user) => {
     base.push({ id: "clients", label: "Clients", icon: "" }, { id: "users", label: "User Management", icon: "" });
   }
   if (role === "Vendor") {
-    base.push({ id: "rffs", label: "My RFFs", icon: "" }, { id: "quotes", label: "Quotes", icon: "" }, { id: "vendor-invoices-submit", label: "Invoices", icon: "" }, { id: "vendor-tasks", label: "My Tasks", icon: "" });
+    base.push({ id: "rffs", label: "My RFFs", icon: "" }, { id: "quotes", label: "Quotes", icon: "" }, { id: "vendor-invoices-submit", label: "Invoices", icon: "" }, { id: "vendor-transactions", label: "Financial Transactions", icon: "" }, { id: "vendor-tasks", label: "My Tasks", icon: "" });
   }
   if (role === "Client") {
     base.push({ id: "client-events", label: "My Events", icon: "" }, { id: "notifications", label: "Notifications", icon: "" }, { id: "calendar", label: "Calendar", icon: "" });
@@ -7610,6 +7610,165 @@ const CMDashboard = ({ user, onTab, activeCountry }) => {
   );
 };
 
+
+const VendorTransactionsView = ({ user }) => {
+  const [invoices, setInvoices] = React.useState([]);
+  const [vouchers, setVouchers] = React.useState([]);
+  const [pos, setPOs] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      const [inv, pv, po] = await Promise.all([
+        supabase.from("vendor_invoices").select("*").eq("vendor_id", user?.id).order("created_at", { ascending: false }),
+        supabase.from("payment_vouchers").select("*").eq("payee", user?.name).order("created_at", { ascending: false }),
+        supabase.from("purchase_orders").select("*").eq("vendor_id", user?.id).order("created_at", { ascending: false }),
+      ]);
+      setInvoices(inv.data || []);
+      setVouchers(pv.data || []);
+      setPOs(po.data || []);
+      setLoading(false);
+    };
+    load();
+  }, [user?.id]);
+
+  const totalInvoiced = invoices.reduce((s, i) => s + parseFloat(i.amount||0), 0);
+  const totalPaid = vouchers.filter(v => v.status === 'paid').reduce((s, v) => s + parseFloat(v.amount||0), 0);
+  const totalPending = vouchers.filter(v => ['pending_approval','approved'].includes(v.status)).reduce((s, v) => s + parseFloat(v.amount||0), 0);
+  const outstanding = totalInvoiced - totalPaid;
+  const currency = user?.country === 'Nigeria' ? 'NGN' : 'GHS';
+  const fmt = (amt) => currency + ' ' + parseFloat(amt||0).toLocaleString();
+
+  if (loading) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'40vh' }}><div style={{ width:32, height:32, border:`3px solid ${T.border}`, borderTop:`3px solid ${T.cyan}`, borderRadius:'50%', animation:'spin 0.8s linear infinite' }} /></div>;
+
+  return (
+    <div style={{ animation:'fadeUp 0.35s ease' }}>
+      <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}` }}>
+        <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:'0.14em', textTransform:'uppercase', marginBottom:6 }}>Finance</div>
+        <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Financial Transactions</h2>
+        <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Your invoices, payments and outstanding balances</div>
+      </div>
+
+      {/* KPI Cards */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px,1fr))', gap:12, marginBottom:28 }}>
+        {[
+          { label:'Total Invoiced', value:fmt(totalInvoiced), color:T.cyan },
+          { label:'Total Paid', value:fmt(totalPaid), color:'#10B981' },
+          { label:'Payment in Progress', value:fmt(totalPending), color:T.amber },
+          { label:'Outstanding Balance', value:fmt(outstanding), color:outstanding > 0 ? T.red : T.teal },
+        ].map(k => (
+          <div key={k.label} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:'16px 18px' }}>
+            <div style={{ color:k.color, fontWeight:900, fontSize:18 }}>{k.value}</div>
+            <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', marginTop:4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Invoices */}
+      <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:20, marginBottom:20 }}>
+        <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:14 }}>Invoices Submitted</div>
+        {invoices.length === 0 ? (
+          <div style={{ color:T.textMuted, fontSize:13, textAlign:'center', padding:'20px 0' }}>No invoices submitted yet</div>
+        ) : (
+          <table style={{ width:'100%', borderCollapse:'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom:`1px solid ${T.border}` }}>
+                {['Event','Amount','Submitted','Status'].map(h => (
+                  <th key={h} style={{ padding:'8px 12px', textAlign:'left', color:T.textMuted, fontSize:10, fontWeight:700, textTransform:'uppercase' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.map(inv => {
+                const statusColor = { submitted:T.amber, reviewed:T.cyan, approved:T.teal, paid:'#10B981', rejected:T.red }[inv.status] || T.textMuted;
+                return (
+                  <tr key={inv.id} style={{ borderBottom:`1px solid ${T.border}44` }}>
+                    <td style={{ padding:'10px 12px', color:T.textPrimary, fontSize:13 }}>{inv.event_name||'—'}</td>
+                    <td style={{ padding:'10px 12px', color:T.textPrimary, fontWeight:700, fontSize:13 }}>{fmt(inv.amount)}</td>
+                    <td style={{ padding:'10px 12px', color:T.textMuted, fontSize:12 }}>{inv.created_at ? new Date(inv.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—'}</td>
+                    <td style={{ padding:'10px 12px' }}>
+                      <span style={{ background:statusColor+'18', color:statusColor, border:`1px solid ${statusColor}30`, borderRadius:20, padding:'2px 10px', fontSize:10, fontWeight:700, textTransform:'uppercase' }}>{inv.status}</span>
+                      {inv.invoice_url && <a href={inv.invoice_url} target="_blank" rel="noreferrer" style={{ marginLeft:8, color:T.cyan, fontSize:10, fontWeight:700 }}>View</a>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Payments */}
+      <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:20, marginBottom:20 }}>
+        <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:14 }}>Payment History</div>
+        {vouchers.length === 0 ? (
+          <div style={{ color:T.textMuted, fontSize:13, textAlign:'center', padding:'20px 0' }}>No payments processed yet</div>
+        ) : (
+          <table style={{ width:'100%', borderCollapse:'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom:`1px solid ${T.border}` }}>
+                {['Voucher','Description','Amount','Date','Status'].map(h => (
+                  <th key={h} style={{ padding:'8px 12px', textAlign:'left', color:T.textMuted, fontSize:10, fontWeight:700, textTransform:'uppercase' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {vouchers.map(v => {
+                const sc = { paid:'#10B981', approved:T.teal, pending_approval:T.amber, rejected:T.red }[v.status] || T.textMuted;
+                return (
+                  <tr key={v.id} style={{ borderBottom:`1px solid ${T.border}44` }}>
+                    <td style={{ padding:'10px 12px', color:T.cyan, fontWeight:700, fontSize:12 }}>{v.voucher_number}</td>
+                    <td style={{ padding:'10px 12px', color:T.textMuted, fontSize:12 }}>{v.description||'—'}</td>
+                    <td style={{ padding:'10px 12px', color:T.textPrimary, fontWeight:700 }}>{fmt(v.amount)}</td>
+                    <td style={{ padding:'10px 12px', color:T.textMuted, fontSize:12 }}>{v.paid_at ? new Date(v.paid_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—'}</td>
+                    <td style={{ padding:'10px 12px' }}>
+                      <span style={{ background:sc+'18', color:sc, border:`1px solid ${sc}30`, borderRadius:20, padding:'2px 10px', fontSize:10, fontWeight:700, textTransform:'uppercase' }}>{v.status==='paid'?'Paid':v.status==='approved'?'Processing':v.status==='pending_approval'?'Pending':'—'}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Purchase Orders */}
+      <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:20 }}>
+        <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:14 }}>Purchase Orders</div>
+        {pos.length === 0 ? (
+          <div style={{ color:T.textMuted, fontSize:13, textAlign:'center', padding:'20px 0' }}>No purchase orders yet</div>
+        ) : (
+          <table style={{ width:'100%', borderCollapse:'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom:`1px solid ${T.border}` }}>
+                {['PO Number','Event','Amount','Status'].map(h => (
+                  <th key={h} style={{ padding:'8px 12px', textAlign:'left', color:T.textMuted, fontSize:10, fontWeight:700, textTransform:'uppercase' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {pos.map(po => {
+                const sc = { paid:'#10B981', sent:T.cyan, invoiced:T.amber, fully_signed:T.teal }[po.status] || T.textMuted;
+                return (
+                  <tr key={po.id} style={{ borderBottom:`1px solid ${T.border}44` }}>
+                    <td style={{ padding:'10px 12px', color:T.cyan, fontWeight:700, fontSize:12 }}>{po.internal_po_number}</td>
+                    <td style={{ padding:'10px 12px', color:T.textPrimary, fontSize:13 }}>{po.event_name||'—'}</td>
+                    <td style={{ padding:'10px 12px', color:T.textPrimary, fontWeight:700 }}>{fmt(po.amount)}</td>
+                    <td style={{ padding:'10px 12px' }}>
+                      <span style={{ background:sc+'18', color:sc, border:`1px solid ${sc}30`, borderRadius:20, padding:'2px 10px', fontSize:10, fontWeight:700, textTransform:'uppercase' }}>{po.status}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export { PublicVendorApplicationForm };
 export default function StretchfieldWorkRoom({ user: propUser, profile: propProfile, onLogout }) {
   // Public vendor application route
@@ -7753,6 +7912,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "po-signing": return <PurchaseOrderView user={currentUser} />;
       case "vendor-invoices": return <FinanceInvoicesView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "vendor-invoices-submit": return <VendorInvoiceView user={currentUser} />;
+      case "vendor-transactions": return <VendorTransactionsView user={currentUser} />;
       case "notifications": return <NotificationsView user={currentUser} onNavigate={(tab, resourceId) => { setActiveTab(tab); if (resourceId) setPendingResourceId(resourceId); }} />;
       case "rffs": return <VendorRFFsView user={currentUser} />;
       case "quotes": return <VendorQuotesView user={currentUser} />;

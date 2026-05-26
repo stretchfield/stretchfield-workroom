@@ -9237,6 +9237,10 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
   const [saving, setSaving] = useState(false);
   const [staffList, setStaffList] = useState([]);
   const [vendors, setVendors] = useState([]);
+  const [installmentModal, setInstallmentModal] = useState(null);
+  const [installments, setInstallments] = useState([]);
+  const [installForm, setInstallForm] = useState({ description: '', amount: '', percentage: '', due_date: '', notes: '' });
+  const [installSaving, setInstallSaving] = useState(false);
 
 
   // Voucher form
@@ -9744,6 +9748,12 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
                         )}
                         {isFinance && v.status === 'approved' && (
                           <button onClick={() => markPaid(v)} style={{ background: T.cyan+'18', border: `1px solid ${T.cyan}30`, color: T.cyan, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>Mark Paid</button>
+                        <button onClick={async () => {
+                          const { data: inst } = await supabase.from('payment_installments').select('*').eq('voucher_id', v.id).order('installment_number');
+                          setInstallments(inst || []);
+                          setInstallmentModal(v);
+                          setInstallForm({ description: '', amount: '', percentage: '', due_date: '', notes: '' });
+                        }} style={{ background: '#8B5CF618', border: '1px solid #8B5CF630', color: '#8B5CF6', padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>Split Payment</button>
                         )}
                         <button onClick={async () => {
                           const { data: ceo } = await supabase.from('profiles').select('name').eq('role','CEO').single();

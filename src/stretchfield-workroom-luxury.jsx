@@ -4196,8 +4196,8 @@ const CRMView = ({ user, activeCountry = "All" }) => {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 10, marginBottom: 20 }}>
         {[
           { label: "Total Leads", value: leads.length, color: T.cyan },
-          { label: "Pipeline Value", value: "GHS "+totalPipeline.toLocaleString(), color: T.amber },
-          { label: "Won", value: wonCount, sub: "GHS "+totalWon.toLocaleString(), color: T.teal },
+          { label: "Pipeline Value", value: getCurrency(activeCountry)+" "+totalPipeline.toLocaleString(), color: T.amber },
+          { label: "Won", value: wonCount, sub: getCurrency(activeCountry)+" "+totalWon.toLocaleString(), color: T.teal },
           { label: "Pending Approval", value: pendingApproval, color: pendingApproval > 0 ? T.red : T.textMuted },
         ].map((k,i) => (
           <div key={i} style={{ padding: "12px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
@@ -4237,7 +4237,7 @@ const CRMView = ({ user, activeCountry = "All" }) => {
                         <span style={{ color: stage.color, fontWeight: 800, fontSize: 11, textTransform: "uppercase" }}>{stage.label}</span>
                         <span style={{ color: T.textMuted, fontSize: 10, marginLeft: 6 }}>({stageLeads.length})</span>
                       </div>
-                      {stageValue > 0 && <span style={{ color: stage.color, fontSize: 10, fontWeight: 700 }}>GHS {stageValue.toLocaleString()}</span>}
+                      {stageValue > 0 && <span style={{ color: stage.color, fontSize: 10, fontWeight: 700 }}>{getCurrency(activeCountry)+" "+stageValue.toLocaleString()}</span>}
                     </div>
                     {/* Cards */}
                     <div style={{ minHeight: 80 }}>
@@ -4272,7 +4272,7 @@ const CRMView = ({ user, activeCountry = "All" }) => {
                           {lead.email && <div style={{ color: T.textMuted, fontSize: 11 }}>{lead.email}</div>}
                         </td>
                         <td style={{ padding: "10px 14px", color: T.textSecondary, fontSize: 12 }}>{lead.contact_name||"—"}<br/><span style={{ color: T.textMuted, fontSize: 11 }}>{lead.phone||""}</span></td>
-                        <td style={{ padding: "10px 14px", color: T.amber, fontWeight: 800, fontSize: 13 }}>GHS {(lead.value||0).toLocaleString()}</td>
+                        <td style={{ padding: "10px 14px", color: T.amber, fontWeight: 800, fontSize: 13 }}>{getCurrency(activeCountry)+" "+(lead.value||0).toLocaleString()}</td>
                         <td style={{ padding: "10px 14px" }}><span style={{ background: stage.color+"18", color: stage.color, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{stage.label}</span></td>
                         <td style={{ padding: "10px 14px", color: T.textMuted, fontSize: 12 }}>{lead.source||"—"}</td>
                         <td style={{ padding: "10px 14px", color: T.cyan, fontSize: 12 }}>{lead.assigned_name||"—"}</td>
@@ -4308,7 +4308,7 @@ const CRMView = ({ user, activeCountry = "All" }) => {
               ["Contact Name", "contact_name", "text", "Full name"],
               ["Email", "email", "email", "email@company.com"],
               ["Phone", "phone", "text", "+233 XX XXX XXXX"],
-              ["Value (GHS)", "value", "number", "Estimated deal value"],
+              ["Value ("+getCurrency(activeCountry)+")", "value", "number", "Estimated deal value"],
               ["Source", "source", "text", "Referral, LinkedIn, Cold call..."],
             ].map(([label, key, type, placeholder]) => (
               <div key={key} style={{ marginBottom: 12 }}>

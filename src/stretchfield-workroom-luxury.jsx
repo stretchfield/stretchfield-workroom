@@ -14683,27 +14683,32 @@ const VendorOnboardingView = ({ user, activeCountry = "All" }) => {
                   <div style={{ color:T.textSecondary, fontSize:12 }}>{app.ceo_notes}</div>
                 </div>
               )}
-              <div style={{ display:"flex", gap:8 }}>
+              <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                 {app.status === "declined" && (
                   <button onClick={() => setEditApp(app)} style={{ background:T.amber+"15", border:`1px solid ${T.amber}30`, color:T.amber, padding:"8px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700 }}>Edit & Resubmit</button>
                 )}
-                {app.status === "submitted" && <button onClick={async () => {
-                  await supabase.from("vendor_applications").update({ status:"pending", submitted_by: user?.id }).eq("id", app.id);
-                  // Notify CEO
-                  const { data: ceos } = await supabase.from("profiles").select("id").eq("role","CEO");
-                  for (const ceo of ceos||[]) {
-                    await supabase.from("notifications").insert({ user_id:ceo.id, title:"Vendor Application — "+app.vendor_name, message:"VM has reviewed and approved "+app.vendor_name+" ("+app.vendor_type+") for onboarding. Awaiting your final approval.", type:"vendor_application", resource_id:app.id });
-                  }
-                  load();
-                  alert(app.vendor_name + " approved and sent to CEO for final approval.");
-                }} style={{ background:"linear-gradient(135deg,"+T.teal+",#10B981)", border:"none", color:"#fff", padding:"8px 18px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:12 }}>Approve & Send to CEO</button>
-                <button onClick={() => setEditApp(app)} style={{ background:T.cyan+"15", border:"1px solid "+T.cyan+"30", color:T.cyan, padding:"8px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700 }}>Edit Details</button>
-                <button onClick={async () => {
-                  const reason = window.prompt("Reason for rejection:");
-                  if (!reason) return;
-                  await supabase.from("vendor_applications").update({ status:"declined", ceo_notes:reason }).eq("id", app.id);
-                  load();
-                }} style={{ background:T.red+"15", border:"1px solid "+T.red+"30", color:T.red, padding:"8px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700 }}>Reject</button>
+                {app.status === "submitted" && (
+                  <button onClick={async () => {
+                    await supabase.from("vendor_applications").update({ status:"pending", submitted_by: user?.id }).eq("id", app.id);
+                    const { data: ceos } = await supabase.from("profiles").select("id").eq("role","CEO");
+                    for (const ceo of ceos||[]) {
+                      await supabase.from("notifications").insert({ user_id:ceo.id, title:"Vendor Application — "+app.vendor_name, message:"VM has reviewed and approved "+app.vendor_name+" ("+app.vendor_type+") for onboarding. Awaiting your final approval.", type:"vendor_application", resource_id:app.id });
+                    }
+                    load();
+                    alert(app.vendor_name + " approved and sent to CEO for final approval.");
+                  }} style={{ background:"linear-gradient(135deg,"+T.teal+",#10B981)", border:"none", color:"#fff", padding:"8px 18px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:12 }}>Approve & Send to CEO</button>
+                )}
+                {app.status === "submitted" && (
+                  <button onClick={() => setEditApp(app)} style={{ background:T.cyan+"15", border:"1px solid "+T.cyan+"30", color:T.cyan, padding:"8px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700 }}>Edit Details</button>
+                )}
+                {app.status === "submitted" && (
+                  <button onClick={async () => {
+                    const reason = window.prompt("Reason for rejection:");
+                    if (!reason) return;
+                    await supabase.from("vendor_applications").update({ status:"declined", ceo_notes:reason }).eq("id", app.id);
+                    load();
+                  }} style={{ background:T.red+"15", border:"1px solid "+T.red+"30", color:T.red, padding:"8px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700 }}>Reject</button>
+                )}
               </div>
             </div>
           ))}

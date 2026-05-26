@@ -9748,6 +9748,8 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
                         )}
                         {isFinance && v.status === 'approved' && (
                           <button onClick={() => markPaid(v)} style={{ background: T.cyan+'18', border: `1px solid ${T.cyan}30`, color: T.cyan, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>Mark Paid</button>
+                        )}
+                        {isFinance && (
                         <button onClick={async () => {
                           const { data: inst } = await supabase.from('payment_installments').select('*').eq('voucher_id', v.id).order('installment_number');
                           setInstallments(inst || []);
@@ -10227,7 +10229,103 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
       )}
 
       {/* FM Sign Voucher Modal */}
-      {fmSignModal && (
+            {installmentModal && (
+        <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setInstallmentModal(null)}>
+          <div style={{ background:T.surface, border:"1px solid #8B5CF630", borderRadius:16, width:"100%", maxWidth:600, padding:28, maxHeight:"90vh", overflowY:"auto" }} onClick={e=>e.stopPropagation()}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
+              <div>
+                <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18 }}>Split Payment — {installmentModal.voucher_number}</div>
+                <div style={{ color:T.textMuted, fontSize:13, marginTop:2 }}>{installmentModal.payee} · {getCurrency(installmentModal.country||"Ghana")} {parseFloat(installmentModal.amount||0).toLocaleString()} total</div>
+              </div>
+              <button onClick={() => setInstallmentModal(null)} style={{ background:"none", border:"1px solid "+T.border, color:T.textMuted, width:32, height:32, borderRadius:8, cursor:"pointer", fontSize:18 }}>×</button>
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:20 }}>
+              {[
+                { label:"Total Amount", value:getCurrency(installmentModal.country||"Ghana")+" "+parseFloat(installmentModal.amount||0).toLocaleString(), color:T.cyan },
+                { label:"Total Paid", value:getCurrency(installmentModal.country||"Ghana")+" "+installments.filter(i=>i.status==="paid").reduce((s,i)=>s+parseFloat(i.amount||0),0).toLocaleString(), color:"#10B981" },
+                { label:"Outstanding", value:getCurrency(installmentModal.country||"Ghana")+" "+(parseFloat(installmentModal.amount||0)-installments.filter(i=>i.status==="paid").reduce((s,i)=>s+parseFloat(i.amount||0),0)).toLocaleString(), color:T.amber },
+              ].map(k => (
+                <div key={k.label} style={{ background:T.bg, borderRadius:8, padding:"12px 14px" }}>
+                  <div style={{ color:k.color, fontWeight:800, fontSize:16 }}>{k.value}</div>
+                  <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginTop:3 }}>{k.label}</div>
+                </div>
+              ))}
+            </div>
+            {installments.length > 0 && (
+              <div style={{ marginBottom:20 }}>
+                <div style={{ color:T.textPrimary, fontWeight:700, fontSize:14, marginBottom:10 }}>Payment Schedule</div>
+                {installments.map(inst => (
+                  <div key={inst.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 14px", background:T.bg, borderRadius:8, marginBottom:6, border:"1px solid "+(inst.status==="paid"?"#10B98130":T.border) }}>
+                    <div>
+                      <div style={{ color:T.textPrimary, fontSize:13, fontWeight:700 }}>Payment {inst.installment_number} — {inst.description||"Installment"}</div>
+                      <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>
+                        {getCurrency(installmentModal.country||"Ghana")} {parseFloat(inst.amount||0).toLocaleString()}
+                        {inst.percentage ? ` (${inst.percentage}%)` : ""}
+                        {inst.due_date ? " · Due "+new Date(inst.due_date).toLocaleDateString("en-GB",{day:"numeric",month:"short"}) : ""}
+                      </div>
+                    </div>
+                    <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                      <span style={{ background:inst.status==="paid"?"#10B98120":T.amber+"20", color:inst.status==="paid"?"#10B981":T.amber, borderRadius:20, padding:"2px 10px", fontSize:10, fontWeight:700 }}>{inst.status==="paid"?"Paid":"Pending"}</span>
+                      {inst.status !== "paid" && (
+                        <button onClick={async () => {
+                          await supabase.from("payment_installments").update({ status:"paid", paid_at:new Date().toISOString(), paid_by:user?.id, paid_by_name:user?.name }).eq("id",inst.id);
+                          const newTotalPaid = installments.filter(ii=>ii.status==="paid"||ii.id===inst.id).reduce((s,ii)=>s+parseFloat(ii.amount||0),0);
+                          const allPaid = newTotalPaid >= parseFloat(installmentModal.amount||0);
+                          await supabase.from("payment_vouchers").update({ total_paid:newTotalPaid, status:allPaid?"paid":"approved" }).eq("id",installmentModal.id);
+                          const payeeVendor = vendors.find(v => v.name === installmentModal.payee);
+                          if (payeeVendor?.email) {
+                            const cur = getCurrency(installmentModal.country||"Ghana");
+                            const html = "<div style='font-family:Arial;max-width:600px;'><div style='height:6px;background:linear-gradient(90deg,#00C8FF,#00E5C8)'></div><div style='background:#060B14;padding:20px 28px'><div style='color:#00C8FF;font-weight:700'>STRETCHFIELD</div></div><div style='padding:28px;background:#F4F6FB'><p style='color:#0A1628;font-size:15px;font-weight:700'>Payment "+inst.installment_number+" Confirmed</p><p style='color:#0A1628'>Amount: <strong>"+cur+" "+parseFloat(inst.amount||0).toLocaleString()+"</strong></p><p style='color:#0A1628'>Voucher: "+installmentModal.voucher_number+"</p><p style='color:#64748B;font-size:12px'>Remaining: "+cur+" "+(parseFloat(installmentModal.amount||0)-newTotalPaid).toLocaleString()+"</p></div></div>";
+                            await sendEmail(payeeVendor.email, "Payment "+inst.installment_number+" Confirmed — "+cur+" "+parseFloat(inst.amount||0).toLocaleString(), html);
+                          }
+                          const { data: upd } = await supabase.from("payment_installments").select("*").eq("voucher_id",installmentModal.id).order("installment_number");
+                          setInstallments(upd||[]);
+                          if (allPaid) { setInstallmentModal(null); load(); }
+                        }} style={{ background:"#10B98115", border:"1px solid #10B98130", color:"#10B981", padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:10, fontWeight:700 }}>Mark Paid</button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ background:T.bg, borderRadius:10, padding:"16px 18px", marginBottom:16 }}>
+              <div style={{ color:T.textPrimary, fontWeight:700, fontSize:14, marginBottom:12 }}>Add Payment</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
+                <div>
+                  <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Description</label>
+                  <input value={installForm.description} onChange={e=>setInstallForm(f=>({...f,description:e.target.value}))} placeholder="e.g. 50% Upfront" style={{ width:"100%", padding:"9px 12px", background:T.surface, border:"1px solid "+T.border, borderRadius:8, color:T.textPrimary, fontSize:13, outline:"none", boxSizing:"border-box" }} />
+                </div>
+                <div>
+                  <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Amount</label>
+                  <input type="number" value={installForm.amount} onChange={e=>{ const amt=e.target.value; const pct=installmentModal.amount?Math.round((parseFloat(amt)/parseFloat(installmentModal.amount))*100):""; setInstallForm(f=>({...f,amount:amt,percentage:pct})); }} placeholder="0" style={{ width:"100%", padding:"9px 12px", background:T.surface, border:"1px solid "+T.border, borderRadius:8, color:T.textPrimary, fontSize:13, outline:"none", boxSizing:"border-box" }} />
+                </div>
+                <div>
+                  <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Percentage (%)</label>
+                  <input type="number" value={installForm.percentage} onChange={e=>{ const pct=e.target.value; const amt=installmentModal.amount?Math.round((parseFloat(pct)/100)*parseFloat(installmentModal.amount)):""; setInstallForm(f=>({...f,percentage:pct,amount:amt})); }} placeholder="50" style={{ width:"100%", padding:"9px 12px", background:T.surface, border:"1px solid "+T.border, borderRadius:8, color:T.textPrimary, fontSize:13, outline:"none", boxSizing:"border-box" }} />
+                </div>
+                <div>
+                  <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Due Date</label>
+                  <input type="date" value={installForm.due_date} onChange={e=>setInstallForm(f=>({...f,due_date:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.surface, border:"1px solid "+T.border, borderRadius:8, color:T.textPrimary, fontSize:13, outline:"none", boxSizing:"border-box" }} />
+                </div>
+              </div>
+              <button onClick={async () => {
+                if (!installForm.amount) { alert("Enter an amount"); return; }
+                setInstallSaving(true);
+                const nextNum = (installments.length||0)+1;
+                await supabase.from("payment_installments").insert({ voucher_id:installmentModal.id, installment_number:nextNum, description:installForm.description||"Payment "+nextNum, amount:parseFloat(installForm.amount), percentage:parseFloat(installForm.percentage)||null, due_date:installForm.due_date||null, status:"pending", country:installmentModal.country||"Ghana" });
+                await supabase.from("payment_vouchers").update({ payment_schedule:"split", installments_count:nextNum }).eq("id",installmentModal.id);
+                const { data: upd } = await supabase.from("payment_installments").select("*").eq("voucher_id",installmentModal.id).order("installment_number");
+                setInstallments(upd||[]);
+                setInstallForm({ description:"", amount:"", percentage:"", due_date:"", notes:"" });
+                setInstallSaving(false);
+              }} disabled={installSaving} style={{ background:"linear-gradient(135deg,#8B5CF6,#7C3AED)", border:"none", color:"#fff", padding:"10px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{installSaving?"Adding...":"+ Add Payment"}</button>
+            </div>
+            <button onClick={() => setInstallmentModal(null)} style={{ width:"100%", background:"none", border:"1px solid "+T.border, color:T.textMuted, padding:"10px", borderRadius:8, cursor:"pointer" }}>Close</button>
+          </div>
+        </div>
+      )}
+
+{fmSignModal && (
         <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setFmSignModal(null)}>
           <div style={{ background:T.surface, border:`1px solid ${T.amber}30`, borderRadius:16, width:"100%", maxWidth:500, padding:28 }} onClick={e=>e.stopPropagation()}>
             <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>Finance Manager Signature</div>

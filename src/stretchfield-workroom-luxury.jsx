@@ -15334,6 +15334,27 @@ const OpportunitiesView = ({ user, onNavigate, activeCountry = "All" }) => {
         </div>
       </div>
 
+      {/* Workflow banner */}
+      <div style={{ display:"flex", alignItems:"center", gap:0, marginBottom:20, background:T.surface, border:`1px solid ${T.border}`, borderRadius:10, overflow:"hidden" }}>
+        {[
+          { step:"1", label:"Add Opportunity", desc:"Identify prospect", color:T.cyan },
+          { step:"2", label:"Qualify & Contact", desc:"Research and reach out", color:T.teal },
+          { step:"3", label:"Convert to Lead", desc:"Assign to sales rep", color:"#10B981" },
+          { step:"4", label:"Won", desc:"Client confirmed", color:T.amber },
+          { step:"5", label:"Client & Event", desc:"Create event", color:"#8B5CF6" },
+        ].map((s, i) => (
+          <div key={s.step} style={{ flex:1, padding:"10px 14px", borderRight:i<4?`1px solid ${T.border}`:"none", display:"flex", alignItems:"center", gap:10 }}>
+            <div style={{ width:24, height:24, borderRadius:"50%", background:s.color+"20", border:`1px solid ${s.color}40`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+              <span style={{ color:s.color, fontSize:10, fontWeight:800 }}>{s.step}</span>
+            </div>
+            <div>
+              <div style={{ color:T.textPrimary, fontSize:11, fontWeight:700 }}>{s.label}</div>
+              <div style={{ color:T.textMuted, fontSize:9 }}>{s.desc}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginBottom: 24 }}>
         {[
@@ -15419,7 +15440,7 @@ const OpportunitiesView = ({ user, onNavigate, activeCountry = "All" }) => {
                              {(oppActivities[o.id]||[]).length > 0 ? oppActivities[o.id].length : "Notes"}
                           </button>
                           {o.status !== "Converted" && (
-                            <button onClick={() => handleConvert(o)} style={{ background: "#10B98115", border: "1px solid #10B98130", color: "#10B981", padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>→ Lead</button>
+                            <button onClick={() => handleConvert(o)} style={{ background: "linear-gradient(135deg,#10B981,#059669)", border: "none", color: "#fff", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 800, whiteSpace: "nowrap" }}>Convert to Lead</button>
                           )}
                           {["CEO","Administrator"].includes(user?.role) && (
                             <button onClick={async () => {

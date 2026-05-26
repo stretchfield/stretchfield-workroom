@@ -6508,7 +6508,7 @@ const StaffPaymentRatesView = ({ user }) => {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [paymentRates, setPaymentRates] = useState([]);
   const [saving, setSaving] = useState(false);
-  const isCEO = user.role === "CEO";
+  const isCEO = user?.role === "CEO";
 
   useEffect(() => {
     supabase.from("projects").select("*").order("event_date", { ascending: false }).then(({ data }) => setEvents(data || []));
@@ -6751,8 +6751,8 @@ const ClientPaymentsView = ({ user, activeCountry = "All" }) => {
   const [modal, setModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ client_id:"", client_name:"", project_id:"", event_name:"", amount:"", payment_date: new Date().toISOString().slice(0,10), payment_method:"Bank Transfer", reference_number:"", zoho_invoice_url:"", notes:"", sales_rep_id:"", sales_rep_name:"" });
-  const isFM = user.role === "Finance Manager";
-  const isCEO = user.role === "CEO";
+  const isFM = user?.role === "Finance Manager";
+  const isCEO = user?.role === "CEO";
   const [salesReps, setSalesReps] = useState([]);
   const [editPayment, setEditPayment] = useState(null);
 
@@ -16148,7 +16148,7 @@ const RunOfShowSection = ({ event, user, members }) => {
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ time_slot:"", duration_mins:"", segment_title:"", responsible_person:"", notes:"" });
   const [saving, setSaving] = useState(false);
-  const canEdit = ["CEO","Strategy & Events Lead","Country Manager"].includes(user.role);
+  const canEdit = ["CEO","Strategy & Events Lead","Country Manager"].includes(user?.role);
 
   const load = async () => {
     const { data } = await supabase.from("run_of_show").select("*").eq("project_id", event.id).order("order_index");
@@ -16268,8 +16268,8 @@ const EventChecklistSection = ({ event, user, members }) => {
   const [adding, setAdding] = useState(false);
   const [newItem, setNewItem] = useState({ category:"Venue", item:"", responsible_role:"" });
   const [saving, setSaving] = useState(false);
-  const isVM = user.role === "Vendor Manager";
-  const canEdit = ["CEO","Strategy & Events Lead","Country Manager"].includes(user.role);
+  const isVM = user?.role === "Vendor Manager";
+  const canEdit = ["CEO","Strategy & Events Lead","Country Manager"].includes(user?.role);
   const canCheck = canEdit || isVM;
 
   const load = async () => {
@@ -16395,7 +16395,7 @@ const ClientCommsSection = ({ event, user }) => {
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ log_date: new Date().toISOString().slice(0,10), type:"call", contact_name:"", summary:"", outcome:"", follow_up_required:false, follow_up_notes:"" });
   const [saving, setSaving] = useState(false);
-  const canEdit = ["CEO","Strategy & Events Lead","Country Manager"].includes(user.role);
+  const canEdit = ["CEO","Strategy & Events Lead","Country Manager"].includes(user?.role);
 
   const load = async () => {
     const { data } = await supabase.from("client_comms_log").select("*").eq("project_id", event.id).order("log_date", { ascending:false });
@@ -16502,7 +16502,7 @@ const EventDebriefSection = ({ event, user }) => {
   const [debrief, setDebrief] = useState(null);
   const [form, setForm] = useState({ what_went_well:"", what_to_do_differently:"", client_informal_feedback:"", surprises:"", recommendations:"" });
   const [saving, setSaving] = useState(false);
-  const canEdit = ["CEO","Strategy & Events Lead","Country Manager"].includes(user.role);
+  const canEdit = ["CEO","Strategy & Events Lead","Country Manager"].includes(user?.role);
 
   const load = async () => {
     const { data } = await supabase.from("event_debrief").select("*").eq("project_id", event.id).order("submitted_at", { ascending:false });
@@ -16581,9 +16581,9 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
   const [paymentRates, setPaymentRates] = useState([]);
   const [staffProfiles, setStaffProfiles] = useState([]);
   const [savingRates, setSavingRates] = useState(false);
-  const isCEO = user.role === "CEO";
-  const canManage = ["CEO", "Country Manager", "Strategy & Events Lead"].includes(user.role);
-  const canSetRates = ["CEO", "Finance Manager"].includes(user.role);
+  const isCEO = user?.role === "CEO";
+  const canManage = ["CEO", "Country Manager", "Strategy & Events Lead"].includes(user?.role);
+  const canSetRates = ["CEO", "Finance Manager"].includes(user?.role);
   const PHASES = ["Brief", "Planning", "Pre-Production", "Production", "Live", "Post-Production", "Completed"];
   const phaseIdx = PHASES.indexOf(event.phase || "Planning");
   const daysToEvent = event.event_date ? Math.ceil((new Date(event.event_date) - new Date()) / (1000*60*60*24)) : null;
@@ -16606,7 +16606,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
     setStaffProfiles(sp.data || []);
     setPaymentRates(pr.data || []);
     // Mark messages as read
-    const unread = (mg.data || []).filter(m => m.sender_id !== user.id);
+    const unread = (mg.data || []).filter(m => m.sender_id !== user?.id);
     if (unread.length > 0) {
       await supabase.from("event_team_messages").update({ read_by: supabase.rpc }).eq("project_id", event.id);
     }
@@ -16614,9 +16614,9 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
 
   useEffect(() => { load(); }, [event.id]);
 
-  const myTasks = isCEO ? tasks : tasks.filter(t => t.assignee_id === user.id || (Array.isArray(t.assignee_ids) && t.assignee_ids.includes(user.id)));
+  const myTasks = isCEO ? tasks : tasks.filter(t => t.assignee_id === user?.id || (Array.isArray(t.assignee_ids) && t.assignee_ids.includes(user?.id)));
   const completedTasks = myTasks.filter(t => t.status === "completed").length;
-  const unreadMsgs = messages.filter(m => m.sender_id !== user.id).length;
+  const unreadMsgs = messages.filter(m => m.sender_id !== user?.id).length;
 
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
@@ -16639,12 +16639,12 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
           name: taskForm.name, project_id: event.id,
           deadline: taskForm.deadline || null, status: "pending",
           assignee_id: aid, assignee_name: assignee?.name || "",
-          assigned_by: user.id, notes: taskForm.notes || null,
+          assigned_by: user?.id, notes: taskForm.notes || null,
           assignee_ids: assigneeIds,
         });
         await supabase.from("notifications").insert({ user_id: aid, title: "New Task — " + event.name, message: taskForm.name, type: "task" });
         const { data: assigneeProfile } = await supabase.from("profiles").select("email,name").eq("id", aid).single();
-        if (assigneeProfile?.email) await sendEmail(assigneeProfile.email, "New Task Assigned — " + event.name, taskEmailHtml({ staffName: assigneeProfile.name, taskName: taskForm.name, eventName: event.name, deadline: taskForm.deadline || null, assignedBy: user.name, notes: taskForm.notes || null }));
+        if (assigneeProfile?.email) await sendEmail(assigneeProfile.email, "New Task Assigned — " + event.name, taskEmailHtml({ staffName: assigneeProfile.name, taskName: taskForm.name, eventName: event.name, deadline: taskForm.deadline || null, assignedBy: user?.name, notes: taskForm.notes || null }));
       }
     } else if (assigneeIds.length === 1) {
       const assignee = members.find(m => m.id === assigneeIds[0]);
@@ -16652,7 +16652,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
         name: taskForm.name, project_id: event.id,
         deadline: taskForm.deadline || null, status: "pending",
         assignee_id: assigneeIds[0], assignee_name: assignee?.name || "",
-        assigned_by: user.id, notes: taskForm.notes || null,
+        assigned_by: user?.id, notes: taskForm.notes || null,
         assignee_ids: assigneeIds,
       });
       await supabase.from("notifications").insert({ user_id: assigneeIds[0], title: "New Task — " + event.name, message: taskForm.name, type: "task" });
@@ -16660,7 +16660,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
       await supabase.from("tasks").insert({
         name: taskForm.name, project_id: event.id,
         deadline: taskForm.deadline || null, status: "pending",
-        assigned_by: user.id, notes: taskForm.notes || null,
+        assigned_by: user?.id, notes: taskForm.notes || null,
       });
     }
     setTaskForm({ name: "", deadline: "", assignee_ids: [], status: "pending", notes: "" });
@@ -16690,7 +16690,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
     await supabase.from("event_documents").insert({
       project_id: event.id, title: docForm.title,
       document_type: docForm.document_type, document_url,
-      shared_by: user.id, shared_by_name: user.name,
+      shared_by: user?.id, shared_by_name: user?.name,
       uploaded_by_client: false, requires_approval: false,
     });
     setDocForm({ title: "", document_type: "Event Brief", share_with_client: false });
@@ -16785,10 +16785,10 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
           { id: "tasks", label: "Tasks (" + myTasks.length + ")" },
           { id: "documents", label: "Documents (" + documents.length + ")" },
           { id: "messages", label: "Messages" + (unreadMsgs > 0 ? " " : "") },
-          ...( ["CEO","Strategy & Events Lead","Vendor Manager","Country Manager"].includes(user.role) ? [{ id: "run-of-show", label: "Run of Show" }] : []),
-          ...( ["CEO","Strategy & Events Lead","Vendor Manager","Country Manager"].includes(user.role) ? [{ id: "checklist", label: "Checklist" }] : []),
-          ...( ["CEO","Strategy & Events Lead","Country Manager"].includes(user.role) ? [{ id: "comms-log", label: "Client Comms" }] : []),
-          ...( ["CEO","Strategy & Events Lead","Country Manager","Vendor Manager"].includes(user.role) ? [{ id: "debrief", label: "Debrief" }] : []),
+          ...( ["CEO","Strategy & Events Lead","Vendor Manager","Country Manager"].includes(user?.role) ? [{ id: "run-of-show", label: "Run of Show" }] : []),
+          ...( ["CEO","Strategy & Events Lead","Vendor Manager","Country Manager"].includes(user?.role) ? [{ id: "checklist", label: "Checklist" }] : []),
+          ...( ["CEO","Strategy & Events Lead","Country Manager"].includes(user?.role) ? [{ id: "comms-log", label: "Client Comms" }] : []),
+          ...( ["CEO","Strategy & Events Lead","Country Manager","Vendor Manager"].includes(user?.role) ? [{ id: "debrief", label: "Debrief" }] : []),
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveSection(tab.id)} style={{ padding: "10px 18px", border: "none", background: "none", cursor: "pointer", color: activeSection === tab.id ? T.cyan : T.textMuted, fontWeight: activeSection === tab.id ? 800 : 400, fontSize: 13, borderBottom: activeSection === tab.id ? "2px solid " + T.cyan : "2px solid transparent", marginBottom: -1, transition: "all 0.15s", whiteSpace:"nowrap" }}>{tab.label}</button>
         ))}
@@ -16818,7 +16818,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
               {messages.slice(-2).map(m => (
                 <div key={m.id} style={{ padding: "8px 0", borderBottom: "1px solid " + T.border+"22" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                    <span style={{ color: m.sender_id === user.id ? T.cyan : T.teal, fontSize: 11, fontWeight: 700 }}>{m.sender_name}</span>
+                    <span style={{ color: m.sender_id === user?.id ? T.cyan : T.teal, fontSize: 11, fontWeight: 700 }}>{m.sender_name}</span>
                     <span style={{ color: T.textMuted, fontSize: 10 }}>{new Date(m.created_at).toLocaleDateString("en-GB")}</span>
                   </div>
                   <div style={{ color: T.textSecondary, fontSize: 13 }}>{m.message}</div>
@@ -16948,7 +16948,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
                     <div style={{ maxHeight: 180, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
                       {(docComments[d.id] || []).length === 0 && <div style={{ color: T.textMuted, fontSize: 12 }}>No comments yet.</div>}
                       {(docComments[d.id] || []).map(c => {
-                        const isMe = c.sender_id === user.id;
+                        const isMe = c.sender_id === user?.id;
                         return (
                           <div key={c.id} style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" }}>
                             <div style={{ maxWidth: "80%", background: isMe ? T.teal+"18" : T.surface, border: "1px solid " + (isMe ? T.teal+"30" : T.border), borderRadius: isMe ? "12px 12px 2px 12px" : "12px 12px 12px 2px", padding: "8px 12px" }}>
@@ -16977,7 +16977,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
           <div style={{ background: T.surface, border: "1px solid " + T.border, borderRadius: 12, padding: "16px", marginBottom: 14, maxHeight: 400, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
             {messages.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "20px 0" }}>No messages yet. Start the team conversation.</div>}
             {messages.map(m => {
-              const isMe = m.sender_id === user.id;
+              const isMe = m.sender_id === user?.id;
               return (
                 <div key={m.id} style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" }}>
                   <div style={{ maxWidth: "80%", background: isMe ? T.cyan+"18" : T.bg, border: "1px solid " + (isMe ? T.cyan+"30" : T.border), borderRadius: isMe ? "12px 12px 2px 12px" : "12px 12px 12px 2px", padding: "10px 14px" }}>
@@ -18435,9 +18435,9 @@ const EventIntelligenceReport = ({ event, user, onClose }) => {
     business_development_signals: "", next_edition_recommendations: "",
   });
 
-  const isCEO = user.role === "CEO";
-  const isStrategy = user.role === "Strategy & Events Lead";
-  const isVM = user.role === "Vendor Manager";
+  const isCEO = user?.role === "CEO";
+  const isStrategy = user?.role === "Strategy & Events Lead";
+  const isVM = user?.role === "Vendor Manager";
 
   const load = async () => {
     try {
@@ -18965,7 +18965,7 @@ const PaymentAuthorisationView = ({ user, onNavigate, activeCountry = "All" }) =
   const [lastPos, setLastPos] = useState(null);
 
   const isFinance = user.role === "Finance Manager";
-  const isCEO = user.role === "CEO";
+  const isCEO = user?.role === "CEO";
 
   const load = async () => {
     try {
@@ -22505,7 +22505,7 @@ const EventBriefsView = ({ user }) => {
     setBriefs(b||[]);
     // Filter events assigned to this ESL
     const myEvents = (ev||[]).filter(e =>
-      e.assigned_to === user.id ||
+      e.assigned_to === user?.id ||
       (Array.isArray(e.assigned_to_ids) && e.assigned_to_ids.includes(user.id)) ||
       user.role === "CEO" || user.role === "Finance Manager"
     );
@@ -23910,9 +23910,9 @@ const EventReportsView = ({ user, activeCountry = "All" }) => {
     strategic_intent_achieved:"", client_satisfaction:"", business_development_signals:"", next_edition_recommendations:"",
   });
 
-  const isStrategy = user.role === "Strategy & Events Lead";
-  const isVM = user.role === "Vendor Manager";
-  const isCEO = user.role === "CEO";
+  const isStrategy = user?.role === "Strategy & Events Lead";
+  const isVM = user?.role === "Vendor Manager";
+  const isCEO = user?.role === "CEO";
 
   const load = async () => {
     const [{ data: ev }, { data: rp }, { data: sc }] = await Promise.all([

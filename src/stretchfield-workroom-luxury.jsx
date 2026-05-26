@@ -15150,7 +15150,7 @@ const OpportunitiesView = ({ user, onNavigate, activeCountry = "All" }) => {
   const [modal, setModal] = useState(false);
   const [editModal, setEditModal] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ company: "", sector: "", presence: "GH", event_fit: "", notes: "", status: "New", contact_name: "", contact_email: "", contact_phone: "" });
+  const [form, setForm] = useState({ company: "", sector: "", presence: activeCountry === "Nigeria" ? "NG" : "GH", event_fit: "", notes: "", status: "New", contact_name: "", contact_email: "", contact_phone: "", contact_title: "", estimated_value: "", expected_event_date: "", event_type: "", source: "Direct Outreach", city: activeCountry === "Nigeria" ? "Lagos" : "Accra", website: "" });
   const [expandedOpp, setExpandedOpp] = useState(null);
   const [oppActivities, setOppActivities] = useState({});
   const [actForm, setActForm] = useState({ type: "note", content: "", scheduled_date: "", scheduled_time: "" });
@@ -15240,10 +15240,30 @@ const OpportunitiesView = ({ user, onNavigate, activeCountry = "All" }) => {
   const handleAdd = async () => {
     if (!form.company) return;
     setSaving(true);
-    await supabase.from("opportunities").insert({ ...form, created_by: user.id, assigned_to: user.id });
+    await supabase.from("opportunities").insert({
+      company: form.company,
+      sector: form.sector,
+      presence: form.presence,
+      event_fit: form.event_fit,
+      notes: form.notes,
+      status: form.status || "New",
+      contact_name: form.contact_name,
+      contact_email: form.contact_email,
+      contact_phone: form.contact_phone,
+      contact_title: form.contact_title,
+      value: parseFloat(form.estimated_value) || 0,
+      event_type: form.event_type,
+      event_date: form.expected_event_date || null,
+      source: form.source,
+      city: form.city,
+      website: form.website,
+      country: user?.country || activeCountry || 'Ghana',
+      created_by: user?.id,
+      assigned_to: user?.id,
+    });
     setSaving(false);
     setModal(false);
-    setForm({ company: "", sector: "", presence: "GH", event_fit: "", notes: "", status: "New", contact_name: "", contact_email: "", contact_phone: "" });
+    setForm({ company: "", sector: "", presence: activeCountry === "Nigeria" ? "NG" : "GH", event_fit: "", notes: "", status: "New", contact_name: "", contact_email: "", contact_phone: "", contact_title: "", estimated_value: "", expected_event_date: "", event_type: "", source: "Direct Outreach", city: activeCountry === "Nigeria" ? "Lagos" : "Accra", website: "" });
     load();
   };
 
@@ -15525,9 +15545,37 @@ const OpportunitiesView = ({ user, onNavigate, activeCountry = "All" }) => {
         <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setModal(false)}>
           <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: "100%", maxWidth: 540, padding: 28, boxShadow: `0 24px 80px rgba(0,0,0,0.4)`, animation: "fadeUp 0.25s ease" }} onClick={e => e.stopPropagation()}>
             <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 20 }}>Add Opportunity</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
-              <div><label style={labelStyle}>Company Name</label><input value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} style={inputStyle} placeholder="e.g. Ecobank Ghana" /></div>
-              <div><label style={labelStyle}>Sector</label><input value={form.sector} onChange={e => setForm({ ...form, sector: e.target.value })} style={inputStyle} placeholder="e.g. Banking" /></div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+              <div><label style={labelStyle}>Company Name *</label><input value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} style={inputStyle} placeholder="e.g. GTBank Nigeria" /></div>
+              <div><label style={labelStyle}>Sector *</label>
+                <select value={form.sector} onChange={e => setForm({ ...form, sector: e.target.value })} style={inputStyle}>
+                  <option value="">Select sector...</option>
+                  {["Banking & Finance","Insurance","Oil & Gas","Telecoms","FMCG","Healthcare","Technology","Real Estate","Aviation","Government & Public Sector","NGO & Development","Manufacturing","Retail","Education","Professional Services","Media & Entertainment","Agriculture","Other"].map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div><label style={labelStyle}>Contact Person</label><input value={form.contact_name} onChange={e => setForm({ ...form, contact_name: e.target.value })} style={inputStyle} placeholder="Full name" /></div>
+              <div><label style={labelStyle}>Title / Position</label><input value={form.contact_title} onChange={e => setForm({ ...form, contact_title: e.target.value })} style={inputStyle} placeholder="e.g. Head of Events" /></div>
+              <div><label style={labelStyle}>Email</label><input type="email" value={form.contact_email} onChange={e => setForm({ ...form, contact_email: e.target.value })} style={inputStyle} placeholder="contact@company.com" /></div>
+              <div><label style={labelStyle}>Phone</label><input value={form.contact_phone} onChange={e => setForm({ ...form, contact_phone: e.target.value })} style={inputStyle} placeholder="+234 XXX XXX XXXX" /></div>
+              <div><label style={labelStyle}>City</label>
+                <select value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} style={inputStyle}>
+                  {activeCountry === "Nigeria" ? ["Lagos","Abuja","Port Harcourt","Kano","Ibadan","Other"].map(c => <option key={c}>{c}</option>) : ["Accra","Kumasi","Takoradi","Tamale","Other"].map(c => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div><label style={labelStyle}>Estimated Value ({activeCountry === "Nigeria" ? "NGN" : "GHS"})</label><input type="number" value={form.estimated_value} onChange={e => setForm({ ...form, estimated_value: e.target.value })} style={inputStyle} placeholder="0" /></div>
+              <div><label style={labelStyle}>Event Type</label>
+                <select value={form.event_type} onChange={e => setForm({ ...form, event_type: e.target.value })} style={inputStyle}>
+                  <option value="">Select...</option>
+                  {["Conference","Summit","Awards Ceremony","Product Launch","Corporate Retreat","Annual General Meeting","Exhibition/Expo","Workshop/Training","Gala Dinner","Team Building","Hybrid Event","Virtual Event","Other"].map(t => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+              <div><label style={labelStyle}>Expected Event Date</label><input type="date" value={form.expected_event_date} onChange={e => setForm({ ...form, expected_event_date: e.target.value })} style={inputStyle} /></div>
+              <div><label style={labelStyle}>Source</label>
+                <select value={form.source} onChange={e => setForm({ ...form, source: e.target.value })} style={inputStyle}>
+                  {["Direct Outreach","Referral","LinkedIn","Conference","Website","Cold Call","Partnership","Other"].map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div><label style={labelStyle}>Website</label><input value={form.website} onChange={e => setForm({ ...form, website: e.target.value })} style={inputStyle} placeholder="www.company.com" /></div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 14 }}>
               <div><label style={labelStyle}>Presence</label>

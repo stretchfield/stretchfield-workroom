@@ -14634,7 +14634,7 @@ const VendorOnboardingView = ({ user, activeCountry = "All" }) => {
           </div>
           {apps.filter(a => a.status === "submitted").length === 0 ? (
             <div style={{ textAlign:"center", padding:40, color:T.textMuted, fontSize:13 }}>No new external applications yet.</div>
-          ) : apps.filter(a => a.status === "submitted").map(app => (
+          ) : apps.filter(a => ["submitted","declined"].includes(a.status)).map(app => (
             <div key={app.id} style={{ background:T.surface, border:"1px solid "+T.amber+"30", borderLeft:"3px solid "+T.amber, borderRadius:10, padding:"16px 18px", marginBottom:10 }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12 }}>
                 <div>
@@ -14677,9 +14677,18 @@ const VendorOnboardingView = ({ user, activeCountry = "All" }) => {
                   {app.vat_cert_url && <a href={app.vat_cert_url} target="_blank" rel="noreferrer" style={{ background:T.teal+"15", border:"1px solid "+T.teal+"30", color:T.teal, padding:"5px 12px", borderRadius:8, fontSize:11, fontWeight:700, textDecoration:"none" }}>View VAT Certificate</a>}
                 </div>
               )}
+              {app.status === "declined" && app.ceo_notes && (
+                <div style={{ background:T.red+"10", border:`1px solid ${T.red}25`, borderRadius:8, padding:"8px 12px", marginBottom:10 }}>
+                  <div style={{ color:T.red, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:3 }}>CEO Feedback — Please address before resubmitting</div>
+                  <div style={{ color:T.textSecondary, fontSize:12 }}>{app.ceo_notes}</div>
+                </div>
+              )}
               <div style={{ display:"flex", gap:8 }}>
-                <button onClick={async () => {
-                  await supabase.from("vendor_applications").update({ status:"pending", submitted_by: user.id }).eq("id", app.id);
+                {app.status === "declined" && (
+                  <button onClick={() => setEditApp(app)} style={{ background:T.amber+"15", border:`1px solid ${T.amber}30`, color:T.amber, padding:"8px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700 }}>Edit & Resubmit</button>
+                )}
+                {app.status === "submitted" && <button onClick={async () => {
+                  await supabase.from("vendor_applications").update({ status:"pending", submitted_by: user?.id }).eq("id", app.id);
                   // Notify CEO
                   const { data: ceos } = await supabase.from("profiles").select("id").eq("role","CEO");
                   for (const ceo of ceos||[]) {

@@ -15718,11 +15718,12 @@ const OpportunitiesView = ({ user, onNavigate, activeCountry = "All" }) => {
       value: 0,
       notes: 'Converted from Opportunities.',
       source: 'Opportunities',
-      created_by: user && user.id,
-      assigned_to: opp.assigned_to || (user && user.id),
-      assigned_name: opp.assigned_name || (user && user.name) || '',
-      sales_rep_id: opp.assigned_to || (user && user.id),
-      sales_rep_name: opp.assigned_name || (user && user.name) || '',
+      created_by: user?.id,
+      assigned_to: opp.assigned_to || user?.id,
+      assigned_name: opp.assigned_name || user?.name || '',
+      sales_rep_id: opp.assigned_to || user?.id,
+      sales_rep_name: opp.assigned_name || user?.name || '',
+      country: opp.country || user?.country || 'Ghana',
     }).select().single();
     if (!res.error && res.data) {
       await supabase.from('opportunities').update({ status: 'Converted', converted_at: new Date().toISOString() }).eq('id', opp.id);

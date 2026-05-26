@@ -14144,6 +14144,7 @@ const ApprovedVendorsTab = ({ apps, user, load }) => {
   const [editModal, setEditModal] = React.useState(null);
   const [editForm, setEditForm] = React.useState({});
   const [savingEdit, setSavingEdit] = React.useState(false);
+  const pendingApps = apps.filter(a => a.status === "pending");
   const approvedApps = apps.filter(a => ["approved","login-created"].includes(a.status));
   const VTYPES = ["Event Lighting","Events Ushering","Photography","Videography","Catering","Entertainment Provider (MC, DJ, Live Band, Performers)","Event Decor","Event Production Company","Event Refreshment","Furniture & Equipment Rental","Gift & Merchandise Supplier","Health & Safety Provider","Printing Company","Registration & Badging Service","Security Service","Technology Provider","Transportation (Shuttle, Car Rental)","Venue Provider","Other"];
 
@@ -14198,6 +14199,57 @@ const ApprovedVendorsTab = ({ apps, user, load }) => {
       <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 16 }}>
         {approvedApps.length === 0 ? "No approved vendors yet. CEO will approve your submissions." : `${approvedApps.length} approved vendor${approvedApps.length !== 1 ? "s" : ""}`}
       </div>
+      {/* Pending CEO Approval */}
+      {pendingApps.length > 0 && (
+        <div style={{ marginBottom:20 }}>
+          <div style={{ color:T.amber, fontWeight:800, fontSize:14, marginBottom:10 }}>{pendingApps.length} Pending Your Approval</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {pendingApps.map(app => (
+              <div key={app.id} style={{ background:T.surface, border:`1px solid ${T.amber}30`, borderLeft:`3px solid ${T.amber}`, borderRadius:10, padding:"16px 18px" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
+                  <div>
+                    <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15 }}>{app.vendor_name}</div>
+                    <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{app.vendor_type} · {app.contact_person} · {app.contact_email}</div>
+                    <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>{app.country} · Submitted {new Date(app.created_at).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}</div>
+                  </div>
+                  <span style={{ background:T.amber+"18", color:T.amber, border:`1px solid ${T.amber}30`, borderRadius:20, padding:"3px 12px", fontSize:10, fontWeight:800 }}>PENDING</span>
+                </div>
+                {app.bank_name && (
+                  <div style={{ background:T.bg, borderRadius:8, padding:"10px 14px", marginBottom:10, display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
+                    <div><div style={{ color:T.textMuted, fontSize:10, fontWeight:700 }}>BANK</div><div style={{ color:T.textPrimary, fontSize:12 }}>{app.bank_name}</div></div>
+                    <div><div style={{ color:T.textMuted, fontSize:10, fontWeight:700 }}>ACCOUNT NAME</div><div style={{ color:T.textPrimary, fontSize:12 }}>{app.bank_account_name||"—"}</div></div>
+                    <div><div style={{ color:T.textMuted, fontSize:10, fontWeight:700 }}>ACCOUNT NO</div><div style={{ color:T.textPrimary, fontSize:12 }}>{app.account_no||"—"}</div></div>
+                  </div>
+                )}
+                {(app.business_reg_url || app.vat_cert_url) && (
+                  <div style={{ display:"flex", gap:8, marginBottom:10 }}>
+                    {app.business_reg_url && <a href={app.business_reg_url} target="_blank" rel="noreferrer" style={{ background:T.cyan+"15", border:`1px solid ${T.cyan}30`, color:T.cyan, padding:"5px 12px", borderRadius:8, fontSize:11, fontWeight:700, textDecoration:"none" }}>View Business Reg</a>}
+                    {app.vat_cert_url && <a href={app.vat_cert_url} target="_blank" rel="noreferrer" style={{ background:T.teal+"15", border:`1px solid ${T.teal}30`, color:T.teal, padding:"5px 12px", borderRadius:8, fontSize:11, fontWeight:700, textDecoration:"none" }}>View VAT Certificate</a>}
+                  </div>
+                )}
+                <div style={{ display:"flex", gap:8 }}>
+                  <button onClick={async () => {
+                    await supabase.from("vendor_applications").update({ status:"approved", approved_by:user?.id }).eq("id", app.id);
+                    const { data: vms } = await supabase.from("profiles").select("id").eq("role","Vendor Manager");
+                    for (const vm of vms||[]) {
+                      await supabase.from("notifications").insert({ user_id:vm.id, title:"Vendor Approved — "+app.vendor_name, message:"CEO has approved "+app.vendor_name+". Please create their portal login.", type:"vendor_application", resource_id:app.id });
+                    }
+                    load();
+                    alert(app.vendor_name + " approved! VM notified to create login.");
+                  }} style={{ background:`linear-gradient(135deg,${T.teal},#10B981)`, border:"none", color:"#fff", padding:"8px 18px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:12 }}>Approve</button>
+                  <button onClick={async () => {
+                    const notes = window.prompt("Reason for declining:");
+                    if (!notes) return;
+                    await supabase.from("vendor_applications").update({ status:"declined", ceo_notes:notes }).eq("id", app.id);
+                    load();
+                  }} style={{ background:T.red+"15", border:`1px solid ${T.red}30`, color:T.red, padding:"8px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700 }}>Decline</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {approvedApps.map(app => (
           <div key={app.id} style={{ background: T.surface, border: `1px solid ${app.status === "login-created" ? T.teal+"50" : T.amber+"50"}`, borderLeft: `3px solid ${app.status === "login-created" ? T.teal : T.amber}`, borderRadius: 10, padding: "16px 18px" }}>

@@ -9918,8 +9918,32 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
             )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-              <div><label style={labelStyle}>Payee / Supplier *</label><input value={vForm.payee} onChange={e => setVForm({...vForm, payee: e.target.value})} style={inputStyle} placeholder="Who is being paid?" /></div>
-              <div><label style={labelStyle}>Amount (GHS) *</label><input type="number" value={vForm.amount} onChange={e => setVForm({...vForm, amount: e.target.value})} style={inputStyle} placeholder="0.00" /></div>
+              <div><label style={labelStyle}>Payee / Supplier *</label>
+                <select value={vForm.payee} onChange={e => {
+                  const val = e.target.value;
+                  if (val === '__manual__') { setVForm({...vForm, payee: ''}); }
+                  else {
+                    // Auto-fill bank details from vendor/staff profile
+                    const vendor = vendors.find(v => v.name === val) || staffList.find(s => s.name === val);
+                    setVForm({...vForm, payee: val,
+                      account_name: vendor?.bank_account_name || vendor?.bank_account_number ? vendor.bank_account_name : vForm.account_name,
+                      account_number: vendor?.bank_account_number || vForm.account_number,
+                      bank_name: vendor?.bank_name || vForm.bank_name,
+                    });
+                  }
+                }} style={inputStyle}>
+                  <option value="">Select payee...</option>
+                  {vendors.length > 0 && <optgroup label="Approved Vendors">
+                    {vendors.filter(v => v.name).map(v => <option key={v.id} value={v.name}>{v.name}{v.service_category ? ' — '+v.service_category : ''}</option>)}
+                  </optgroup>}
+                  {staffList.length > 0 && <optgroup label="Staff">
+                    {staffList.filter(s => s.name).map(s => <option key={s.id} value={s.name}>{s.name} — {s.role}</option>)}
+                  </optgroup>}
+                  <option value="__manual__">+ Enter manually...</option>
+                </select>
+                {vForm.payee === '' && <input value={vForm.payee} onChange={e => setVForm({...vForm, payee: e.target.value})} style={{...inputStyle, marginTop:6}} placeholder="Enter payee name manually" />}
+              </div>
+              <div><label style={labelStyle}>Amount ({getCurrency(activeCountry)}) *</label><input type="number" value={vForm.amount} onChange={e => setVForm({...vForm, amount: e.target.value})} style={inputStyle} placeholder="0.00" /></div>
             </div>
 
             <div style={{ marginBottom: 14 }}>

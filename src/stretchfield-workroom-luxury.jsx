@@ -15177,17 +15177,18 @@ const OpportunitiesView = ({ user, onNavigate, activeCountry = "All" }) => {
   const addActivity = async (oppId, company) => {
     if (!actForm.content) return;
     setAddingAct(true);
-    await supabase.from("opportunity_activities").insert({
+    const { error: actErr } = await supabase.from("opportunity_activities").insert({
       opportunity_id: oppId,
       type: actForm.type,
       content: actForm.content,
       scheduled_date: actForm.scheduled_date || null,
       scheduled_time: actForm.scheduled_time || null,
-      created_by: user.id,
-      created_by_name: user.name,
+      created_by: user?.id,
+      created_by_name: user?.name,
     });
-    // Notify CEO if logged by non-CEO (Kofi live feed)
-    if (user.role !== "CEO") {
+    if (actErr) { alert("Error saving activity: " + actErr.message); setAddingAct(false); return; }
+    // Notify CEO if logged by non-CEO
+    if (user?.role !== "CEO") {
       const { data: ceos } = await supabase.from("profiles").select("id").eq("role","CEO");
       for (const ceo of ceos||[]) {
         await supabase.from("notifications").insert({ user_id: ceo.id, title: "S&M Activity — " + company, message: user.name + " logged a " + actForm.type + " on " + company + ": " + actForm.content, type: "crm" });

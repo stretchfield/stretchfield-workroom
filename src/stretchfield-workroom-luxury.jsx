@@ -14632,7 +14632,7 @@ const VendorOnboardingView = ({ user, activeCountry = "All" }) => {
             </div>
             <button onClick={() => { const link = window.location.origin + "/applyvendor"; navigator.clipboard.writeText(link); alert("Link copied!\n\n" + link); }} style={{ background:T.surface, border:"1px solid "+T.border, color:T.textMuted, padding:"8px 14px", borderRadius:8, cursor:"pointer", fontSize:11, fontWeight:700 }}>Copy Form Link</button>
           </div>
-          {apps.filter(a => a.status === "submitted").length === 0 ? (
+          {apps.filter(a => ["submitted","declined"].includes(a.status)).length === 0 ? (
             <div style={{ textAlign:"center", padding:40, color:T.textMuted, fontSize:13 }}>No new external applications yet.</div>
           ) : apps.filter(a => ["submitted","declined"].includes(a.status)).map(app => (
             <div key={app.id} style={{ background:T.surface, border:"1px solid "+T.amber+"30", borderLeft:"3px solid "+T.amber, borderRadius:10, padding:"16px 18px", marginBottom:10 }}>

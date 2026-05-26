@@ -7505,9 +7505,7 @@ const CMDashboard = ({ user, onTab, activeCountry }) => {
             </div>
           </div>
           <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-            <div style={{ background:T.cyan+'15', border:`1px solid ${T.cyan}30`, borderRadius:20, padding:'5px 14px' }}>
-              <span style={{ color:T.cyan, fontSize:11, fontWeight:800 }}>{country} Operations</span>
-            </div>
+
             {pendingVouchers.length > 0 && (
               <button onClick={() => onTab && onTab('payment-authorisation')} style={{ background:T.amber+'15', border:`1px solid ${T.amber}40`, color:T.amber, padding:'10px 18px', borderRadius:10, cursor:'pointer', fontWeight:800, fontSize:13 }}>
                 Sign Payments ({pendingVouchers.length})

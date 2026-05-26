@@ -12547,7 +12547,10 @@ const QuoteComparisonView = ({ user, activeCountry = "All" }) => {
   useEffect(() => { load(); }, [activeCountry]);
 
   const loadRffs = async (eventId) => {
-      (!activeCountry || activeCountry === "All") ? supabase.from("rffs").select("*").order("created_at", { ascending: false }) : supabase.from("rffs").select("*").eq("country", activeCountry).order("created_at", { ascending: false }),
+    const rffsQuery = (!activeCountry || activeCountry === "All")
+      ? supabase.from("rffs").select("*").order("created_at", { ascending: false })
+      : supabase.from("rffs").select("*").eq("country", activeCountry).order("created_at", { ascending: false });
+    const { data } = await rffsQuery;
     setRffs(data || []);
     setSelectedRff("");
     setAssignments([]);

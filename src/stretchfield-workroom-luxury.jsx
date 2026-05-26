@@ -7439,6 +7439,179 @@ const PublicVendorApplicationForm = () => {
   );
 };
 
+
+const CMDashboard = ({ user, onTab, activeCountry }) => {
+  const [events, setEvents] = React.useState([]);
+  const [opportunities, setOpps] = React.useState([]);
+  const [vendors, setVendors] = React.useState([]);
+  const [clientPayments, setClientPayments] = React.useState([]);
+  const [vouchers, setVouchers] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const country = user?.country || 'Nigeria';
+  const currency = country === 'Nigeria' ? 'NGN' : 'GHS';
+
+  React.useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const [ev, op, vp, cp, vo] = await Promise.all([
+          supabase.from('projects').select('*').eq('country', country).order('event_date', { ascending: true }),
+          supabase.from('opportunities').select('*').eq('country', country).order('created_at', { ascending: false }),
+          supabase.from('profiles').select('*').eq('role', 'Vendor').eq('country', country),
+          supabase.from('client_payments').select('*').eq('country', country).order('payment_date', { ascending: false }),
+          supabase.from('payment_vouchers').select('*').eq('country', country).order('created_at', { ascending: false }),
+        ]);
+        setEvents(ev.data || []);
+        setOpps(op.data || []);
+        setVendors(vp.data || []);
+        setClientPayments(cp.data || []);
+        setVouchers(vo.data || []);
+      } catch(e) { console.error('CM Dashboard load error:', e); }
+      setLoading(false);
+    };
+    load();
+  }, [country]);
+
+  const now = new Date();
+  const greeting = now.getHours() < 12 ? 'Good Morning' : now.getHours() < 17 ? 'Good Afternoon' : 'Good Evening';
+  const dateStr = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const activeEvents = events.filter(e => !['Completed','Cancelled','completed','cancelled'].includes(e.phase||''));
+  const upcomingEvents = events.filter(e => e.event_date && new Date(e.event_date) >= now).slice(0, 3);
+  const totalRevenue = clientPayments.reduce((s, p) => s + parseFloat(p.amount||0), 0);
+  const pipelineValue = opportunities.filter(o => !['won','lost','Converted'].includes(o.status)).reduce((s,o) => s + parseFloat(o.value||0), 0);
+  const pendingVouchers = vouchers.filter(v => ['pending_approval','approved'].includes(v.status));
+  const recentOpps = opportunities.slice(0, 4);
+
+  const fmtAmt = (amt) => currency + ' ' + parseFloat(amt||0).toLocaleString();
+
+  if (loading) return (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh' }}>
+      <div style={{ width:32, height:32, border:`3px solid ${T.border}`, borderTop:`3px solid ${T.cyan}`, borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
+    </div>
+  );
+
+  return (
+    <div style={{ animation:'fadeUp 0.35s ease' }}>
+      {/* Hero */}
+      <div style={{ background:`linear-gradient(135deg, ${T.bgDeep} 0%, #0D1F36 60%, ${T.bgDeep} 100%)`, border:`1px solid ${T.border}`, borderRadius:16, padding:'32px 36px', marginBottom:24, position:'relative', overflow:'hidden' }}>
+        <div style={{ position:'absolute', top:-60, right:-60, width:280, height:280, background:`radial-gradient(circle, ${T.cyan}08, transparent 70%)`, pointerEvents:'none' }} />
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:16 }}>
+          <div>
+            <div style={{ color:T.textMuted, fontSize:11, fontWeight:600, letterSpacing:'0.12em', textTransform:'uppercase', marginBottom:6 }}>{dateStr}</div>
+            <h1 style={{ margin:'0 0 6px', fontSize:28, fontWeight:900, color:T.textPrimary, letterSpacing:'-0.03em' }}>{greeting}, {user?.name?.split(' ')[0]}.</h1>
+            <div style={{ color:T.textMuted, fontSize:14, marginTop:4 }}>
+              {activeEvents.length} active event{activeEvents.length!==1?'s':''} in flight
+              {pendingVouchers.length > 0 && <span style={{ color:T.amber, fontWeight:700 }}> · {pendingVouchers.length} payment{pendingVouchers.length!==1?'s':''} awaiting signature</span>}
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+            <div style={{ background:T.cyan+'15', border:`1px solid ${T.cyan}30`, borderRadius:20, padding:'5px 14px' }}>
+              <span style={{ color:T.cyan, fontSize:11, fontWeight:800 }}>{country} Operations</span>
+            </div>
+            {pendingVouchers.length > 0 && (
+              <button onClick={() => onTab && onTab('payment-authorisation')} style={{ background:T.amber+'15', border:`1px solid ${T.amber}40`, color:T.amber, padding:'10px 18px', borderRadius:10, cursor:'pointer', fontWeight:800, fontSize:13 }}>
+                Sign Payments ({pendingVouchers.length})
+              </button>
+            )}
+            <button onClick={() => onTab && onTab('events')} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:'none', color:'#060B14', padding:'10px 20px', borderRadius:10, cursor:'pointer', fontWeight:800, fontSize:13 }}>
+              View All Events
+            </button>
+          </div>
+        </div>
+        {/* KPI Stats */}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(130px,1fr))', gap:12, marginTop:24, paddingTop:20, borderTop:`1px solid ${T.border}44` }}>
+          {[
+            { label:'Active Events', value:activeEvents.length, color:T.cyan },
+            { label:'Pipeline Value', value:fmtAmt(Math.round(pipelineValue/1000))+'k', color:T.teal },
+            { label:'Revenue YTD', value:fmtAmt(Math.round(totalRevenue/1000))+'k', color:'#10B981' },
+            { label:'Active Vendors', value:vendors.length, color:T.textSecondary },
+            { label:'Pending Payments', value:pendingVouchers.length, color:pendingVouchers.length>0?T.amber:T.textMuted },
+          ].map(stat => (
+            <div key={stat.label} style={{ background:`${T.bg}80`, borderRadius:10, padding:'12px 14px' }}>
+              <div style={{ color:stat.color, fontWeight:900, fontSize:20 }}>{stat.value}</div>
+              <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', marginTop:3 }}>{stat.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Two column */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
+        {/* Upcoming Events */}
+        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:24 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+            <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em' }}>Operations</div>
+            <button onClick={() => onTab && onTab('events')} style={{ background:'none', border:'none', color:T.cyan, cursor:'pointer', fontSize:12, fontWeight:700 }}>View all</button>
+          </div>
+          <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16, marginBottom:12 }}>Upcoming Events</div>
+          {upcomingEvents.length === 0 ? (
+            <div style={{ color:T.textMuted, fontSize:13, textAlign:'center', padding:'20px 0' }}>No upcoming events</div>
+          ) : upcomingEvents.map(e => (
+            <div key={e.id} style={{ padding:'10px 0', borderBottom:`1px solid ${T.border}44` }}>
+              <div style={{ color:T.textPrimary, fontWeight:700, fontSize:13 }}>{e.name}</div>
+              <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>{e.client} · {e.event_date ? new Date(e.event_date).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : 'TBC'}</div>
+              <span style={{ background:T.cyan+'18', color:T.cyan, borderRadius:20, padding:'2px 8px', fontSize:10, fontWeight:700 }}>{e.phase||'Planning'}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Pipeline */}
+        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:24 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+            <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em' }}>Business Development</div>
+            <button onClick={() => onTab && onTab('opportunities')} style={{ background:'none', border:'none', color:T.cyan, cursor:'pointer', fontSize:12, fontWeight:700 }}>View all</button>
+          </div>
+          <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16, marginBottom:12 }}>Pipeline & Revenue</div>
+          <div style={{ background:T.bg, borderRadius:8, padding:'12px 14px', marginBottom:12 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
+              <span style={{ color:T.textMuted, fontSize:12 }}>Revenue vs Target</span>
+            </div>
+            <div style={{ height:6, background:T.border, borderRadius:3, marginBottom:6 }}>
+              <div style={{ width:totalRevenue > 0 ? '100%' : '0%', height:'100%', background:`linear-gradient(90deg,${T.cyan},${T.teal})`, borderRadius:3 }} />
+            </div>
+            <div style={{ color:T.teal, fontSize:13, fontWeight:700 }}>{fmtAmt(totalRevenue)}</div>
+          </div>
+          {recentOpps.length === 0 ? (
+            <div style={{ color:T.textMuted, fontSize:13, textAlign:'center', padding:'20px 0' }}>No opportunities yet</div>
+          ) : recentOpps.map(o => (
+            <div key={o.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:`1px solid ${T.border}44` }}>
+              <div>
+                <div style={{ color:T.textPrimary, fontSize:13, fontWeight:600 }}>{o.company}</div>
+                <div style={{ color:T.textMuted, fontSize:10, textTransform:'uppercase' }}>{o.status}</div>
+              </div>
+              <div style={{ color:T.amber, fontWeight:700, fontSize:13 }}>{fmtAmt(o.value||0)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Finance Snapshot */}
+      <div style={{ background:`linear-gradient(135deg, #060B14 0%, #0A1628 100%)`, border:`1px solid ${T.border}`, borderRadius:12, padding:24 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+          <div>
+            <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em' }}>Finance</div>
+            <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16 }}>Financial Snapshot</div>
+          </div>
+          <button onClick={() => onTab && onTab('finance')} style={{ background:'none', border:'none', color:T.cyan, cursor:'pointer', fontSize:12, fontWeight:700 }}>Finance</button>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(150px,1fr))', gap:12 }}>
+          {[
+            { label:'Total Revenue', value:fmtAmt(totalRevenue), color:T.teal },
+            { label:'Pending Payments', value:fmtAmt(pendingVouchers.reduce((s,v)=>s+parseFloat(v.amount||0),0)), color:T.amber },
+            { label:'Approved Payments', value:fmtAmt(vouchers.filter(v=>v.status==='approved').reduce((s,v)=>s+parseFloat(v.amount||0),0)), color:T.cyan },
+            { label:'Vouchers Pending', value:pendingVouchers.length, color:pendingVouchers.length>0?T.amber:T.textMuted },
+          ].map(stat => (
+            <div key={stat.label} style={{ background:`${T.surface}80`, borderRadius:10, padding:'14px 16px' }}>
+              <div style={{ color:stat.color, fontWeight:900, fontSize:18 }}>{stat.value}</div>
+              <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', marginTop:3 }}>{stat.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export { PublicVendorApplicationForm };
 export default function StretchfieldWorkRoom({ user: propUser, profile: propProfile, onLogout }) {
   // Public vendor application route
@@ -7501,7 +7674,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "dashboard":
         if (role === "CEO") return <CEODashboard onTab={setActiveTab} user={currentUser} activeCountry={activeCountry} />;
         if (role === "Board of Directors") return <BoardDashboard user={currentUser} />;
-        if (role === "Country Manager") return <CEODashboard onTab={setActiveTab} user={currentUser} activeCountry={user.country} />;
+        if (role === "Country Manager") return <CMDashboard onTab={setActiveTab} user={currentUser} activeCountry={currentUser.country} />;
         if (role === "Vendor") return <VendorDashboard user={currentUser} />;
         if (role === "Client") return <ClientDashboard user={currentUser} />;
         if (role === "Finance Manager") return <FinanceManagerDashboard user={currentUser} onTab={setActiveTab} activeCountry={activeCountry} />;

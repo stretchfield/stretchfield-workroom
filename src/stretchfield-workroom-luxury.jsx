@@ -7565,7 +7565,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "budgets": return <BudgetView user={currentUser} />;
       case "expenses": return <ExpenseView user={currentUser} />;
       case "finance-reports": return <FinanceReportsView user={currentUser} />;
-      case "event-reports": return <EventReportsView user={currentUser} />;
+      case "event-reports": return <EventReportsView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "feedback": return <FeedbackView userRole={currentUser.role} />;
       case "calendar": return <CalendarView user={currentUser} onNavigate={(tab) => setActiveTab(tab)} />;
       case "zoho-books": return <ZohoBooksView user={currentUser} />;

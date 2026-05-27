@@ -1040,7 +1040,7 @@ const getNavItems = (role, user) => {
     base.push({ id: "rffs", label: "My RFFs", icon: "" }, { id: "quotes", label: "Quotes", icon: "" }, { id: "vendor-invoices-submit", label: "Invoices", icon: "" }, { id: "vendor-transactions", label: "Financial Transactions", icon: "" }, { id: "vendor-tasks", label: "My Tasks", icon: "" });
   }
   if (role === "Client") {
-    base.push({ id: "client-events", label: "My Events", icon: "" }, { id: "calendar", label: "Calendar", icon: "" });
+    base.push({ id: "client-events", label: "My Events", icon: "" });
   }
   if (role === "Board of Directors") {
     return [{ id: "dashboard", label: "Dashboard", icon: "" }, { id: "notifications", label: "Notifications", icon: "" }];
@@ -1061,7 +1061,7 @@ const getNavItems = (role, user) => {
         { id: "sm-tasks", label: "S&M Tasks", icon: "" },
         { id: "outreach-planner", label: "Outreach Planner", icon: "" },
       ] : []),
-      { id: "calendar", label: "Calendar", icon: "" },
+
       { id: "notifications", label: "Notifications", icon: "" },
     ];
   }

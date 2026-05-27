@@ -25395,7 +25395,7 @@ const EventsView = ({ user, userRole, activeCountry = "All" }) => {
                   const inProgressPct = totalTasks > 0 ? eventTasks.reduce((sum, t) => sum + (parseInt(t.progress)||0), 0) / totalTasks : (p.completion || 0);
                   const taskCompletion = totalTasks > 0 ? Math.round(inProgressPct) : (p.completion || 0);
                   return (
-                    <>
+                    <div>
                       <div style={{ height: 4, background: T.border + "44", borderRadius: 2, marginBottom: 6 }}>
                         <div style={{ height: "100%", width: taskCompletion + "%", background: `linear-gradient(90deg, ${T.cyan}, ${T.teal})`, borderRadius: 2, transition: "width 0.4s ease" }} />
                       </div>
@@ -25403,28 +25403,28 @@ const EventsView = ({ user, userRole, activeCountry = "All" }) => {
                         <div style={{ color: T.textMuted, fontSize: 10 }}>
                           {totalTasks > 0 ? `${completedTasks}/${totalTasks} tasks · ${taskCompletion}% complete` : `${taskCompletion}% complete`}
                         </div>
+                        {canManage ? (
+                          <button onClick={async (e) => {
+                            e.stopPropagation();
+                            await supabase.from("projects").update({ active_for_client: !p.active_for_client }).eq("id", p.id);
+                            load();
+                          }} style={{
+                            background: p.active_for_client ? T.teal + "18" : "none",
+                            border: `1px solid ${p.active_for_client ? T.teal + "60" : T.border}`,
+                            color: p.active_for_client ? T.teal : T.textMuted,
+                            padding: "3px 10px", borderRadius: 20, cursor: "pointer", fontSize: 10, fontWeight: 700,
+                          }}>
+                            {p.active_for_client ? " Client Visible" : " Hidden"}
+                          </button>
+                        ) : (
+                          <span style={{ color: p.active_for_client ? T.teal : T.textMuted, fontSize: 10, fontWeight: 600 }}>
+                            {p.active_for_client ? " Visible" : " Hidden"}
+                          </span>
+                        )}
                       </div>
-                    </>
+                    </div>
                   );
                 })()}
-                {canManage ? (
-                    <button onClick={async (e) => {
-                      e.stopPropagation();
-                      await supabase.from("projects").update({ active_for_client: !p.active_for_client }).eq("id", p.id);
-                      load();
-                    }} style={{
-                      background: p.active_for_client ? T.teal + "18" : "none",
-                      border: `1px solid ${p.active_for_client ? T.teal + "60" : T.border}`,
-                      color: p.active_for_client ? T.teal : T.textMuted,
-                      padding: "3px 10px", borderRadius: 20, cursor: "pointer", fontSize: 10, fontWeight: 700,
-                    }}>
-                      {p.active_for_client ? " Client Visible" : " Hidden"}
-                    </button>
-                  ) : (
-                    <span style={{ color: p.active_for_client ? T.teal : T.textMuted, fontSize: 10, fontWeight: 600 }}>
-                      {p.active_for_client ? " Visible" : " Hidden"}
-                    </span>
-                  )}
                 </div>
 
                 {/* Edit + Delete buttons — canManage roles */}

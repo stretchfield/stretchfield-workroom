@@ -8105,7 +8105,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
                 <span style={{ color:T.cyan, fontSize:11, fontWeight:800 }}>{currentUser.country === "Nigeria" ? "🇳🇬" : "🇬🇭"} {currentUser.country}</span>
               </div>
             ) : (
-              <span style={{ color: T.textMuted, fontSize: 11, letterSpacing: "0.04em", whiteSpace: "nowrap" }}>Stretchfield / {currentUser.name.split(" ")[0]}</span>
+              
             )}
           </div>
 
@@ -24239,13 +24239,13 @@ const ClientDashboard = ({ user }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {payments.map(p => (
-                    <tr key={p.id} style={{ borderBottom:`1px solid ${T.border}44` }}>
-                      <td style={{ padding:"10px 12px", color:T.textPrimary, fontSize:13 }}>{p.event_name||"—"}</td>
-                      <td style={{ padding:"10px 12px", color:"#10B981", fontWeight:700, fontSize:13 }}>GHS {parseFloat(p.amount||0).toLocaleString()}</td>
-                      <td style={{ padding:"10px 12px", color:T.textMuted, fontSize:12 }}>{p.payment_date ? new Date(p.payment_date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}) : "—"}</td>
-                      <td style={{ padding:"10px 12px", color:T.textMuted, fontSize:12 }}>{p.payment_method||"—"}</td>
-                      <td style={{ padding:"10px 12px", color:T.textMuted, fontSize:12 }}>{p.reference_number||"—"}</td>
+                  {payments.map(pay => (
+                    <tr key={pay.id} style={{ borderBottom:`1px solid ${T.border}44` }}>
+                      <td style={{ padding:"10px 12px", color:T.textPrimary, fontSize:13 }}>{pay.event_name||"—"}</td>
+                      <td style={{ padding:"10px 12px", color:"#10B981", fontWeight:700, fontSize:13 }}>GHS {parseFloat(pay.amount||0).toLocaleString()}</td>
+                      <td style={{ padding:"10px 12px", color:T.textMuted, fontSize:12 }}>{pay.payment_date ? new Date(pay.payment_date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}) : "—"}</td>
+                      <td style={{ padding:"10px 12px", color:T.textMuted, fontSize:12 }}>{pay.payment_method||"—"}</td>
+                      <td style={{ padding:"10px 12px", color:T.textMuted, fontSize:12 }}>{pay.reference_number||"—"}</td>
                     </tr>
                   ))}
                 </tbody>

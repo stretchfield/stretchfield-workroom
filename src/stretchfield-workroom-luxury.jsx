@@ -7773,6 +7773,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
   }
   const [activeTab, setActiveTab] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [openGroups, setOpenGroups] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [pendingResourceId, setPendingResourceId] = useState(null);

@@ -17301,7 +17301,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
   const [expandedDoc, setExpandedDoc] = useState(null);
   const [docComments, setDocComments] = useState({});
   const [docComment, setDocComment] = useState("");
-  const [taskForm, setTaskForm] = useState({ name: "", deadline: "", assignee_ids: [], status: "pending", notes: "" });
+  const [taskForm, setTaskForm] = useState({ name: "", deadline: "", assignee_ids: [], status: "pending", notes: "", priority: "Medium" });
   const [docForm, setDocForm] = useState({ title: "", document_type: "Event Brief", share_with_client: false });
   const [savingTask, setSavingTask] = useState(false);
 
@@ -17590,6 +17590,15 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
                 <div>
                   <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Deadline</label>
                   <input type="date" value={taskForm.deadline} onChange={e => setTaskForm(f => ({...f, deadline: e.target.value}))} style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Priority</label>
+                  <select value={taskForm.priority||'Medium'} onChange={e => setTaskForm(f => ({...f, priority: e.target.value}))} style={inputStyle}>
+                    <option value="Critical">🔴 Critical</option>
+                    <option value="High">🟠 High</option>
+                    <option value="Medium">🟡 Medium</option>
+                    <option value="Low">🟢 Low</option>
+                  </select>
                 </div>
                 <div>
                   <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Notes</label>

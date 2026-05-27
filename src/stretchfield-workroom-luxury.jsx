@@ -1040,7 +1040,7 @@ const getNavItems = (role, user) => {
     base.push({ id: "rffs", label: "My RFFs", icon: "" }, { id: "quotes", label: "Quotes", icon: "" }, { id: "vendor-invoices-submit", label: "Invoices", icon: "" }, { id: "vendor-transactions", label: "Financial Transactions", icon: "" }, { id: "vendor-tasks", label: "My Tasks", icon: "" });
   }
   if (role === "Client") {
-    base.push({ id: "client-events", label: "My Events", icon: "" }, { id: "notifications", label: "Notifications", icon: "" }, { id: "calendar", label: "Calendar", icon: "" });
+    base.push({ id: "client-events", label: "My Events", icon: "" }, { id: "calendar", label: "Calendar", icon: "" });
   }
   if (role === "Board of Directors") {
     return [{ id: "dashboard", label: "Dashboard", icon: "" }, { id: "notifications", label: "Notifications", icon: "" }];
@@ -23957,9 +23957,9 @@ const ClientDashboard = ({ user }) => {
         setClientId(clientData.id);
         const [ev, dc, mg, ms, ai, sat, rp] = await Promise.all([
           supabase.from("projects").select("*").eq("client_id", clientData.id).order("event_date", { ascending: true }),
-          supabase.from("event_documents").select("*").eq("is_internal", false).order("created_at", { ascending: false }),
+          supabase.from("event_documents").select("*").eq("is_internal", false).eq("shared_with_client", true).order("created_at", { ascending: false }),
           supabase.from("client_messages").select("*").eq("client_id", clientData.id).order("created_at", { ascending: false }),
-          supabase.from("client_milestones").select("*").order("created_at", { ascending: false }),
+          supabase.from("client_milestones").select("*").in("project_id", ev.data?.map(e=>e.id)||[]).order("created_at", { ascending: false }),
           supabase.from("client_action_items").select("*").eq("client_id", clientData.id).order("due_date", { ascending: true }),
           supabase.from("client_satisfaction").select("*").eq("client_id", clientData.id).order("submitted_at", { ascending: false }),
           supabase.from("event_intelligence_reports").select("*"),

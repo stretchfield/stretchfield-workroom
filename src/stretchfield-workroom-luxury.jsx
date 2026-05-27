@@ -2591,7 +2591,7 @@ const VendorDashboard = ({ user }) => {
             { label: "Active RFFs", value: assignments.filter(a => a.status === "pending").length, color: T.cyan },
             { label: "Quotes Submitted", value: assignments.filter(a => a.status === "quote-submitted").length, color: T.amber },
             { label: "Jobs Done", value: completedJobs, color: T.teal },
-            { label: "Total Business", value: "GHS "+Math.round(totalBusiness/1000)+"k", color: T.amber },
+            { label: "Total Business", value: (user?.country==="Nigeria"?"NGN":"GHS")+" "+Math.round(totalBusiness/1000)+"k", color: T.amber },
             { label: "Pending Invoices", value: pendingInvoices.length, color: pendingInvoices.length > 0 ? T.amber : T.textMuted },
             { label: "Paid Invoices", value: paidInvoices.length, color: T.teal },
           ].map(k => (
@@ -2646,7 +2646,7 @@ const VendorDashboard = ({ user }) => {
                 <div>
                   <div style={{ color: T.cyan, fontWeight: 700, fontSize: 13 }}>{po.internal_po_number || "PO"}</div>
                   <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{po.event_name}</div>
-                  <div style={{ color: T.amber, fontWeight: 700, fontSize: 12, marginTop: 3 }}>{po.currency||"GHS"} {parseFloat(po.amount||0).toLocaleString()}</div>
+                  <div style={{ color: T.amber, fontWeight: 700, fontSize: 12, marginTop: 3 }}>{po.currency||(user?.country==="Nigeria"?"NGN":"GHS")} {parseFloat(po.amount||0).toLocaleString()}</div>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
                   <span style={{ color: statusColors[po.status]||T.textMuted, fontSize: 10, fontWeight: 700, background: (statusColors[po.status]||T.textMuted)+"18", padding: "2px 8px", borderRadius: 20 }}>{po.status}</span>
@@ -2710,7 +2710,7 @@ const VendorDashboard = ({ user }) => {
                     {inv.document_url && <a href={inv.document_url} target="_blank" rel="noreferrer" style={{ color: T.cyan, fontSize: 10, fontWeight: 700 }}>↗ View Document</a>}
                   </div>
                   <div style={{ textAlign: "right", minWidth: 120 }}>
-                    <div style={{ color: statusColor, fontWeight: 800, fontSize: 14 }}>{inv.currency||"GHS"} {parseFloat(inv.amount||0).toLocaleString()}</div>
+                    <div style={{ color: statusColor, fontWeight: 800, fontSize: 14 }}>{inv.currency||(user?.country==="Nigeria"?"NGN":"GHS")} {parseFloat(inv.amount||0).toLocaleString()}</div>
                     <div style={{ color: statusColor, fontSize: 10, fontWeight: 700, marginTop: 3, background: statusColor+"15", padding: "2px 8px", borderRadius: 20, display: "inline-block" }}>{statusLabel}</div>
                     {isPaid && inv.paid_at && <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>Paid {new Date(inv.paid_at).toLocaleDateString("en-GB")}</div>}
                   </div>
@@ -2843,7 +2843,7 @@ const VendorRFFsView = ({ user }) => {
     if (vms) await Promise.all(vms.map(vm => supabase.from('notifications').insert({
       user_id: vm.id,
       title: 'Quote Submitted',
-      message: `${user.name} submitted a quote of GHS ${parseFloat(quoteAmount).toLocaleString()} for "${quoteModal.title}"`,
+      message: `${user?.name} submitted a quote of ${user?.country==="Nigeria"?"NGN":"GHS"} ${parseFloat(quoteAmount).toLocaleString()} for "${quoteModal.title}"`,
       type: 'rff',
     })));
 
@@ -2917,7 +2917,7 @@ const VendorRFFsView = ({ user }) => {
           <div style={{ color: T.textSecondary, fontSize: 13, marginBottom: 16, padding: '10px 14px', background: T.cyan + '10', borderRadius: 8, border: `1px solid ${T.cyan}22` }}>
             Client: <strong style={{ color: T.cyan }}>{quoteModal.client_name}</strong> · Event: <strong style={{ color: T.textPrimary }}>{quoteModal.event_name}</strong>
           </div>
-          <Input label="Quote Amount (GHS )" type="number" placeholder="e.g. 5000" value={quoteAmount} onChange={v => setQuoteAmount(v)} />
+          <Input label={`Quote Amount (${user?.country==="Nigeria"?"NGN":"GHS"})`} type="number" placeholder="e.g. 5000" value={quoteAmount} onChange={v => setQuoteAmount(v)} />
           <div style={{ marginBottom: 16 }}>
             <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Attach Invoice / Quotation Document</div>
             <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx" onChange={e => setQuoteFile(e.target.files[0])} style={{
@@ -6875,7 +6875,7 @@ const ClientPaymentsView = ({ user, activeCountry = "All" }) => {
         <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={() => setEditPayment(null)}>
           <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:440, padding:28 }} onClick={e=>e.stopPropagation()}>
             <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:4 }}>Edit Payment</div>
-            <div style={{ color:T.teal, fontWeight:800, fontSize:16, marginBottom:20 }}>GHS {parseFloat(editPayment.amount||0).toLocaleString()} — {editPayment.client_name}</div>
+            <div style={{ color:T.teal, fontWeight:800, fontSize:16, marginBottom:20 }}>{(user?.country==="Nigeria"?"NGN":"GHS")+" "}{parseFloat(editPayment.amount||0).toLocaleString()} — {editPayment.client_name}</div>
             <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
               <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Assign Sales Rep</label>
               <select value={editPayment.sales_rep_id||""} onChange={e=>{ const r=salesReps.find(x=>x.id===e.target.value); setEditPayment(p=>({...p,sales_rep_id:e.target.value,sales_rep_name:r?.name||""})); }} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
@@ -12133,7 +12133,7 @@ const PurchaseOrderView = ({ user, activeCountry = "All" }) => {
     await supabase.from("purchase_orders").update({ status: "sent" }).eq("id", po.id);
     await supabase.from("notifications").insert({ user_id: po.vendor_id, title: "Purchase Order — " + po.internal_po_number, message: "A Purchase Order has been issued for " + (po.event_name||"your services") + ". Log in to view and download.", type: "rff" });
     const { data: vp } = await supabase.from("profiles").select("email,name").eq("id", po.vendor_id).single();
-    if (vp?.email) await sendEmail(vp.email, "Purchase Order " + po.internal_po_number + " — Stretchfield", poEmailHtml({ vendorName: vp.name, poNumber: po.internal_po_number, eventName: po.event_name||"", amount: po.amount, currency: po.currency||"GHS", notes: po.notes||"" }));
+    if (vp?.email) await sendEmail(vp.email, "Purchase Order " + po.internal_po_number + " — Stretchfield", poEmailHtml({ vendorName: vp.name, poNumber: po.internal_po_number, eventName: po.event_name||"", amount: po.amount, currency: po.currency||(user?.country==="Nigeria"?"NGN":"GHS"), notes: po.notes||"" }));
     load();
   };
 
@@ -12239,7 +12239,7 @@ const PurchaseOrderView = ({ user, activeCountry = "All" }) => {
                       </td>
                       <td style={{ padding:"10px 14px", color:T.textPrimary, fontSize:12, fontWeight:600 }}>{po.vendor_name}</td>
                       <td style={{ padding:"10px 14px", color:T.textSecondary, fontSize:12 }}>{po.event_name}</td>
-                      <td style={{ padding:"10px 14px", color:T.amber, fontSize:12, fontWeight:700 }}>{po.currency||"GHS"} {(po.amount||0).toLocaleString()}</td>
+                      <td style={{ padding:"10px 14px", color:T.amber, fontSize:12, fontWeight:700 }}>{po.currency||(user?.country==="Nigeria"?"NGN":"GHS")} {(po.amount||0).toLocaleString()}</td>
                       <td style={{ padding:"10px 14px" }}><span style={{ color:po.zoho_po_id?T.teal:T.textMuted, fontSize:11 }}>{po.zoho_po_id?" Zoho":"Local"}</span></td>
                       <td style={{ padding:"10px 14px" }}>
                         <span style={{ background:(statusColors[po.status]||T.textMuted)+"18", color:statusColors[po.status]||T.textMuted, borderRadius:20, padding:"2px 10px", fontSize:10, fontWeight:700, textTransform:"uppercase" }}>{po.status}</span>

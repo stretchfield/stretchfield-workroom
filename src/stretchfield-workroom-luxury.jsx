@@ -25403,10 +25403,11 @@ const EventsView = ({ user, userRole, activeCountry = "All" }) => {
                         <div style={{ color: T.textMuted, fontSize: 10 }}>
                           {totalTasks > 0 ? `${completedTasks}/${totalTasks} tasks · ${taskCompletion}% complete` : `${taskCompletion}% complete`}
                         </div>
-                      </>
-                    );
-                  })()}
-                  {canManage ? (
+                      </div>
+                    </>
+                  );
+                })()}
+                {canManage ? (
                     <button onClick={async (e) => {
                       e.stopPropagation();
                       await supabase.from("projects").update({ active_for_client: !p.active_for_client }).eq("id", p.id);

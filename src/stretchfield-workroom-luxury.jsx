@@ -16652,7 +16652,7 @@ const EventClientPortalPanel = ({ event, client, user, onClose }) => {
                     </div>
                   </div>
                   {/* Comment thread */}
-                  <TaskCommentThread taskId={t.id} user={user} />
+                  <TaskCommentThread taskId={m.id} user={user} />
                 </div>
               );
             })}
@@ -17629,7 +17629,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
                     </div>
                   </div>
                   {/* Comment thread */}
-                  <TaskCommentThread taskId={t.id} user={user} />
+                  <TaskCommentThread taskId={m.id} user={user} />
                 </div>
               );
             })}

@@ -17283,7 +17283,8 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
 
   useEffect(() => { load(); }, [event.id]);
 
-  const myTasks = isCEO ? tasks : tasks.filter(t => t.assignee_id === user?.id || (Array.isArray(t.assignee_ids) && t.assignee_ids.includes(user?.id)));
+  const isCM = user?.role === 'Country Manager';
+  const myTasks = (isCEO || isCM) ? tasks : tasks.filter(t => t.assignee_id === user?.id || (Array.isArray(t.assignee_ids) && t.assignee_ids.includes(user?.id)));
   const completedTasks = myTasks.filter(t => t.status === "completed").length;
   const unreadMsgs = messages.filter(m => m.sender_id !== user?.id).length;
 

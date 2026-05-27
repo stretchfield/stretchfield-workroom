@@ -3832,7 +3832,7 @@ const LeadCard = ({ lead, selectedLead, setSelectedLead, activities, onReactivat
   const tIcons = { note: "", call: "", meeting: "", email: "", demo: "", "follow-up": "" };
   return (
     <div onClick={() => setSelectedLead(isSelected ? null : lead)}
-      style={{ background: isSelected ? T.surface : T.bg, border: `1px solid ${isSelected ? stage.color+"80" : T.border}", borderLeft: `3px solid ${stage.color}`, borderRadius: 10, padding: "14px 16px", cursor: "pointer", transition: "all 0.2s", marginBottom: 8, opacity: isLost ? 0.7 : 1 }}
+      style={{ background: isSelected ? T.surface : T.bg, border: `1px solid ${isSelected ? stage.color+"80" : T.border}`, borderLeft: `3px solid ${stage.color}`, borderRadius: 10, padding: "14px 16px", cursor: "pointer", transition: "all 0.2s", marginBottom: 8, opacity: isLost ? 0.7 : 1 }}
       onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.borderColor = stage.color+"50"; e.currentTarget.style.background = T.surface; }}}
       onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.background = T.bg; }}}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
@@ -7038,7 +7038,7 @@ const ClientActionItemsView = ({ user }) => {
           const isOverdue = item.due_date && new Date(item.due_date) < new Date() && item.status === "pending";
           const statusColor = item.status==="completed" ? T.teal : isOverdue ? T.red : T.amber;
           return (
-            <div key={item.id} style={{ background:T.surface, border:`1px solid ${isOverdue?T.red+"30":T.border}", borderLeft:`3px solid ${statusColor}`, borderRadius:12, padding:"16px 20px", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+            <div key={item.id} style={{ background:T.surface, border:`1px solid ${isOverdue?T.red+"30":T.border}`, borderLeft:`3px solid ${statusColor}`, borderRadius:12, padding:"16px 20px", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
               <div style={{ flex:1 }}>
                 <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:4 }}>
                   <div style={{ color:T.textPrimary, fontWeight:700, fontSize:14 }}>{item.title}</div>
@@ -9899,7 +9899,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
             const statusColors = { pending:T.amber, pending_ceo:T.cyan, approved:T.teal, rejected:T.red, paid:"#10B981" };
             const statusLabels = { pending:"Pending Finance Review", pending_ceo:"Sent to CEO — Awaiting Approval", approved:"CEO Approved — Ready to Pay", rejected:"Rejected", paid:"Paid " };
             return (
-              <div key={req.id} style={{ background:T.surface, border:`1px solid ${req.status==="pending"?T.amber+"30":T.border}", borderLeft:`4px solid ${statusColors[req.status]||T.border}`, borderRadius:12, padding:"16px 20px", marginBottom:10 }}>
+              <div key={req.id} style={{ background:T.surface, border:`1px solid ${req.status==="pending"?T.amber+"30":T.border}`, borderLeft:`4px solid ${statusColors[req.status]||T.border}`, borderRadius:12, padding:"16px 20px", marginBottom:10 }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
                   <div>
                     <div style={{ color:T.textPrimary, fontWeight:800, fontSize:14 }}>{req.staff_name}</div>
@@ -22845,7 +22845,7 @@ const VendorSLAView = ({ user, activeCountry = "All" }) => {
         {slas.map(s => {
           const color = statusColors[s.status] || T.textMuted;
           return (
-            <div key={s.id} style={{ background:T.surface, border:`1px solid ${s.status==="breached"?T.red+"30":T.border}", borderLeft:`3px solid ${color}`, borderRadius:12, padding:"14px 18px", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+            <div key={s.id} style={{ background:T.surface, border:`1px solid ${s.status==="breached"?T.red+"30":T.border}`, borderLeft:`3px solid ${color}`, borderRadius:12, padding:"14px 18px", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
               <div style={{ flex:1 }}>
                 <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:4 }}>
                   <div style={{ color:T.textPrimary, fontWeight:700, fontSize:14 }}>{s.vendor_name}</div>
@@ -23247,7 +23247,7 @@ const EventBriefsView = ({ user }) => {
           {events.map(ev => {
             const brief = briefs.find(b => b.project_id === ev.id);
             return (
-              <div key={ev.id} style={{ background:T.surface, border:`1px solid ${brief?T.teal+"40":T.border}", borderLeft:`3px solid ${brief?T.teal:T.border}`, borderRadius:12, padding:"16px 20px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div key={ev.id} style={{ background:T.surface, border:`1px solid ${brief?T.teal+"40":T.border}`, borderLeft:`3px solid ${brief?T.teal:T.border}`, borderRadius:12, padding:"16px 20px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                 <div>
                   <div style={{ color:T.textPrimary, fontWeight:700, fontSize:14 }}>{ev.name}</div>
                   <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{ev.client} · {ev.event_date?new Date(ev.event_date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):"TBC"}</div>
@@ -23361,7 +23361,7 @@ const EventMilestonesView = ({ user }) => {
           const isOverdue = m.due_date && new Date(m.due_date) < new Date() && m.status === "pending";
           const daysLeft = m.due_date ? Math.ceil((new Date(m.due_date)-new Date())/86400000) : null;
           return (
-            <div key={m.id} style={{ background:T.surface, border:`1px solid ${isOverdue?T.red+"30":T.border}", borderLeft:`3px solid ${m.status==="completed"?T.teal:isOverdue?T.red:color}", borderRadius:10, padding:"14px 18px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <div key={m.id} style={{ background:T.surface, border:`1px solid ${isOverdue?T.red+"30":T.border}`, borderLeft:`3px solid ${m.status==="completed"?T.teal:isOverdue?T.red:color}", borderRadius:10, padding:"14px 18px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
               <div style={{ flex:1 }}>
                 <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:4 }}>
                   <div style={{ color:m.status==="completed"?T.textMuted:T.textPrimary, fontWeight:700, fontSize:13, textDecoration:m.status==="completed"?"line-through":"none" }}>{m.title}</div>
@@ -24054,7 +24054,7 @@ const ClientDashboard = ({ user }) => {
                 const isOverdue = item.due_date && new Date(item.due_date) < new Date() && item.status === "pending";
                 const statusColor = item.status==="completed" ? T.teal : isOverdue ? T.red : T.amber;
                 return (
-                  <div key={item.id} style={{ background:T.surface, border:`1px solid ${isOverdue?T.red+"40":item.status==="completed"?T.teal+"30":T.amber+"30"}", borderLeft:`3px solid ${statusColor}`, borderRadius:12, padding:"16px 20px" }}>
+                  <div key={item.id} style={{ background:T.surface, border:`1px solid ${isOverdue?T.red+"40":item.status==="completed"?T.teal+"30":T.amber+"30"}`, borderLeft:`3px solid ${statusColor}`, borderRadius:12, padding:"16px 20px" }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
                       <div style={{ flex:1 }}>
                         <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
@@ -25119,7 +25119,7 @@ Format: Use clear section headers matching the names above. Write in flowing par
               { label:"Vendor", done:report?.vendor_submitted_at, by:"Vendor Manager" },
               { label:"Strategic", done:report?.ceo_submitted_at, by:"CEO" },
             ].map(s => (
-              <div key={s.label} style={{ background:T.bg, border:`1px solid ${s.done?T.teal+"40":T.border}", borderRadius:10, padding:"12px 14px" }}>
+              <div key={s.label} style={{ background:T.bg, border:`1px solid ${s.done?T.teal+"40":T.border}`, borderRadius:10, padding:"12px 14px" }}>
                 <div style={{ color:s.done?T.teal:T.amber, fontWeight:800, fontSize:12 }}>{s.done?" Done":"Pending"}</div>
                 <div style={{ color:T.textPrimary, fontSize:12, fontWeight:600, marginTop:2 }}>{s.label}</div>
                 <div style={{ color:T.textMuted, fontSize:10, marginTop:2 }}>{s.by}</div>

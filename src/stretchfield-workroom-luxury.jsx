@@ -1964,7 +1964,7 @@ const VendorManagerDashboard = ({ user, activeCountry = "All" }) => {
                       { key:"transport", label:"Transport Allowance", amount: payReqForm._rates?.transport },
                     ].map(({ key, label, amount }) => (
                       <div key={key} onClick={() => amount && setPayReqForm(f=>({...f, selectedTypes:{...f.selectedTypes, [key]:!f.selectedTypes[key]}}))}
-                        style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 14px", background: payReqForm.selectedTypes[key] ? T.cyan+"15" : T.bg, border:`1px solid ${payReqForm.selectedTypes[key] ? T.cyan+"60" : T.border}", borderRadius:8, cursor: amount ? "pointer" : "default", opacity: amount ? 1 : 0.4 }}>
+                        style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 14px", background: payReqForm.selectedTypes[key] ? T.cyan+"15" : T.bg, border:`1px solid ${payReqForm.selectedTypes[key] ? T.cyan+"60" : T.border}`, borderRadius:8, cursor: amount ? "pointer" : "default", opacity: amount ? 1 : 0.4 }}>
                         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                           <div style={{ width:18, height:18, borderRadius:4, border:`2px solid ${payReqForm.selectedTypes[key] ? T.cyan : T.border}`, background: payReqForm.selectedTypes[key] ? T.cyan : "transparent", display:"flex", alignItems:"center", justifyContent:"center" }}>
                             {payReqForm.selectedTypes[key] && <span style={{ color:"#060B14", fontSize:11, fontWeight:900 }}></span>}
@@ -18937,7 +18937,7 @@ const BudgetView = ({ user }) => {
         <Modal title="Set Event Budget" onClose={() => setModal(false)}>
           <Select label="Event" options={[{ value: "", label: "Select event..." }, ...events.map(e => ({ value: e.id, label: e.name }))]}
             value={form.project_id} onChange={v => { const e = events.find(x => x.id === v); setForm({ ...form, project_id: v, event_name: e ? e.name : "" }); }} />
-          <Input label=`Total Budget (${getCurrency(activeCountry||user?.country||"Ghana")})` type="number" placeholder="0" value={form.total_budget} onChange={v => setForm({ ...form, total_budget: v })} />
+          <Input label={`Total Budget (${getCurrency(activeCountry||user?.country||"Ghana")})`} type="number" placeholder="0" value={form.total_budget} onChange={v => setForm({ ...form, total_budget: v })} />
           <Input label="Notes" placeholder="Budget notes..." value={form.notes} onChange={v => setForm({ ...form, notes: v })} />
           <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
             <Btn onClick={handleCreate} disabled={saving}>{saving ? "Saving..." : "Set Budget"}</Btn>
@@ -19063,7 +19063,7 @@ const ExpenseView = ({ user }) => {
       {modal && (
         <Modal title="Log Expense" onClose={() => setModal(false)}>
           <Input label="Description" placeholder="What was this expense for?" value={form.description} onChange={v => setForm({ ...form, description: v })} />
-          <Input label=`Amount (${getCurrency(activeCountry||user?.country||"Ghana")})` type="number" placeholder="0" value={form.amount} onChange={v => setForm({ ...form, amount: v })} />
+          <Input label={`Amount (${getCurrency(activeCountry||user?.country||"Ghana")})`} type="number" placeholder="0" value={form.amount} onChange={v => setForm({ ...form, amount: v })} />
           <Select label="Category" options={[{ value: "", label: "Select category..." }, ...categories.map(c => ({ value: c, label: c }))]}
             value={form.category} onChange={v => setForm({ ...form, category: v })} />
           <Select label="Event (optional)" options={[{ value: "", label: "Not event specific" }, ...events.map(e => ({ value: e.id, label: e.name }))]}

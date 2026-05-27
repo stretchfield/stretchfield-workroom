@@ -16479,7 +16479,7 @@ const EventClientPortalPanel = ({ event, client, user, onClose }) => {
   const [messages, setMessages] = useState([]);
   const [feedback, setFeedback] = useState([]);
   const [activeSection, setActiveSection] = useState("milestones");
-  const [milestoneForm, setMilestoneForm] = useState({ title: "", description: "", due_date: "", requires_approval: false });
+  const [milestoneForm, setMilestoneForm] = useState({ title: "", description: "", due_date: "", requires_approval: false, priority: "Medium" });
   const [showMilestoneForm, setShowMilestoneForm] = useState(false);
   const [docForm, setDocForm] = useState({ title: "", document_type: "Event Brief", requires_approval: false });
   const [docFile, setDocFile] = useState(null);
@@ -16516,10 +16516,11 @@ const EventClientPortalPanel = ({ event, client, user, onClose }) => {
       description: milestoneForm.description || null,
       due_date: milestoneForm.due_date || null,
       status: "pending", requires_approval: milestoneForm.requires_approval,
-      created_by: user.id,
+      priority: milestoneForm.priority || "Medium",
+      created_by: user?.id,
     });
     await notifyClient("New Milestone — " + event.name, milestoneForm.title + " has been added to your event timeline.");
-    setMilestoneForm({ title: "", description: "", due_date: "", requires_approval: false });
+    setMilestoneForm({ title: "", description: "", due_date: "", requires_approval: false, priority: "Medium" });
     setShowMilestoneForm(false);
     setSaving(false);
     load();
@@ -16619,6 +16620,15 @@ const EventClientPortalPanel = ({ event, client, user, onClose }) => {
                   <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Due Date</label>
                   <input type="date" value={milestoneForm.due_date} onChange={e => setMilestoneForm(f => ({...f, due_date: e.target.value}))} style={inputStyle} />
                 </div>
+                <div>
+                  <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Priority</label>
+                  <select value={milestoneForm.priority||"Medium"} onChange={e => setMilestoneForm(f => ({...f, priority: e.target.value}))} style={inputStyle}>
+                    <option value="Critical">🔴 Critical</option>
+                    <option value="High">🟠 High</option>
+                    <option value="Medium">🟡 Medium</option>
+                    <option value="Low">🟢 Low</option>
+                  </select>
+                </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 18 }}>
                   <input type="checkbox" checked={milestoneForm.requires_approval} onChange={e => setMilestoneForm(f => ({...f, requires_approval: e.target.checked}))} id="ms_appr" />
                   <label htmlFor="ms_appr" style={{ color: T.textMuted, fontSize: 12 }}>Requires client approval</label>
@@ -16640,7 +16650,10 @@ const EventClientPortalPanel = ({ event, client, user, onClose }) => {
                 <div key={m.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderLeft: `3px solid ${c}`, borderRadius: 10, padding: "12px 16px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
-                      <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{m.title}</div>
+                      <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                        <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{m.title}</div>
+                        {m.priority && <span style={{ background: m.priority==="Critical"?T.red+"20":m.priority==="High"?T.amber+"20":m.priority==="Medium"?T.cyan+"20":"#10B98120", color: m.priority==="Critical"?T.red:m.priority==="High"?T.amber:m.priority==="Medium"?T.cyan:"#10B981", borderRadius:20, padding:"1px 8px", fontSize:9, fontWeight:800 }}>{m.priority}</span>}
+                      </div>
                       {m.description && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{m.description}</div>}
                       {m.due_date && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>Due: {new Date(m.due_date).toLocaleDateString("en-GB")}</div>}
                       {m.requires_approval && <div style={{ color: m.approved_by_client ? T.teal : T.amber, fontSize: 10, fontWeight: 700, marginTop: 3 }}>{m.approved_by_client ? " Approved by client" : "Awaiting client approval"}</div>}

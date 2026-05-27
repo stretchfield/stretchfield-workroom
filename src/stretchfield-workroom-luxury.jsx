@@ -10439,7 +10439,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
             <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Petty Cash Voucher</div>
             <div style={{ color: T.amber, fontSize: 12, marginBottom: 20 }}> Maximum single payment: GHS 200. Use cheque for larger amounts.</div>
             <div style={{ marginBottom: 14 }}><label style={labelStyle}>Payee *</label><input value={pcForm.payee} onChange={e => setPcForm({...pcForm, payee: e.target.value})} style={inputStyle} placeholder="Who is being paid?" /></div>
-            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Purpose</label><input value={pcForm.purpose} onChange={e => setPcForm({...pcForm, purpose: e.target.value})} style={inputStyle} placeholder="What is this for?` /></div>
+            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Purpose</label><input value={pcForm.purpose} onChange={e => setPcForm({...pcForm, purpose: e.target.value})} style={inputStyle} placeholder="What is this for?" /></div>
             <div style={{ marginBottom: 20 }}><label style={labelStyle}>Amount (${getCurrency(activeCountry||user?.country||"Ghana")}) *</label><input type="number" max="200" value={pcForm.amount} onChange={e => setPcForm({...pcForm, amount: e.target.value})} style={inputStyle} placeholder="Max GHS 200" /></div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={savePCVoucher} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: 'none', color: '#fff', padding: '10px 24px', borderRadius: 8, cursor: 'pointer', fontWeight: 800, fontSize: 13 }}>{saving ? 'Saving...' : 'Submit Voucher'}</button>

@@ -24104,6 +24104,157 @@ const ClientDashboard = ({ user }) => {
       </> }
 
       {/*  ACTION ITEMS  */}
+      {/* EVENT PROGRESS */}
+      {activeSection === "event-progress" && (
+        <div>
+          {events.length === 0 ? (
+            <div style={{ textAlign:"center", padding:60, color:T.textMuted }}>No events yet.</div>
+          ) : events.map(ev => {
+            const evMilestones = milestones.filter(m => m.project_id === ev.id);
+            const priorityWeight = { Critical:4, High:3, Medium:2, Low:1 };
+            const statusPct = { pending:0, "in-progress":50, completed:100 };
+            const totalWeight = evMilestones.reduce((s,m) => s+(priorityWeight[m.priority||"Medium"]||2), 0);
+            const earnedWeight = evMilestones.reduce((s,m) => s+(priorityWeight[m.priority||"Medium"]||2)*((statusPct[m.status]||0)/100), 0);
+            const progress = totalWeight > 0 ? Math.round((earnedWeight/totalWeight)*100) : 0;
+            const completed = evMilestones.filter(m => m.status==="completed").length;
+            return (
+              <div key={ev.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:24, marginBottom:16 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
+                  <div>
+                    <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16 }}>{ev.name}</div>
+                    <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{ev.event_date ? new Date(ev.event_date+"T12:00:00").toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"}) : "Date TBC"}</div>
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ color:T.cyan, fontWeight:900, fontSize:28 }}>{progress}%</div>
+                    <div style={{ color:T.textMuted, fontSize:11 }}>{completed}/{evMilestones.length} milestones</div>
+                  </div>
+                </div>
+                <div style={{ height:8, background:T.border+"44", borderRadius:4, marginBottom:20 }}>
+                  <div style={{ height:"100%", width:progress+"%", background:`linear-gradient(90deg,${T.cyan},${T.teal})`, borderRadius:4, transition:"width 0.4s ease" }} />
+                </div>
+                {evMilestones.length === 0 ? (
+                  <div style={{ color:T.textMuted, fontSize:13, textAlign:"center", padding:"20px 0" }}>No milestones added yet.</div>
+                ) : evMilestones.map(m => {
+                  const pw = priorityWeight[m.priority||"Medium"]||2;
+                  const sc = m.status==="completed"?"#10B981":m.status==="in-progress"?T.amber:T.textMuted;
+                  const pl = m.priority||"Medium";
+                  const plColor = pl==="Critical"?T.red:pl==="High"?T.amber:pl==="Medium"?T.cyan:"#10B981";
+                  return (
+                    <div key={m.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 14px", background:T.bg, borderRadius:8, marginBottom:6, borderLeft:`3px solid ${sc}` }}>
+                      <div style={{ flex:1 }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                          <div style={{ color:T.textPrimary, fontWeight:700, fontSize:13 }}>{m.title}</div>
+                          <span style={{ background:plColor+"20", color:plColor, borderRadius:20, padding:"1px 8px", fontSize:9, fontWeight:800 }}>{pl}</span>
+                        </div>
+                        {m.due_date && <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>Due {new Date(m.due_date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}</div>}
+                        {m.description && <div style={{ color:T.textMuted, fontSize:11, marginTop:2, fontStyle:"italic" }}>{m.description}</div>}
+                      </div>
+                      <span style={{ background:sc+"18", color:sc, border:`1px solid ${sc}30`, borderRadius:20, padding:"3px 12px", fontSize:10, fontWeight:800, textTransform:"uppercase", marginLeft:12, whiteSpace:"nowrap" }}>{m.status||"pending"}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* MESSAGES */}
+      {activeSection === "messages" && (
+        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:24 }}>
+          <div style={{ color:T.textPrimary, fontWeight:800, fontSize:16, marginBottom:16 }}>Messages</div>
+          <div style={{ maxHeight:400, overflowY:"auto", marginBottom:16, display:"flex", flexDirection:"column", gap:10 }}>
+            {messages.length === 0 ? (
+              <div style={{ color:T.textMuted, fontSize:13, textAlign:"center", padding:"30px 0" }}>No messages yet.</div>
+            ) : messages.slice().reverse().map(m => {
+              const isMe = m.sender_id === user?.id;
+              return (
+                <div key={m.id} style={{ display:"flex", flexDirection:"column", alignItems:isMe?"flex-end":"flex-start" }}>
+                  <div style={{ background:isMe?T.cyan+"18":T.bg, border:`1px solid ${isMe?T.cyan+"30":T.border}`, borderRadius:10, padding:"10px 14px", maxWidth:"75%" }}>
+                    <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:4 }}>
+                      <span style={{ color:isMe?T.cyan:T.teal, fontSize:11, fontWeight:700 }}>{m.sender_name}</span>
+                      <span style={{ color:T.textMuted, fontSize:10 }}>{new Date(m.created_at).toLocaleDateString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</span>
+                    </div>
+                    <div style={{ color:T.textPrimary, fontSize:13 }}>{m.message}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ display:"flex", gap:10 }}>
+            <input value={newMessage} onChange={e=>setNewMessage(e.target.value)}
+              onKeyDown={async e => {
+                if (e.key==="Enter" && newMessage.trim()) {
+                  setSendingMsg(true);
+                  const eventId = events[0]?.id;
+                  await supabase.from("client_messages").insert({ project_id:eventId, client_id:clientId, sender_id:user?.id, sender_name:user?.name, sender_role:"Client", message:newMessage.trim(), read_by_team:false, read_by_client:true });
+                  setNewMessage("");
+                  const { data } = await supabase.from("client_messages").select("*").eq("client_id",clientId).order("created_at",{ascending:false});
+                  setMessages(data||[]);
+                  setSendingMsg(false);
+                }
+              }}
+              placeholder="Type a message... (Enter to send)"
+              style={{ flex:1, padding:"10px 14px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }} />
+            <button onClick={async () => {
+              if (!newMessage.trim()) return;
+              setSendingMsg(true);
+              const eventId = events[0]?.id;
+              await supabase.from("client_messages").insert({ project_id:eventId, client_id:clientId, sender_id:user?.id, sender_name:user?.name, sender_role:"Client", message:newMessage.trim(), read_by_team:false, read_by_client:true });
+              setNewMessage("");
+              const { data } = await supabase.from("client_messages").select("*").eq("client_id",clientId).order("created_at",{ascending:false});
+              setMessages(data||[]);
+              setSendingMsg(false);
+            }} disabled={sendingMsg||!newMessage.trim()} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#fff", padding:"10px 20px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{sendingMsg?"...":"Send"}</button>
+          </div>
+        </div>
+      )}
+
+      {/* INVOICES & PAYMENTS */}
+      {activeSection === "payments" && (
+        <div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))", gap:12, marginBottom:20 }}>
+            {[
+              { label:"Total Paid", value:"GHS "+payments.reduce((s,p)=>s+parseFloat(p.amount||0),0).toLocaleString(), color:"#10B981" },
+              { label:"Last Payment", value:payments[0] ? new Date(payments[0].payment_date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}) : "—", color:T.cyan },
+              { label:"Transactions", value:payments.length, color:T.teal },
+            ].map(k => (
+              <div key={k.label} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:"16px 18px" }}>
+                <div style={{ color:k.color, fontWeight:900, fontSize:18 }}>{k.value}</div>
+                <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginTop:4 }}>{k.label}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:20 }}>
+            <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:14 }}>Payment History</div>
+            {payments.length === 0 ? (
+              <div style={{ color:T.textMuted, fontSize:13, textAlign:"center", padding:"30px 0" }}>No payments recorded yet.</div>
+            ) : (
+              <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                <thead>
+                  <tr style={{ borderBottom:`1px solid ${T.border}` }}>
+                    {["Event","Amount","Date","Method","Reference"].map(h => (
+                      <th key={h} style={{ padding:"8px 12px", textAlign:"left", color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {payments.map(p => (
+                    <tr key={p.id} style={{ borderBottom:`1px solid ${T.border}44` }}>
+                      <td style={{ padding:"10px 12px", color:T.textPrimary, fontSize:13 }}>{p.event_name||"—"}</td>
+                      <td style={{ padding:"10px 12px", color:"#10B981", fontWeight:700, fontSize:13 }}>GHS {parseFloat(p.amount||0).toLocaleString()}</td>
+                      <td style={{ padding:"10px 12px", color:T.textMuted, fontSize:12 }}>{p.payment_date ? new Date(p.payment_date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}) : "—"}</td>
+                      <td style={{ padding:"10px 12px", color:T.textMuted, fontSize:12 }}>{p.payment_method||"—"}</td>
+                      <td style={{ padding:"10px 12px", color:T.textMuted, fontSize:12 }}>{p.reference_number||"—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
       {activeSection === "action-items" && (
         <div>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>

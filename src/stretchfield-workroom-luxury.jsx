@@ -23955,6 +23955,9 @@ const ClientDashboard = ({ user }) => {
   const [actionItems, setActionItems] = useState([]);
   const [satisfaction, setSatisfaction] = useState([]);
   const [reports, setReports] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [sendingMsg, setSendingMsg] = useState(false);
   const [activeSection, setActiveSection] = useState("overview");
   const [satisfactionModal, setSatisfactionModal] = useState(null);
   const [satForm, setSatForm] = useState({ rating:0, nps_score:null, feedback:"", milestone:"" });

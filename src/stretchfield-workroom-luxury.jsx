@@ -105,7 +105,7 @@ const poEmailHtml = ({ vendorName, poNumber, eventName, amount, currency, notes 
   `<p style="color:#0A1628;font-size:14px;margin:0 0 16px;">Dear <strong>${vendorName}</strong>,</p>
   <p style="color:#0A1628;font-size:14px;margin:0 0 20px;">A Purchase Order has been raised for your services. Please submit your invoice upon completion.</p>
   <div style="background:#fff;border:1px solid #C2C9DC;border-radius:8px;padding:20px 24px;margin-bottom:20px;">
-    <table style="width:100%;border-collapse:collapse;">${emailRow("PO Number", `<strong style="color:#00C8FF;">${poNumber}</strong>`)}${emailRow("Event", eventName || "—")}${emailRow("Amount`, `<strong>${currency} ${parseFloat(amount || 0).toLocaleString()}</strong>`)}${notes ? emailRow("Notes", notes) : ""}</table>
+    <table style="width:100%;border-collapse:collapse;">${emailRow("PO Number", `<strong style="color:#00C8FF;">${poNumber}</strong>`)}${emailRow("Event", eventName || "—")}${emailRow("Amount", `<strong>${currency} ${parseFloat(amount || 0).toLocaleString()}</strong>`)}${notes ? emailRow("Notes", notes) : ""}</table>
   </div>
   ${emailBtn("Submit Invoice in WorkRoom", BASE_URL)}`
 );
@@ -5349,7 +5349,7 @@ const StrategyMapView = ({ user }) => {
       {selectedEvent && !loading && (
         <div>
           {/* Event header card */}
-          <div style={{ background: archetype ? archetype.color+"12" : T.surface, border: `1px solid ${archetype ? archetype.color+"40" : T.border}", borderRadius: 12, padding: "20px 24px`, marginBottom: 20 }}>
+          <div style={{ background: archetype ? archetype.color+"12" : T.surface, border: `1px solid ${archetype ? archetype.color+"40" : T.border}`, borderRadius: 12, padding: "20px 24px`, marginBottom: 20 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
                 <div style={{ color: archetype?.color || T.cyan, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>{selectedEvent.event_category || "Event"}</div>
@@ -12755,7 +12755,7 @@ const QuotesReceivedView = ({ user, activeCountry = "All" }) => {
             const isExpanded = selectedRff === rff.id;
 
             return (
-              <div key={rff.id} style={{ background: T.surface, border: `1px solid ${isExpanded ? T.cyan + "60" : T.border}", borderRadius: 12, overflow: "hidden`, transition: "border-color 0.2s" }}>
+              <div key={rff.id} style={{ background: T.surface, border: `1px solid ${isExpanded ? T.cyan + "60" : T.border}`, borderRadius: 12, overflow: "hidden", transition: "border-color 0.2s" }}>
                 {/* RFF Header */}
                 <div onClick={() => setSelectedRff(isExpanded ? null : rff.id)} style={{ padding: "16px 20px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
                   onMouseEnter={e => e.currentTarget.style.background = T.bg}

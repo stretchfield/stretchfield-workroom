@@ -10455,14 +10455,14 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
           <div style={{ background: T.surface, border: `1px solid ${T.cyan}30`, borderRadius: 16, width: '100%', maxWidth: 560, padding: 28 }} onClick={e => e.stopPropagation()}>
             <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18, marginBottom: 4 }}>Daily Balance Report</div>
             <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>Prepared each morning and sent to the Director. Shows previous payments, inflows and expected transactions.</div>
-            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Report Date</label><input type="date` value={dbForm.report_date} onChange={e => setDbForm({...dbForm, report_date: e.target.value})} style={inputStyle} /></div>
+            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Report Date</label><input type="date" value={dbForm.report_date} onChange={e => setDbForm({...dbForm, report_date: e.target.value})} style={inputStyle} /></div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-              <div><label style={labelStyle}>Opening Balance (${getCurrency(activeCountry||user?.country||"Ghana")})</label><input type="number" value={dbForm.opening_balance} onChange={e => setDbForm({...dbForm, opening_balance: e.target.value})} style={inputStyle} placeholder="0.00` /></div>
-              <div><label style={labelStyle}>Expected Inflows (${getCurrency(activeCountry||user?.country||"Ghana")})</label><input type="number" value={dbForm.expected_inflows} onChange={e => setDbForm({...dbForm, expected_inflows: e.target.value})} style={inputStyle} placeholder="0.00` /></div>
+              <div><label style={labelStyle}>Opening Balance (${getCurrency(activeCountry||user?.country||"Ghana")})</label><input type="number" value={dbForm.opening_balance} onChange={e => setDbForm({...dbForm, opening_balance: e.target.value})} style={inputStyle} placeholder="0.00" /></div>
+              <div><label style={labelStyle}>Expected Inflows (${getCurrency(activeCountry||user?.country||"Ghana")})</label><input type="number" value={dbForm.expected_inflows} onChange={e => setDbForm({...dbForm, expected_inflows: e.target.value})} style={inputStyle} placeholder="0.00" /></div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-              <div><label style={labelStyle}>Expected Expenditure (${getCurrency(activeCountry||user?.country||"Ghana")})</label><input type="number" value={dbForm.expected_expenditure} onChange={e => setDbForm({...dbForm, expected_expenditure: e.target.value})} style={inputStyle} placeholder="0.00` /></div>
-              <div><label style={labelStyle}>Actual Inflows (${getCurrency(activeCountry||user?.country||"Ghana")})</label><input type="number" value={dbForm.actual_inflows} onChange={e => setDbForm({...dbForm, actual_inflows: e.target.value})} style={inputStyle} placeholder="0.00` /></div>
+              <div><label style={labelStyle}>Expected Expenditure (${getCurrency(activeCountry||user?.country||"Ghana")})</label><input type="number" value={dbForm.expected_expenditure} onChange={e => setDbForm({...dbForm, expected_expenditure: e.target.value})} style={inputStyle} placeholder="0.00" /></div>
+              <div><label style={labelStyle}>Actual Inflows (${getCurrency(activeCountry||user?.country||"Ghana")})</label><input type="number" value={dbForm.actual_inflows} onChange={e => setDbForm({...dbForm, actual_inflows: e.target.value})} style={inputStyle} placeholder="0.00" /></div>
             </div>
             <div style={{ marginBottom: 14 }}><label style={labelStyle}>Actual Payments Made (${getCurrency(activeCountry||user?.country||"Ghana")})</label><input type="number" value={dbForm.actual_payments} onChange={e => setDbForm({...dbForm, actual_payments: e.target.value})} style={inputStyle} placeholder="0.00" /></div>
             {(dbForm.opening_balance || dbForm.actual_inflows || dbForm.actual_payments) && (
@@ -18409,7 +18409,7 @@ const CEOClientFinanceView = ({ user, activeCountry = "All" }) => {
                   </div>
                   <div>
                     <label style={labelStyle}>Description</label>
-                    <input value={expenseForm.description} onChange={e => setExpenseForm({ ...expenseForm, description: e.target.value })} placeholder="Brief description` style={inputStyle} />
+                    <input value={expenseForm.description} onChange={e => setExpenseForm({ ...expenseForm, description: e.target.value })} placeholder="Brief description" style={inputStyle} />
                   </div>
                   <div>
                     <label style={labelStyle}>Amount (${getCurrency(activeCountry||user?.country||"Ghana")})</label>

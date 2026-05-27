@@ -23998,7 +23998,7 @@ const ClientDashboard = ({ user }) => {
       setLoading(false);
     };
     load();
-  }, [user.id]);
+  }, [user?.id]);
 
   const now = new Date();
   const greeting = now.getHours() < 12 ? "Good Morning" : now.getHours() < 17 ? "Good Afternoon" : "Good Evening";
@@ -24039,6 +24039,9 @@ const ClientDashboard = ({ user }) => {
       <div style={{ display:"flex", gap:4, marginBottom:20, borderBottom:`1px solid ${T.border}`, overflowX:"auto", msOverflowStyle:"none", scrollbarWidth:"none" }}>
         {[
           { id:"overview", label:"Overview" },
+          { id:"event-progress", label:"Event Progress" },
+          { id:"messages", label:`Messages${unreadMessages.length>0?" ("+unreadMessages.length+")":""}` },
+          { id:"payments", label:"Invoices & Payments" },
           { id:"action-items", label:`Action Items${actionItems.filter(a=>a.status==="pending").length>0?" ("+actionItems.filter(a=>a.status==="pending").length+")":""}` },
           { id:"intelligence", label:"Event Intelligence" },
           { id:"satisfaction", label:"Satisfaction" },

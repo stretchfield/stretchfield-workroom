@@ -7124,7 +7124,7 @@ const ClientEventsView = ({ user }) => {
 
   if (loading) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"40vh" }}><div style={{ width:32, height:32, border:`3px solid ${T.border}`, borderTop:`3px solid ${T.cyan}`, borderRadius:"50%", animation:"spin 0.8s linear infinite" }} /></div>;
 
-  if (selectedEvent) return <InternalEventPortal event={selectedEvent} user={user} allTasks={[]} onClose={() => setSelectedEvent(null)} />;
+  if (selectedEvent) return <EventClientPortalPanel event={selectedEvent} client={{email: user?.email, name: user?.name}} user={user} onClose={() => setSelectedEvent(null)} />;
 
   return (
     <div style={{ animation:"fadeUp 0.35s ease" }}>

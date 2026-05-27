@@ -24129,6 +24129,35 @@ const ClientDashboard = ({ user }) => {
       </div>
       </> }
 
+      {/* EVENT PROGRESS SUMMARY IN OVERVIEW */}
+      {activeSection === "overview" && events.length > 0 && (
+        <div style={{ marginBottom:20 }}>
+          {events.map(ev => {
+            const evMs = milestones.filter(m => m.project_id === ev.id);
+            const priorityWeight = { Critical:4, High:3, Medium:2, Low:1 };
+            const statusPct = { pending:0, "in-progress":50, completed:100 };
+            const totalW = evMs.reduce((s,m) => s+(priorityWeight[m.priority||"Medium"]||2), 0);
+            const earnedW = evMs.reduce((s,m) => s+(priorityWeight[m.priority||"Medium"]||2)*((statusPct[m.status]||0)/100), 0);
+            const progress = totalW > 0 ? Math.round((earnedW/totalW)*100) : 0;
+            const completed = evMs.filter(m => m.status==="completed").length;
+            return (
+              <div key={ev.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:"16px 20px", marginBottom:12 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+                  <div>
+                    <div style={{ color:T.textPrimary, fontWeight:800, fontSize:14 }}>{ev.name}</div>
+                    <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>{completed}/{evMs.length} milestones complete</div>
+                  </div>
+                  <div style={{ color:T.cyan, fontWeight:900, fontSize:24 }}>{progress}%</div>
+                </div>
+                <div style={{ height:6, background:T.border+"44", borderRadius:3 }}>
+                  <div style={{ height:"100%", width:progress+"%", background:`linear-gradient(90deg,${T.cyan},${T.teal})`, borderRadius:3, transition:"width 0.4s ease" }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/*  ACTION ITEMS  */}
       {/* EVENT PROGRESS */}
       {activeSection === "event-progress" && (
@@ -24241,7 +24270,7 @@ const ClientDashboard = ({ user }) => {
         <div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))", gap:12, marginBottom:20 }}>
             {[
-              { label:"Total Paid", value:"GHS "+payments.reduce((s,p)=>s+parseFloat(p.amount||0),0).toLocaleString(), color:"#10B981" },
+              { label:"Total Paid", value:(user?.country==="Nigeria"?"NGN":"GHS")+" "+payments.reduce((s,p)=>s+parseFloat(p.amount||0),0).toLocaleString(), color:"#10B981" },
               { label:"Last Payment", value:payments[0] ? new Date(payments[0].payment_date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}) : "—", color:T.cyan },
               { label:"Transactions", value:payments.length, color:T.teal },
             ].map(k => (
@@ -24268,7 +24297,7 @@ const ClientDashboard = ({ user }) => {
                   {payments.map(pay => (
                     <tr key={pay.id} style={{ borderBottom:`1px solid ${T.border}44` }}>
                       <td style={{ padding:"10px 12px", color:T.textPrimary, fontSize:13 }}>{pay.event_name||"—"}</td>
-                      <td style={{ padding:"10px 12px", color:"#10B981", fontWeight:700, fontSize:13 }}>GHS {parseFloat(pay.amount||0).toLocaleString()}</td>
+                      <td style={{ padding:"10px 12px", color:"#10B981", fontWeight:700, fontSize:13 }}>{(user?.country==="Nigeria"?"NGN":"GHS")+" "+parseFloat(pay.amount||0).toLocaleString()}</td>
                       <td style={{ padding:"10px 12px", color:T.textMuted, fontSize:12 }}>{pay.payment_date ? new Date(pay.payment_date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}) : "—"}</td>
                       <td style={{ padding:"10px 12px", color:T.textMuted, fontSize:12 }}>{pay.payment_method||"—"}</td>
                       <td style={{ padding:"10px 12px", color:T.textMuted, fontSize:12 }}>{pay.reference_number||"—"}</td>

@@ -1964,7 +1964,7 @@ const VendorManagerDashboard = ({ user, activeCountry = "All" }) => {
                       { key:"transport", label:"Transport Allowance", amount: payReqForm._rates?.transport },
                     ].map(({ key, label, amount }) => (
                       <div key={key} onClick={() => amount && setPayReqForm(f=>({...f, selectedTypes:{...f.selectedTypes, [key]:!f.selectedTypes[key]}}))}
-                        style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 14px", background: payReqForm.selectedTypes[key] ? T.cyan+"15" : T.bg, border:`1px solid ${payReqForm.selectedTypes[key] ? T.cyan+"60" : T.border}`, borderRadius:8, cursor: amount ? "pointer" : "default", opacity: amount ? 1 : 0.4 }}>
+                        style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 14px", background: payReqForm.selectedTypes[key] ? T.cyan+"15" : T.bg, border:`1px solid ${payReqForm.selectedTypes[key] ? T.cyan+"60" : T.border}", borderRadius:8, cursor: amount ? "pointer" : "default", opacity: amount ? 1 : 0.4 }}>
                         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                           <div style={{ width:18, height:18, borderRadius:4, border:`2px solid ${payReqForm.selectedTypes[key] ? T.cyan : T.border}`, background: payReqForm.selectedTypes[key] ? T.cyan : "transparent", display:"flex", alignItems:"center", justifyContent:"center" }}>
                             {payReqForm.selectedTypes[key] && <span style={{ color:"#060B14", fontSize:11, fontWeight:900 }}></span>}
@@ -2374,7 +2374,7 @@ const StaffDashboard = ({ user }) => {
                       { key:"transport", label:"Transport Allowance", amount: payReqForm._rates?.transport },
                     ].map(({ key, label, amount }) => (
                       <div key={key} onClick={() => amount && setPayReqForm(f=>({...f, selectedTypes:{...f.selectedTypes, [key]:!f.selectedTypes[key]}}))}
-                        style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 14px", background: payReqForm.selectedTypes?.[key] ? T.cyan+"15" : T.bg, border:`1px solid ${payReqForm.selectedTypes?.[key] ? T.cyan+"60" : T.border}`, borderRadius:8, cursor: amount ? "pointer" : "default", opacity: amount ? 1 : 0.4 }}>
+                        style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 14px", background: payReqForm.selectedTypes?.[key] ? T.cyan+"15" : T.bg, border:`1px solid ${payReqForm.selectedTypes?.[key] ? T.cyan+"60" : T.border}", borderRadius:8, cursor: amount ? "pointer" : "default", opacity: amount ? 1 : 0.4 }}>
                         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                           <div style={{ width:18, height:18, borderRadius:4, border:`2px solid ${payReqForm.selectedTypes?.[key] ? T.cyan : T.border}`, background: payReqForm.selectedTypes?.[key] ? T.cyan : "transparent", display:"flex", alignItems:"center", justifyContent:"center" }}>
                             {payReqForm.selectedTypes?.[key] && <span style={{ color:"#060B14", fontSize:11, fontWeight:900 }}></span>}
@@ -2940,8 +2940,8 @@ const VendorRFFsView = ({ user }) => {
              Your quote was approved. Please submit your invoice below.
           </div>
           <div style={{ marginBottom: 14 }}>
-            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", display: "block`, marginBottom: 5 }}>Invoice Amount (${getCurrency(activeCountry||user?.country||"Ghana")})</label>
-            <input type=`number" value={invoiceAmount} onChange={e => setInvoiceAmount(e.target.value)} placeholder="Enter invoice amount" style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 5 }}>Invoice Amount ({getCurrency(activeCountry||user?.country||"Ghana")})</label>
+            <input type="number" value={invoiceAmount} onChange={e => setInvoiceAmount(e.target.value)} placeholder="Enter invoice amount" style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
           </div>
           <div style={{ marginBottom: 14 }}>
             <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 5 }}>Notes</label>
@@ -3832,7 +3832,7 @@ const LeadCard = ({ lead, selectedLead, setSelectedLead, activities, onReactivat
   const tIcons = { note: "", call: "", meeting: "", email: "", demo: "", "follow-up": "" };
   return (
     <div onClick={() => setSelectedLead(isSelected ? null : lead)}
-      style={{ background: isSelected ? T.surface : T.bg, border: `1px solid ${isSelected ? stage.color+"80" : T.border}`, borderLeft: `3px solid ${stage.color}`, borderRadius: 10, padding: "14px 16px", cursor: "pointer", transition: "all 0.2s", marginBottom: 8, opacity: isLost ? 0.7 : 1 }}
+      style={{ background: isSelected ? T.surface : T.bg, border: `1px solid ${isSelected ? stage.color+"80" : T.border}", borderLeft: `3px solid ${stage.color}`, borderRadius: 10, padding: "14px 16px", cursor: "pointer", transition: "all 0.2s", marginBottom: 8, opacity: isLost ? 0.7 : 1 }}
       onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.borderColor = stage.color+"50"; e.currentTarget.style.background = T.surface; }}}
       onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.background = T.bg; }}}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
@@ -3929,8 +3929,8 @@ const LeadPanel = ({ lead, activities, canEdit, canApprove, addActivity, updateS
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
               <div>
-                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase`, marginBottom: 3 }}>Value (${getCurrency(activeCountry||user?.country||"Ghana")})</div>
-                <input type=`number" value={editVals.value} onChange={e => setEditVals(v => ({...v, value: e.target.value}))} style={{ width: "100%", padding: "6px 10px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>Value (${getCurrency(activeCountry||user?.country||"Ghana")})</div>
+                <input type="number" value={editVals.value} onChange={e => setEditVals(v => ({...v, value: e.target.value}))} style={{ width: "100%", padding: "6px 10px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
               </div>
               <div>
                 <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>Event Date</div>
@@ -4143,7 +4143,7 @@ const CRMView = ({ user, activeCountry = "All" }) => {
       });
       const lead = leads.find(l => l.id === leadId);
       if (lead?.assigned_to) {
-        await supabase.from("notifications").insert({ user_id: lead.assigned_to, title: `Follow-up Scheduled — ${company}`, message: `${actForm.type} scheduled on ${actForm.scheduled_date}${actForm.scheduled_time ? " at " + actForm.scheduled_time : ""}`, type: "crm" });
+        await supabase.from("notifications").insert({ user_id: lead.assigned_to, title: `Follow-up Scheduled — ${company}`, message: `${actForm.type} scheduled on ${actForm.scheduled_date}${actForm.scheduled_time ? " at " + actForm.scheduled_time : ""}", type: "crm" });
       }
     }
     setActForm({ type: "call", notes: "", scheduled_date: "", scheduled_time: "" });
@@ -5349,7 +5349,7 @@ const StrategyMapView = ({ user }) => {
       {selectedEvent && !loading && (
         <div>
           {/* Event header card */}
-          <div style={{ background: archetype ? archetype.color+"12" : T.surface, border: `1px solid ${archetype ? archetype.color+"40" : T.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 20 }}>
+          <div style={{ background: archetype ? archetype.color+"12" : T.surface, border: `1px solid ${archetype ? archetype.color+"40" : T.border}", borderRadius: 12, padding: "20px 24px", marginBottom: 20 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
                 <div style={{ color: archetype?.color || T.cyan, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>{selectedEvent.event_category || "Event"}</div>
@@ -6078,7 +6078,7 @@ const HRView = ({ user }) => {
 
   const approveLeave = async (id, staffId, approved) => {
     await supabase.from("leave_requests").update({ status: approved ? "approved" : "declined", approved_by: user.id, approved_at: new Date().toISOString() }).eq("id", id);
-    await supabase.from("notifications").insert({ user_id: staffId, title: approved ? "Leave Approved" : "Leave Declined", message: `Your leave request has been ${approved ? "approved" : "declined"} by CEO.`, type: "task" });
+    await supabase.from("notifications").insert({ user_id: staffId, title: approved ? "Leave Approved" : "Leave Declined", message: `Your leave request has been ${approved ? "approved" : "declined"} by CEO.", type: "task" });
     load();
   };
 
@@ -6926,8 +6926,8 @@ const ClientPaymentsView = ({ user, activeCountry = "All" }) => {
               </div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
                 <div>
-                  <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block`, marginBottom:4 }}>Amount (${getCurrency(activeCountry||user?.country||"Ghana")}) *</label>
-                  <input type=`number" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} placeholder="0.00"
+                  <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Amount (${getCurrency(activeCountry||user?.country||"Ghana")}) *</label>
+                  <input type="number" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} placeholder="0.00"
                     style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
                 </div>
                 <div>
@@ -7038,7 +7038,7 @@ const ClientActionItemsView = ({ user }) => {
           const isOverdue = item.due_date && new Date(item.due_date) < new Date() && item.status === "pending";
           const statusColor = item.status==="completed" ? T.teal : isOverdue ? T.red : T.amber;
           return (
-            <div key={item.id} style={{ background:T.surface, border:`1px solid ${isOverdue?T.red+"30":T.border}`, borderLeft:`3px solid ${statusColor}`, borderRadius:12, padding:"16px 20px", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+            <div key={item.id} style={{ background:T.surface, border:`1px solid ${isOverdue?T.red+"30":T.border}", borderLeft:`3px solid ${statusColor}`, borderRadius:12, padding:"16px 20px", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
               <div style={{ flex:1 }}>
                 <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:4 }}>
                   <div style={{ color:T.textPrimary, fontWeight:700, fontSize:14 }}>{item.title}</div>
@@ -9608,7 +9608,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
               { label: 'Total Inflows', value: `${getCurrency(activeCountry)} ${totalClientInflows.toLocaleString()}`, sub: `${clientInvoices.length} client invoices`, color: '#10B981', icon: '' },
               { label: 'Total Paid Out', value: `${getCurrency(activeCountry)} ${totalVouchersPaid.toLocaleString()}`, sub: `${paidVouchers.length} vouchers paid`, color: T.red, icon: '' },
               { label: 'Pending Approval', value: `${getCurrency(activeCountry)} ${totalPendingAmt.toLocaleString()}`, sub: `${pendingVouchers.length} vouchers`, color: T.amber, icon: '⏳' },
-              { label: 'Petty Cash Float', value: `${getCurrency(activeCountry||user?.country||"Ghana")} ${(pcBalance.toLocaleString())}`, sub: `${pcPct}% remaining`, color: pcPct < 10 ? T.red : T.cyan, icon: '' },
+              { label: 'Petty Cash Float', value: `${getCurrency(activeCountry||user?.country||"Ghana")} ${(pcBalance.toLocaleString())}", sub: `${pcPct}% remaining`, color: pcPct < 10 ? T.red : T.cyan, icon: '' },
             ].map((k,i) => (
               <div key={i} style={{ padding: '16px 18px', background: T.surface, border: `1px solid ${T.border}`, borderTop: `3px solid ${k.color}`, borderRadius: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -9899,7 +9899,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
             const statusColors = { pending:T.amber, pending_ceo:T.cyan, approved:T.teal, rejected:T.red, paid:"#10B981" };
             const statusLabels = { pending:"Pending Finance Review", pending_ceo:"Sent to CEO — Awaiting Approval", approved:"CEO Approved — Ready to Pay", rejected:"Rejected", paid:"Paid " };
             return (
-              <div key={req.id} style={{ background:T.surface, border:`1px solid ${req.status==="pending"?T.amber+"30":T.border}`, borderLeft:`4px solid ${statusColors[req.status]||T.border}`, borderRadius:12, padding:"16px 20px", marginBottom:10 }}>
+              <div key={req.id} style={{ background:T.surface, border:`1px solid ${req.status==="pending"?T.amber+"30":T.border}", borderLeft:`4px solid ${statusColors[req.status]||T.border}`, borderRadius:12, padding:"16px 20px", marginBottom:10 }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
                   <div>
                     <div style={{ color:T.textPrimary, fontWeight:800, fontSize:14 }}>{req.staff_name}</div>
@@ -10440,7 +10440,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
             <div style={{ color: T.amber, fontSize: 12, marginBottom: 20 }}> Maximum single payment: GHS 200. Use cheque for larger amounts.</div>
             <div style={{ marginBottom: 14 }}><label style={labelStyle}>Payee *</label><input value={pcForm.payee} onChange={e => setPcForm({...pcForm, payee: e.target.value})} style={inputStyle} placeholder="Who is being paid?" /></div>
             <div style={{ marginBottom: 14 }}><label style={labelStyle}>Purpose</label><input value={pcForm.purpose} onChange={e => setPcForm({...pcForm, purpose: e.target.value})} style={inputStyle} placeholder="What is this for?` /></div>
-            <div style={{ marginBottom: 20 }}><label style={labelStyle}>Amount (${getCurrency(activeCountry||user?.country||"Ghana")}) *</label><input type=`number" max="200" value={pcForm.amount} onChange={e => setPcForm({...pcForm, amount: e.target.value})} style={inputStyle} placeholder="Max GHS 200" /></div>
+            <div style={{ marginBottom: 20 }}><label style={labelStyle}>Amount (${getCurrency(activeCountry||user?.country||"Ghana")}) *</label><input type="number" max="200" value={pcForm.amount} onChange={e => setPcForm({...pcForm, amount: e.target.value})} style={inputStyle} placeholder="Max GHS 200" /></div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={savePCVoucher} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.cyan})`, border: 'none', color: '#fff', padding: '10px 24px', borderRadius: 8, cursor: 'pointer', fontWeight: 800, fontSize: 13 }}>{saving ? 'Saving...' : 'Submit Voucher'}</button>
               <button onClick={() => setPcModal(false)} style={{ background: 'none', border: `1px solid ${T.border}`, color: T.textMuted, padding: '10px 20px', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>Cancel</button>
@@ -10457,14 +10457,14 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
             <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>Prepared each morning and sent to the Director. Shows previous payments, inflows and expected transactions.</div>
             <div style={{ marginBottom: 14 }}><label style={labelStyle}>Report Date</label><input type="date` value={dbForm.report_date} onChange={e => setDbForm({...dbForm, report_date: e.target.value})} style={inputStyle} /></div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-              <div><label style={labelStyle}>Opening Balance (${getCurrency(activeCountry||user?.country||"Ghana")})</label><input type=`number" value={dbForm.opening_balance} onChange={e => setDbForm({...dbForm, opening_balance: e.target.value})} style={inputStyle} placeholder="0.00` /></div>
-              <div><label style={labelStyle}>Expected Inflows (${getCurrency(activeCountry||user?.country||"Ghana")})</label><input type=`number" value={dbForm.expected_inflows} onChange={e => setDbForm({...dbForm, expected_inflows: e.target.value})} style={inputStyle} placeholder="0.00` /></div>
+              <div><label style={labelStyle}>Opening Balance (${getCurrency(activeCountry||user?.country||"Ghana")})</label><input type="number" value={dbForm.opening_balance} onChange={e => setDbForm({...dbForm, opening_balance: e.target.value})} style={inputStyle} placeholder="0.00` /></div>
+              <div><label style={labelStyle}>Expected Inflows (${getCurrency(activeCountry||user?.country||"Ghana")})</label><input type="number" value={dbForm.expected_inflows} onChange={e => setDbForm({...dbForm, expected_inflows: e.target.value})} style={inputStyle} placeholder="0.00` /></div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-              <div><label style={labelStyle}>Expected Expenditure (${getCurrency(activeCountry||user?.country||"Ghana")})</label><input type=`number" value={dbForm.expected_expenditure} onChange={e => setDbForm({...dbForm, expected_expenditure: e.target.value})} style={inputStyle} placeholder="0.00` /></div>
-              <div><label style={labelStyle}>Actual Inflows (${getCurrency(activeCountry||user?.country||"Ghana")})</label><input type=`number" value={dbForm.actual_inflows} onChange={e => setDbForm({...dbForm, actual_inflows: e.target.value})} style={inputStyle} placeholder="0.00` /></div>
+              <div><label style={labelStyle}>Expected Expenditure (${getCurrency(activeCountry||user?.country||"Ghana")})</label><input type="number" value={dbForm.expected_expenditure} onChange={e => setDbForm({...dbForm, expected_expenditure: e.target.value})} style={inputStyle} placeholder="0.00` /></div>
+              <div><label style={labelStyle}>Actual Inflows (${getCurrency(activeCountry||user?.country||"Ghana")})</label><input type="number" value={dbForm.actual_inflows} onChange={e => setDbForm({...dbForm, actual_inflows: e.target.value})} style={inputStyle} placeholder="0.00` /></div>
             </div>
-            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Actual Payments Made (${getCurrency(activeCountry||user?.country||"Ghana")})</label><input type=`number" value={dbForm.actual_payments} onChange={e => setDbForm({...dbForm, actual_payments: e.target.value})} style={inputStyle} placeholder="0.00" /></div>
+            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Actual Payments Made (${getCurrency(activeCountry||user?.country||"Ghana")})</label><input type="number" value={dbForm.actual_payments} onChange={e => setDbForm({...dbForm, actual_payments: e.target.value})} style={inputStyle} placeholder="0.00" /></div>
             {(dbForm.opening_balance || dbForm.actual_inflows || dbForm.actual_payments) && (
               <div style={{ background: T.bg, border: `1px solid ${T.cyan}30`, borderRadius: 8, padding: '10px 14px', marginBottom: 14 }}>
                 <div style={{ color: T.cyan, fontWeight: 900, fontSize: 16 }}>Closing Balance: GHS {((parseFloat(dbForm.opening_balance)||0) + (parseFloat(dbForm.actual_inflows)||0) - (parseFloat(dbForm.actual_payments)||0)).toLocaleString()}</div>
@@ -11226,7 +11226,7 @@ const VendorRatingsView = ({ user }) => {
                   const tier = score !== null ? getTier(score) : null;
                   const isPoor = score !== null && score < 50;
                   return (
-                    <div key={i} style={{ background: T.surface, border: `1px solid ${score === null ? T.border : isPoor ? T.red + "40" : tier.color + "40"}`, borderTop: `2px solid ${score === null ? T.border : isPoor ? T.red : tier.color}`, borderRadius: 10, padding: "14px 16px" }}>
+                    <div key={i} style={{ background: T.surface, border: `1px solid ${score === null ? T.border : isPoor ? T.red + "40" : tier.color + "40"}", borderTop: `2px solid ${score === null ? T.border : isPoor ? T.red : tier.color}`, borderRadius: 10, padding: "14px 16px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{vd.rff.vendor}</div>
@@ -11265,7 +11265,7 @@ const VendorRatingsView = ({ user }) => {
             const isPoor = v.vendor_scorecard_count > 0 && score < 50;
             const isUnrated = !v.vendor_scorecard_count;
             return (
-              <div key={v.id} style={{ background: T.surface, border: `1px solid ${isPoor ? T.red + "40" : T.border}`, borderTop: `3px solid ${isPoor ? T.red : isUnrated ? T.border : tier.color}`, borderRadius: 12, padding: "18px 20px", transition: "box-shadow 0.2s" }}
+              <div key={v.id} style={{ background: T.surface, border: `1px solid ${isPoor ? T.red + "40" : T.border}", borderTop: `3px solid ${isPoor ? T.red : isUnrated ? T.border : tier.color}`, borderRadius: 12, padding: "18px 20px", transition: "box-shadow 0.2s" }}
                 onMouseEnter={e => e.currentTarget.style.boxShadow = `0 4px 20px ${isPoor ? T.red : isUnrated ? T.border : tier.color}15`}
                 onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
               >
@@ -11595,7 +11595,7 @@ const GigConfirmationView = ({ user }) => {
         {awards.map(award => {
           const rff = rffs.find(r => r.id === award.rff_id);
           return (
-            <div key={award.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderLeft: `3px solid ${award.status === "confirmed" ? "#10B981" : T.teal}`, borderRadius: 12, padding: "18px 20px" }}>
+            <div key={award.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderLeft: `3px solid ${award.status === "confirmed" ? "#10B981" : T.teal}", borderRadius: 12, padding: "18px 20px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{award.vendor_name}</div>
@@ -12529,8 +12529,8 @@ const VendorInvoiceView = ({ user }) => {
               </div>
             )}
             <div style={{ marginBottom: 14 }}>
-              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block`, marginBottom: 5 }}>Invoice Amount (${getCurrency(activeCountry||user?.country||"Ghana")})</label>
-              <input type=`number" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} placeholder="0.00" style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Invoice Amount (${getCurrency(activeCountry||user?.country||"Ghana")})</label>
+              <input type="number" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} placeholder="0.00" style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
             </div>
             <div style={{ marginBottom: 14 }}>
               <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Upload Invoice Document</label>
@@ -12755,7 +12755,7 @@ const QuotesReceivedView = ({ user, activeCountry = "All" }) => {
             const isExpanded = selectedRff === rff.id;
 
             return (
-              <div key={rff.id} style={{ background: T.surface, border: `1px solid ${isExpanded ? T.cyan + "60" : T.border}`, borderRadius: 12, overflow: "hidden", transition: "border-color 0.2s" }}>
+              <div key={rff.id} style={{ background: T.surface, border: `1px solid ${isExpanded ? T.cyan + "60" : T.border}", borderRadius: 12, overflow: "hidden", transition: "border-color 0.2s" }}>
                 {/* RFF Header */}
                 <div onClick={() => setSelectedRff(isExpanded ? null : rff.id)} style={{ padding: "16px 20px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
                   onMouseEnter={e => e.currentTarget.style.background = T.bg}
@@ -13485,8 +13485,8 @@ const QuoteComparisonView = ({ user, activeCountry = "All" }) => {
 
             <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
               <div>
-                <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block`, marginBottom: 4 }}>New Agreed Amount (${getCurrency(activeCountry||user?.country||"Ghana")})</label>
-                <input type=`number" value={changeOrderForm.new_amount} onChange={e => setChangeOrderForm(f => ({...f, new_amount: e.target.value}))} placeholder="Enter new amount" style={{ width: "100%", padding: "10px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                <label style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>New Agreed Amount (${getCurrency(activeCountry||user?.country||"Ghana")})</label>
+                <input type="number" value={changeOrderForm.new_amount} onChange={e => setChangeOrderForm(f => ({...f, new_amount: e.target.value}))} placeholder="Enter new amount" style={{ width: "100%", padding: "10px 12px", background: T.bg, border: "1px solid " + T.border, borderRadius: 8, color: T.textPrimary, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                 {changeOrderForm.new_amount && (
                   <div style={{ marginTop: 6, color: parseFloat(changeOrderForm.new_amount) > parseFloat(changeOrderModal.agreed_amount || changeOrderModal.quoted_amount) ? T.red : T.teal, fontSize: 12, fontWeight: 700 }}>
                     {parseFloat(changeOrderForm.new_amount) > parseFloat(changeOrderModal.agreed_amount || changeOrderModal.quoted_amount) ? "" : ""} GHS {Math.abs(parseFloat(changeOrderForm.new_amount) - parseFloat(changeOrderModal.agreed_amount || changeOrderModal.quoted_amount)).toLocaleString()} {parseFloat(changeOrderForm.new_amount) > parseFloat(changeOrderModal.agreed_amount || changeOrderModal.quoted_amount) ? "increase" : "decrease"}
@@ -13547,8 +13547,8 @@ const QuoteComparisonView = ({ user, activeCountry = "All" }) => {
 
             {/* Agreed Amount — editable */}
             <div style={{ marginBottom: 16, background: T.amber+"10", border: `1px solid ${T.amber}30`, borderRadius: 8, padding: "12px 14px" }}>
-              <label style={{ color: T.amber, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block`, marginBottom: 5 }}>Agreed Amount (${getCurrency(activeCountry||user?.country||"Ghana")}) — edit if negotiated</label>
-              <input type=`number" value={agreedAmount} onChange={e => setAgreedAmount(e.target.value)}
+              <label style={{ color: T.amber, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Agreed Amount (${getCurrency(activeCountry||user?.country||"Ghana")}) — edit if negotiated</label>
+              <input type="number" value={agreedAmount} onChange={e => setAgreedAmount(e.target.value)}
                 style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.amber}40`, borderRadius: 8, color: T.textPrimary, fontSize: 15, fontWeight: 700, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
                 placeholder={awardModal.quote_amount || "Enter agreed amount"} />
               {agreedAmount && parseFloat(agreedAmount) !== awardModal.quote_amount && (
@@ -13630,7 +13630,7 @@ const RFFApprovalsView = ({ user, activeCountry = "All" }) => {
     // Notify Vendor Manager
     const { data: vms } = await supabase.from("profiles").select("id").eq("role", "Vendor Manager");
     if (vms) await Promise.all(vms.map(async vm => {
-      await supabase.from("notifications").insert({ user_id: vm.id, title: "RFF Declined", message: `RFF "${rff.title}" was declined. Notes: ${notes}`, type: "rff" });
+      await supabase.from("notifications").insert({ user_id: vm.id, title: "RFF Declined", message: `RFF "${rff.title}" was declined. Notes: ${notes}", type: "rff" });
       const { data: vmProfile } = await supabase.from("profiles").select("email, name").eq("id", vm.id).single();
       if (vmProfile?.email) await sendEmail(vmProfile.email, `RFF Declined — ${rff.title}`, notifEmailHtml({ name: vmProfile.name, title: "RFF Declined", message: `RFF "${rff.title}" was declined by the CEO.<br><br><strong>Notes:</strong> ${notes}`, actionUrl: BASE_URL, actionLabel: "View RFF" }));
     }));
@@ -14518,7 +14518,7 @@ const ApprovedVendorsTab = ({ apps, user, load }) => {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {approvedApps.map(app => (
-          <div key={app.id} style={{ background: T.surface, border: `1px solid ${app.status === "login-created" ? T.teal+"50" : T.amber+"50"}`, borderLeft: `3px solid ${app.status === "login-created" ? T.teal : T.amber}`, borderRadius: 10, padding: "16px 18px" }}>
+          <div key={app.id} style={{ background: T.surface, border: `1px solid ${app.status === "login-created" ? T.teal+"50" : T.amber+"50"}", borderLeft: `3px solid ${app.status === "login-created" ? T.teal : T.amber}", borderRadius: 10, padding: "16px 18px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
                 <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{app.vendor_name}</div>
@@ -15133,7 +15133,7 @@ const VendorAssignmentView = ({ user, activeCountry = "All" }) => {
     setSaving(true);
     await supabase.from("rff_vendor_assignments").insert({ rff_id: rff.id, vendor_id: vendor.id, vendor_name: vendor.name, assigned_by: user.id });
     // Notify vendor
-    await supabase.from("notifications").insert({ user_id: vendor.id, title: "New RFF Assignment", message: `You have been assigned to RFF: "${rff.title}" for ${rff.event_name}. Please submit your quote.`, type: "rff" });
+    await supabase.from("notifications").insert({ user_id: vendor.id, title: "New RFF Assignment", message: `You have been assigned to RFF: "${rff.title}" for ${rff.event_name}. Please submit your quote.", type: "rff" });
     const { data: vendorProf } = await supabase.from("profiles").select("email,name").eq("id", vendor.id).single();
     if (vendorProf?.email) await sendEmail(vendorProf.email, `Request for Quote — ${rff.title}`, rffEmailHtml({ vendorName: vendor.name, rffTitle: rff.title || "Request for Quote", eventName: rff.event_name || "", deadline: rff.quote_deadline, category: rff.category || "", notes: rff.description || "" }));
     // Update RFF status to show vendors are being assigned
@@ -15616,8 +15616,8 @@ const OpportunitiesView = ({ user, onNavigate, activeCountry = "All" }) => {
       // Notify assigned sales team
       const { data: sales } = await supabase.from("profiles").select("id, email, name").eq("role", "Sales & Marketing");
       for (const s of sales || []) {
-        await supabase.from("notifications").insert({ user_id: s.id, title: `Follow-up Scheduled — ${company}`, message: `${actForm.type} scheduled on ${actForm.scheduled_date}${actForm.scheduled_time ? " at " + actForm.scheduled_time : ""} for ${company}`, type: "crm" });
-        if (s.email) await sendEmail(s.email, `Follow-up Scheduled — ${company}`, notifEmailHtml({ name: s.name, title: `${actForm.type} Scheduled`, message: `A <strong>${actForm.type}</strong> has been scheduled for <strong>${company}</strong> on <strong>${actForm.scheduled_date}${actForm.scheduled_time ? " at " + actForm.scheduled_time : ""}</strong>.<br><br><em>${actForm.content}</em>`, actionUrl: BASE_URL, actionLabel: "View in WorkRoom" }));
+        await supabase.from("notifications").insert({ user_id: s.id, title: `Follow-up Scheduled — ${company}`, message: `${actForm.type} scheduled on ${actForm.scheduled_date}${actForm.scheduled_time ? " at " + actForm.scheduled_time : ""} for ${company}", type: "crm" });
+        if (s.email) await sendEmail(s.email, `Follow-up Scheduled — ${company}`, notifEmailHtml({ name: s.name, title: `${actForm.type} Scheduled`, message: `A <strong>${actForm.type}</strong> has been scheduled for <strong>${company}</strong> on <strong>${actForm.scheduled_date}${actForm.scheduled_time ? " at " + actForm.scheduled_time : ""}</strong>.<br><br><em>${actForm.content}</em>", actionUrl: BASE_URL, actionLabel: "View in WorkRoom" }));
       }
     }
     setActForm({ type: "note", content: "", scheduled_date: "", scheduled_time: "" });
@@ -15869,7 +15869,7 @@ const OpportunitiesView = ({ user, onNavigate, activeCountry = "All" }) => {
                       {canManage && (
                         <div style={{ display: "flex", gap: 6 }}>
                           <button onClick={() => setEditModal({ ...o })} style={{ background: T.cyan + "15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>Edit</button>
-                          <button onClick={() => { const isOpen = expandedOpp === o.id; setExpandedOpp(isOpen ? null : o.id); if (!isOpen) loadActivities(o.id); }} style={{ background: expandedOpp === o.id ? "#8B5CF620" : T.surface, border: `1px solid ${expandedOpp === o.id ? "#8B5CF6" : T.border}`, color: expandedOpp === o.id ? "#8B5CF6" : T.textMuted, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>
+                          <button onClick={() => { const isOpen = expandedOpp === o.id; setExpandedOpp(isOpen ? null : o.id); if (!isOpen) loadActivities(o.id); }} style={{ background: expandedOpp === o.id ? "#8B5CF620" : T.surface, border: `1px solid ${expandedOpp === o.id ? "#8B5CF6" : T.border}", color: expandedOpp === o.id ? "#8B5CF6" : T.textMuted, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>
                              {(oppActivities[o.id]||[]).length > 0 ? oppActivities[o.id].length : "Notes"}
                           </button>
                           {o.status !== "Converted" && (
@@ -15905,7 +15905,7 @@ const OpportunitiesView = ({ user, onNavigate, activeCountry = "All" }) => {
                             <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "12px 14px", marginBottom: 12 }}>
                               <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
                                 {["note","call","meeting","email","demo","follow-up"].map(t => (
-                                  <button key={t} onClick={() => setActForm(f => ({...f, type: t}))} style={{ padding: "3px 10px", borderRadius: 20, border: `1px solid ${actForm.type === t ? "#8B5CF6" : T.border}`, background: actForm.type === t ? "#8B5CF620" : "none", color: actForm.type === t ? "#8B5CF6" : T.textMuted, fontSize: 10, fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>{t}</button>
+                                  <button key={t} onClick={() => setActForm(f => ({...f, type: t}))} style={{ padding: "3px 10px", borderRadius: 20, border: `1px solid ${actForm.type === t ? "#8B5CF6" : T.border}", background: actForm.type === t ? "#8B5CF620" : "none", color: actForm.type === t ? "#8B5CF6" : T.textMuted, fontSize: 10, fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>{t}</button>
                                 ))}
                               </div>
                               <textarea value={actForm.content} onChange={e => setActForm(f => ({...f, content: e.target.value}))} placeholder={`Add ${actForm.type}...`} rows={2} style={{ width: "100%", padding: "8px 10px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none", resize: "none", boxSizing: "border-box", marginBottom: 6 }} />
@@ -16194,7 +16194,7 @@ const VendorsView = ({ user, activeCountry = "All" }) => {
     }).eq('id', resubmitModal.id);
     // Notify CEO
     const { data: ceos } = await supabase.from('profiles').select('id').in('role', ['CEO', 'Country Manager']);
-    if (ceos) await Promise.all(ceos.map(c => supabase.from('notifications').insert({ user_id: c.id, title: 'RFF Resubmitted', message: `RFF "${resubmitModal.title}" has been revised and resubmitted for approval.`, type: 'rff' })));
+    if (ceos) await Promise.all(ceos.map(c => supabase.from('notifications').insert({ user_id: c.id, title: 'RFF Resubmitted', message: `RFF "${resubmitModal.title}" has been revised and resubmitted for approval.", type: 'rff' })));
     setResubmitModal(null); setResubmitFile(null); setResubmitNotes('');
     setSaving(false); load();
   };
@@ -16236,7 +16236,7 @@ const VendorsView = ({ user, activeCountry = "All" }) => {
           <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 12 }}>Approved Vendors — Account Status</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
             {vendorApps.filter(a => ["approved","login-created"].includes(a.status)).map(app => (
-              <div key={app.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${app.status === "login-created" ? "#10B981" : T.amber}`, borderRadius: 10, padding: "14px 16px" }}>
+              <div key={app.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${app.status === "login-created" ? "#10B981" : T.amber}", borderRadius: 10, padding: "14px 16px" }}>
                 <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 2 }}>{app.vendor_name}</div>
                 <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 6 }}>{app.vendor_type} · {app.contact_person}</div>
                 <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 8 }}>{app.contact_email}</div>
@@ -16731,8 +16731,8 @@ const EventClientPortalPanel = ({ event, client, user, onClose }) => {
                   <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:10 }}>
                     {[["Project Fee","project_fee"],["Per Diem","per_diem"],["Transport","transport_allowance"]].map(([label,field]) => (
                       <div key={field}>
-                        <label style={{ color:T.textMuted, fontSize:9, fontWeight:700, textTransform:"uppercase", display:"block`, marginBottom:3 }}>{label} (${getCurrency(activeCountry||user?.country||"Ghana")})</label>
-                        <input type=`number" id={"rate-"+staff.id+"-"+field} defaultValue={existing?.[field]||""} placeholder="0.00"
+                        <label style={{ color:T.textMuted, fontSize:9, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:3 }}>{label} (${getCurrency(activeCountry||user?.country||"Ghana")})</label>
+                        <input type="number" id={"rate-"+staff.id+"-"+field} defaultValue={existing?.[field]||""} placeholder="0.00"
                           style={{ width:"100%", padding:"7px 10px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:6, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
                       </div>
                     ))}
@@ -16766,7 +16766,7 @@ const EventClientPortalPanel = ({ event, client, user, onClose }) => {
               const isTeam = m.sender_role !== "Client";
               return (
                 <div key={m.id} style={{ display: "flex", flexDirection: "column", alignItems: isTeam ? "flex-end" : "flex-start" }}>
-                  <div style={{ maxWidth: "80%", background: isTeam ? T.teal+"18" : T.bg, border: `1px solid ${isTeam ? T.teal+"30" : T.border}`, borderRadius: isTeam ? "12px 12px 2px 12px" : "12px 12px 12px 2px", padding: "10px 14px" }}>
+                  <div style={{ maxWidth: "80%", background: isTeam ? T.teal+"18" : T.bg, border: `1px solid ${isTeam ? T.teal+"30" : T.border}", borderRadius: isTeam ? "12px 12px 2px 12px" : "12px 12px 12px 2px", padding: "10px 14px" }}>
                     <div style={{ color: T.textPrimary, fontSize: 13, lineHeight: 1.5 }}>{m.message}</div>
                   </div>
                   <div style={{ color: T.textMuted, fontSize: 10, marginTop: 3 }}>{m.sender_name} · {new Date(m.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
@@ -18348,7 +18348,7 @@ const CEOClientFinanceView = ({ user, activeCountry = "All" }) => {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginBottom: 20 }}>
             {[
               { label: "Agreed Budget", value: agreedBudget > 0 ? `${getCurrency(activeCountry||user?.country||"Ghana")} ${(agreedBudget.toLocaleString())}` : "Not set", color: T.cyan },
-              { label: "Total Recorded Spend", value: `${getCurrency(activeCountry||user?.country||"Ghana")} ${(totalSpent.toLocaleString())}`, color: T.amber },
+              { label: "Total Recorded Spend", value: `${getCurrency(activeCountry||user?.country||"Ghana")} ${(totalSpent.toLocaleString())}", color: T.amber },
               { label: "Utilisation", value: agreedBudget > 0 ? spentPct + "%" : "—", color: spentPct > 90 ? T.red : T.teal },
             ].map((k, i) => (
               <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
@@ -18373,10 +18373,10 @@ const CEOClientFinanceView = ({ user, activeCountry = "All" }) => {
           {tab === "budget" && (
             <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "22px 24px" }}>
               <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14, marginBottom: 18 }}>{currentBudget ? "Update Budget" : "Set Budget"}</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))`, gap: 14, marginBottom: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 14, marginBottom: 16 }}>
                 <div>
                   <label style={labelStyle}>Agreed Budget (${getCurrency(activeCountry||user?.country||"Ghana")})</label>
-                  <input type=`number" value={budgetForm.agreed_budget} onChange={e => setBudgetForm({ ...budgetForm, agreed_budget: e.target.value })} placeholder="e.g. 50000" style={inputStyle} />
+                  <input type="number" value={budgetForm.agreed_budget} onChange={e => setBudgetForm({ ...budgetForm, agreed_budget: e.target.value })} placeholder="e.g. 50000" style={inputStyle} />
                 </div>
                 <div>
                   <label style={labelStyle}>Management Fee %</label>
@@ -18413,7 +18413,7 @@ const CEOClientFinanceView = ({ user, activeCountry = "All" }) => {
                   </div>
                   <div>
                     <label style={labelStyle}>Amount (${getCurrency(activeCountry||user?.country||"Ghana")})</label>
-                    <input type=`number" value={expenseForm.amount} onChange={e => setExpenseForm({ ...expenseForm, amount: e.target.value })} placeholder="0.00" style={inputStyle} />
+                    <input type="number" value={expenseForm.amount} onChange={e => setExpenseForm({ ...expenseForm, amount: e.target.value })} placeholder="0.00" style={inputStyle} />
                   </div>
                 </div>
                 <button onClick={handleAddExpense} disabled={saving || !expenseForm.amount} style={{
@@ -19959,8 +19959,8 @@ const PaymentAuthorisationView = ({ user, onNavigate, activeCountry = "All" }) =
             </div>
             {/* Amount */}
             <div>
-              <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block`, marginBottom:4 }}>Amount (${getCurrency(activeCountry||user?.country||"Ghana")})</label>
-              <input type=`number" value={form.agreed_amount} onChange={e=>setForm(f=>({...f,agreed_amount:e.target.value}))} placeholder="0.00" style={inputStyle} />
+              <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Amount (${getCurrency(activeCountry||user?.country||"Ghana")})</label>
+              <input type="number" value={form.agreed_amount} onChange={e=>setForm(f=>({...f,agreed_amount:e.target.value}))} placeholder="0.00" style={inputStyle} />
             </div>
             {/* Payment Method */}
             <div>
@@ -20463,8 +20463,8 @@ const SalesDashboardView = ({ user, activeCountry = "All" }) => {
           <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:400, padding:28 }} onClick={e=>e.stopPropagation()}>
             <div style={{ color:T.textPrimary, fontWeight:900, fontSize:18, marginBottom:20 }}>Edit Sales Target</div>
             <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block`, marginBottom:4 }}>Target Amount (${getCurrency(activeCountry||user?.country||"Ghana")})</label>
-              <input type=`number" value={editTarget.target_amount} onChange={e=>setEditTarget(t=>({...t,target_amount:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Target Amount (${getCurrency(activeCountry||user?.country||"Ghana")})</label>
+              <input type="number" value={editTarget.target_amount} onChange={e=>setEditTarget(t=>({...t,target_amount:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
               <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Commission Rate (%)</label>
               <input type="number" value={editTarget.commission_rate||5} onChange={e=>setEditTarget(t=>({...t,commission_rate:parseFloat(e.target.value)||5}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
@@ -21082,7 +21082,7 @@ const CEOBroadcastView = ({ user }) => {
               <textarea value={form.message} onChange={e=>setForm(f=>({...f,message:e.target.value}))} rows={5} placeholder="Your message to the team..." style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} /></div>
             </div>
             <div style={{ display:"flex", gap:10, marginTop:20 }}>
-              <button onClick={handleSend} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${priorityColors[form.priority]},${form.priority==="urgent"?"#F97316":form.priority==="important"?"#F59E0B":T.teal})`, border:"none", color:form.priority==="normal"?"#060B14":"#fff", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Sending...":" Send Broadcast"}</button>
+              <button onClick={handleSend} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${priorityColors[form.priority]},${form.priority==="urgent"?"#F97316":form.priority==="important"?"#F59E0B":T.teal})", border:"none", color:form.priority==="normal"?"#060B14":"#fff", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Sending...":" Send Broadcast"}</button>
               <button onClick={()=>setModal(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
             </div>
           </div>
@@ -22435,8 +22435,8 @@ const VendorContractsView = ({ user, activeCountry = "All" }) => {
                 <select value={form.contract_type} onChange={e=>setForm(f=>({...f,contract_type:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
                   {["service","retainer","one-off","framework","nda"].map(t=><option key={t}>{t}</option>)}
                 </select></div>
-                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block`, marginBottom:4 }}>Contract Value (${getCurrency(activeCountry||user?.country||"Ghana")})</label>
-                <input type=`number" value={form.value} onChange={e=>setForm(f=>({...f,value:e.target.value}))} placeholder="0" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Contract Value (${getCurrency(activeCountry||user?.country||"Ghana")})</label>
+                <input type="number" value={form.value} onChange={e=>setForm(f=>({...f,value:e.target.value}))} placeholder="0" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
                 <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Start Date</label>
                 <input type="date" value={form.start_date} onChange={e=>setForm(f=>({...f,start_date:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
                 <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>End Date</label>
@@ -22845,7 +22845,7 @@ const VendorSLAView = ({ user, activeCountry = "All" }) => {
         {slas.map(s => {
           const color = statusColors[s.status] || T.textMuted;
           return (
-            <div key={s.id} style={{ background:T.surface, border:`1px solid ${s.status==="breached"?T.red+"30":T.border}`, borderLeft:`3px solid ${color}`, borderRadius:12, padding:"14px 18px", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+            <div key={s.id} style={{ background:T.surface, border:`1px solid ${s.status==="breached"?T.red+"30":T.border}", borderLeft:`3px solid ${color}`, borderRadius:12, padding:"14px 18px", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
               <div style={{ flex:1 }}>
                 <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:4 }}>
                   <div style={{ color:T.textPrimary, fontWeight:700, fontSize:14 }}>{s.vendor_name}</div>
@@ -22973,10 +22973,10 @@ const MarketRatesView = ({ user, activeCountry = "All" }) => {
               <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Service Description</label>
               <input value={form.service_description} onChange={e=>setForm(f=>({...f,service_description:e.target.value}))} placeholder="e.g. Full event lighting rig" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
-                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block`, marginBottom:4 }}>Min Rate (${getCurrency(activeCountry||user?.country||"Ghana")})</label>
-                <input type=`number" value={form.min_rate} onChange={e=>setForm(f=>({...f,min_rate:e.target.value}))} placeholder="0" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
-                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block`, marginBottom:4 }}>Max Rate (${getCurrency(activeCountry||user?.country||"Ghana")})</label>
-                <input type=`number" value={form.max_rate} onChange={e=>setForm(f=>({...f,max_rate:e.target.value}))} placeholder="0" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Min Rate (${getCurrency(activeCountry||user?.country||"Ghana")})</label>
+                <input type="number" value={form.min_rate} onChange={e=>setForm(f=>({...f,min_rate:e.target.value}))} placeholder="0" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+                <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Max Rate (${getCurrency(activeCountry||user?.country||"Ghana")})</label>
+                <input type="number" value={form.max_rate} onChange={e=>setForm(f=>({...f,max_rate:e.target.value}))} placeholder="0" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
                 <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Unit</label>
                 <select value={form.unit} onChange={e=>setForm(f=>({...f,unit:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
                   {["per event","per day","per hour","per person","per item"].map(u=><option key={u}>{u}</option>)}
@@ -23247,7 +23247,7 @@ const EventBriefsView = ({ user }) => {
           {events.map(ev => {
             const brief = briefs.find(b => b.project_id === ev.id);
             return (
-              <div key={ev.id} style={{ background:T.surface, border:`1px solid ${brief?T.teal+"40":T.border}`, borderLeft:`3px solid ${brief?T.teal:T.border}`, borderRadius:12, padding:"16px 20px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div key={ev.id} style={{ background:T.surface, border:`1px solid ${brief?T.teal+"40":T.border}", borderLeft:`3px solid ${brief?T.teal:T.border}`, borderRadius:12, padding:"16px 20px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                 <div>
                   <div style={{ color:T.textPrimary, fontWeight:700, fontSize:14 }}>{ev.name}</div>
                   <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{ev.client} · {ev.event_date?new Date(ev.event_date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):"TBC"}</div>
@@ -23361,7 +23361,7 @@ const EventMilestonesView = ({ user }) => {
           const isOverdue = m.due_date && new Date(m.due_date) < new Date() && m.status === "pending";
           const daysLeft = m.due_date ? Math.ceil((new Date(m.due_date)-new Date())/86400000) : null;
           return (
-            <div key={m.id} style={{ background:T.surface, border:`1px solid ${isOverdue?T.red+"30":T.border}`, borderLeft:`3px solid ${m.status==="completed"?T.teal:isOverdue?T.red:color}`, borderRadius:10, padding:"14px 18px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <div key={m.id} style={{ background:T.surface, border:`1px solid ${isOverdue?T.red+"30":T.border}", borderLeft:`3px solid ${m.status==="completed"?T.teal:isOverdue?T.red:color}", borderRadius:10, padding:"14px 18px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
               <div style={{ flex:1 }}>
                 <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:4 }}>
                   <div style={{ color:m.status==="completed"?T.textMuted:T.textPrimary, fontWeight:700, fontSize:13, textDecoration:m.status==="completed"?"line-through":"none" }}>{m.title}</div>
@@ -24054,7 +24054,7 @@ const ClientDashboard = ({ user }) => {
                 const isOverdue = item.due_date && new Date(item.due_date) < new Date() && item.status === "pending";
                 const statusColor = item.status==="completed" ? T.teal : isOverdue ? T.red : T.amber;
                 return (
-                  <div key={item.id} style={{ background:T.surface, border:`1px solid ${isOverdue?T.red+"40":item.status==="completed"?T.teal+"30":T.amber+"30"}`, borderLeft:`3px solid ${statusColor}`, borderRadius:12, padding:"16px 20px" }}>
+                  <div key={item.id} style={{ background:T.surface, border:`1px solid ${isOverdue?T.red+"40":item.status==="completed"?T.teal+"30":T.amber+"30"}", borderLeft:`3px solid ${statusColor}`, borderRadius:12, padding:"16px 20px" }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
                       <div style={{ flex:1 }}>
                         <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
@@ -25119,7 +25119,7 @@ Format: Use clear section headers matching the names above. Write in flowing par
               { label:"Vendor", done:report?.vendor_submitted_at, by:"Vendor Manager" },
               { label:"Strategic", done:report?.ceo_submitted_at, by:"CEO" },
             ].map(s => (
-              <div key={s.label} style={{ background:T.bg, border:`1px solid ${s.done?T.teal+"40":T.border}`, borderRadius:10, padding:"12px 14px" }}>
+              <div key={s.label} style={{ background:T.bg, border:`1px solid ${s.done?T.teal+"40":T.border}", borderRadius:10, padding:"12px 14px" }}>
                 <div style={{ color:s.done?T.teal:T.amber, fontWeight:800, fontSize:12 }}>{s.done?" Done":"Pending"}</div>
                 <div style={{ color:T.textPrimary, fontSize:12, fontWeight:600, marginTop:2 }}>{s.label}</div>
                 <div style={{ color:T.textMuted, fontSize:10, marginTop:2 }}>{s.by}</div>
@@ -25482,7 +25482,7 @@ const EventsView = ({ user, userRole, activeCountry = "All" }) => {
                   const newNames = strategyLeads.filter(l => newIds.includes(l.id)).map(l => l.name).join(", ");
                   await supabase.from("projects").update({ assigned_to: newIds[0] || null, assigned_to_name: newNames || null, assigned_to_ids: newIds }).eq("id", assignModal.id);
                   if (!isAssigned) {
-                    await supabase.from("notifications").insert({ user_id: sl.id, title: "Event Assigned to You", message: `CEO assigned you to "${assignModal.name}". Check your Events tab.`, type: "task" });
+                    await supabase.from("notifications").insert({ user_id: sl.id, title: "Event Assigned to You", message: `CEO assigned you to "${assignModal.name}". Check your Events tab.", type: "task" });
                     if (sl.email) await sendEmail(sl.email, `Event Assigned — ${assignModal.name}`, notifEmailHtml({ name: sl.name, title: "Event Assigned to You", message: `CEO has assigned you as Strategy Lead for <strong>${assignModal.name}</strong>. Please log in to view the event details.`, actionUrl: "https://workroom.stretchfield.com", actionLabel: "View Event" }));
                   }
                   setAssignModal(prev => ({...prev, assigned_to: newIds[0] || null, assigned_to_ids: newIds, assigned_to_name: newNames}));
@@ -25607,7 +25607,7 @@ const EventsView = ({ user, userRole, activeCountry = "All" }) => {
           <Input label="Event Name" placeholder="e.g. Brand Campaign" value={form.name} onChange={v => setForm({ ...form, name: v })} />
           <div style={{ marginBottom: 14 }}>
             <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>Event Category *</div>
-            <select value={form.event_category} onChange={e => setForm({...form, event_category: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${form.event_category ? T.border : "#F59E0B"}`, borderRadius: 8, color: form.event_category ? T.textPrimary : T.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+            <select value={form.event_category} onChange={e => setForm({...form, event_category: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${form.event_category ? T.border : "#F59E0B"}", borderRadius: 8, color: form.event_category ? T.textPrimary : T.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
               <option value="">Select event category...</option>
               <option value="Conference/Seminar">Conference / Seminar</option>
               <option value="Product Launch">Product Launch</option>

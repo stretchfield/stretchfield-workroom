@@ -2374,7 +2374,7 @@ const StaffDashboard = ({ user }) => {
                       { key:"transport", label:"Transport Allowance", amount: payReqForm._rates?.transport },
                     ].map(({ key, label, amount }) => (
                       <div key={key} onClick={() => amount && setPayReqForm(f=>({...f, selectedTypes:{...f.selectedTypes, [key]:!f.selectedTypes[key]}}))}
-                        style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 14px", background: payReqForm.selectedTypes?.[key] ? T.cyan+"15" : T.bg, border:`1px solid ${payReqForm.selectedTypes?.[key] ? T.cyan+"60" : T.border}", borderRadius:8, cursor: amount ? "pointer" : "default", opacity: amount ? 1 : 0.4 }}>
+                        style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 14px", background: payReqForm.selectedTypes?.[key] ? T.cyan+"15" : T.bg, border:`1px solid ${payReqForm.selectedTypes?.[key] ? T.cyan+"60" : T.border}`, borderRadius:8, cursor: amount ? "pointer" : "default", opacity: amount ? 1 : 0.4 }}>
                         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                           <div style={{ width:18, height:18, borderRadius:4, border:`2px solid ${payReqForm.selectedTypes?.[key] ? T.cyan : T.border}`, background: payReqForm.selectedTypes?.[key] ? T.cyan : "transparent", display:"flex", alignItems:"center", justifyContent:"center" }}>
                             {payReqForm.selectedTypes?.[key] && <span style={{ color:"#060B14", fontSize:11, fontWeight:900 }}></span>}

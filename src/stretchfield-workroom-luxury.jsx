@@ -25425,7 +25425,6 @@ const EventsView = ({ user, userRole, activeCountry = "All" }) => {
                     </div>
                   );
                 })()}
-                </div>
 
                 {/* Edit + Delete buttons — canManage roles */}
                 {canManage && (

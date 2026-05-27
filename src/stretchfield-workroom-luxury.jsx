@@ -3929,7 +3929,7 @@ const LeadPanel = ({ lead, activities, canEdit, canApprove, addActivity, updateS
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
               <div>
-                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>Value (${getCurrency(user?.country||activeCountry||"Ghana")})</div>
+                <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>Value (${getCurrency(lead?.country||"Ghana")})</div>
                 <input type="number" value={editVals.value} onChange={e => setEditVals(v => ({...v, value: e.target.value}))} style={{ width: "100%", padding: "6px 10px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
               </div>
               <div>
@@ -3959,7 +3959,7 @@ const LeadPanel = ({ lead, activities, canEdit, canApprove, addActivity, updateS
         )}
 
         <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
-          <span style={{ color: T.amber, fontWeight: 900, fontSize: 18 }}>{getCurrency(user?.country||activeCountry||"Ghana")+" "+((lead.value||0).toLocaleString()).toLocaleString()}</span>
+          <span style={{ color: T.amber, fontWeight: 900, fontSize: 18 }}>{getCurrency(lead?.country||"Ghana")+" "+((lead.value||0).toLocaleString()).toLocaleString()}</span>
           <span style={{ background: stage.color+"20", color: stage.color, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{lead.status}</span>
         </div>
         {canEdit && (
@@ -25387,12 +25387,25 @@ const EventsView = ({ user, userRole, activeCountry = "All" }) => {
                   {p.deadline && <div style={{ color: T.textMuted, fontSize: 11 }}>Due {p.deadline}</div>}
                 </div>
 
-                {/* Progress bar */}
-                <div style={{ height: 4, background: T.border + "44", borderRadius: 2, marginBottom: 6 }}>
-                  <div style={{ height: "100%", width: (p.completion || 0) + "%", background: `linear-gradient(90deg, ${T.cyan}, ${T.teal})`, borderRadius: 2, transition: "width 0.4s ease" }} />
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ color: T.textMuted, fontSize: 10 }}>{p.completion || 0}% complete</div>
+                {/* Progress bar — calculated from tasks */}
+                {(() => {
+                  const eventTasks = tasks.filter(t => t.project_id === p.id || t.event_id === p.id);
+                  const totalTasks = eventTasks.length;
+                  const completedTasks = eventTasks.filter(t => t.status === 'completed' || t.status === 'done' || t.progress === 100).length;
+                  const inProgressPct = totalTasks > 0 ? eventTasks.reduce((sum, t) => sum + (parseInt(t.progress)||0), 0) / totalTasks : (p.completion || 0);
+                  const taskCompletion = totalTasks > 0 ? Math.round(inProgressPct) : (p.completion || 0);
+                  return (
+                    <>
+                      <div style={{ height: 4, background: T.border + "44", borderRadius: 2, marginBottom: 6 }}>
+                        <div style={{ height: "100%", width: taskCompletion + "%", background: `linear-gradient(90deg, ${T.cyan}, ${T.teal})`, borderRadius: 2, transition: "width 0.4s ease" }} />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ color: T.textMuted, fontSize: 10 }}>
+                          {totalTasks > 0 ? `${completedTasks}/${totalTasks} tasks · ${taskCompletion}% complete` : `${taskCompletion}% complete`}
+                        </div>
+                      </>
+                    );
+                  })()}
                   {canManage ? (
                     <button onClick={async (e) => {
                       e.stopPropagation();

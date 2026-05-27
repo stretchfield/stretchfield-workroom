@@ -105,7 +105,7 @@ const poEmailHtml = ({ vendorName, poNumber, eventName, amount, currency, notes 
   `<p style="color:#0A1628;font-size:14px;margin:0 0 16px;">Dear <strong>${vendorName}</strong>,</p>
   <p style="color:#0A1628;font-size:14px;margin:0 0 20px;">A Purchase Order has been raised for your services. Please submit your invoice upon completion.</p>
   <div style="background:#fff;border:1px solid #C2C9DC;border-radius:8px;padding:20px 24px;margin-bottom:20px;">
-    <table style="width:100%;border-collapse:collapse;">${emailRow("PO Number", `<strong style="color:#00C8FF;">${poNumber}</strong>`)}${emailRow("Event", eventName || "—")}${emailRow("Amount", `<strong>${currency} ${parseFloat(amount || 0).toLocaleString()}</strong>`)}${notes ? emailRow("Notes", notes) : ""}</table>
+    <table style="width:100%;border-collapse:collapse;">${emailRow("PO Number", `<strong style="color:#00C8FF;">${poNumber}</strong>`)}${emailRow("Event", eventName || "—")}${emailRow("Amount`, `<strong>${currency} ${parseFloat(amount || 0).toLocaleString()}</strong>`)}${notes ? emailRow("Notes", notes) : ""}</table>
   </div>
   ${emailBtn("Submit Invoice in WorkRoom", BASE_URL)}`
 );
@@ -4143,7 +4143,7 @@ const CRMView = ({ user, activeCountry = "All" }) => {
       });
       const lead = leads.find(l => l.id === leadId);
       if (lead?.assigned_to) {
-        await supabase.from("notifications").insert({ user_id: lead.assigned_to, title: `Follow-up Scheduled — ${company}`, message: `${actForm.type} scheduled on ${actForm.scheduled_date}${actForm.scheduled_time ? " at " + actForm.scheduled_time : ""}", type: "crm" });
+        await supabase.from("notifications").insert({ user_id: lead.assigned_to, title: `Follow-up Scheduled — ${company}`, message: `${actForm.type} scheduled on ${actForm.scheduled_date}${actForm.scheduled_time ? " at " + actForm.scheduled_time : ""}`, type: "crm" });
       }
     }
     setActForm({ type: "call", notes: "", scheduled_date: "", scheduled_time: "" });
@@ -5349,7 +5349,7 @@ const StrategyMapView = ({ user }) => {
       {selectedEvent && !loading && (
         <div>
           {/* Event header card */}
-          <div style={{ background: archetype ? archetype.color+"12" : T.surface, border: `1px solid ${archetype ? archetype.color+"40" : T.border}", borderRadius: 12, padding: "20px 24px", marginBottom: 20 }}>
+          <div style={{ background: archetype ? archetype.color+"12" : T.surface, border: `1px solid ${archetype ? archetype.color+"40" : T.border}", borderRadius: 12, padding: "20px 24px`, marginBottom: 20 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
                 <div style={{ color: archetype?.color || T.cyan, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>{selectedEvent.event_category || "Event"}</div>
@@ -6078,7 +6078,7 @@ const HRView = ({ user }) => {
 
   const approveLeave = async (id, staffId, approved) => {
     await supabase.from("leave_requests").update({ status: approved ? "approved" : "declined", approved_by: user.id, approved_at: new Date().toISOString() }).eq("id", id);
-    await supabase.from("notifications").insert({ user_id: staffId, title: approved ? "Leave Approved" : "Leave Declined", message: `Your leave request has been ${approved ? "approved" : "declined"} by CEO.", type: "task" });
+    await supabase.from("notifications").insert({ user_id: staffId, title: approved ? "Leave Approved" : "Leave Declined", message: `Your leave request has been ${approved ? "approved" : "declined"} by CEO.`, type: "task" });
     load();
   };
 
@@ -9608,7 +9608,7 @@ const FinanceDashboard = ({ user, onTab, activeCountry = "All" }) => {
               { label: 'Total Inflows', value: `${getCurrency(activeCountry)} ${totalClientInflows.toLocaleString()}`, sub: `${clientInvoices.length} client invoices`, color: '#10B981', icon: '' },
               { label: 'Total Paid Out', value: `${getCurrency(activeCountry)} ${totalVouchersPaid.toLocaleString()}`, sub: `${paidVouchers.length} vouchers paid`, color: T.red, icon: '' },
               { label: 'Pending Approval', value: `${getCurrency(activeCountry)} ${totalPendingAmt.toLocaleString()}`, sub: `${pendingVouchers.length} vouchers`, color: T.amber, icon: '⏳' },
-              { label: 'Petty Cash Float', value: `${getCurrency(activeCountry||user?.country||"Ghana")} ${(pcBalance.toLocaleString())}", sub: `${pcPct}% remaining`, color: pcPct < 10 ? T.red : T.cyan, icon: '' },
+              { label: 'Petty Cash Float', value: `${getCurrency(activeCountry||user?.country||"Ghana")} ${(pcBalance.toLocaleString())}`, sub: `${pcPct}% remaining`, color: pcPct < 10 ? T.red : T.cyan, icon: '' },
             ].map((k,i) => (
               <div key={i} style={{ padding: '16px 18px', background: T.surface, border: `1px solid ${T.border}`, borderTop: `3px solid ${k.color}`, borderRadius: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -11226,7 +11226,7 @@ const VendorRatingsView = ({ user }) => {
                   const tier = score !== null ? getTier(score) : null;
                   const isPoor = score !== null && score < 50;
                   return (
-                    <div key={i} style={{ background: T.surface, border: `1px solid ${score === null ? T.border : isPoor ? T.red + "40" : tier.color + "40"}", borderTop: `2px solid ${score === null ? T.border : isPoor ? T.red : tier.color}`, borderRadius: 10, padding: "14px 16px" }}>
+                    <div key={i} style={{ background: T.surface, border: `1px solid ${score === null ? T.border : isPoor ? T.red + "40" : tier.color + "40"}`, borderTop: `2px solid ${score === null ? T.border : isPoor ? T.red : tier.color}`, borderRadius: 10, padding: "14px 16px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{vd.rff.vendor}</div>
@@ -11265,7 +11265,7 @@ const VendorRatingsView = ({ user }) => {
             const isPoor = v.vendor_scorecard_count > 0 && score < 50;
             const isUnrated = !v.vendor_scorecard_count;
             return (
-              <div key={v.id} style={{ background: T.surface, border: `1px solid ${isPoor ? T.red + "40" : T.border}", borderTop: `3px solid ${isPoor ? T.red : isUnrated ? T.border : tier.color}`, borderRadius: 12, padding: "18px 20px", transition: "box-shadow 0.2s" }}
+              <div key={v.id} style={{ background: T.surface, border: `1px solid ${isPoor ? T.red + "40" : T.border}`, borderTop: `3px solid ${isPoor ? T.red : isUnrated ? T.border : tier.color}`, borderRadius: 12, padding: "18px 20px", transition: "box-shadow 0.2s" }}
                 onMouseEnter={e => e.currentTarget.style.boxShadow = `0 4px 20px ${isPoor ? T.red : isUnrated ? T.border : tier.color}15`}
                 onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
               >
@@ -11595,7 +11595,7 @@ const GigConfirmationView = ({ user }) => {
         {awards.map(award => {
           const rff = rffs.find(r => r.id === award.rff_id);
           return (
-            <div key={award.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderLeft: `3px solid ${award.status === "confirmed" ? "#10B981" : T.teal}", borderRadius: 12, padding: "18px 20px" }}>
+            <div key={award.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderLeft: `3px solid ${award.status === "confirmed" ? "#10B981" : T.teal}`, borderRadius: 12, padding: "18px 20px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{award.vendor_name}</div>
@@ -12755,7 +12755,7 @@ const QuotesReceivedView = ({ user, activeCountry = "All" }) => {
             const isExpanded = selectedRff === rff.id;
 
             return (
-              <div key={rff.id} style={{ background: T.surface, border: `1px solid ${isExpanded ? T.cyan + "60" : T.border}", borderRadius: 12, overflow: "hidden", transition: "border-color 0.2s" }}>
+              <div key={rff.id} style={{ background: T.surface, border: `1px solid ${isExpanded ? T.cyan + "60" : T.border}", borderRadius: 12, overflow: "hidden`, transition: "border-color 0.2s" }}>
                 {/* RFF Header */}
                 <div onClick={() => setSelectedRff(isExpanded ? null : rff.id)} style={{ padding: "16px 20px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
                   onMouseEnter={e => e.currentTarget.style.background = T.bg}
@@ -13630,7 +13630,7 @@ const RFFApprovalsView = ({ user, activeCountry = "All" }) => {
     // Notify Vendor Manager
     const { data: vms } = await supabase.from("profiles").select("id").eq("role", "Vendor Manager");
     if (vms) await Promise.all(vms.map(async vm => {
-      await supabase.from("notifications").insert({ user_id: vm.id, title: "RFF Declined", message: `RFF "${rff.title}" was declined. Notes: ${notes}", type: "rff" });
+      await supabase.from("notifications").insert({ user_id: vm.id, title: "RFF Declined", message: `RFF "${rff.title}" was declined. Notes: ${notes}`, type: "rff" });
       const { data: vmProfile } = await supabase.from("profiles").select("email, name").eq("id", vm.id).single();
       if (vmProfile?.email) await sendEmail(vmProfile.email, `RFF Declined — ${rff.title}`, notifEmailHtml({ name: vmProfile.name, title: "RFF Declined", message: `RFF "${rff.title}" was declined by the CEO.<br><br><strong>Notes:</strong> ${notes}`, actionUrl: BASE_URL, actionLabel: "View RFF" }));
     }));
@@ -14518,7 +14518,7 @@ const ApprovedVendorsTab = ({ apps, user, load }) => {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {approvedApps.map(app => (
-          <div key={app.id} style={{ background: T.surface, border: `1px solid ${app.status === "login-created" ? T.teal+"50" : T.amber+"50"}", borderLeft: `3px solid ${app.status === "login-created" ? T.teal : T.amber}", borderRadius: 10, padding: "16px 18px" }}>
+          <div key={app.id} style={{ background: T.surface, border: `1px solid ${app.status === "login-created" ? T.teal+"50" : T.amber+"50"}`, borderLeft: `3px solid ${app.status === "login-created" ? T.teal : T.amber}`, borderRadius: 10, padding: "16px 18px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
                 <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>{app.vendor_name}</div>
@@ -15133,7 +15133,7 @@ const VendorAssignmentView = ({ user, activeCountry = "All" }) => {
     setSaving(true);
     await supabase.from("rff_vendor_assignments").insert({ rff_id: rff.id, vendor_id: vendor.id, vendor_name: vendor.name, assigned_by: user.id });
     // Notify vendor
-    await supabase.from("notifications").insert({ user_id: vendor.id, title: "New RFF Assignment", message: `You have been assigned to RFF: "${rff.title}" for ${rff.event_name}. Please submit your quote.", type: "rff" });
+    await supabase.from("notifications").insert({ user_id: vendor.id, title: "New RFF Assignment", message: `You have been assigned to RFF: "${rff.title}" for ${rff.event_name}. Please submit your quote.`, type: "rff" });
     const { data: vendorProf } = await supabase.from("profiles").select("email,name").eq("id", vendor.id).single();
     if (vendorProf?.email) await sendEmail(vendorProf.email, `Request for Quote — ${rff.title}`, rffEmailHtml({ vendorName: vendor.name, rffTitle: rff.title || "Request for Quote", eventName: rff.event_name || "", deadline: rff.quote_deadline, category: rff.category || "", notes: rff.description || "" }));
     // Update RFF status to show vendors are being assigned
@@ -15616,8 +15616,8 @@ const OpportunitiesView = ({ user, onNavigate, activeCountry = "All" }) => {
       // Notify assigned sales team
       const { data: sales } = await supabase.from("profiles").select("id, email, name").eq("role", "Sales & Marketing");
       for (const s of sales || []) {
-        await supabase.from("notifications").insert({ user_id: s.id, title: `Follow-up Scheduled — ${company}`, message: `${actForm.type} scheduled on ${actForm.scheduled_date}${actForm.scheduled_time ? " at " + actForm.scheduled_time : ""} for ${company}", type: "crm" });
-        if (s.email) await sendEmail(s.email, `Follow-up Scheduled — ${company}`, notifEmailHtml({ name: s.name, title: `${actForm.type} Scheduled`, message: `A <strong>${actForm.type}</strong> has been scheduled for <strong>${company}</strong> on <strong>${actForm.scheduled_date}${actForm.scheduled_time ? " at " + actForm.scheduled_time : ""}</strong>.<br><br><em>${actForm.content}</em>", actionUrl: BASE_URL, actionLabel: "View in WorkRoom" }));
+        await supabase.from("notifications").insert({ user_id: s.id, title: `Follow-up Scheduled — ${company}`, message: `${actForm.type} scheduled on ${actForm.scheduled_date}${actForm.scheduled_time ? " at " + actForm.scheduled_time : ""} for ${company}`, type: "crm" });
+        if (s.email) await sendEmail(s.email, `Follow-up Scheduled — ${company}`, notifEmailHtml({ name: s.name, title: `${actForm.type} Scheduled`, message: `A <strong>${actForm.type}</strong> has been scheduled for <strong>${company}</strong> on <strong>${actForm.scheduled_date}${actForm.scheduled_time ? " at " + actForm.scheduled_time : ""}</strong>.<br><br><em>${actForm.content}</em>`, actionUrl: BASE_URL, actionLabel: "View in WorkRoom" }));
       }
     }
     setActForm({ type: "note", content: "", scheduled_date: "", scheduled_time: "" });
@@ -15869,7 +15869,7 @@ const OpportunitiesView = ({ user, onNavigate, activeCountry = "All" }) => {
                       {canManage && (
                         <div style={{ display: "flex", gap: 6 }}>
                           <button onClick={() => setEditModal({ ...o })} style={{ background: T.cyan + "15", border: `1px solid ${T.cyan}30`, color: T.cyan, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>Edit</button>
-                          <button onClick={() => { const isOpen = expandedOpp === o.id; setExpandedOpp(isOpen ? null : o.id); if (!isOpen) loadActivities(o.id); }} style={{ background: expandedOpp === o.id ? "#8B5CF620" : T.surface, border: `1px solid ${expandedOpp === o.id ? "#8B5CF6" : T.border}", color: expandedOpp === o.id ? "#8B5CF6" : T.textMuted, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>
+                          <button onClick={() => { const isOpen = expandedOpp === o.id; setExpandedOpp(isOpen ? null : o.id); if (!isOpen) loadActivities(o.id); }} style={{ background: expandedOpp === o.id ? "#8B5CF620" : T.surface, border: `1px solid ${expandedOpp === o.id ? "#8B5CF6" : T.border}`, color: expandedOpp === o.id ? "#8B5CF6" : T.textMuted, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>
                              {(oppActivities[o.id]||[]).length > 0 ? oppActivities[o.id].length : "Notes"}
                           </button>
                           {o.status !== "Converted" && (
@@ -15905,7 +15905,7 @@ const OpportunitiesView = ({ user, onNavigate, activeCountry = "All" }) => {
                             <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "12px 14px", marginBottom: 12 }}>
                               <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
                                 {["note","call","meeting","email","demo","follow-up"].map(t => (
-                                  <button key={t} onClick={() => setActForm(f => ({...f, type: t}))} style={{ padding: "3px 10px", borderRadius: 20, border: `1px solid ${actForm.type === t ? "#8B5CF6" : T.border}", background: actForm.type === t ? "#8B5CF620" : "none", color: actForm.type === t ? "#8B5CF6" : T.textMuted, fontSize: 10, fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>{t}</button>
+                                  <button key={t} onClick={() => setActForm(f => ({...f, type: t}))} style={{ padding: "3px 10px", borderRadius: 20, border: `1px solid ${actForm.type === t ? "#8B5CF6" : T.border}`, background: actForm.type === t ? "#8B5CF620" : "none", color: actForm.type === t ? "#8B5CF6" : T.textMuted, fontSize: 10, fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>{t}</button>
                                 ))}
                               </div>
                               <textarea value={actForm.content} onChange={e => setActForm(f => ({...f, content: e.target.value}))} placeholder={`Add ${actForm.type}...`} rows={2} style={{ width: "100%", padding: "8px 10px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, color: T.textPrimary, fontSize: 12, fontFamily: "inherit", outline: "none", resize: "none", boxSizing: "border-box", marginBottom: 6 }} />
@@ -16194,7 +16194,7 @@ const VendorsView = ({ user, activeCountry = "All" }) => {
     }).eq('id', resubmitModal.id);
     // Notify CEO
     const { data: ceos } = await supabase.from('profiles').select('id').in('role', ['CEO', 'Country Manager']);
-    if (ceos) await Promise.all(ceos.map(c => supabase.from('notifications').insert({ user_id: c.id, title: 'RFF Resubmitted', message: `RFF "${resubmitModal.title}" has been revised and resubmitted for approval.", type: 'rff' })));
+    if (ceos) await Promise.all(ceos.map(c => supabase.from('notifications').insert({ user_id: c.id, title: 'RFF Resubmitted', message: `RFF "${resubmitModal.title}" has been revised and resubmitted for approval.`, type: 'rff' })));
     setResubmitModal(null); setResubmitFile(null); setResubmitNotes('');
     setSaving(false); load();
   };
@@ -16236,7 +16236,7 @@ const VendorsView = ({ user, activeCountry = "All" }) => {
           <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 12 }}>Approved Vendors — Account Status</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
             {vendorApps.filter(a => ["approved","login-created"].includes(a.status)).map(app => (
-              <div key={app.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${app.status === "login-created" ? "#10B981" : T.amber}", borderRadius: 10, padding: "14px 16px" }}>
+              <div key={app.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${app.status === "login-created" ? "#10B981" : T.amber}`, borderRadius: 10, padding: "14px 16px" }}>
                 <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 2 }}>{app.vendor_name}</div>
                 <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 6 }}>{app.vendor_type} · {app.contact_person}</div>
                 <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 8 }}>{app.contact_email}</div>
@@ -16766,7 +16766,7 @@ const EventClientPortalPanel = ({ event, client, user, onClose }) => {
               const isTeam = m.sender_role !== "Client";
               return (
                 <div key={m.id} style={{ display: "flex", flexDirection: "column", alignItems: isTeam ? "flex-end" : "flex-start" }}>
-                  <div style={{ maxWidth: "80%", background: isTeam ? T.teal+"18" : T.bg, border: `1px solid ${isTeam ? T.teal+"30" : T.border}", borderRadius: isTeam ? "12px 12px 2px 12px" : "12px 12px 12px 2px", padding: "10px 14px" }}>
+                  <div style={{ maxWidth: "80%", background: isTeam ? T.teal+"18" : T.bg, border: `1px solid ${isTeam ? T.teal+"30" : T.border}`, borderRadius: isTeam ? "12px 12px 2px 12px" : "12px 12px 12px 2px", padding: "10px 14px" }}>
                     <div style={{ color: T.textPrimary, fontSize: 13, lineHeight: 1.5 }}>{m.message}</div>
                   </div>
                   <div style={{ color: T.textMuted, fontSize: 10, marginTop: 3 }}>{m.sender_name} · {new Date(m.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
@@ -18348,7 +18348,7 @@ const CEOClientFinanceView = ({ user, activeCountry = "All" }) => {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginBottom: 20 }}>
             {[
               { label: "Agreed Budget", value: agreedBudget > 0 ? `${getCurrency(activeCountry||user?.country||"Ghana")} ${(agreedBudget.toLocaleString())}` : "Not set", color: T.cyan },
-              { label: "Total Recorded Spend", value: `${getCurrency(activeCountry||user?.country||"Ghana")} ${(totalSpent.toLocaleString())}", color: T.amber },
+              { label: "Total Recorded Spend", value: `${getCurrency(activeCountry||user?.country||"Ghana")} ${(totalSpent.toLocaleString())}`, color: T.amber },
               { label: "Utilisation", value: agreedBudget > 0 ? spentPct + "%" : "—", color: spentPct > 90 ? T.red : T.teal },
             ].map((k, i) => (
               <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
@@ -21082,7 +21082,7 @@ const CEOBroadcastView = ({ user }) => {
               <textarea value={form.message} onChange={e=>setForm(f=>({...f,message:e.target.value}))} rows={5} placeholder="Your message to the team..." style={{ width:"100%", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", resize:"none", boxSizing:"border-box" }} /></div>
             </div>
             <div style={{ display:"flex", gap:10, marginTop:20 }}>
-              <button onClick={handleSend} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${priorityColors[form.priority]},${form.priority==="urgent"?"#F97316":form.priority==="important"?"#F59E0B":T.teal})", border:"none", color:form.priority==="normal"?"#060B14":"#fff", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Sending...":" Send Broadcast"}</button>
+              <button onClick={handleSend} disabled={saving} style={{ flex:1, background:`linear-gradient(135deg,${priorityColors[form.priority]},${form.priority==="urgent"?"#F97316":form.priority==="important"?"#F59E0B":T.teal})", border:"none`, color:form.priority==="normal"?"#060B14":"#fff", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{saving?"Sending...":" Send Broadcast"}</button>
               <button onClick={()=>setModal(false)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer" }}>Cancel</button>
             </div>
           </div>
@@ -23361,7 +23361,7 @@ const EventMilestonesView = ({ user }) => {
           const isOverdue = m.due_date && new Date(m.due_date) < new Date() && m.status === "pending";
           const daysLeft = m.due_date ? Math.ceil((new Date(m.due_date)-new Date())/86400000) : null;
           return (
-            <div key={m.id} style={{ background:T.surface, border:`1px solid ${isOverdue?T.red+"30":T.border}`, borderLeft:`3px solid ${m.status==="completed"?T.teal:isOverdue?T.red:color}", borderRadius:10, padding:"14px 18px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <div key={m.id} style={{ background:T.surface, border:`1px solid ${isOverdue?T.red+"30":T.border}`, borderLeft:`3px solid ${m.status==="completed"?T.teal:isOverdue?T.red:color}", borderRadius:10, padding:"14px 18px`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
               <div style={{ flex:1 }}>
                 <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:4 }}>
                   <div style={{ color:m.status==="completed"?T.textMuted:T.textPrimary, fontWeight:700, fontSize:13, textDecoration:m.status==="completed"?"line-through":"none" }}>{m.title}</div>
@@ -25482,7 +25482,7 @@ const EventsView = ({ user, userRole, activeCountry = "All" }) => {
                   const newNames = strategyLeads.filter(l => newIds.includes(l.id)).map(l => l.name).join(", ");
                   await supabase.from("projects").update({ assigned_to: newIds[0] || null, assigned_to_name: newNames || null, assigned_to_ids: newIds }).eq("id", assignModal.id);
                   if (!isAssigned) {
-                    await supabase.from("notifications").insert({ user_id: sl.id, title: "Event Assigned to You", message: `CEO assigned you to "${assignModal.name}". Check your Events tab.", type: "task" });
+                    await supabase.from("notifications").insert({ user_id: sl.id, title: "Event Assigned to You", message: `CEO assigned you to "${assignModal.name}". Check your Events tab.`, type: "task" });
                     if (sl.email) await sendEmail(sl.email, `Event Assigned — ${assignModal.name}`, notifEmailHtml({ name: sl.name, title: "Event Assigned to You", message: `CEO has assigned you as Strategy Lead for <strong>${assignModal.name}</strong>. Please log in to view the event details.`, actionUrl: "https://workroom.stretchfield.com", actionLabel: "View Event" }));
                   }
                   setAssignModal(prev => ({...prev, assigned_to: newIds[0] || null, assigned_to_ids: newIds, assigned_to_name: newNames}));
@@ -25607,7 +25607,7 @@ const EventsView = ({ user, userRole, activeCountry = "All" }) => {
           <Input label="Event Name" placeholder="e.g. Brand Campaign" value={form.name} onChange={v => setForm({ ...form, name: v })} />
           <div style={{ marginBottom: 14 }}>
             <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>Event Category *</div>
-            <select value={form.event_category} onChange={e => setForm({...form, event_category: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${form.event_category ? T.border : "#F59E0B"}", borderRadius: 8, color: form.event_category ? T.textPrimary : T.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+            <select value={form.event_category} onChange={e => setForm({...form, event_category: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${form.event_category ? T.border : "#F59E0B"}`, borderRadius: 8, color: form.event_category ? T.textPrimary : T.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
               <option value="">Select event category...</option>
               <option value="Conference/Seminar">Conference / Seminar</option>
               <option value="Product Launch">Product Launch</option>

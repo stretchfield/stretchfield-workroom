@@ -23948,28 +23948,37 @@ const ClientDashboard = ({ user }) => {
   const [savingSat, setSavingSat] = useState(false);
 
   useEffect(() => {
-    const load = async () => {
+     const load = async () => {
       setLoading(true);
-      const { data: clientData } = await supabase.from("clients").select("id").eq("email", user.email).single();
-      if (clientData) {
+      try {
+        const { data: clientData } = await supabase.from("clients").select("id").eq("email", user?.email).single();
+        if (!clientData) { setLoading(false); return; }
         setClientId(clientData.id);
-        const [ev, dc, mg, ms, ai, sat, rp] = await Promise.all([
-          supabase.from("projects").select("*").eq("client_id", clientData.id).order("event_date", { ascending: true }),
-          supabase.from("event_documents").select("*").eq("is_internal", false).eq("shared_with_client", true).order("created_at", { ascending: false }),
+        // Load events first to get IDs
+        const { data: evData } = await supabase.from("projects").select("*").eq("client_id", clientData.id).order("event_date", { ascending: true });
+        const eventIds = (evData||[]).map(e => e.id);
+        setEvents(evData || []);
+        // Load rest in parallel
+        const [mg, ms, ai, sat, rp, pay] = await Promise.all([
           supabase.from("client_messages").select("*").eq("client_id", clientData.id).order("created_at", { ascending: false }),
-          supabase.from("client_milestones").select("*").in("project_id", ev.data?.map(e=>e.id)||[]).order("created_at", { ascending: false }),
+          eventIds.length > 0 ? supabase.from("client_milestones").select("*").in("project_id", eventIds).order("created_at", { ascending: false }) : Promise.resolve({ data: [] }),
           supabase.from("client_action_items").select("*").eq("client_id", clientData.id).order("due_date", { ascending: true }),
           supabase.from("client_satisfaction").select("*").eq("client_id", clientData.id).order("submitted_at", { ascending: false }),
           supabase.from("event_intelligence_reports").select("*"),
+          supabase.from("client_payments").select("*").eq("client_id", clientData.id).order("payment_date",{ascending:false}),
         ]);
-        setEvents(ev.data || []);
-        setDocuments(dc.data || []);
         setMessages(mg.data || []);
         setMilestones(ms.data || []);
         setActionItems(ai.data || []);
         setSatisfaction(sat.data || []);
         setReports(rp.data || []);
-      }
+        setPayments(pay.data || []);
+        // Docs — only client-shared, scoped to their events
+        if (eventIds.length > 0) {
+          const { data: dcData } = await supabase.from("event_documents").select("*").in("project_id", eventIds).eq("shared_with_client", true).order("created_at", { ascending: false });
+          setDocuments(dcData || []);
+        }
+      } catch(err) { console.error("Client load error:", err); }
       setLoading(false);
     };
     load();

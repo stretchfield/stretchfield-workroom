@@ -16656,6 +16656,8 @@ const EventClientPortalPanel = ({ event, client, user, onClose }) => {
                       ))}
                     </div>
                   </div>
+                  {/* Comment thread */}
+                  <TaskCommentThread taskId={t.id} user={user} />
                 </div>
               );
             })}
@@ -17227,6 +17229,62 @@ const EventDebriefSection = ({ event, user }) => {
   );
 };
 
+
+const TaskCommentThread = ({ taskId, user }) => {
+  const [comments, setComments] = React.useState([]);
+  const [text, setText] = React.useState('');
+  const [open, setOpen] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!open) return;
+    supabase.from('task_comments').select('*').eq('task_id', taskId).order('created_at', { ascending: true })
+      .then(({ data }) => setComments(data || []));
+  }, [taskId, open]);
+
+  const submit = async () => {
+    if (!text.trim()) return;
+    setSaving(true);
+    await supabase.from('task_comments').insert({
+      task_id: taskId,
+      content: text.trim(),
+      author_id: user?.id,
+      author_name: user?.name,
+    });
+    setText('');
+    const { data } = await supabase.from('task_comments').select('*').eq('task_id', taskId).order('created_at', { ascending: true });
+    setComments(data || []);
+    setSaving(false);
+  };
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <button onClick={() => setOpen(!open)} style={{ background: 'none', border: 'none', color: T.textMuted, fontSize: 11, cursor: 'pointer', padding: 0, fontWeight: 700 }}>
+        {open ? '▲ Hide' : `▼ Comments${comments.length > 0 ? ` (${comments.length})` : ''}`}
+      </button>
+      {open && (
+        <div style={{ marginTop: 8 }}>
+          {comments.length === 0 && <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 6 }}>No comments yet.</div>}
+          {comments.map(c => (
+            <div key={c.id} style={{ background: T.bg, borderRadius: 8, padding: '8px 10px', marginBottom: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                <span style={{ color: T.cyan, fontSize: 11, fontWeight: 700 }}>{c.author_name || 'Unknown'}</span>
+                <span style={{ color: T.textMuted, fontSize: 10 }}>{new Date(c.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+              <div style={{ color: T.textPrimary, fontSize: 12 }}>{c.content}</div>
+            </div>
+          ))}
+          <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+            <input value={text} onChange={e => setText(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
+              placeholder="Add a comment..." style={{ flex: 1, padding: '7px 10px', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 12, fontFamily: 'inherit', outline: 'none' }} />
+            <button onClick={submit} disabled={saving} style={{ background: `linear-gradient(135deg,${T.cyan},${T.teal})`, border: 'none', color: '#fff', padding: '7px 14px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 12 }}>{saving ? '...' : 'Post'}</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
   const [activeSection, setActiveSection] = useState("overview");
   const [tasks, setTasks] = useState([]);
@@ -17309,7 +17367,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
           name: taskForm.name, project_id: event.id,
           deadline: taskForm.deadline || null, status: "pending",
           assignee_id: aid, assignee_name: assignee?.name || "",
-          assigned_by: user?.id, notes: taskForm.notes || null,
+          assigned_by: user?.id, notes: taskForm.notes || null, priority: taskForm.priority || 'Medium',
           assignee_ids: assigneeIds,
         });
         await supabase.from("notifications").insert({ user_id: aid, title: "New Task — " + event.name, message: taskForm.name, type: "task" });
@@ -17552,7 +17610,10 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
                 <div key={t.id} style={{ background: T.surface, border: "1px solid " + T.border, borderLeft: "3px solid " + color, borderRadius: 10, padding: "12px 16px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                     <div style={{ flex: 1 }}>
-                      <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{t.name}</div>
+                      <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                        <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{t.name}</div>
+                        {t.priority && <span style={{ background: t.priority==='Critical'?T.red+'20':t.priority==='High'?T.amber+'20':t.priority==='Medium'?T.cyan+'20':'#10B98120', color: t.priority==='Critical'?T.red:t.priority==='High'?T.amber:t.priority==='Medium'?T.cyan:'#10B981', borderRadius:20, padding:"1px 8px", fontSize:9, fontWeight:800 }}>{t.priority}</span>}
+                      </div>
                       {t.assignee_name && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Assigned to: {t.assignee_name}</div>}
                       {t.deadline && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Due: {new Date(t.deadline).toLocaleDateString("en-GB")}</div>}
                       {t.notes && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4, fontStyle: "italic" }}>{t.notes}</div>}
@@ -17563,6 +17624,8 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
                       ))}
                     </div>
                   </div>
+                  {/* Comment thread */}
+                  <TaskCommentThread taskId={t.id} user={user} />
                 </div>
               );
             })}
@@ -25388,13 +25451,19 @@ const EventsView = ({ user, userRole, activeCountry = "All" }) => {
                   {p.deadline && <div style={{ color: T.textMuted, fontSize: 11 }}>Due {p.deadline}</div>}
                 </div>
 
-                {/* Progress bar — calculated from tasks */}
+                {/* Progress bar — weighted by priority × status */}
                 {(() => {
+                  const priorityWeight = { Critical: 4, High: 3, Medium: 2, Low: 1 };
+                  const statusPct = { pending: 0, 'in-progress': 50, completed: 100, done: 100 };
                   const eventTasks = tasks.filter(t => t.project_id === p.id || t.event_id === p.id);
                   const totalTasks = eventTasks.length;
-                  const completedTasks = eventTasks.filter(t => t.status === 'completed' || t.status === 'done' || t.progress === 100).length;
-                  const inProgressPct = totalTasks > 0 ? eventTasks.reduce((sum, t) => sum + (parseInt(t.progress)||0), 0) / totalTasks : (p.completion || 0);
-                  const taskCompletion = totalTasks > 0 ? Math.round(inProgressPct) : (p.completion || 0);
+                  const completedTasks = eventTasks.filter(t => t.status === 'completed' || t.status === 'done').length;
+                  let taskCompletion = 0;
+                  if (totalTasks > 0) {
+                    const totalWeight = eventTasks.reduce((s, t) => s + (priorityWeight[t.priority] || 2), 0);
+                    const earnedWeight = eventTasks.reduce((s, t) => s + (priorityWeight[t.priority] || 2) * ((statusPct[t.status] || 0) / 100), 0);
+                    taskCompletion = totalWeight > 0 ? Math.round((earnedWeight / totalWeight) * 100) : 0;
+                  }
                   return (
                     <div>
                       <div style={{ height: 4, background: T.border + "44", borderRadius: 2, marginBottom: 6 }}>

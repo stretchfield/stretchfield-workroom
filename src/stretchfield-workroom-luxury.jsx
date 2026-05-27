@@ -8104,9 +8104,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
               <div style={{ background:T.cyan+"15", border:"1px solid "+T.cyan+"30", borderRadius:20, padding:"4px 12px" }}>
                 <span style={{ color:T.cyan, fontSize:11, fontWeight:800 }}>{currentUser.country === "Nigeria" ? "🇳🇬" : "🇬🇭"} {currentUser.country}</span>
               </div>
-            ) : (
-              
-            )}
+            ) : null}
           </div>
 
           {/* Tagline — positioned safely left of controls */}

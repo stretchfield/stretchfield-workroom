@@ -3757,16 +3757,7 @@ const VendorTasksView = ({ user }) => {
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 4 }}>{detailTask.name}</div>
           <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 16 }}>Due {detailTask.deadline}</div>
 
-          {/* Progress */}
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Progress: {detailTask.progress || 0}%</div>
-            <input type="range" min="0" max="100" value={detailTask.progress || 0}
-              onChange={e => setDetailTask({ ...detailTask, progress: parseInt(e.target.value) })}
-              style={{ width: '100%', accentColor: T.cyan }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: T.textMuted, fontSize: 11, marginTop: 4 }}>
-              <span>0%</span><span>50%</span><span>100%</span>
-            </div>
-          </div>
+
 
           {/* Status */}
           <Select label="Status" options={[
@@ -4608,12 +4599,7 @@ const SMTasksView = ({ user }) => {
       {detailTask && (
         <Modal title="Update Task" onClose={() => setDetailTask(null)}>
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 12 }}>{detailTask.name}</div>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Progress: {detailTask.progress || 0}%</div>
-            <input type="range" min="0" max="100" value={detailTask.progress || 0}
-              onChange={e => setDetailTask({ ...detailTask, progress: parseInt(e.target.value) })}
-              style={{ width: "100%", accentColor: T.cyan }} />
-          </div>
+
           <Select label="Status" options={[
             { value: "pending", label: "Pending" },
             { value: "in-progress", label: "In Progress" },
@@ -5359,7 +5345,17 @@ const StrategyMapView = ({ user }) => {
               </div>
               <div style={{ textAlign: "right" }}>
                 <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 4 }}>Completion</div>
-                <div style={{ color: archetype?.color || T.cyan, fontWeight: 900, fontSize: 24 }}>{selectedEvent.completion || 0}%</div>
+                <div style={{ color: archetype?.color || T.cyan, fontWeight: 900, fontSize: 24 }}>
+                  {(() => {
+                    const priorityWeight = { Critical: 4, High: 3, Medium: 2, Low: 1 };
+                    const statusPct = { pending: 0, 'in-progress': 50, completed: 100, done: 100 };
+                    const eTasks = allTasks ? allTasks.filter(t => t.project_id === selectedEvent.id) : [];
+                    if (eTasks.length === 0) return (selectedEvent.completion || 0) + '%';
+                    const totalW = eTasks.reduce((s,t) => s+(priorityWeight[t.priority]||2), 0);
+                    const earnedW = eTasks.reduce((s,t) => s+(priorityWeight[t.priority]||2)*((statusPct[t.status]||0)/100), 0);
+                    return Math.round((earnedW/totalW)*100) + '%';
+                  })()}
+                </div>
               </div>
             </div>
           </div>
@@ -8026,11 +8022,11 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
 
               // Group item with children
               const isGroupActive = item.children && item.children.some(c => c.id === activeTab);
-              const [groupOpen, setGroupOpen] = React.useState(true);
+              const groupOpen = openGroups[item.id] !== false; // default open
 
               return (
                 <div key={item.id} style={{ marginBottom: 2 }}>
-                  <button onClick={() => setGroupOpen(o => !o)} style={{
+                  <button onClick={() => setOpenGroups(g => ({...g, [item.id]: !groupOpen}))} style={{
                     width: "100%", display: "flex", alignItems: "center", gap: 8,
                     padding: "8px 10px", borderRadius: 6, border: "none", cursor: "pointer",
                     background: isGroupActive ? T.cyan+"10" : "none",
@@ -25513,11 +25509,11 @@ const EventsView = ({ user, userRole, activeCountry = "All" }) => {
                   </div>
                 )}
 
-                {/* Assign Opportunity + Impact buttons — CEO only */}
-                {user?.role === "CEO" && (
+                {/* Assign Event + Impact buttons — CEO and CM */}
+                {(user?.role === "CEO" || user?.role === "Country Manager") && (
                   <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
                     <button onClick={e => { e.stopPropagation(); setAssignModal(p); }} style={{ flex: 1, padding: "6px 10px", background: T.amber+"15", border: `1px solid ${T.amber}30`, borderRadius: 6, cursor: "pointer", color: T.amber, fontSize: 11, fontWeight: 700 }}>
-                       {p.assigned_to_name ? p.assigned_to_name.split(" ")[0] : "Assign Opportunity"}
+                       {p.assigned_to_name ? p.assigned_to_name.split(" ")[0] : "Assign Event"}
                     </button>
                     <button onClick={e => { e.stopPropagation(); setInternalPortalEvent(p); }} style={{ flex: 1, padding: "6px 10px", background: T.cyan+"15", border: `1px solid ${T.cyan}30`, borderRadius: 6, cursor: "pointer", color: T.cyan, fontSize: 11, fontWeight: 700 }}>Open</button>
                     {p.event_category && (

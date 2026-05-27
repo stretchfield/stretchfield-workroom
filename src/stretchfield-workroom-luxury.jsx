@@ -8039,7 +8039,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
                     {!sidebarCollapsed && (
                       <>
                         <span style={{ flex: 1 }}>{item.label}</span>
-                        <span style={{ fontSize: 9, transition: "transform 0.2s", transform: groupOpen ? "rotate(180deg)" : "rotate(0deg)", opacity: 0.5 }}></span>
+                        <span style={{ fontSize: 11, transition: "transform 0.2s", transform: groupOpen ? "rotate(90deg)" : "rotate(0deg)", opacity: 0.7, fontWeight: 700 }}>›</span>
                       </>
                     )}
                     {sidebarCollapsed && <span style={{ fontSize: 9 }}></span>}
@@ -8109,8 +8109,8 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
             )}
           </div>
 
-          {/* Centre — tagline */}
-          <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", pointerEvents: "none", textAlign: "center", maxWidth: "calc(100% - 480px)" }}>
+          {/* Tagline — positioned safely left of controls */}
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", overflow: "hidden", padding: "0 20px" }}>
             <span style={{
               fontFamily: "'Cormorant Garamond', Georgia, serif",
               fontStyle: "italic",
@@ -25671,12 +25671,7 @@ const EventsView = ({ user, userRole, activeCountry = "All" }) => {
             { value: 'completed', label: 'Completed' },
             { value: 'on-hold', label: 'On Hold' },
           ]} value={editForm.status} onChange={v => setEditForm({ ...editForm, status: v })} />
-          <div style={{ marginBottom: 12 }}>
-            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 6 }}>Completion: {editForm.completion}%</label>
-            <input type="range" min="0" max="100" value={editForm.completion}
-              onChange={e => setEditForm({ ...editForm, completion: e.target.value })}
-              style={{ width: "100%", accentColor: T.cyan }} />
-          </div>
+
           <div style={{ marginBottom: 12 }}>
             <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 6 }}>Assign Strategy & Events Lead</label>
             <select value={editForm.assigned_to||""} onChange={e => { const sl = strategyLeads.find(s => s.id === e.target.value); setEditForm({...editForm, assigned_to: e.target.value, assigned_to_name: sl?.name || ''}); }} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>

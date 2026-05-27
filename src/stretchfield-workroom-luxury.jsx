@@ -3844,7 +3844,7 @@ const LeadCard = ({ lead, selectedLead, setSelectedLead, activities, onReactivat
         {lead.status === "won" && !lead.approved && <span style={{ background: T.amber+"20", color: T.amber, fontSize: 9, fontWeight: 800, borderRadius: 20, padding: "2px 7px", flexShrink: 0, marginLeft: 6 }}>CEO</span>}
         {lead.status === "won" && lead.approved && <span style={{ background: "#10B98120", color: "#10B981", fontSize: 9, fontWeight: 800, borderRadius: 20, padding: "2px 7px", flexShrink: 0, marginLeft: 6 }}></span>}
       </div>
-      <div style={{ color: T.amber, fontWeight: 900, fontSize: 15, marginBottom: 8 }}>{getCurrency(user?.country||"Ghana")+" "+((lead.value||0).toLocaleString()).toLocaleString()}</div>
+      <div style={{ color: T.amber, fontWeight: 900, fontSize: 15, marginBottom: 8 }}>{getCurrency(lead?.country||"Ghana")+" "+((lead.value||0).toLocaleString()).toLocaleString()}</div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <span style={{ color: T.textMuted, fontSize: 10 }}>{daysSince}d</span>

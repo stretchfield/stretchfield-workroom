@@ -13268,7 +13268,7 @@ const QuoteComparisonView = ({ user, activeCountry = "All" }) => {
                           <div style={{ height: "100%", width: `${pct}%`, background: `linear-gradient(90deg, ${barColor}, ${barColor}99)`, borderRadius: 4, transition: "width 0.4s ease", border: isSelected ? `2px solid ${T.amber}` : "none", boxSizing: "border-box" }} />
                         </div>
                         <div style={{ width: 130, flexShrink: 0 }}>
-                          <div style={{ color: barColor, fontSize: 12, fontWeight: 700 }}>{getCurrency(user?.country||activeCountry||"Ghana")+" "+((a.quote_amount || 0).toLocaleString()).toLocaleString()}</div>
+                          <div style={{ color: barColor, fontSize: 12, fontWeight: 700 }}>{getCurrency(selectedRff?.country||activeCountry||"Ghana")+" "+((a.quote_amount || 0).toLocaleString()).toLocaleString()}</div>
                           {variancePct !== null && (
                             <div style={{ color: parseFloat(variancePct) <= 0 ? T.teal : T.red, fontSize: 10, fontWeight: 700 }}>
                               {parseFloat(variancePct) <= 0 ? ` ${Math.abs(variancePct)}% under` : ` ${variancePct}% over`}
@@ -13319,14 +13319,14 @@ const QuoteComparisonView = ({ user, activeCountry = "All" }) => {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 20, flexWrap: "wrap" }}>
                   <div>
                     <div style={{ color: T.textPrimary, fontWeight: 900, fontSize: 18 }}>{a.vendor_name}</div>
-                    <div style={{ color: T.amber, fontWeight: 900, fontSize: 22, marginTop: 4 }}>{getCurrency(user?.country||activeCountry||"Ghana")+" "+(a.quote_amount.toLocaleString()).toLocaleString()}</div>
+                    <div style={{ color: T.amber, fontWeight: 900, fontSize: 22, marginTop: 4 }}>{getCurrency(selectedRff?.country||activeCountry||"Ghana")+" "+(a.quote_amount.toLocaleString()).toLocaleString()}</div>
                     <div style={{ color: isOver ? T.red : T.teal, fontWeight: 700, fontSize: 13, marginTop: 4 }}>
-                      {isOver ? ` GHS ${Math.abs(diff).toLocaleString()} over budget (${pct}%)` : ` GHS ${Math.abs(diff).toLocaleString()} under budget (${Math.abs(pct)}%)`}
+                      {isOver ? ` ${getCurrency(selectedRff?.country||activeCountry||"Ghana")} ${Math.abs(diff).toLocaleString()} over budget (${pct}%)` : ` ${getCurrency(selectedRff?.country||activeCountry||"Ghana")} ${Math.abs(diff).toLocaleString()} under budget (${Math.abs(pct)}%)`}
                     </div>
                   </div>
                   <div style={{ background: T.bg, borderRadius: 10, padding: "14px 18px", minWidth: 160 }}>
                     <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>Proposed Budget</div>
-                    <div style={{ color: T.cyan, fontWeight: 900, fontSize: 20 }}>{getCurrency(user?.country||activeCountry||"Ghana")+" "+(activeBudget.toLocaleString()).toLocaleString()}</div>
+                    <div style={{ color: T.cyan, fontWeight: 900, fontSize: 20 }}>{getCurrency(selectedRff?.country||activeCountry||"Ghana")+" "+(activeBudget.toLocaleString()).toLocaleString()}</div>
                   </div>
                 </div>
                 {s && (

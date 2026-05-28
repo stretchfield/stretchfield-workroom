@@ -11464,7 +11464,7 @@ const ContractAwardApprovalView = ({ user, activeCountry = "All" }) => {
           await supabase.from("notifications").insert({
             user_id: fm.id,
             title: "Invoice Auto-Created — " + award.vendor_name,
-            message: award.vendor_name + "'s approved quote has been automatically submitted as invoice " + invNum + " for GHS " + parseFloat(assignment.quote_amount).toLocaleString() + ". Go to Vendor Invoices to review.",
+            message: award.vendor_name + "'s approved quote has been automatically submitted as invoice " + invNum + " for " + getCurrency(award.country||activeCountry||"Ghana") + " " + parseFloat(assignment.quote_amount).toLocaleString() + ". Go to Vendor Invoices to review.",
             type: "finance",
           });
         }
@@ -11543,8 +11543,8 @@ const ContractAwardApprovalView = ({ user, activeCountry = "All" }) => {
                   <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{award.vendor_name}</div>
                   <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{rff?.title} · {rff?.event_name}</div>
                   <div style={{ display: "flex", gap: 16, marginTop: 6 }}>
-                    <span style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>Quote: GHS {(award.quoted_amount || 0).toLocaleString()}</span>
-                    {totalBudget > 0 && <span style={{ color: T.cyan, fontSize: 13 }}>Budget: GHS {totalBudget.toLocaleString()}</span>}
+                    <span style={{ color: T.amber, fontWeight: 700, fontSize: 13 }}>Quote: {getCurrency(award.country||activeCountry||"Ghana")} {(award.quoted_amount || 0).toLocaleString()}</span>
+                    {totalBudget > 0 && <span style={{ color: T.cyan, fontSize: 13 }}>Budget: {getCurrency(award.country||activeCountry||"Ghana")} {totalBudget.toLocaleString()}</span>}
                   </div>
                   {award.vendor_manager_notes && <div style={{ color: T.textMuted, fontSize: 12, marginTop: 6, fontStyle: "italic" }}>VM Notes: {award.vendor_manager_notes}</div>}
                 </div>

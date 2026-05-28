@@ -1775,30 +1775,6 @@ const VendorManagerDashboard = ({ user, activeCountry = "All" }) => {
               <input value={bankForm.bank_account_number} onChange={e=>setBankForm(f=>({...f,bank_account_number:e.target.value}))} placeholder="Account number" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:"1px solid "+T.border, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
               <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Mobile Money Number</label>
               <input value={bankForm.mobile_money_number} onChange={e=>setBankForm(f=>({...f,mobile_money_number:e.target.value}))} placeholder="e.g. 0244000000" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:"1px solid "+T.border, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
-              {/* Presence */}
-              <div>
-                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Country Presence</label>
-                <select value={bankForm.presence||"GH"} onChange={e=>setBankForm(f=>({...f,presence:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:"1px solid "+T.border, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
-                  <option value="GH">🇬🇭 Ghana Only</option>
-                  <option value="NG">🇳🇬 Nigeria Only</option>
-                  <option value="GH+NG">🇬🇭 Ghana + 🇳🇬 Nigeria</option>
-                  <option value="GH+NG+KE">🇬🇭 Ghana + 🇳🇬 Nigeria + 🇰🇪 Kenya</option>
-                </select>
-              </div>
-              {/* Nigeria bank details */}
-              {(bankForm.presence||"GH").includes("NG") && (
-                <div style={{ background:T.bg, borderRadius:10, padding:"12px 14px", border:"1px solid #10B98130" }}>
-                  <div style={{ color:"#10B981", fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:10 }}>🇳🇬 Nigeria Bank Details (NGN)</div>
-                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-                    {[["Bank Name (NG)","bank_name_ng","e.g. GTBank"],["Branch (NG)","bank_branch_ng","e.g. Lagos"],["Account Name (NG)","bank_account_name_ng","Name on account"],["Account Number (NG)","bank_account_number_ng","Account number"]].map(([label,key,ph]) => (
-                      <div key={key}>
-                        <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>{label}</label>
-                        <input value={bankForm[key]||""} onChange={e=>setBankForm(f=>({...f,[key]:e.target.value}))} placeholder={ph} style={{ width:"100%", padding:"9px 12px", background:T.surface, border:"1px solid "+T.border, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
               <button onClick={saveVMBankDetails} disabled={savingBank} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{savingBank?"Saving...":"Save Bank Details"}</button>
             </div>
           )}
@@ -14090,6 +14066,7 @@ const VendorApprovalsPanel = ({ user, onLoginCreated }) => {
   const [declineModal, setDeclineModal] = useState(null);
   const [ceoNotes, setCeoNotes] = useState("");
   const [password, setPassword] = useState("");
+  const [vendorPresence, setVendorPresence] = useState("GH");
   const [saving, setSaving] = useState(false);
   const [createdCreds, setCreatedCreds] = useState(null);
 
@@ -14326,6 +14303,15 @@ const VendorApprovalsPanel = ({ user, onLoginCreated }) => {
             </div>
             {password && <div style={{ color: T.teal, fontSize: 11, marginBottom: 16 }}> Password will be emailed to vendor on login creation</div>}
             {!password && <div style={{ color: T.amber, fontSize: 11, marginBottom: 16 }}>Click Generate to auto-create from vendor email</div>}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Country Presence</label>
+              <select value={vendorPresence} onChange={e => setVendorPresence(e.target.value)} style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                <option value="GH">🇬🇭 Ghana Only</option>
+                <option value="NG">🇳🇬 Nigeria Only</option>
+                <option value="GH+NG">🇬🇭 Ghana + 🇳🇬 Nigeria</option>
+                <option value="GH+NG+KE">🇬🇭 Ghana + 🇳🇬 Nigeria + 🇰🇪 Kenya</option>
+              </select>
+            </div>
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={handleCreateLogin} disabled={saving} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Creating..." : "Create Login"}</button>
               <button onClick={() => setLoginModal(null)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>

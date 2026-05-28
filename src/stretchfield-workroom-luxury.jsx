@@ -13773,7 +13773,7 @@ const RFFApprovalsView = ({ user, activeCountry = "All" }) => {
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: "10px 14px", color: total > 0 ? T.teal : T.textMuted, fontWeight: 700, fontSize: 13 }}>{total > 0 ? `${getCurrency(user?.country||activeCountry||"Ghana")} ${(total.toLocaleString())}` : "—"}</td>
+                      <td style={{ padding: "10px 14px", color: total > 0 ? T.teal : T.textMuted, fontWeight: 700, fontSize: 13 }}>{total > 0 ? `${getCurrency(rff.country||activeCountry||"Ghana")} ${(total.toLocaleString())}` : "—"}</td>
                       <td style={{ padding: "10px 14px" }}>
                         <button onClick={() => {
                           const existing = existingBudgets.filter(b => b.rff_id === rff.id);

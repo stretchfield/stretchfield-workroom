@@ -14486,6 +14486,7 @@ const ApprovedVendorsTab = ({ apps, user, load }) => {
         company_name: editForm.vendor_name,
         phone: editForm.phone,
         service_category: editForm.vendor_type,
+        presence: editForm.presence || "GH",
         email: editForm.contact_email,
       }).eq("id", profile.id);
     }
@@ -14599,6 +14600,16 @@ const ApprovedVendorsTab = ({ apps, user, load }) => {
                 <select value={editForm.vendor_type||""} onChange={e=>setEditForm(f=>({...f,vendor_type:e.target.value}))}
                   style={{ width:"100%", padding:"8px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
                   {VTYPES.map(t => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>Country Presence</div>
+                <select value={editForm.presence||"GH"} onChange={e=>setEditForm(f=>({...f,presence:e.target.value}))}
+                  style={{ width:"100%", padding:"8px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  <option value="GH">🇬🇭 Ghana Only</option>
+                  <option value="NG">🇳🇬 Nigeria Only</option>
+                  <option value="GH+NG">🇬🇭 Ghana + 🇳🇬 Nigeria</option>
+                  <option value="GH+NG+KE">🇬🇭 Ghana + 🇳🇬 Nigeria + 🇰🇪 Kenya</option>
                 </select>
               </div>
             </div>

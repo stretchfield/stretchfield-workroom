@@ -13357,7 +13357,7 @@ const QuoteComparisonView = ({ user, activeCountry = "All" }) => {
                   <div style={{ color: T.textSecondary, fontSize: 12, lineHeight: 1.6 }}>
                     {isOver
                       ? `${a.vendor_name} has quoted GHS ${Math.abs(diff).toLocaleString()} above the proposed budget. Consider negotiating the price down or reviewing the budget allocation before proceeding.`
-                      : `${a.vendor_name}'s quote is within budget with GHS ${Math.abs(diff).toLocaleString()} to spare. ${s?.isNewVendor ? "Note: This is a new vendor with no prior Stretchfield history." : "Vendor has prior engagement history."} You may proceed or invite more quotes for comparison.`}
+                      : `${a.vendor_name}'s quote is within budget with ${getCurrency(selectedRff?.country||activeCountry||"Ghana")} ${Math.abs(diff).toLocaleString()} to spare. ${s?.isNewVendor ? "Note: This is a new vendor with no prior Stretchfield history." : "Vendor has prior engagement history."} You may proceed or invite more quotes for comparison.`}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 10, marginTop: 14 }}>

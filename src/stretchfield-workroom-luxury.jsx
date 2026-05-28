@@ -1068,7 +1068,7 @@ const getNavItems = (role, user) => {
   if (!["Vendor","Client","Strategy & Events Lead"].includes(role)) {
     base.push({ id: "feedback", label: "Feedback", icon: "" });
   }
-  if (role !== "Client") base.push({ id: "calendar", label: "Calendar", icon: "" });
+  if (!["Client","Vendor"].includes(role)) base.push({ id: "calendar", label: "Calendar", icon: "" });
   base.push({ id: "notifications", label: "Notifications", icon: "" });
   return base;
 };

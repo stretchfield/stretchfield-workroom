@@ -12293,7 +12293,7 @@ const PurchaseOrderView = ({ user, activeCountry = "All" }) => {
                       </td>
                       <td style={{ padding:"10px 14px", color:T.textPrimary, fontSize:12, fontWeight:600 }}>{po.vendor_name}</td>
                       <td style={{ padding:"10px 14px", color:T.textSecondary, fontSize:12 }}>{po.event_name}</td>
-                      <td style={{ padding:"10px 14px", color:T.amber, fontSize:12, fontWeight:700 }}>{po.currency||(user?.country==="Nigeria"?"NGN":"GHS")} {(po.amount||0).toLocaleString()}</td>
+                      <td style={{ padding:"10px 14px", color:T.amber, fontSize:12, fontWeight:700 }}>{po.currency||(po.country==="Nigeria"?"NGN":activeCountry==="Nigeria"?"NGN":"GHS")} {(po.amount||0).toLocaleString()}</td>
                       <td style={{ padding:"10px 14px" }}><span style={{ color:po.zoho_po_id?T.teal:T.textMuted, fontSize:11 }}>{po.zoho_po_id?" Zoho":"Local"}</span></td>
                       <td style={{ padding:"10px 14px" }}>
                         <span style={{ background:(statusColors[po.status]||T.textMuted)+"18", color:statusColors[po.status]||T.textMuted, borderRadius:20, padding:"2px 10px", fontSize:10, fontWeight:700, textTransform:"uppercase" }}>{po.status}</span>

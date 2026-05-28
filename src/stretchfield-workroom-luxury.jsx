@@ -11397,7 +11397,7 @@ const ContractAwardApprovalView = ({ user, activeCountry = "All" }) => {
   const load = async () => {
     const awQuery = (!activeCountry || activeCountry === "All") ? supabase.from("rff_awards").select("*").order("created_at", { ascending: false }) : supabase.from("rff_awards").select("*").eq("country", activeCountry).order("created_at", { ascending: false });
     const { data: aw } = await awQuery;
-    const rfQuery = supabase.from("rffs").select("*").eq("country", activeCountry);
+    const rfQuery = (!activeCountry || activeCountry === "All") ? supabase.from("rffs").select("*") : supabase.from("rffs").select("*").eq("country", activeCountry);
     const { data: rf } = await rfQuery;
     const { data: bud } = await supabase.from("rff_budgets").select("*");
     setAwards(aw || []);
@@ -11456,6 +11456,7 @@ const ContractAwardApprovalView = ({ user, activeCountry = "All" }) => {
           invoice_filename: assignment.quote_notes || "Quote document",
           invoice_number: invNum,
           status: "submitted",
+          country: award.country || "Ghana",
           notes: "Auto-generated from approved quote — no revision requested",
           created_at: new Date().toISOString(),
         });

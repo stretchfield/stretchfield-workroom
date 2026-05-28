@@ -11705,7 +11705,7 @@ const generatePOPDF = (po, vendor, rff, event) => {
   .terms-box { background: #F4F6FB; border-left: 4px solid #00C8FF; border-radius: 0 8px 8px 0; padding: 14px 18px; margin-bottom: 28px; }
   .terms-box .label { font-size: 10px; font-weight: 700; color: #5A6E8A; text-transform: uppercase; margin-bottom: 6px; }
   .terms-box .value { font-size: 13px; color: #0A1628; line-height: 1.6; }
-  .signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 40px; }
+  .signatures { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 20px; margin-top: 40px; }
   .sig-box { padding-top: 10px; }
   .sig-box .name { font-size: 12px; font-weight: 700; color: #0A1628; margin-top: 4px; }
   .sig-box .role { font-size: 10px; color: #5A6E8A; }
@@ -11728,7 +11728,7 @@ const generatePOPDF = (po, vendor, rff, event) => {
       <div class="tagline">We don't plan events. We engineer impact.</div>
       <div class="contact">
         info@stretchfield.com · www.stretchfield.com<br>
-        Accra, Ghana
+        ${po.country === "Nigeria" ? "Lagos, Nigeria" : "Accra, Ghana"}
       </div>
     </div>
     <div class="po-title">
@@ -11823,6 +11823,16 @@ const generatePOPDF = (po, vendor, rff, event) => {
       <div class="role">Authorised by · Stretchfield</div>
       ${po.ceo_signed_at ? '<div style="font-size:9px;color:#5A6E8A;margin-top:2px;">' + new Date(po.ceo_signed_at).toLocaleDateString("en-GB") + '</div>' : ''}
     </div>
+    ${po.country === "Nigeria" ? `
+    <div class="sig-box">
+      <div style="height:52px;display:flex;align-items:flex-end;padding-bottom:4px;">
+        ${po.cm_signature ? '<img src="' + po.cm_signature + '" style="height:48px;max-width:160px;object-fit:contain;" />' : ''}
+      </div>
+      <div style="border-bottom:1px solid #C2C9DC;margin-bottom:5px;"></div>
+      <div class="name">Country Manager — Nigeria</div>
+      <div class="role">Confirmed by</div>
+      ${po.cm_signed_at ? '<div style="font-size:9px;color:#5A6E8A;margin-top:2px;">' + new Date(po.cm_signed_at).toLocaleDateString("en-GB") + '</div>' : ''}
+    </div>` : ''}
   </div>
 
   <!-- Footer -->
@@ -12151,14 +12161,24 @@ const PurchaseOrderView = ({ user, activeCountry = "All" }) => {
       updates.vm_signed_by = user.id;
       const ceoSigned = po.ceo_signed_at;
       const financeSigned = po.finance_signed_at || updates.finance_signed_at;
-      updates.status = (ceoSigned && financeSigned) ? "fully_signed" : "vm_signed";
+      const cmSigned = po.cm_signed_at || (po.country !== "Nigeria");
+      updates.status = (ceoSigned && financeSigned && cmSigned) ? "fully_signed" : "vm_signed";
     } else if (role === "ceo") {
       updates.ceo_signature = sigData;
       updates.ceo_signed_at = now;
       updates.ceo_signed_by = user.id;
       const vmSigned = po.vm_signed_at;
       const financeSigned = po.finance_signed_at;
-      updates.status = (vmSigned && financeSigned) ? "fully_signed" : "ceo_signed";
+      const cmSigned = po.cm_signed_at || (po.country !== "Nigeria");
+      updates.status = (vmSigned && financeSigned && cmSigned) ? "fully_signed" : "ceo_signed";
+    } else if (role === "cm") {
+      updates.cm_signature = sigData;
+      updates.cm_signed_at = now;
+      updates.cm_signed_by = user.id;
+      const vmSigned = po.vm_signed_at;
+      const financeSigned = po.finance_signed_at;
+      const ceoSigned = po.ceo_signed_at;
+      updates.status = (vmSigned && financeSigned && ceoSigned) ? "fully_signed" : "cm_signed";
     }
 
     await supabase.from("purchase_orders").update(updates).eq("id", po.id);
@@ -12319,6 +12339,12 @@ const PurchaseOrderView = ({ user, activeCountry = "All" }) => {
                                 <span style={{ width:8, height:8, borderRadius:"50%", background: po.ceo_signed_at ? T.teal : T.amber, display:"inline-block" }} />
                                 <span style={{ color: po.ceo_signed_at ? T.teal : T.amber, fontSize:10, fontWeight:700 }}>CEO {po.ceo_signed_at ? "" : "Pending"}</span>
                               </div>
+                              {po.country === "Nigeria" && (
+                                <div style={{ display:"flex", gap:4, alignItems:"center" }}>
+                                  <span style={{ width:8, height:8, borderRadius:"50%", background: po.cm_signed_at ? T.teal : T.amber, display:"inline-block" }} />
+                                  <span style={{ color: po.cm_signed_at ? T.teal : T.amber, fontSize:10, fontWeight:700 }}>CM Nigeria {po.cm_signed_at ? "" : "Pending"}</span>
+                                </div>
+                              )}
                             </div>
                           )}
                           {po.status === "fully_signed" && ["CEO","Finance Manager"].includes(user.role) && <button onClick={() => publishPO(po)} style={{ background:"linear-gradient(135deg,"+T.teal+",#10B981)", border:"none", color:"#fff", padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}>↑ Publish</button>}
@@ -12328,8 +12354,12 @@ const PurchaseOrderView = ({ user, activeCountry = "All" }) => {
                             <button onClick={() => setSigningPO({ po, role:"vm" })} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#fff", padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}> Sign</button>
                           )}
                           {/* CEO Sign button */}
-                          {["pending_signatures","vm_signed"].includes(po.status) && user.role === "CEO" && !po.ceo_signed_at && (
+                          {["pending_signatures","vm_signed","cm_signed"].includes(po.status) && user.role === "CEO" && !po.ceo_signed_at && (
                             <button onClick={() => setSigningPO({ po, role:"ceo" })} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#fff", padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}> Sign</button>
+                          )}
+                          {/* CM Nigeria Sign button */}
+                          {["pending_signatures","vm_signed","ceo_signed"].includes(po.status) && user.role === "Country Manager" && po.country === "Nigeria" && !po.cm_signed_at && (
+                            <button onClick={() => setSigningPO({ po, role:"cm" })} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#fff", padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}> Sign</button>
                           )}
                           {["draft","pending_signatures","vm_signed","ceo_signed","fully_signed"].includes(po.status) && po.status !== "sent" && user.role === "Finance Manager" && (
                             <button onClick={() => deletePO(po)} style={{ background:T.red+"15", border:"1px solid "+T.red+"30", color:T.red, padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}></button>

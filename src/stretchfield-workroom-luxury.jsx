@@ -13034,7 +13034,7 @@ const QuoteComparisonView = ({ user, activeCountry = "All" }) => {
       await supabase.from("notifications").insert({
         user_id: ceo.id,
         title: "Contract Award Pending Approval",
-        message: `${user.name} has nominated ${awardModal.vendor_name} for "${rff?.title}". Agreed Amount: GHS ${finalAmount?.toLocaleString()}${finalAmount !== awardModal.quote_amount ? ` (Original: GHS ${awardModal.quote_amount?.toLocaleString()})` : ""}. Please review.`,
+        message: `${user.name} has nominated ${awardModal.vendor_name} for "${rff?.title}". Agreed Amount: ${getCurrency(selectedRff?.country||activeCountry||"Ghana")} ${finalAmount?.toLocaleString()}${finalAmount !== awardModal.quote_amount ? ` (Original: ${getCurrency(selectedRff?.country||activeCountry||"Ghana")} ${awardModal.quote_amount?.toLocaleString()})` : ""}. Please review.`,
         type: "rff",
       });
     }
@@ -13172,7 +13172,7 @@ const QuoteComparisonView = ({ user, activeCountry = "All" }) => {
               });
               return (
                 <option key={cat} value={cat}>
-                  {cat}{catVendors.length > 0 ? " — " + catVendors.length + " vendor" + (catVendors.length !== 1 ? "s" : "") : " — no quotes yet"}{budgetLine ? " (GHS " + (budgetLine.proposed_amount||0).toLocaleString() + ")" : ""}
+                  {cat}{catVendors.length > 0 ? " — " + catVendors.length + " vendor" + (catVendors.length !== 1 ? "s" : "") : " — no quotes yet"}{budgetLine ? " (" + getCurrency(selectedRff?.country||activeCountry||"Ghana") + " " + (budgetLine.proposed_amount||0).toLocaleString() + ")" : ""}
                 </option>
               );
             })}
@@ -13185,10 +13185,10 @@ const QuoteComparisonView = ({ user, activeCountry = "All" }) => {
           {/* Budget vs Quotes KPI */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 12, marginBottom: 24 }}>
             {[
-              { label: selectedCategory === "all" ? "Total Budget" : selectedCategory.split(" ").slice(0,2).join(" ") + " Budget", value: activeBudget > 0 ? `${getCurrency(user?.country||activeCountry||"Ghana")} ${(activeBudget.toLocaleString())}` : "Not set", color: activeBudget > 0 ? T.cyan : T.textMuted },
+              { label: selectedCategory === "all" ? "Total Budget" : selectedCategory.split(" ").slice(0,2).join(" ") + " Budget", value: activeBudget > 0 ? `${getCurrency(selectedRff?.country||activeCountry||"Ghana")} ${(activeBudget.toLocaleString())}` : "Not set", color: activeBudget > 0 ? T.cyan : T.textMuted },
               { label: "Quotes Received", value: filteredAssignments.length, color: T.teal },
-              { label: "Lowest Quote", value: filteredAssignments.length > 0 ? `${getCurrency(user?.country||activeCountry||"Ghana")} ${(Math.min(...filteredAssignments.map(a => a.quote_amount)).toLocaleString())}` : "—", color: "#10B981" },
-              { label: "Highest Quote", value: filteredAssignments.length > 0 ? `${getCurrency(user?.country||activeCountry||"Ghana")} ${(Math.max(...filteredAssignments.map(a => a.quote_amount)).toLocaleString())}` : "—", color: T.amber },
+              { label: "Lowest Quote", value: filteredAssignments.length > 0 ? `${getCurrency(selectedRff?.country||activeCountry||"Ghana")} ${(Math.min(...filteredAssignments.map(a => a.quote_amount)).toLocaleString())}` : "—", color: "#10B981" },
+              { label: "Highest Quote", value: filteredAssignments.length > 0 ? `${getCurrency(selectedRff?.country||activeCountry||"Ghana")} ${(Math.max(...filteredAssignments.map(a => a.quote_amount)).toLocaleString())}` : "—", color: T.amber },
             ].map((k, i) => (
               <div key={i} style={{ padding: "14px 16px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
                 <div style={{ color: k.color, fontSize: 18, fontWeight: 900 }}>{k.value}</div>
@@ -13205,7 +13205,7 @@ const QuoteComparisonView = ({ user, activeCountry = "All" }) => {
                 {budgets.map(b => (
                   <div key={b.id} style={{ background: T.bg, borderRadius: 8, padding: "10px 14px", border: `1px solid ${T.border}` }}>
                     <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{b.category}</div>
-                    <div style={{ color: T.cyan, fontWeight: 900, fontSize: 16, marginTop: 4 }}>{getCurrency(user?.country||activeCountry||"Ghana")+" "+((b.proposed_amount || 0).toLocaleString()).toLocaleString()}</div>
+                    <div style={{ color: T.cyan, fontWeight: 900, fontSize: 16, marginTop: 4 }}>{getCurrency(selectedRff?.country||activeCountry||"Ghana")+" "+((b.proposed_amount || 0).toLocaleString()).toLocaleString()}</div>
                     {b.notes && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{b.notes}</div>}
                   </div>
                 ))}
@@ -13225,7 +13225,7 @@ const QuoteComparisonView = ({ user, activeCountry = "All" }) => {
                     <div style={{ flex: 1, height: 28, background: T.border + "44", borderRadius: 4, overflow: "hidden", position: "relative" }}>
                       <div style={{ height: "100%", width: "100%", background: `linear-gradient(90deg, ${T.cyan}40, ${T.cyan}20)`, borderRadius: 4, border: `2px dashed ${T.cyan}`, boxSizing: "border-box" }} />
                     </div>
-                    <div style={{ width: 120, color: T.cyan, fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{getCurrency(user?.country||activeCountry||"Ghana")+" "+(activeBudget.toLocaleString()).toLocaleString()}</div>
+                    <div style={{ width: 120, color: T.cyan, fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{getCurrency(selectedRff?.country||activeCountry||"Ghana")+" "+(activeBudget.toLocaleString()).toLocaleString()}</div>
                   </div>
                 )}
                 {/* Group by vendor category */}

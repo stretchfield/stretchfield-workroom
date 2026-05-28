@@ -1759,7 +1759,7 @@ const VendorManagerDashboard = ({ user, activeCountry = "All" }) => {
                   : "Add your bank details for payment processing."}
               </div>
             </div>
-            <button onClick={() => setShowBankForm(!showBankForm)} style={{ background:`linear-gradient(135deg,${T.amber},#F59E0B)`, border:"none", color:"#060B14", padding:"8px 18px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13, flexShrink:0, marginLeft:16 }}>{showBankForm?"Close": profile?.bank_name ? "Edit" : "Add Bank Details"}</button>
+            <button onClick={() => setShowBankForm(!showBankForm)} style={{ background:`linear-gradient(135deg,${T.amber},#F59E0B)`, border:"none", color:"#060B14", padding:"8px 18px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13, flexShrink:0, marginLeft:16 }}>{showBankForm?"Close": bankForm.bank_name ? "Edit" : "Add Bank Details"}</button>
           </div>
           {showBankForm && (
             <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:10 }}>

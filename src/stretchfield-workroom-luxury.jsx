@@ -13590,22 +13590,22 @@ const QuoteComparisonView = ({ user, activeCountry = "All" }) => {
             <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 20 }}>Nominate {awardModal.vendor_name} for this RFF</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 12, marginBottom: 16, background: T.bg, borderRadius: 8, padding: "12px 14px" }}>
               <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Vendor</div><div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13, marginTop: 3 }}>{awardModal.vendor_name}</div></div>
-              <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Original Quote</div><div style={{ color: "#10B981", fontWeight: 900, fontSize: 16, marginTop: 3 }}>{getCurrency(user?.country||activeCountry||"Ghana")+" "+((awardModal.quote_amount || 0).toLocaleString()).toLocaleString()}</div></div>
-              <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Proposed Budget</div><div style={{ color: T.cyan, fontWeight: 700, fontSize: 13, marginTop: 3 }}>{getCurrency(user?.country||activeCountry||"Ghana")+" "+((activeBudget || totalBudget).toLocaleString()).toLocaleString()}</div></div>
-              <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Variance</div><div style={{ color: (parseFloat(agreedAmount)||awardModal.quote_amount) <= (activeBudget||totalBudget) ? T.teal : T.red, fontWeight: 700, fontSize: 13, marginTop: 3 }}>{(parseFloat(agreedAmount)||awardModal.quote_amount) <= (activeBudget||totalBudget) ? " Within budget" : ` Over by GHS ${((parseFloat(agreedAmount)||awardModal.quote_amount) - (activeBudget||totalBudget)).toLocaleString()}`}</div></div>
+              <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Original Quote</div><div style={{ color: "#10B981", fontWeight: 900, fontSize: 16, marginTop: 3 }}>{getCurrency(selectedRff?.country||activeCountry||"Ghana")+" "+((awardModal.quote_amount || 0).toLocaleString()).toLocaleString()}</div></div>
+              <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Proposed Budget</div><div style={{ color: T.cyan, fontWeight: 700, fontSize: 13, marginTop: 3 }}>{getCurrency(selectedRff?.country||activeCountry||"Ghana")+" "+((activeBudget || totalBudget).toLocaleString()).toLocaleString()}</div></div>
+              <div><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Variance</div><div style={{ color: (parseFloat(agreedAmount)||awardModal.quote_amount) <= (activeBudget||totalBudget) ? T.teal : T.red, fontWeight: 700, fontSize: 13, marginTop: 3 }}>{(parseFloat(agreedAmount)||awardModal.quote_amount) <= (activeBudget||totalBudget) ? " Within budget" : ` Over by ${getCurrency(selectedRff?.country||activeCountry||"Ghana")} ${((parseFloat(agreedAmount)||awardModal.quote_amount) - (activeBudget||totalBudget)).toLocaleString()}`}</div></div>
             </div>
 
             {/* Agreed Amount — editable */}
             <div style={{ marginBottom: 16, background: T.amber+"10", border: `1px solid ${T.amber}30`, borderRadius: 8, padding: "12px 14px" }}>
-              <label style={{ color: T.amber, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Agreed Amount (${getCurrency(user?.country||activeCountry||"Ghana")}) — edit if negotiated</label>
+              <label style={{ color: T.amber, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Agreed Amount (${getCurrency(selectedRff?.country||activeCountry||"Ghana")}) — edit if negotiated</label>
               <input type="number" value={agreedAmount} onChange={e => setAgreedAmount(e.target.value)}
                 style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.amber}40`, borderRadius: 8, color: T.textPrimary, fontSize: 15, fontWeight: 700, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
                 placeholder={awardModal.quote_amount || "Enter agreed amount"} />
               {agreedAmount && parseFloat(agreedAmount) !== awardModal.quote_amount && (
                 <div style={{ color: T.amber, fontSize: 11, marginTop: 5, fontWeight: 600 }}>
                   {parseFloat(agreedAmount) < awardModal.quote_amount
-                    ? ` Negotiated down by GHS ${(awardModal.quote_amount - parseFloat(agreedAmount)).toLocaleString()}`
-                    : `↑ Increased by GHS ${(parseFloat(agreedAmount) - awardModal.quote_amount).toLocaleString()}`}
+                    ? ` Negotiated down by ${getCurrency(selectedRff?.country||activeCountry||"Ghana")} ${(awardModal.quote_amount - parseFloat(agreedAmount)).toLocaleString()}`
+                    : `↑ Increased by ${getCurrency(selectedRff?.country||activeCountry||"Ghana")} ${(parseFloat(agreedAmount) - awardModal.quote_amount).toLocaleString()}`}
                 </div>
               )}
             </div>

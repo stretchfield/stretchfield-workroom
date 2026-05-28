@@ -11472,7 +11472,7 @@ const ContractAwardApprovalView = ({ user, activeCountry = "All" }) => {
         await supabase.from("notifications").insert({
           user_id: award.vendor_id,
           title: "Quote Accepted as Invoice",
-          message: "Your quote of GHS " + parseFloat(assignment.quote_amount).toLocaleString() + " has been approved and automatically submitted as your invoice " + invNum + ". Finance will process payment shortly.",
+          message: "Your quote of " + getCurrency(award.country||activeCountry||"Ghana") + " " + parseFloat(assignment.quote_amount).toLocaleString() + " has been approved and automatically submitted as your invoice " + invNum + ". Finance will process payment shortly.",
           type: "finance",
         });
         // Notify VM
@@ -13027,6 +13027,8 @@ const QuoteComparisonView = ({ user, activeCountry = "All" }) => {
       vendor_manager_notes: awardNotes,
       status: "pending_ceo",
       awarded_by: user.id,
+      country: rff?.country || activeCountry || "Ghana",
+      event_name: rff?.event_name || "",
     });
     // Notify CEO
     const { data: ceos } = await supabase.from("profiles").select("id").eq("role", "CEO");

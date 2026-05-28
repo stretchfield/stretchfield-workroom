@@ -1745,15 +1745,21 @@ const VendorManagerDashboard = ({ user, activeCountry = "All" }) => {
   return (
     <div style={{ animation: "fadeUp 0.35s ease" }}>
 
-      {/*  BANK DETAILS BANNER  */}
-      {bankRequested && !bankSubmitted && (
+      {/*  BANK DETAILS SECTION — always visible */}
+      {(true) && (
         <div style={{ background:`linear-gradient(135deg,${T.amber}15,${T.amber}05)`, border:`1px solid ${T.amber}40`, borderRadius:12, padding:"16px 20px", marginBottom:16 }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
             <div>
-              <div style={{ color:T.amber, fontWeight:800, fontSize:14, marginBottom:4 }}> Bank Details Required</div>
-              <div style={{ color:T.textMuted, fontSize:13 }}>Finance has requested your bank details for payment processing.</div>
+              <div style={{ color:T.amber, fontWeight:800, fontSize:14, marginBottom:4 }}>
+                {profile?.bank_name ? " Bank Details" : " Bank Details Required"}
+              </div>
+              <div style={{ color:T.textMuted, fontSize:13 }}>
+                {profile?.bank_name 
+                  ? `${profile.bank_name} · ${profile.bank_account_number} · Presence: ${profile.presence||"GH"}`
+                  : "Add your bank details for payment processing."}
+              </div>
             </div>
-            <button onClick={() => setShowBankForm(!showBankForm)} style={{ background:`linear-gradient(135deg,${T.amber},#F59E0B)`, border:"none", color:"#060B14", padding:"8px 18px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13, flexShrink:0, marginLeft:16 }}>{showBankForm?"Close":"Add Bank Details"}</button>
+            <button onClick={() => setShowBankForm(!showBankForm)} style={{ background:`linear-gradient(135deg,${T.amber},#F59E0B)`, border:"none", color:"#060B14", padding:"8px 18px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13, flexShrink:0, marginLeft:16 }}>{showBankForm?"Close": profile?.bank_name ? "Edit" : "Add Bank Details"}</button>
           </div>
           {showBankForm && (
             <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:10 }}>

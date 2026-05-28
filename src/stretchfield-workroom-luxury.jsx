@@ -11814,15 +11814,6 @@ const generatePOPDF = (po, vendor, rff, event) => {
       <div class="role">Prepared by</div>
       ${po.vm_signed_at ? '<div style="font-size:9px;color:#5A6E8A;margin-top:2px;">' + new Date(po.vm_signed_at).toLocaleDateString("en-GB") + '</div>' : ''}
     </div>
-    <div class="sig-box">
-      <div style="height:52px;display:flex;align-items:flex-end;padding-bottom:4px;">
-        ${po.ceo_signature ? '<img src="' + po.ceo_signature + '" style="height:48px;max-width:160px;object-fit:contain;" />' : ''}
-      </div>
-      <div style="border-bottom:1px solid #C2C9DC;margin-bottom:5px;"></div>
-      <div class="name">CEO</div>
-      <div class="role">Authorised by · Stretchfield</div>
-      ${po.ceo_signed_at ? '<div style="font-size:9px;color:#5A6E8A;margin-top:2px;">' + new Date(po.ceo_signed_at).toLocaleDateString("en-GB") + '</div>' : ''}
-    </div>
     ${po.country === "Nigeria" ? `
     <div class="sig-box">
       <div style="height:52px;display:flex;align-items:flex-end;padding-bottom:4px;">
@@ -11833,6 +11824,15 @@ const generatePOPDF = (po, vendor, rff, event) => {
       <div class="role">Confirmed by</div>
       ${po.cm_signed_at ? '<div style="font-size:9px;color:#5A6E8A;margin-top:2px;">' + new Date(po.cm_signed_at).toLocaleDateString("en-GB") + '</div>' : ''}
     </div>` : ''}
+    <div class="sig-box">
+      <div style="height:52px;display:flex;align-items:flex-end;padding-bottom:4px;">
+        ${po.ceo_signature ? '<img src="' + po.ceo_signature + '" style="height:48px;max-width:160px;object-fit:contain;" />' : ''}
+      </div>
+      <div style="border-bottom:1px solid #C2C9DC;margin-bottom:5px;"></div>
+      <div class="name">CEO</div>
+      <div class="role">Authorised by · Stretchfield</div>
+      ${po.ceo_signed_at ? '<div style="font-size:9px;color:#5A6E8A;margin-top:2px;">' + new Date(po.ceo_signed_at).toLocaleDateString("en-GB") + '</div>' : ''}
+    </div>
   </div>
 
   <!-- Footer -->

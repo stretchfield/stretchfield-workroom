@@ -7960,7 +7960,7 @@ export default function StretchfieldWorkRoom({ user: propUser, profile: propProf
       case "quote-comparison": return <QuoteComparisonView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "contract-awards": return <ContractAwardApprovalView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "gig-confirmation": return <GigConfirmationView user={currentUser} />;
-      case "purchase-orders": return <PurchaseOrderView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
+      case "purchase-orders": return <PurchaseOrderView user={currentUser} activeCountry={currentUser.role === "CEO" ? activeCountry : ["Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "po-signing": return <PurchaseOrderView user={currentUser} />;
       case "vendor-invoices": return <FinanceInvoicesView user={currentUser} activeCountry={["CEO","Finance Manager","Vendor Manager"].includes(currentUser.role) ? activeCountry : currentUser.country} />;
       case "vendor-invoices-submit": return <VendorInvoiceView user={currentUser} />;
@@ -12020,7 +12020,7 @@ const PurchaseOrderView = ({ user, activeCountry = "All" }) => {
   const load = async () => {
     const [{ data: aw }, { data: po }, { data: rf }, { data: ev }, { data: vp }, { data: va }] = await Promise.all([
       (!activeCountry || activeCountry === "All") ? supabase.from("rff_awards").select("*").in("status",["confirmed","po_created","invoiced","paid"]) : supabase.from("rff_awards").select("*").in("status",["confirmed","po_created","invoiced","paid"]).eq("country",activeCountry),
-      (!activeCountry || activeCountry === "All") ? supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }) : supabase.from("purchase_orders").select("*").eq("country", activeCountry).order("created_at", { ascending: false }),
+      (!activeCountry || activeCountry === "All") ? supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }) : supabase.from("purchase_orders").select("*").or(`country.eq.${activeCountry},status.eq.pending_signatures`).order("created_at", { ascending: false }),
       (!activeCountry || activeCountry === "All") ? supabase.from("rffs").select("*") : supabase.from("rffs").select("*").eq("country",activeCountry),
       (!activeCountry || activeCountry === "All") ? supabase.from("projects").select("*") : supabase.from("projects").select("*").eq("country",activeCountry),
       supabase.from("profiles").select("id,name,email,phone,company_name,service_category").eq("role","Vendor"),
@@ -12139,8 +12139,15 @@ const PurchaseOrderView = ({ user, activeCountry = "All" }) => {
     for (const ceo of ceos || []) {
       await supabase.from("notifications").insert({ user_id: ceo.id, title: "PO Signature Required — " + po.internal_po_number, message: "Finance has requested your signature on Purchase Order " + po.internal_po_number + " for " + (po.vendor_name||"vendor") + ".", type: "rff" });
     }
+    // Notify CM Nigeria if Nigeria PO
+    if (po.country === "Nigeria") {
+      const { data: cms } = await supabase.from("profiles").select("id,email,name").eq("role","Country Manager").eq("country","Nigeria");
+      for (const cm of cms || []) {
+        await supabase.from("notifications").insert({ user_id: cm.id, title: "PO Signature Required — " + po.internal_po_number, message: "Your signature is required on Purchase Order " + po.internal_po_number + " for " + (po.vendor_name||"vendor") + " — " + (po.event_name||"WHX Lagos") + ".", type: "rff" });
+      }
+    }
     load();
-    alert("PO sent to VM and CEO for signing.");
+    alert("PO sent to VM, CEO" + (po.country === "Nigeria" ? " and CM Nigeria" : "") + " for signing.");
   };
 
   const signPO = async (po, role) => {

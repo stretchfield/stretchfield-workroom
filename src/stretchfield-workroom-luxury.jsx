@@ -12437,6 +12437,12 @@ const PurchaseOrderView = ({ user, activeCountry = "All" }) => {
                 <button onClick={() => setSigData("")} style={{ background:"none", border:"none", color:T.textMuted, fontSize:11, cursor:"pointer" }}>Draw instead</button>
               </div>
             )}
+            {savedSig && !sigData && (
+              <button onClick={() => setSigData(savedSig)} style={{ width:"100%", background:T.teal+"15", border:"1px solid "+T.teal+"30", color:T.teal, padding:"8px", borderRadius:8, cursor:"pointer", fontWeight:700, fontSize:12, marginTop:4, marginBottom:4 }}>Use Saved Signature</button>
+            )}
+            {sigData && savedSig && sigData !== savedSig && (
+              <div style={{ color:T.teal, fontSize:11, marginTop:4 }}>Custom signature drawn</div>
+            )}
             <div style={{ display:"flex", gap:10, marginTop:8 }}>
               <button onClick={() => signPO(signingPO.po, signingPO.role)} disabled={!sigData} style={{ flex:1, background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#fff", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13, opacity:!sigData?0.5:1 }}>Confirm Signature</button>
               <button onClick={() => { setSigningPO(null); setSigData(""); }} style={{ background:"none", border:"1px solid "+T.border, color:T.textMuted, padding:"11px 16px", borderRadius:8, cursor:"pointer", fontSize:13 }}>Cancel</button>

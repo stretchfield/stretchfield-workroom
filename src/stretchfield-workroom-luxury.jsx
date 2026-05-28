@@ -13801,7 +13801,7 @@ const RFFApprovalsView = ({ user, activeCountry = "All" }) => {
 
             <div style={{ color: T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8, paddingBottom: 6, borderBottom: `1px solid ${T.cyan}30` }}>Budget Line Items</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 32px", gap: 8, marginBottom: 6 }}>
-              {["Category",`Proposed Amount (${getCurrency(user?.country||activeCountry||"Ghana")})`,"Notes",""].map((h,i) => (
+              {["Category",`Proposed Amount (${getCurrency(actionModal?.rff?.country||activeCountry||"Ghana")})`,"Notes",""].map((h,i) => (
                 <div key={i} style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</div>
               ))}
             </div>
@@ -13856,7 +13856,7 @@ const RFFApprovalsView = ({ user, activeCountry = "All" }) => {
                 <div style={{ color: T.cyan, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8, paddingBottom: 6, borderBottom: `1px solid ${T.cyan}30` }}>Proposed Budget Template</div>
                 <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 10 }}>Add budget line items for this RFF. These will be used to compare vendor quotes.</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 32px", gap: 8, marginBottom: 6 }}>
-                  {["Category",`Proposed Amount (${getCurrency(user?.country||activeCountry||"Ghana")})`,"Notes",""].map((h,i) => (
+                  {["Category",`Proposed Amount (${getCurrency(actionModal?.rff?.country||activeCountry||"Ghana")})`,"Notes",""].map((h,i) => (
                     <div key={i} style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{h}</div>
                   ))}
                 </div>

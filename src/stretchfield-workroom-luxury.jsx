@@ -15135,8 +15135,8 @@ const VendorAssignmentView = ({ user, activeCountry = "All" }) => {
   const load = async () => {
     const [r, e, v, a] = await Promise.all([
       (!activeCountry || activeCountry === "All") ? supabase.from("rffs").select("*").order("created_at", { ascending: false }) : supabase.from("rffs").select("*").eq("country", activeCountry).order("created_at", { ascending: false }),
-      supabase.from("projects").select("*").eq("country", activeCountry),
-      (!activeCountry || activeCountry === "All") ? supabase.from("profiles").select("*").eq("role", "Vendor") : supabase.from("profiles").select("*").eq("role", "Vendor").or(`country.eq.${activeCountry},presence.like.%${activeCountry}%`),
+      (!activeCountry || activeCountry === "All") ? supabase.from("projects").select("*") : supabase.from("projects").select("*").eq("country", activeCountry),
+      (!activeCountry || activeCountry === "All") ? supabase.from("profiles").select("*").eq("role", "Vendor") : supabase.from("profiles").select("*").eq("role", "Vendor").or(`country.eq.${activeCountry},presence.like.%${activeCountry === "Nigeria" ? "NG" : "GH"}%`),
       supabase.from("rff_vendor_assignments").select("*"),
     ]);
     setRffs(r.data || []);

@@ -1751,11 +1751,11 @@ const VendorManagerDashboard = ({ user, activeCountry = "All" }) => {
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
             <div>
               <div style={{ color:T.amber, fontWeight:800, fontSize:14, marginBottom:4 }}>
-                {profile?.bank_name ? " Bank Details" : " Bank Details Required"}
+                {bankForm.bank_name ? " Bank Details" : " Bank Details Required"}
               </div>
               <div style={{ color:T.textMuted, fontSize:13 }}>
-                {profile?.bank_name 
-                  ? `${profile.bank_name} · ${profile.bank_account_number} · Presence: ${profile.presence||"GH"}`
+                {bankForm.bank_name 
+                  ? `${bankForm.bank_name} · ${bankForm.bank_account_number} · Presence: ${bankForm.presence||"GH"}`
                   : "Add your bank details for payment processing."}
               </div>
             </div>

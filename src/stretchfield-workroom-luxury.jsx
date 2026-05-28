@@ -11565,9 +11565,9 @@ const ContractAwardApprovalView = ({ user, activeCountry = "All" }) => {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 12, background: T.bg, borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
               {[
                 ["Vendor", previewAward.vendor_name],
-                ["Quoted Amount", `${getCurrency(user?.country||activeCountry||"Ghana")} ${((previewAward.quoted_amount||0).toLocaleString())}`],
-                ["Proposed Budget", `${getCurrency(user?.country||activeCountry||"Ghana")} ${((previewAward.proposed_budget||0).toLocaleString())}`],
-                ["Variance", previewAward.quoted_amount <= (previewAward.proposed_budget||0) ? " Within budget" : ` Over by GHS ${((previewAward.quoted_amount||0)-(previewAward.proposed_budget||0)).toLocaleString()}`],
+                ["Quoted Amount", `${getCurrency(previewAward?.country||activeCountry||"Ghana")} ${((previewAward.quoted_amount||0).toLocaleString())}`],
+                ["Proposed Budget", `${getCurrency(previewAward?.country||activeCountry||"Ghana")} ${((previewAward.proposed_budget||0).toLocaleString())}`],
+                ["Variance", previewAward.quoted_amount <= (previewAward.proposed_budget||0) ? " Within budget" : ` Over by ${getCurrency(previewAward?.country||activeCountry||"Ghana")} ${((previewAward.quoted_amount||0)-(previewAward.proposed_budget||0)).toLocaleString()}`],
               ].map(([l,v]) => (
                 <div key={l}><div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{l}</div><div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600, marginTop: 3 }}>{v}</div></div>
               ))}

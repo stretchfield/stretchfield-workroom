@@ -7641,28 +7641,42 @@ const VendorTransactionsView = ({ user }) => {
   const [vouchers, setVouchers] = React.useState([]);
   const [pos, setPOs] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
+  const [profile, setProfile] = React.useState(null);
+  const isMultiCountry = profile?.presence && profile.presence.includes('+');
+  const defaultCountry = user?.country || 'Ghana';
+  const [selectedCountry, setSelectedCountry] = React.useState(defaultCountry);
 
   React.useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const [inv, pv, po] = await Promise.all([
+      const [inv, pv, po, pr] = await Promise.all([
         supabase.from("vendor_invoices").select("*").eq("vendor_id", user?.id).order("created_at", { ascending: false }),
         supabase.from("payment_vouchers").select("*").eq("payee", user?.name).order("created_at", { ascending: false }),
         supabase.from("purchase_orders").select("*").eq("vendor_id", user?.id).order("created_at", { ascending: false }),
+        supabase.from("profiles").select("presence,country").eq("id", user?.id).single(),
       ]);
       setInvoices(inv.data || []);
       setVouchers(pv.data || []);
       setPOs(po.data || []);
+      setProfile(pr.data || null);
       setLoading(false);
     };
     load();
   }, [user?.id]);
 
-  const totalInvoiced = invoices.reduce((s, i) => s + parseFloat(i.amount||0), 0);
-  const totalPaid = vouchers.filter(v => v.status === 'paid').reduce((s, v) => s + parseFloat(v.amount||0), 0);
-  const totalPending = vouchers.filter(v => ['pending_approval','approved'].includes(v.status)).reduce((s, v) => s + parseFloat(v.amount||0), 0);
+  const presenceCountries = profile?.presence ? 
+    profile.presence.split('+').map(c => c === 'GH' ? 'Ghana' : c === 'NG' ? 'Nigeria' : c === 'KE' ? 'Kenya' : c) : 
+    [defaultCountry];
+
+  const filteredInvoices = invoices.filter(i => !isMultiCountry || (i.country||'Ghana') === selectedCountry);
+  const filteredVouchers = vouchers.filter(v => !isMultiCountry || (v.country||'Ghana') === selectedCountry);
+  const filteredPOs = pos.filter(p => !isMultiCountry || (p.country||'Ghana') === selectedCountry);
+
+  const totalInvoiced = filteredInvoices.reduce((s, i) => s + parseFloat(i.amount||0), 0);
+  const totalPaid = filteredVouchers.filter(v => v.status === 'paid').reduce((s, v) => s + parseFloat(v.amount||0), 0);
+  const totalPending = filteredVouchers.filter(v => ['pending_approval','approved'].includes(v.status)).reduce((s, v) => s + parseFloat(v.amount||0), 0);
   const outstanding = totalInvoiced - totalPaid;
-  const currency = user?.country === 'Nigeria' ? 'NGN' : 'GHS';
+  const currency = selectedCountry === 'Nigeria' ? 'NGN' : 'GHS';
   const fmt = (amt) => currency + ' ' + parseFloat(amt||0).toLocaleString();
 
   if (loading) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'40vh' }}><div style={{ width:32, height:32, border:`3px solid ${T.border}`, borderTop:`3px solid ${T.cyan}`, borderRadius:'50%', animation:'spin 0.8s linear infinite' }} /></div>;
@@ -7670,9 +7684,21 @@ const VendorTransactionsView = ({ user }) => {
   return (
     <div style={{ animation:'fadeUp 0.35s ease' }}>
       <div style={{ marginBottom:24, paddingBottom:20, borderBottom:`1px solid ${T.border}` }}>
-        <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:'0.14em', textTransform:'uppercase', marginBottom:6 }}>Finance</div>
-        <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Financial Transactions</h2>
-        <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Your invoices, payments and outstanding balances</div>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+          <div>
+            <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, letterSpacing:'0.14em', textTransform:'uppercase', marginBottom:6 }}>Finance</div>
+            <h2 style={{ margin:0, color:T.textPrimary, fontSize:22, fontWeight:800 }}>Financial Transactions</h2>
+            <div style={{ color:T.textMuted, fontSize:12, marginTop:4 }}>Your invoices, payments and outstanding balances</div>
+          </div>
+          {isMultiCountry && (
+            <div>
+              <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:'uppercase', display:'block', marginBottom:4 }}>Country</label>
+              <select value={selectedCountry} onChange={e => setSelectedCountry(e.target.value)} style={{ padding:'8px 12px', background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:'inherit', outline:'none' }}>
+                {presenceCountries.map(c => <option key={c} value={c}>{c === 'Nigeria' ? '🇳🇬' : c === 'Ghana' ? '🇬🇭' : '🌍'} {c}</option>)}
+              </select>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -7693,7 +7719,7 @@ const VendorTransactionsView = ({ user }) => {
       {/* Invoices */}
       <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:20, marginBottom:20 }}>
         <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:14 }}>Invoices Submitted</div>
-        {invoices.length === 0 ? (
+        {filteredInvoices.length === 0 ? (
           <div style={{ color:T.textMuted, fontSize:13, textAlign:'center', padding:'20px 0' }}>No invoices submitted yet</div>
         ) : (
           <table style={{ width:'100%', borderCollapse:'collapse' }}>
@@ -7705,7 +7731,7 @@ const VendorTransactionsView = ({ user }) => {
               </tr>
             </thead>
             <tbody>
-              {invoices.map(inv => {
+              {filteredInvoices.map(inv => {
                 const statusColor = { submitted:T.amber, reviewed:T.cyan, approved:T.teal, paid:'#10B981', rejected:T.red }[inv.status] || T.textMuted;
                 return (
                   <tr key={inv.id} style={{ borderBottom:`1px solid ${T.border}44` }}>
@@ -7727,7 +7753,7 @@ const VendorTransactionsView = ({ user }) => {
       {/* Payments */}
       <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:20, marginBottom:20 }}>
         <div style={{ color:T.textPrimary, fontWeight:800, fontSize:15, marginBottom:14 }}>Payment History</div>
-        {vouchers.length === 0 ? (
+        {filteredVouchers.length === 0 ? (
           <div style={{ color:T.textMuted, fontSize:13, textAlign:'center', padding:'20px 0' }}>No payments processed yet</div>
         ) : (
           <table style={{ width:'100%', borderCollapse:'collapse' }}>
@@ -7739,7 +7765,7 @@ const VendorTransactionsView = ({ user }) => {
               </tr>
             </thead>
             <tbody>
-              {vouchers.map(v => {
+              {filteredVouchers.map(v => {
                 const sc = { paid:'#10B981', approved:T.teal, pending_approval:T.amber, rejected:T.red }[v.status] || T.textMuted;
                 return (
                   <tr key={v.id} style={{ borderBottom:`1px solid ${T.border}44` }}>
@@ -7773,7 +7799,7 @@ const VendorTransactionsView = ({ user }) => {
               </tr>
             </thead>
             <tbody>
-              {pos.map(po => {
+              {filteredPOs.map(po => {
                 const sc = { paid:'#10B981', sent:T.cyan, invoiced:T.amber, fully_signed:T.teal }[po.status] || T.textMuted;
                 return (
                   <tr key={po.id} style={{ borderBottom:`1px solid ${T.border}44` }}>
@@ -12505,7 +12531,7 @@ const VendorInvoiceView = ({ user }) => {
         <button onClick={() => setModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>+ Submit Invoice</button>
       </div>
 
-      {invoices.length === 0 ? (
+      {filteredInvoices.length === 0 ? (
         <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}></div>
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No invoices submitted</div>
@@ -12615,7 +12641,7 @@ const FinanceInvoicesView = ({ user, activeCountry = "All" }) => {
         <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{invoices.filter(i => i.status === "submitted").length} new invoices to review</div>
       </div>
       <div style={{ background: T.surface, border: "1px solid "+T.border, borderRadius: 12, overflow: "hidden" }}>
-        {invoices.length === 0 ? (
+        {filteredInvoices.length === 0 ? (
           <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>No invoices received yet.</div>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -15263,6 +15289,28 @@ const VendorAssignmentView = ({ user, activeCountry = "All" }) => {
                       <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}> Due {rff.deadline}</div>
                       {rff.quote_deadline && <div style={{ color: T.amber, fontSize: 11, fontWeight: 700, marginTop: 3 }}> Quote Deadline: {new Date(rff.quote_deadline).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</div>}
                       {rff.description && <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 4 }}>{rff.description}</div>}
+                      {/* Upload RFF doc if missing */}
+                      {!rff.document_url && (
+                        <label style={{ display:"inline-flex", alignItems:"center", gap:6, marginTop:8, background:T.amber+"15", border:`1px solid ${T.amber}30`, color:T.amber, padding:"5px 12px", borderRadius:8, cursor:"pointer", fontSize:11, fontWeight:700 }}>
+                           Upload RFF Document
+                          <input type="file" style={{ display:"none" }} accept=".pdf,.doc,.docx" onChange={async e => {
+                            const f = e.target.files?.[0];
+                            if (!f) return;
+                            const ext = f.name.split('.').pop();
+                            const fname = `rff_doc_${rff.id}.${ext}`;
+                            const { error: upErr } = await supabase.storage.from('rffs').upload(fname, f, { upsert: true });
+                            if (!upErr) {
+                              const { data: urlData } = supabase.storage.from('rffs').getPublicUrl(fname);
+                              await supabase.from('rffs').update({ document_url: urlData.publicUrl, document_name: f.name }).eq('id', rff.id);
+                              load();
+                              alert('RFF document uploaded. Vendors can now download it.');
+                            }
+                          }} />
+                        </label>
+                      )}
+                      {rff.document_url && (
+                        <a href={rff.document_url} target="_blank" rel="noreferrer" style={{ display:"inline-flex", alignItems:"center", gap:6, marginTop:8, background:T.cyan+"15", border:`1px solid ${T.cyan}30`, color:T.cyan, padding:"5px 12px", borderRadius:8, fontSize:11, fontWeight:700, textDecoration:"none" }}> View RFF Document</a>
+                      )}
                     </div>
 
                     {/* Summary badges */}
@@ -17873,7 +17921,7 @@ const InvoicesView = () => {
         ))}
       </div>
 
-      {invoices.length === 0 ? (
+      {filteredInvoices.length === 0 ? (
         <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}></div>
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No invoices yet</div>

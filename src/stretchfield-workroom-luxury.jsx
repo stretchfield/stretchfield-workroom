@@ -12230,7 +12230,7 @@ const PurchaseOrderView = ({ user, activeCountry = "All" }) => {
                     <div>
                       <div style={{ color:T.textPrimary, fontWeight:900, fontSize:16 }}>{award.vendor_name}</div>
                       <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{rff?.title} {event?.name ? "· "+event.name : ""}</div>
-                      <div style={{ color:T.amber, fontWeight:900, fontSize:18, marginTop:6 }}>{fmtMoney(amount||0, "Ghana")}</div>
+                      <div style={{ color:T.amber, fontWeight:900, fontSize:18, marginTop:6 }}>{fmtMoney(amount||0, award.country||activeCountry||"Ghana")}</div>
                       <div style={{ color:T.textMuted, fontSize:11, marginTop:2 }}>Approved quote — locked and non-editable</div>
                     </div>
                     <span style={{ color:T.cyan, fontSize:10, fontWeight:800, background:T.cyan+"15", padding:"3px 10px", borderRadius:20 }}>CONFIRMED</span>

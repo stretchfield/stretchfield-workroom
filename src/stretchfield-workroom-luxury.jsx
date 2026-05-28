@@ -11990,7 +11990,7 @@ const PurchaseOrderView = ({ user, activeCountry = "All" }) => {
   const [previewPO, setPreviewPO] = useState(null);
   const [notesModal, setNotesModal] = useState(null);
   const [editNotes, setEditNotes] = useState("");
-  const [poForm, setPoForm] = useState({ currency: "GHS", notes: "" });
+  const [poForm, setPoForm] = useState({ currency: activeCountry === "Nigeria" ? "NGN" : "GHS", notes: "" });
   const [signingPO, setSigningPO] = useState(null);
   const sigCanvas = React.useRef(null);
   const [sigDrawing, setSigDrawing] = useState(false);
@@ -12017,7 +12017,7 @@ const PurchaseOrderView = ({ user, activeCountry = "All" }) => {
     setRffs(rf || []);
     setEvents(ev || []);
     setVendorProfiles(vp || []);
-    setVendorApps(va.data || []);
+    setVendorApps(va || []);
   };
 
   useEffect(() => {
@@ -12027,7 +12027,7 @@ const PurchaseOrderView = ({ user, activeCountry = "All" }) => {
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "purchase_orders" }, () => load())
       .subscribe();
     return () => supabase.removeChannel(sub);
-  }, []);
+  }, [activeCountry]);
 
   const handleCreatePO = async (award) => {
     console.log("handleCreatePO called", award);
@@ -12545,7 +12545,7 @@ const VendorInvoiceView = ({ user }) => {
               <div>
                 <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{inv.event_name}</div>
                 {inv.invoice_number && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2, fontWeight: 600 }}>{inv.invoice_number}</div>}
-                <div style={{ color: T.amber, fontWeight: 700, fontSize: 13, marginTop: 3 }}>{getCurrency(user?.country||activeCountry||"Ghana")+" "+(parseFloat(inv.amount||0).toLocaleString()).toLocaleString()}</div>
+                <div style={{ color: T.amber, fontWeight: 700, fontSize: 13, marginTop: 3 }}>{getCurrency(user?.country||"Ghana")+" "+(parseFloat(inv.amount||0).toLocaleString()).toLocaleString()}</div>
                 <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Submitted {new Date(inv.created_at).toLocaleDateString("en-GB", {day:"numeric",month:"short",year:"numeric"})}</div>
                 {inv.paid_at && <div style={{ color:"#10B981", fontSize:11, fontWeight:700, marginTop:2 }}> Paid {new Date(inv.paid_at).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}</div>}
                 {inv.notes && inv.status === "rejected" && <div style={{ color:T.red, fontSize:11, marginTop:4, background:T.red+"10", padding:"4px 8px", borderRadius:6 }}>Reason: {inv.notes}</div>}
@@ -12580,7 +12580,7 @@ const VendorInvoiceView = ({ user }) => {
               </div>
             )}
             <div style={{ marginBottom: 14 }}>
-              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Invoice Amount (${getCurrency(user?.country||activeCountry||"Ghana")})</label>
+              <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Invoice Amount (${getCurrency(user?.country||"Ghana")})</label>
               <input type="number" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} placeholder="0.00" style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
             </div>
             <div style={{ marginBottom: 14 }}>
@@ -19846,7 +19846,7 @@ const PaymentAuthorisationView = ({ user, onNavigate, activeCountry = "All" }) =
       setAwards(aw.data || []);
       setRffs(rf.data || []);
       setInvoices(inv.data || []);
-      setVendorApps(va.data || []);
+      setVendorApps(va || []);
     } catch(e) { console.error("PaymentAuth load error:", e); }
   };
 

@@ -2946,7 +2946,7 @@ const VendorRFFsView = ({ user }) => {
           <div style={{ color: T.textSecondary, fontSize: 13, marginBottom: 16, padding: '10px 14px', background: T.cyan + '10', borderRadius: 8, border: `1px solid ${T.cyan}22` }}>
             Client: <strong style={{ color: T.cyan }}>{quoteModal.client_name}</strong> · Event: <strong style={{ color: T.textPrimary }}>{quoteModal.event_name}</strong>
           </div>
-          <Input label={`Quote Amount (${user?.country==="Nigeria"?"NGN":"GHS"})`} type="number" placeholder="e.g. 5000" value={quoteAmount} onChange={v => setQuoteAmount(v)} />
+          <Input label={`Quote Amount (${quoteModal?.country==="Nigeria"?"NGN":"GHS"})`} type="number" placeholder="e.g. 5000" value={quoteAmount} onChange={v => setQuoteAmount(v)} />
           <div style={{ marginBottom: 16 }}>
             <div style={{ color: T.textSecondary, fontSize: 12, fontWeight: 600, marginBottom: 8, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Attach Invoice / Quotation Document</div>
             <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx" onChange={e => setQuoteFile(e.target.files[0])} style={{
@@ -12531,7 +12531,7 @@ const VendorInvoiceView = ({ user }) => {
         <button onClick={() => setModal(true)} style={{ background: `linear-gradient(135deg, ${T.cyan}, ${T.teal})`, border: "none", color: "#fff", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>+ Submit Invoice</button>
       </div>
 
-      {filteredInvoices.length === 0 ? (
+      {invoices.length === 0 ? (
         <div style={{ textAlign: "center", padding: 60, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}` }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}></div>
           <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No invoices submitted</div>

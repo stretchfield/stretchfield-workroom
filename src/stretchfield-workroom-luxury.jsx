@@ -16174,7 +16174,8 @@ const VendorsView = ({ user, activeCountry = "All" }) => {
     } else {
       await supabase.from("rff_sequences").insert({ event_type: prefix, year: parseInt("20"+year), last_sequence: 1 });
     }
-    return `ST/${prefix}/${year}/${String(nextSeq).padStart(3, "0")}`;
+    const countryPrefix = (user?.country === "Nigeria" || activeCountry === "Nigeria") ? "NG" : "ST";
+    return `${countryPrefix}/${prefix}/${year}/${String(nextSeq).padStart(3, "0")}`;
   };
 
   const handleCreate = async () => {
@@ -16200,6 +16201,7 @@ const VendorsView = ({ user, activeCountry = "All" }) => {
       deadline: form.deadline || null, document_url, document_name,
       status: 'pending', submitted_for_approval: true, approved: false,
       event_type: form.event_type, rff_code: rffCode,
+      country: user?.country || activeCountry || 'Ghana',
     });
     if (error) { setError(error.message); setSaving(false); return; }
     // Notify CEO of new RFF pending approval

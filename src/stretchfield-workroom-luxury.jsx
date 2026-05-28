@@ -12847,7 +12847,7 @@ const QuotesReceivedView = ({ user, activeCountry = "All" }) => {
                             <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 13 }}>{a.vendor_name}</div>
                             <div style={{ color: T.textMuted, fontSize: 12 }}>—</div>
                             <div style={{ color: a.quote_amount ? T.amber : T.textMuted, fontWeight: a.quote_amount ? 800 : 400, fontSize: 13 }}>
-                              {a.quote_amount ? `${getCurrency(r?.country||activeCountry||"Ghana")} ${(parseFloat(a.quote_amount).toLocaleString())}` : "Pending"}
+                              {a.quote_amount ? `${getCurrency(rff?.country||activeCountry||"Ghana")} ${(parseFloat(a.quote_amount).toLocaleString())}` : "Pending"}
                             </div>
                             <div>
                               {a.quote_document_url ? (
@@ -12878,9 +12878,9 @@ const QuotesReceivedView = ({ user, activeCountry = "All" }) => {
                         {/* Summary */}
                         {quotedAssignments.length > 0 && (
                           <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${T.border}44`, display: "flex", gap: 20 }}>
-                            <span style={{ color: T.textMuted, fontSize: 12 }}>Lowest: <strong style={{ color: T.teal }}>{getCurrency(r?.country||activeCountry||"Ghana")+" "+(Math.min(...quotedAssignments.map(a => parseFloat(a.quote_amount))).toLocaleString()).toLocaleString()}</strong></span>
-                            <span style={{ color: T.textMuted, fontSize: 12 }}>Highest: <strong style={{ color: T.amber }}>{getCurrency(r?.country||activeCountry||"Ghana")+" "+(Math.max(...quotedAssignments.map(a => parseFloat(a.quote_amount))).toLocaleString()).toLocaleString()}</strong></span>
-                            <span style={{ color: T.textMuted, fontSize: 12 }}>Avg: <strong style={{ color: T.cyan }}>{getCurrency(r?.country||activeCountry||"Ghana")+" "+(Math.round(quotedAssignments.reduce((s,a) => s + parseFloat(a.quote_amount), 0) / quotedAssignments.length).toLocaleString()).toLocaleString()}</strong></span>
+                            <span style={{ color: T.textMuted, fontSize: 12 }}>Lowest: <strong style={{ color: T.teal }}>{getCurrency(rff?.country||activeCountry||"Ghana")+" "+(Math.min(...quotedAssignments.map(a => parseFloat(a.quote_amount))).toLocaleString()).toLocaleString()}</strong></span>
+                            <span style={{ color: T.textMuted, fontSize: 12 }}>Highest: <strong style={{ color: T.amber }}>{getCurrency(rff?.country||activeCountry||"Ghana")+" "+(Math.max(...quotedAssignments.map(a => parseFloat(a.quote_amount))).toLocaleString()).toLocaleString()}</strong></span>
+                            <span style={{ color: T.textMuted, fontSize: 12 }}>Avg: <strong style={{ color: T.cyan }}>{getCurrency(rff?.country||activeCountry||"Ghana")+" "+(Math.round(quotedAssignments.reduce((s,a) => s + parseFloat(a.quote_amount), 0) / quotedAssignments.length).toLocaleString()).toLocaleString()}</strong></span>
                           </div>
                         )}
                       </div>

@@ -14475,6 +14475,7 @@ const ApprovedVendorsTab = ({ apps, user, load }) => {
       account_no: editForm.account_number,
       payment_terms: editForm.payment_terms,
       address: editForm.address,
+      presence: editForm.presence || "GH",
     }).eq("id", editModal.id);
     if (appError) { alert("Save failed: " + appError.message); setSavingEdit(false); return; }
     // Update profiles using the original email (before any email change)

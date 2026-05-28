@@ -1189,7 +1189,7 @@ const CEODashboard = ({ onTab, user, activeCountry = "All" }) => {
   const [bankRequested, setBankRequested] = useState(false);
   const [bankSubmitted, setBankSubmitted] = useState(false);
   const [showBankForm, setShowBankForm] = useState(false);
-  const [bankForm, setBankForm] = useState({ bank_name:"", bank_branch:"", bank_account_name:"", bank_account_number:"", mobile_money_number:"" });
+  const [bankForm, setBankForm] = useState({ bank_name:"", bank_branch:"", bank_account_name:"", bank_account_number:"", mobile_money_number:"", presence:"GH", bank_name_ng:"", bank_account_name_ng:"", bank_account_number_ng:"", bank_branch_ng:"" });
   const [savingBank, setSavingBank] = useState(false);
   const [unreadBroadcasts, setUnreadBroadcasts] = useState([]);
 
@@ -1240,7 +1240,7 @@ const CEODashboard = ({ onTab, user, activeCountry = "All" }) => {
       if (bp) {
         setBankRequested(bp.bank_details_requested||false);
         setBankSubmitted(!!(bp.bank_name && bp.bank_account_number));
-        if (bp.bank_name) setBankForm({ bank_name:bp.bank_name||"", bank_branch:bp.bank_branch||"", bank_account_name:bp.bank_account_name||"", bank_account_number:bp.bank_account_number||"", mobile_money_number:bp.mobile_money_number||"" });
+        if (bp.bank_name) setBankForm({ bank_name:bp.bank_name||"", bank_branch:bp.bank_branch||"", bank_account_name:bp.bank_account_name||"", bank_account_number:bp.bank_account_number||"", mobile_money_number:bp.mobile_money_number||"", presence:bp.presence||"GH", bank_name_ng:bp.bank_name_ng||"", bank_account_name_ng:bp.bank_account_name_ng||"", bank_account_number_ng:bp.bank_account_number_ng||"", bank_branch_ng:bp.bank_branch_ng||"" });
       }
     };
     loadAll();
@@ -1249,7 +1249,7 @@ const CEODashboard = ({ onTab, user, activeCountry = "All" }) => {
   const saveBankDetailsCEO = async () => {
     if (!bankForm.bank_name || !bankForm.bank_account_number) { alert("Bank name and account number are required."); return; }
     setSavingBank(true);
-    await supabase.from("profiles").update({ bank_name:bankForm.bank_name, bank_branch:bankForm.bank_branch, bank_account_name:bankForm.bank_account_name, bank_account_number:bankForm.bank_account_number, mobile_money_number:bankForm.mobile_money_number }).eq("id", user.id);
+    await supabase.from("profiles").update({ bank_name:bankForm.bank_name, bank_branch:bankForm.bank_branch, bank_account_name:bankForm.bank_account_name, bank_account_number:bankForm.bank_account_number, mobile_money_number:bankForm.mobile_money_number, presence:bankForm.presence||"GH", bank_name_ng:bankForm.bank_name_ng||null, bank_account_name_ng:bankForm.bank_account_name_ng||null, bank_account_number_ng:bankForm.bank_account_number_ng||null, bank_branch_ng:bankForm.bank_branch_ng||null }).eq("id", user?.id);
     const { data: fms } = await supabase.from("profiles").select("id").eq("role","Finance Manager");
     for (const fm of fms||[]) { await supabase.from("notifications").insert({ user_id:fm.id, title:"Bank Details Submitted — "+user.name, message:user.name+" submitted bank details: "+bankForm.bank_name+" · "+bankForm.bank_account_number, type:"finance" }); }
     setSavingBank(false);
@@ -1321,6 +1321,18 @@ const CEODashboard = ({ onTab, user, activeCountry = "All" }) => {
           </div>
           {showBankForm && (
             <div style={{ marginTop:16, display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+              {/* Presence */}
+              <div style={{ gridColumn:"1/-1" }}>
+                <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>Country Presence</div>
+                <select value={bankForm.presence||"GH"} onChange={e=>setBankForm(f=>({...f,presence:e.target.value}))} style={{ width:"100%", padding:"8px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  <option value="GH">🇬🇭 Ghana Only</option>
+                  <option value="NG">🇳🇬 Nigeria Only</option>
+                  <option value="GH+NG">🇬🇭 Ghana + 🇳🇬 Nigeria</option>
+                  <option value="GH+NG+KE">🇬🇭 Ghana + 🇳🇬 Nigeria + 🇰🇪 Kenya</option>
+                </select>
+              </div>
+              {/* Ghana bank details */}
+              <div style={{ gridColumn:"1/-1", color:T.cyan, fontSize:11, fontWeight:700, textTransform:"uppercase", marginTop:8 }}>🇬🇭 Ghana Bank Details (GHS)</div>
               {[["Bank Name *","bank_name","e.g. GCB Bank"],["Branch Name","bank_branch","e.g. Accra Main"],["Account Name","bank_account_name","Name on account"],["Account Number *","bank_account_number","Account number"],["Mobile Money Number","mobile_money_number","e.g. 0244123456"]].map(([label,key,ph]) => (
                 <div key={key}>
                   <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>{label}</div>
@@ -1328,6 +1340,17 @@ const CEODashboard = ({ onTab, user, activeCountry = "All" }) => {
                     style={{ width:"100%", padding:"8px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
                 </div>
               ))}
+              {/* Nigeria bank details - show only if presence includes NG */}
+              {(bankForm.presence||"GH").includes("NG") && <>
+                <div style={{ gridColumn:"1/-1", color:"#10B981", fontSize:11, fontWeight:700, textTransform:"uppercase", marginTop:8 }}>🇳🇬 Nigeria Bank Details (NGN)</div>
+                {[["Bank Name (NG)","bank_name_ng","e.g. GTBank"],["Branch Name (NG)","bank_branch_ng","e.g. Lagos Branch"],["Account Name (NG)","bank_account_name_ng","Name on account"],["Account Number (NG)","bank_account_number_ng","Account number"]].map(([label,key,ph]) => (
+                  <div key={key}>
+                    <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>{label}</div>
+                    <input value={bankForm[key]||""} onChange={e=>setBankForm(f=>({...f,[key]:e.target.value}))} placeholder={ph}
+                      style={{ width:"100%", padding:"8px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                  </div>
+                ))}
+              </>}
               <div style={{ gridColumn:"1/-1" }}>
                 <button onClick={saveBankDetailsCEO} disabled={savingBank} style={{ background:`linear-gradient(135deg,${T.amber},#F59E0B)`, border:"none", color:"#060B14", padding:"10px 24px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{savingBank?"Saving...":"Save Bank Details"}</button>
               </div>
@@ -1623,7 +1646,7 @@ const VendorManagerDashboard = ({ user, activeCountry = "All" }) => {
   const [pendingReportEvents, setPendingReportEvents] = useState([]);
   const [reportGateModal, setReportGateModal] = useState(false);
   const [showBankForm, setShowBankForm] = useState(false);
-  const [bankForm, setBankForm] = useState({ bank_name:"", bank_branch:"", bank_account_name:"", bank_account_number:"", mobile_money_number:"" });
+  const [bankForm, setBankForm] = useState({ bank_name:"", bank_branch:"", bank_account_name:"", bank_account_number:"", mobile_money_number:"", presence:"GH", bank_name_ng:"", bank_account_name_ng:"", bank_account_number_ng:"", bank_branch_ng:"" });
   const [bankSubmitted, setBankSubmitted] = useState(false);
   const [bankRequested, setBankRequested] = useState(false);
   const [savingBank, setSavingBank] = useState(false);
@@ -1647,7 +1670,7 @@ const VendorManagerDashboard = ({ user, activeCountry = "All" }) => {
   const saveVMBankDetails = async () => {
     if (!bankForm.bank_name || !bankForm.bank_account_number) { alert("Bank name and account number required."); return; }
     setSavingBank(true);
-    await supabase.from("profiles").update({ bank_name:bankForm.bank_name, bank_branch:bankForm.bank_branch, bank_account_name:bankForm.bank_account_name, bank_account_number:bankForm.bank_account_number, mobile_money_number:bankForm.mobile_money_number }).eq("id", user.id);
+    await supabase.from("profiles").update({ bank_name:bankForm.bank_name, bank_branch:bankForm.bank_branch, bank_account_name:bankForm.bank_account_name, bank_account_number:bankForm.bank_account_number, mobile_money_number:bankForm.mobile_money_number, presence:bankForm.presence||"GH", bank_name_ng:bankForm.bank_name_ng||null, bank_account_name_ng:bankForm.bank_account_name_ng||null, bank_account_number_ng:bankForm.bank_account_number_ng||null, bank_branch_ng:bankForm.bank_branch_ng||null }).eq("id", user?.id);
     const { data: fms } = await supabase.from("profiles").select("id").eq("role","Finance Manager");
     for (const fm of fms||[]) await supabase.from("notifications").insert({ user_id:fm.id, title:"Bank Details Submitted — "+user.name, message:user.name+" submitted bank details: "+bankForm.bank_name+" · "+bankForm.bank_account_number, type:"finance" });
     setBankSubmitted(true); setShowBankForm(false); setSavingBank(false);
@@ -1658,7 +1681,7 @@ const VendorManagerDashboard = ({ user, activeCountry = "All" }) => {
     Promise.all([
       (!activeCountry || activeCountry === "All")
         ? supabase.from("profiles").select("*").eq("role", "Vendor").order("name")
-        : supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", activeCountry).order("name"),
+        : supabase.from("profiles").select("*").eq("role", "Vendor").or(`country.eq.${activeCountry},presence.like.%${activeCountry}%`).order("name"),
       supabase.from("tasks").select("*").eq("assignee_id", user.id),
       supabase.from("projects").select("*").eq("status", "active"),
       supabase.from("notifications").select("*").eq("user_id", user.id).eq("read", false).limit(5),
@@ -1746,6 +1769,30 @@ const VendorManagerDashboard = ({ user, activeCountry = "All" }) => {
               <input value={bankForm.bank_account_number} onChange={e=>setBankForm(f=>({...f,bank_account_number:e.target.value}))} placeholder="Account number" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:"1px solid "+T.border, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
               <div><label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Mobile Money Number</label>
               <input value={bankForm.mobile_money_number} onChange={e=>setBankForm(f=>({...f,mobile_money_number:e.target.value}))} placeholder="e.g. 0244000000" style={{ width:"100%", padding:"9px 12px", background:T.bg, border:"1px solid "+T.border, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} /></div>
+              {/* Presence */}
+              <div>
+                <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>Country Presence</label>
+                <select value={bankForm.presence||"GH"} onChange={e=>setBankForm(f=>({...f,presence:e.target.value}))} style={{ width:"100%", padding:"9px 12px", background:T.bg, border:"1px solid "+T.border, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none" }}>
+                  <option value="GH">🇬🇭 Ghana Only</option>
+                  <option value="NG">🇳🇬 Nigeria Only</option>
+                  <option value="GH+NG">🇬🇭 Ghana + 🇳🇬 Nigeria</option>
+                  <option value="GH+NG+KE">🇬🇭 Ghana + 🇳🇬 Nigeria + 🇰🇪 Kenya</option>
+                </select>
+              </div>
+              {/* Nigeria bank details */}
+              {(bankForm.presence||"GH").includes("NG") && (
+                <div style={{ background:T.bg, borderRadius:10, padding:"12px 14px", border:"1px solid #10B98130" }}>
+                  <div style={{ color:"#10B981", fontSize:11, fontWeight:700, textTransform:"uppercase", marginBottom:10 }}>🇳🇬 Nigeria Bank Details (NGN)</div>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                    {[["Bank Name (NG)","bank_name_ng","e.g. GTBank"],["Branch (NG)","bank_branch_ng","e.g. Lagos"],["Account Name (NG)","bank_account_name_ng","Name on account"],["Account Number (NG)","bank_account_number_ng","Account number"]].map(([label,key,ph]) => (
+                      <div key={key}>
+                        <label style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:4 }}>{label}</label>
+                        <input value={bankForm[key]||""} onChange={e=>setBankForm(f=>({...f,[key]:e.target.value}))} placeholder={ph} style={{ width:"100%", padding:"9px 12px", background:T.surface, border:"1px solid "+T.border, borderRadius:8, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <button onClick={saveVMBankDetails} disabled={savingBank} style={{ background:`linear-gradient(135deg,${T.cyan},${T.teal})`, border:"none", color:"#060B14", padding:"11px", borderRadius:8, cursor:"pointer", fontWeight:800, fontSize:13 }}>{savingBank?"Saving...":"Save Bank Details"}</button>
             </div>
           )}
@@ -12451,7 +12498,7 @@ const VendorInvoiceView = ({ user }) => {
       await supabase.from("notifications").insert({
         user_id: fm.id,
         title: "Invoice Received",
-        message: `${user.name} submitted an invoice of GHS ${parseFloat(form.amount).toLocaleString()} for "${event?.name}".`,
+        message: `${user.name} submitted an invoice of ${user?.country==="Nigeria"?"NGN":"GHS"} ${parseFloat(form.amount).toLocaleString()} for "${event?.name}".`,
         type: "rff",
       });
     }
@@ -14681,7 +14728,7 @@ const VendorOnboardingView = ({ user, activeCountry = "All" }) => {
       supabase.from("vendor_applications").select("*").order("created_at", { ascending: false }),
       (!activeCountry || activeCountry === "All")
         ? supabase.from("profiles").select("*").eq("role", "Vendor").order("name")
-        : supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", activeCountry).order("name"),
+        : supabase.from("profiles").select("*").eq("role", "Vendor").or(`country.eq.${activeCountry},presence.like.%${activeCountry}%`).order("name"),
     ]);
     setApps(appData || []);
     setVendorProfiles(vpData || []);
@@ -15085,7 +15132,7 @@ const VendorAssignmentView = ({ user, activeCountry = "All" }) => {
     const [r, e, v, a] = await Promise.all([
       (!activeCountry || activeCountry === "All") ? supabase.from("rffs").select("*").order("created_at", { ascending: false }) : supabase.from("rffs").select("*").eq("country", activeCountry).order("created_at", { ascending: false }),
       supabase.from("projects").select("*").eq("country", activeCountry),
-      (!activeCountry || activeCountry === "All") ? supabase.from("profiles").select("*").eq("role", "Vendor") : supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", activeCountry),
+      (!activeCountry || activeCountry === "All") ? supabase.from("profiles").select("*").eq("role", "Vendor") : supabase.from("profiles").select("*").eq("role", "Vendor").or(`country.eq.${activeCountry},presence.like.%${activeCountry}%`),
       supabase.from("rff_vendor_assignments").select("*"),
     ]);
     setRffs(r.data || []);
@@ -24639,7 +24686,7 @@ const VendorAnalyticsView = ({ user, activeCountry = "All" }) => {
     const [vp, asn, aw, inv, sc] = await Promise.all([
       (!activeCountry || activeCountry === "All")
         ? supabase.from("profiles").select("*").eq("role", "Vendor").order("name")
-        : supabase.from("profiles").select("*").eq("role", "Vendor").eq("country", activeCountry).order("name"),
+        : supabase.from("profiles").select("*").eq("role", "Vendor").or(`country.eq.${activeCountry},presence.like.%${activeCountry}%`).order("name"),
       supabase.from("rff_vendor_assignments").select("*"),
       supabase.from("rff_awards").select("*"),
       supabase.from("vendor_invoices").select("*"),

@@ -13768,7 +13768,7 @@ const RFFApprovalsView = ({ user, activeCountry = "All" }) => {
                         ) : (
                           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                             {rfBudgets.map(b => (
-                              <span key={b.id} style={{ background: T.cyan+"15", color: T.cyan, border: `1px solid ${T.cyan}30`, borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>{b.category}: GHS {(b.proposed_amount||0).toLocaleString()}</span>
+                              <span key={b.id} style={{ background: T.cyan+"15", color: T.cyan, border: `1px solid ${T.cyan}30`, borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>{b.category}: {getCurrency(activeCountry||user?.country||"Ghana")} {(b.proposed_amount||0).toLocaleString()}</span>
                             ))}
                           </div>
                         )}

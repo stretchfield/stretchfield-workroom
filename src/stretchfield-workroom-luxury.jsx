@@ -12171,6 +12171,7 @@ const PurchaseOrderView = ({ user, activeCountry = "All" }) => {
       const financeSigned = po.finance_signed_at;
       const cmSigned = po.cm_signed_at || (po.country !== "Nigeria");
       updates.status = (vmSigned && financeSigned && cmSigned) ? "fully_signed" : "ceo_signed";
+      // CEO is always last - mark fully signed if all others done
     } else if (role === "cm") {
       updates.cm_signature = sigData;
       updates.cm_signed_at = now;
@@ -12353,13 +12354,13 @@ const PurchaseOrderView = ({ user, activeCountry = "All" }) => {
                           {["pending_signatures","ceo_signed"].includes(po.status) && user.role === "Vendor Manager" && !po.vm_signed_at && (
                             <button onClick={() => setSigningPO({ po, role:"vm" })} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#fff", padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}> Sign</button>
                           )}
-                          {/* CEO Sign button */}
-                          {["pending_signatures","vm_signed","cm_signed"].includes(po.status) && user.role === "CEO" && !po.ceo_signed_at && (
-                            <button onClick={() => setSigningPO({ po, role:"ceo" })} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#fff", padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}> Sign</button>
-                          )}
-                          {/* CM Nigeria Sign button */}
-                          {["pending_signatures","vm_signed","ceo_signed"].includes(po.status) && user.role === "Country Manager" && po.country === "Nigeria" && !po.cm_signed_at && (
+                          {/* CM Nigeria Sign button - signs before CEO */}
+                          {["pending_signatures","vm_signed"].includes(po.status) && user.role === "Country Manager" && po.country === "Nigeria" && !po.cm_signed_at && (
                             <button onClick={() => setSigningPO({ po, role:"cm" })} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#fff", padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}> Sign</button>
+                          )}
+                          {/* CEO Sign button - last to sign */}
+                          {["pending_signatures","vm_signed","cm_signed"].includes(po.status) && user.role === "CEO" && !po.ceo_signed_at && (po.country !== "Nigeria" || po.cm_signed_at) && (
+                            <button onClick={() => setSigningPO({ po, role:"ceo" })} style={{ background:"linear-gradient(135deg,"+T.cyan+","+T.teal+")", border:"none", color:"#fff", padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}> Sign</button>
                           )}
                           {["draft","pending_signatures","vm_signed","ceo_signed","fully_signed"].includes(po.status) && po.status !== "sent" && user.role === "Finance Manager" && (
                             <button onClick={() => deletePO(po)} style={{ background:T.red+"15", border:"1px solid "+T.red+"30", color:T.red, padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:700 }}></button>

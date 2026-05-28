@@ -11769,8 +11769,12 @@ const generatePOPDF = (po, vendor, rff, event) => {
     </thead>
     <tbody>
       <tr>
-        <td>${po.rff_title || rff?.title || po.event_name || "Professional Services"}</td>
-        <td>${po.rff_category || rff?.category || vendor?.service_category || "—"}</td>
+        <td>
+          <strong>${vendor?.service_category || po.rff_category || "Professional Services"}</strong>
+          ${(rff?.description || po.notes) ? '<div style="font-size:11px;color:#5A6E8A;margin-top:3px;">' + (rff?.description || po.notes) + '</div>' : ''}
+          <div style="font-size:11px;color:#5A6E8A;margin-top:3px;">Event: ${po.event_name || rff?.event_name || "—"} · RFF: ${po.rff_title || rff?.title || poNumber}</div>
+        </td>
+        <td>${po.rff_category || rff?.event_type || vendor?.service_category || "—"}</td>
         <td style="text-align:right;font-weight:700;">${po.currency || "GHS"} ${parseFloat(po.amount||0).toLocaleString()}</td>
       </tr>
       ${po.notes ? '<tr><td colspan="3" style="color:#5A6E8A;font-size:12px;font-style:italic;">Note: ' + po.notes + '</td></tr>' : ''}
@@ -11778,7 +11782,7 @@ const generatePOPDF = (po, vendor, rff, event) => {
     <tfoot>
       <tr class="total-row">
         <td colspan="2" style="text-align:right;padding:12px 14px;">Total Amount</td>
-        <td style="text-align:right;padding:12px 14px;" class="total-amount">${po.currency || "GHS"} ${parseFloat(po.amount||0).toLocaleString()}</td>
+        <td style="text-align:right;padding:12px 14px;" class="total-amount">${po.currency || (po.country === "Nigeria" ? "NGN" : "GHS")} ${parseFloat(po.amount||0).toLocaleString()}</td>
       </tr>
     </tfoot>
   </table>

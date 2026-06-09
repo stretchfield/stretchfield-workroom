@@ -2872,7 +2872,7 @@ const VendorRFFsView = ({ user }) => {
     if (vms) await Promise.all(vms.map(vm => supabase.from('notifications').insert({
       user_id: vm.id,
       title: 'Quote Submitted',
-      message: `${user?.name} submitted a quote of ${user?.country==="Nigeria"?"NGN":"GHS"} ${parseFloat(quoteAmount).toLocaleString()} for "${quoteModal.title}"`,
+      message: `${user?.name} submitted a quote of ${quoteModal?.country==="Nigeria"?"NGN":"GHS"} ${parseFloat(quoteAmount).toLocaleString()} for "${quoteModal.title}"`,
       type: 'rff',
     })));
 
@@ -2969,7 +2969,7 @@ const VendorRFFsView = ({ user }) => {
              Your quote was approved. Please submit your invoice below.
           </div>
           <div style={{ marginBottom: 14 }}>
-            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 5 }}>Invoice Amount ({getCurrency(user?.country||"Ghana")})</label>
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 5 }}>Invoice Amount ({invoiceModal?.country==="Nigeria"?"NGN":"GHS"})</label>
             <input type="number" value={invoiceAmount} onChange={e => setInvoiceAmount(e.target.value)} placeholder="Enter invoice amount" style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
           </div>
           <div style={{ marginBottom: 14 }}>
@@ -12551,6 +12551,7 @@ const VendorInvoiceView = ({ user }) => {
       notes: form.notes,
       status: "submitted",
       invoice_number: invoiceNumber,
+      country: event?.country || user?.country || "Ghana",
     });
     // Notify Finance
     const { data: fms } = await supabase.from("profiles").select("id").in("role", ["Finance Manager","CEO"]);

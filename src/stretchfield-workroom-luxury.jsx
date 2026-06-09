@@ -2652,7 +2652,7 @@ const VendorDashboard = ({ user }) => {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ color: T.textPrimary, fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rff?.title || "RFF"}</div>
                   <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{rff?.event_name}</div>
-                  {a.quote_amount && <div style={{ color: T.amber, fontWeight: 700, fontSize: 12, marginTop: 3 }}>{getCurrency(activeCountry||user?.country||"Ghana")+" "+(parseFloat(a.quote_amount).toLocaleString()).toLocaleString()}</div>}
+                  {a.quote_amount && <div style={{ color: T.amber, fontWeight: 700, fontSize: 12, marginTop: 3 }}>{getCurrency(user?.country||"Ghana")+" "+(parseFloat(a.quote_amount).toLocaleString()).toLocaleString()}</div>}
                 </div>
                 <span style={{ color: statusColors[a.status]||T.textMuted, fontSize: 10, fontWeight: 700, background: (statusColors[a.status]||T.textMuted)+"18", padding: "2px 8px", borderRadius: 20, marginLeft: 8, flexShrink: 0 }}>{statusLabels[a.status]||a.status}</span>
               </div>
@@ -2969,7 +2969,7 @@ const VendorRFFsView = ({ user }) => {
              Your quote was approved. Please submit your invoice below.
           </div>
           <div style={{ marginBottom: 14 }}>
-            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 5 }}>Invoice Amount ({getCurrency(activeCountry||user?.country||"Ghana")})</label>
+            <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 5 }}>Invoice Amount ({getCurrency(user?.country||"Ghana")})</label>
             <input type="number" value={invoiceAmount} onChange={e => setInvoiceAmount(e.target.value)} placeholder="Enter invoice amount" style={{ width: "100%", padding: "9px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
           </div>
           <div style={{ marginBottom: 14 }}>

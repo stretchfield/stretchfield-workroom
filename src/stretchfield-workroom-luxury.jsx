@@ -12674,7 +12674,7 @@ const FinanceInvoicesView = ({ user, activeCountry = "All" }) => {
     setInvoices(data || []);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeCountry]);
 
   const updateStatus = async (id, status) => {
     const updates = { status, reviewed_by: user.id };
@@ -12694,7 +12694,7 @@ const FinanceInvoicesView = ({ user, activeCountry = "All" }) => {
         <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>{invoices.filter(i => i.status === "submitted").length} new invoices to review</div>
       </div>
       <div style={{ background: T.surface, border: "1px solid "+T.border, borderRadius: 12, overflow: "hidden" }}>
-        {filteredInvoices.length === 0 ? (
+        {invoices.length === 0 ? (
           <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>No invoices received yet.</div>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse" }}>

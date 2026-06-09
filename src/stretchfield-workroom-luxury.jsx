@@ -2652,7 +2652,7 @@ const VendorDashboard = ({ user }) => {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ color: T.textPrimary, fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rff?.title || "RFF"}</div>
                   <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{rff?.event_name}</div>
-                  {a.quote_amount && <div style={{ color: T.amber, fontWeight: 700, fontSize: 12, marginTop: 3 }}>{getCurrency(user?.country||"Ghana")+" "+(parseFloat(a.quote_amount).toLocaleString()).toLocaleString()}</div>}
+                  {a.quote_amount && <div style={{ color: T.amber, fontWeight: 700, fontSize: 12, marginTop: 3 }}>{getCurrency(a.rff_country||user?.country||"Ghana")+" "+(parseFloat(a.quote_amount).toLocaleString()).toLocaleString()}</div>}
                 </div>
                 <span style={{ color: statusColors[a.status]||T.textMuted, fontSize: 10, fontWeight: 700, background: (statusColors[a.status]||T.textMuted)+"18", padding: "2px 8px", borderRadius: 20, marginLeft: 8, flexShrink: 0 }}>{statusLabels[a.status]||a.status}</span>
               </div>
@@ -12597,7 +12597,7 @@ const VendorInvoiceView = ({ user }) => {
               <div>
                 <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{inv.event_name}</div>
                 {inv.invoice_number && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2, fontWeight: 600 }}>{inv.invoice_number}</div>}
-                <div style={{ color: T.amber, fontWeight: 700, fontSize: 13, marginTop: 3 }}>{getCurrency(user?.country||"Ghana")+" "+(parseFloat(inv.amount||0).toLocaleString()).toLocaleString()}</div>
+                <div style={{ color: T.amber, fontWeight: 700, fontSize: 13, marginTop: 3 }}>{getCurrency(inv.country||user?.country||"Ghana")+" "+(parseFloat(inv.amount||0).toLocaleString()).toLocaleString()}</div>
                 <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Submitted {new Date(inv.created_at).toLocaleDateString("en-GB", {day:"numeric",month:"short",year:"numeric"})}</div>
                 {inv.paid_at && <div style={{ color:"#10B981", fontSize:11, fontWeight:700, marginTop:2 }}> Paid {new Date(inv.paid_at).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}</div>}
                 {inv.notes && inv.status === "rejected" && <div style={{ color:T.red, fontSize:11, marginTop:4, background:T.red+"10", padding:"4px 8px", borderRadius:6 }}>Reason: {inv.notes}</div>}
@@ -17997,7 +17997,7 @@ const InvoicesView = () => {
                 </div>
                 <Badge status={inv.status} />
               </div>
-              <div style={{ color: T.amber, fontSize: 20, fontWeight: 900, marginBottom: 12 }}>{getCurrency(user?.country||"Ghana")+" "+(parseFloat(inv.amount||0).toLocaleString()).toLocaleString()}</div>
+              <div style={{ color: T.amber, fontSize: 20, fontWeight: 900, marginBottom: 12 }}>{getCurrency(inv.country||user?.country||"Ghana")+" "+(parseFloat(inv.amount||0).toLocaleString()).toLocaleString()}</div>
               <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginTop:8 }}>
                 {inv.status === "pending" && (
                   <Btn small onClick={() => handleApprove(inv.id)}> Approve</Btn>

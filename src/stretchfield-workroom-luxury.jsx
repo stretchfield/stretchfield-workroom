@@ -3655,7 +3655,7 @@ const VendorQuotesView = ({ user }) => {
                 <div>
                   <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 15 }}>{q.title}</div>
                   <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}> {q.client_name} · Due {q.deadline}</div>
-                  <div style={{ color: T.amber, fontWeight: 700, fontSize: 14, marginTop: 6 }}>{getCurrency(activeCountry||user?.country||"Ghana")+" "+((q.amount || 0).toLocaleString()).toLocaleString()}</div>
+                  <div style={{ color: T.amber, fontWeight: 700, fontSize: 14, marginTop: 6 }}>{getCurrency(user?.country||"Ghana")+" "+((q.amount || 0).toLocaleString()).toLocaleString()}</div>
                 </div>
                 <Badge status={q.status} />
               </div>
@@ -11609,7 +11609,7 @@ const GigConfirmationView = ({ user }) => {
 
   const load = async () => {
     const { data: aw } = await supabase.from("rff_awards").select("*").in("status", ["approved_ceo","confirmed"]).order("created_at", { ascending: false });
-    const rfQuery = supabase.from("rffs").select("*").eq("country", activeCountry);
+    const rfQuery = supabase.from("rffs").select("*");
     const { data: rf } = await rfQuery;
     setAwards(aw || []);
     setRffs(rf || []);
@@ -11651,7 +11651,7 @@ const GigConfirmationView = ({ user }) => {
                 <div>
                   <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{award.vendor_name}</div>
                   <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{rff?.title} · {rff?.event_name}</div>
-                  <div style={{ color: T.amber, fontWeight: 700, fontSize: 13, marginTop: 4 }}>{getCurrency(activeCountry||user?.country||"Ghana")+" "+((award.quoted_amount || 0).toLocaleString()).toLocaleString()}</div>
+                  <div style={{ color: T.amber, fontWeight: 700, fontSize: 13, marginTop: 4 }}>{getCurrency(user?.country||"Ghana")+" "+((award.quoted_amount || 0).toLocaleString()).toLocaleString()}</div>
                   {award.ceo_notes && <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4, fontStyle: "italic" }}>CEO: {award.ceo_notes}</div>}
                 </div>
                 {award.status === "approved_ceo" && (
@@ -15600,7 +15600,7 @@ const FinanceApprovalsView = ({ user }) => {
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ color: T.amber, fontWeight: 800, fontSize: 18 }}>{getCurrency(activeCountry||user?.country||"Ghana")+" "+((e.amount || 0).toLocaleString()).toLocaleString()}</div>
+                  <div style={{ color: T.amber, fontWeight: 800, fontSize: 18 }}>{getCurrency(user?.country||"Ghana")+" "+((e.amount || 0).toLocaleString()).toLocaleString()}</div>
                   <span style={{ fontSize: 11, fontWeight: 600, color: e.approval_status === "approved" ? T.teal : e.approval_status === "rejected" ? "#F43F5E" : T.amber }}>
                     {e.approval_status === "approved" ? " Approved" : e.approval_status === "rejected" ? " Rejected" : "⏳ Pending"}
                   </span>
@@ -15664,7 +15664,7 @@ const FinanceApprovalsView = ({ user }) => {
                   {p.notes && <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 6, fontStyle: "italic" }}>{p.notes}</div>}
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ color: T.cyan, fontWeight: 800, fontSize: 18 }}>{getCurrency(activeCountry||user?.country||"Ghana")+" "+((p.amount || 0).toLocaleString()).toLocaleString()}</div>
+                  <div style={{ color: T.cyan, fontWeight: 800, fontSize: 18 }}>{getCurrency(user?.country||"Ghana")+" "+((p.amount || 0).toLocaleString()).toLocaleString()}</div>
                   <span style={{ fontSize: 11, fontWeight: 600, color: p.status === "approved" ? T.teal : p.status === "rejected" ? "#F43F5E" : T.amber }}>
                     {p.status === "approved" ? " Payment Approved" : p.status === "rejected" ? " Rejected" : "⏳ Pending"}
                   </span>
@@ -16896,7 +16896,7 @@ const EventClientPortalPanel = ({ event, client, user, onClose }) => {
                   <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:10 }}>
                     {[["Project Fee","project_fee"],["Per Diem","per_diem"],["Transport","transport_allowance"]].map(([label,field]) => (
                       <div key={field}>
-                        <label style={{ color:T.textMuted, fontSize:9, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:3 }}>{label} (${getCurrency(activeCountry||user?.country||"Ghana")})</label>
+                        <label style={{ color:T.textMuted, fontSize:9, fontWeight:700, textTransform:"uppercase", display:"block", marginBottom:3 }}>{label} (${getCurrency(user?.country||"Ghana")})</label>
                         <input type="number" id={"rate-"+staff.id+"-"+field} defaultValue={existing?.[field]||""} placeholder="0.00"
                           style={{ width:"100%", padding:"7px 10px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:6, color:T.textPrimary, fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
                       </div>
@@ -17961,9 +17961,9 @@ const InvoicesView = () => {
       {/* Summary strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 12, marginBottom: 24 }}>
         {[
-          { label: "Pending", value: getCurrency(activeCountry||user?.country||"Ghana")+" "+(totalPending).toLocaleString(), count: invoices.filter(i => i.status === "pending").length, color: T.amber },
-          { label: "Approved", value: getCurrency(activeCountry||user?.country||"Ghana")+" "+(totalApproved).toLocaleString(), count: invoices.filter(i => i.status === "approved").length, color: T.teal },
-          { label: "Paid", value: getCurrency(activeCountry||user?.country||"Ghana")+" "+(totalPaid).toLocaleString(), count: invoices.filter(i => i.status === "paid").length, color: T.cyan },
+          { label: "Pending", value: getCurrency(user?.country||"Ghana")+" "+(totalPending).toLocaleString(), count: invoices.filter(i => i.status === "pending").length, color: T.amber },
+          { label: "Approved", value: getCurrency(user?.country||"Ghana")+" "+(totalApproved).toLocaleString(), count: invoices.filter(i => i.status === "approved").length, color: T.teal },
+          { label: "Paid", value: getCurrency(user?.country||"Ghana")+" "+(totalPaid).toLocaleString(), count: invoices.filter(i => i.status === "paid").length, color: T.cyan },
         ].map((s, i) => (
           <div key={i} style={{ padding: "16px 18px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${s.color}`, borderRadius: 10 }}>
             <div style={{ color: s.color, fontSize: 18, fontWeight: 900 }}>{s.value}</div>
@@ -17996,7 +17996,7 @@ const InvoicesView = () => {
                 </div>
                 <Badge status={inv.status} />
               </div>
-              <div style={{ color: T.amber, fontSize: 20, fontWeight: 900, marginBottom: 12 }}>{getCurrency(activeCountry||user?.country||"Ghana")+" "+(parseFloat(inv.amount||0).toLocaleString()).toLocaleString()}</div>
+              <div style={{ color: T.amber, fontSize: 20, fontWeight: 900, marginBottom: 12 }}>{getCurrency(user?.country||"Ghana")+" "+(parseFloat(inv.amount||0).toLocaleString()).toLocaleString()}</div>
               <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginTop:8 }}>
                 {inv.status === "pending" && (
                   <Btn small onClick={() => handleApprove(inv.id)}> Approve</Btn>
@@ -18009,7 +18009,7 @@ const InvoicesView = () => {
                       payee_type: "vendor",
                       description: "Payment for " + (inv.event_name||"services") + " — Invoice " + (inv.invoice_number||inv.id.slice(0,8)),
                       amount: parseFloat(inv.amount||0),
-                      currency: activeCountry === "Nigeria" ? "NGN" : "GHS",
+                      currency: user?.country === "Nigeria" ? "NGN" : "GHS",
                       event_name: inv.event_name,
                       invoice_ref: inv.invoice_number,
                       raised_by: user.id,
@@ -18854,9 +18854,9 @@ const ClientFinanceView = ({ user }) => {
               {/* KPI strip */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, marginBottom: 24 }}>
                 {[
-                  { label: "Agreed Budget", value: agreedBudget > 0 ? `${getCurrency(activeCountry||user?.country||"Ghana")} ${(agreedBudget.toLocaleString())}` : "—", color: T.cyan },
-                  { label: "Total Spent", value: totalSpent > 0 ? `${getCurrency(activeCountry||user?.country||"Ghana")} ${(totalSpent.toLocaleString())}` : "—", color: T.amber },
-                  { label: "Remaining", value: agreedBudget > 0 ? `${getCurrency(activeCountry||user?.country||"Ghana")} ${(remaining.toLocaleString())}` : "—", color: remaining < 0 ? T.red : T.teal },
+                  { label: "Agreed Budget", value: agreedBudget > 0 ? `${getCurrency(user?.country||"Ghana")} ${(agreedBudget.toLocaleString())}` : "—", color: T.cyan },
+                  { label: "Total Spent", value: totalSpent > 0 ? `${getCurrency(user?.country||"Ghana")} ${(totalSpent.toLocaleString())}` : "—", color: T.amber },
+                  { label: "Remaining", value: agreedBudget > 0 ? `${getCurrency(user?.country||"Ghana")} ${(remaining.toLocaleString())}` : "—", color: remaining < 0 ? T.red : T.teal },
                   { label: "Mgmt Fee", value: agreedBudget > 0 ? `GHS ${mgmtFee.toLocaleString()} (${mgmtFeePct}%)` : "—", color: T.magenta },
                 ].map((k, i) => (
                   <div key={i} style={{ padding: "16px 18px", background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${k.color}`, borderRadius: 10 }}>
@@ -18900,7 +18900,7 @@ const ClientFinanceView = ({ user }) => {
                             </div>
                             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                               <span style={{ color: T.textMuted, fontSize: 11 }}>{pct}%</span>
-                              <span style={{ color: color, fontWeight: 700, fontSize: 13 }}>{getCurrency(activeCountry||user?.country||"Ghana")+" "+(amt.toLocaleString()).toLocaleString()}</span>
+                              <span style={{ color: color, fontWeight: 700, fontSize: 13 }}>{getCurrency(user?.country||"Ghana")+" "+(amt.toLocaleString()).toLocaleString()}</span>
                             </div>
                           </div>
                           <div style={{ height: 5, background: T.border + "44", borderRadius: 3 }}>
@@ -19129,10 +19129,10 @@ const BudgetView = ({ user }) => {
         {canEdit && <Btn onClick={() => setModal(true)}>+ Set Budget</Btn>}
       </div>
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
-        <Stat icon="" label="Total Budgeted" value={getCurrency(activeCountry||user?.country||"Ghana")+" "+(totalBudget).toLocaleString()} color={T.cyan} />
-        <Stat icon="" label="Total Expenses" value={getCurrency(activeCountry||user?.country||"Ghana")+" "+(totalSpent).toLocaleString()} color={T.amber} />
-        <Stat icon="" label="Total Invoiced" value={getCurrency(activeCountry||user?.country||"Ghana")+" "+(totalInvoiced).toLocaleString()} color={T.magenta} />
-        <Stat icon="" label="Remaining" value={getCurrency(activeCountry||user?.country||"Ghana")+" "+((totalBudget - totalSpent - totalInvoiced)).toLocaleString()} color={T.teal} />
+        <Stat icon="" label="Total Budgeted" value={getCurrency(user?.country||"Ghana")+" "+(totalBudget).toLocaleString()} color={T.cyan} />
+        <Stat icon="" label="Total Expenses" value={getCurrency(user?.country||"Ghana")+" "+(totalSpent).toLocaleString()} color={T.amber} />
+        <Stat icon="" label="Total Invoiced" value={getCurrency(user?.country||"Ghana")+" "+(totalInvoiced).toLocaleString()} color={T.magenta} />
+        <Stat icon="" label="Remaining" value={getCurrency(user?.country||"Ghana")+" "+((totalBudget - totalSpent - totalInvoiced)).toLocaleString()} color={T.teal} />
       </div>
       {eventsWithBudget.filter(e => e.budget).map(ev => (
         <Card key={ev.id} style={{ marginBottom: 16 }}>
@@ -19151,7 +19151,7 @@ const BudgetView = ({ user }) => {
             {[[" Budget", ev.budget.total_budget, T.cyan], [" Expenses", ev.spent, T.amber], [" Invoiced", ev.invoiced, T.magenta], [" Remaining", ev.remaining, ev.remaining < 0 ? "#F43F5E" : T.teal]].map(([label, val, color]) => (
               <div key={label} style={{ padding: "10px", background: T.bg, borderRadius: 8, border: "1px solid " + T.border }}>
                 <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 4 }}>{label}</div>
-                <div style={{ color, fontWeight: 700, fontSize: 13 }}>{getCurrency(activeCountry||user?.country||"Ghana")+" "+((val || 0).toLocaleString()).toLocaleString()}</div>
+                <div style={{ color, fontWeight: 700, fontSize: 13 }}>{getCurrency(user?.country||"Ghana")+" "+((val || 0).toLocaleString()).toLocaleString()}</div>
               </div>
             ))}
           </div>
@@ -19173,7 +19173,7 @@ const BudgetView = ({ user }) => {
         <Modal title="Set Event Budget" onClose={() => setModal(false)}>
           <Select label="Event" options={[{ value: "", label: "Select event..." }, ...events.map(e => ({ value: e.id, label: e.name }))]}
             value={form.project_id} onChange={v => { const e = events.find(x => x.id === v); setForm({ ...form, project_id: v, event_name: e ? e.name : "" }); }} />
-          <Input label={`Total Budget (${getCurrency(activeCountry||user?.country||"Ghana")})`} type="number" placeholder="0" value={form.total_budget} onChange={v => setForm({ ...form, total_budget: v })} />
+          <Input label={`Total Budget (${getCurrency(user?.country||"Ghana")})`} type="number" placeholder="0" value={form.total_budget} onChange={v => setForm({ ...form, total_budget: v })} />
           <Input label="Notes" placeholder="Budget notes..." value={form.notes} onChange={v => setForm({ ...form, notes: v })} />
           <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
             <Btn onClick={handleCreate} disabled={saving}>{saving ? "Saving..." : "Set Budget"}</Btn>
@@ -19250,7 +19250,7 @@ const ExpenseView = ({ user }) => {
         {canEdit && <Btn onClick={() => setModal(true)}>+ Log Expense</Btn>}
       </div>
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
-        <Stat icon="" label="Total Expenses" value={getCurrency(activeCountry||user?.country||"Ghana")+" "+(total).toLocaleString()} color={T.amber} />
+        <Stat icon="" label="Total Expenses" value={getCurrency(user?.country||"Ghana")+" "+(total).toLocaleString()} color={T.amber} />
         <Stat icon="" label="Approved" value={filtered.filter(e => e.approved).length} color={T.teal} />
         <Stat icon="⏳" label="Pending Approval" value={filtered.filter(e => !e.approved).length} color={T.magenta} />
       </div>
@@ -19278,7 +19278,7 @@ const ExpenseView = ({ user }) => {
               </div>
             </div>
             <div style={{ textAlign: "right" }}>
-              <div style={{ color: T.amber, fontWeight: 800, fontSize: 16 }}>{getCurrency(activeCountry||user?.country||"Ghana")+" "+((e.amount || 0).toLocaleString()).toLocaleString()}</div>
+              <div style={{ color: T.amber, fontWeight: 800, fontSize: 16 }}>{getCurrency(user?.country||"Ghana")+" "+((e.amount || 0).toLocaleString()).toLocaleString()}</div>
               <div style={{ marginTop: 4 }}>
                 {e.approved
                   ? <span style={{ color: T.teal, fontSize: 11, fontWeight: 600 }}> Approved</span>
@@ -19299,7 +19299,7 @@ const ExpenseView = ({ user }) => {
       {modal && (
         <Modal title="Log Expense" onClose={() => setModal(false)}>
           <Input label="Description" placeholder="What was this expense for?" value={form.description} onChange={v => setForm({ ...form, description: v })} />
-          <Input label={`Amount (${getCurrency(activeCountry||user?.country||"Ghana")})`} type="number" placeholder="0" value={form.amount} onChange={v => setForm({ ...form, amount: v })} />
+          <Input label={`Amount (${getCurrency(user?.country||"Ghana")})`} type="number" placeholder="0" value={form.amount} onChange={v => setForm({ ...form, amount: v })} />
           <Select label="Category" options={[{ value: "", label: "Select category..." }, ...categories.map(c => ({ value: c, label: c }))]}
             value={form.category} onChange={v => setForm({ ...form, category: v })} />
           <Select label="Event (optional)" options={[{ value: "", label: "Not event specific" }, ...events.map(e => ({ value: e.id, label: e.name }))]}
@@ -23316,8 +23316,8 @@ const ProcurementReportView = ({ user }) => {
 
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:12, marginBottom:24 }}>
         {[
-          { label:"Total Awarded", value:getCurrency(activeCountry||user?.country||"Ghana")+" "+(totalSpend).toLocaleString(), color:T.amber },
-          { label:"Total Paid", value:getCurrency(activeCountry||user?.country||"Ghana")+" "+(totalPaid).toLocaleString(), color:T.red },
+          { label:"Total Awarded", value:getCurrency(user?.country||"Ghana")+" "+(totalSpend).toLocaleString(), color:T.amber },
+          { label:"Total Paid", value:getCurrency(user?.country||"Ghana")+" "+(totalPaid).toLocaleString(), color:T.red },
           { label:"Contracts", value:filteredAwards.length, color:T.cyan },
           { label:"Active Vendors", value:vendors.length, color:T.teal },
           { label:"Avg Score", value: scorecards.length>0?(scorecards.reduce((s,sc)=>s+(sc.total_pct||0),0)/scorecards.length).toFixed(1)+"%":"—", color:T.magenta },
@@ -23357,7 +23357,7 @@ const ProcurementReportView = ({ user }) => {
                 <div style={{ width:20, height:20, borderRadius:10, background:T.cyan+"20", color:T.cyan, fontSize:10, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center" }}>{i+1}</div>
                 <div style={{ color:T.textPrimary, fontSize:13, fontWeight:600 }}>{name}</div>
               </div>
-              <div style={{ color:T.amber, fontWeight:700, fontSize:13 }}>{getCurrency(activeCountry||user?.country||"Ghana")+" "+(spend.toLocaleString()).toLocaleString()}</div>
+              <div style={{ color:T.amber, fontWeight:700, fontSize:13 }}>{getCurrency(user?.country||"Ghana")+" "+(spend.toLocaleString()).toLocaleString()}</div>
             </div>
           ))}
           {topVendors.length===0 && <div style={{ color:T.textMuted, fontSize:13 }}>No awards yet</div>}
@@ -24768,7 +24768,7 @@ const BoardDashboard = ({ user }) => {
                 <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{o.company}</div>
                 <div style={{ color: T.textMuted, fontSize: 11 }}>{o.stage}</div>
               </div>
-              <span style={{ color: T.amber, fontSize: 12, fontWeight: 700 }}>{getCurrency(activeCountry||user?.country||"Ghana")+" "+((o.value||0).toLocaleString()).toLocaleString()}</span>
+              <span style={{ color: T.amber, fontSize: 12, fontWeight: 700 }}>{getCurrency(user?.country||"Ghana")+" "+((o.value||0).toLocaleString()).toLocaleString()}</span>
             </div>
           ))}
           {pipeline.length === 0 && <div style={{ color: T.textMuted, fontSize: 13, textAlign: "center", padding: "16px 0" }}>No active pipeline</div>}

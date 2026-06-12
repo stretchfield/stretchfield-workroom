@@ -18531,6 +18531,7 @@ const EventImpactView = ({ user, project }) => {
 
             <button onClick={saveReport} disabled={saving} style={{ background: `linear-gradient(135deg, ${archetype.color}, ${archetype.color}99)`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13, marginRight: 10 }}>{saving ? "Saving..." : "Save Impact Report"}</button>
           </div>
+        )}
 
         {/* CONSOLIDATED IMPACT REPORT TAB */}
         {activeTab === "consolidated" && (

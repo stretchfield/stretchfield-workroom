@@ -5513,6 +5513,63 @@ const StrategyMapView = ({ user }) => {
 };
 
 
+const STRETCHFIELD_DIMENSIONS = [
+  {
+    key: "revenue_sales",
+    label: "Revenue & Sales Impact",
+    icon: "",
+    weight: 0.25,
+    description: "Sales uplift, lead generation, conversion rates post-event",
+    metrics: ["Sales Uplift %", "Leads Generated", "Conversion Rate %"],
+    benchmark: ">10% sales uplift within 90 days",
+  },
+  {
+    key: "market_share",
+    label: "Market Share & Penetration",
+    icon: "",
+    weight: 0.20,
+    description: "Market visibility gain, new customers reached, channel expansion",
+    metrics: ["Market Share Change %", "New Customers Reached", "New Regions/Channels"],
+    benchmark: ">5% market visibility improvement",
+  },
+  {
+    key: "brand_awareness",
+    label: "Brand Impact & Awareness",
+    icon: "",
+    weight: 0.20,
+    description: "Brand recall, media reach, share of voice vs competitors",
+    metrics: ["Brand Recall %", "Media Impressions", "Share of Voice Score"],
+    benchmark: ">70% aided brand recall post-event",
+  },
+  {
+    key: "org_performance",
+    label: "Organisational Performance",
+    icon: "",
+    weight: 0.15,
+    description: "Employee clarity, adoption rates, engagement & retention",
+    metrics: ["Goal Clarity %", "Tool Adoption Rate %", "Engagement Score"],
+    benchmark: ">80% employees report greater clarity",
+  },
+  {
+    key: "innovation_partnerships",
+    label: "Innovation & Partnerships",
+    icon: "",
+    weight: 0.10,
+    description: "Partnerships formed, innovation adoption, investor commitments",
+    metrics: ["Partnerships Formed", "New Initiatives", "Investor Commitments"],
+    benchmark: ">2 new partnerships or initiatives",
+  },
+  {
+    key: "roi_roe",
+    label: "ROI / ROE",
+    icon: "",
+    weight: 0.10,
+    description: "Return on Investment and Return on Engagement",
+    metrics: ["ROI %", "ROE Score", "Event Cost vs Revenue Impact"],
+    benchmark: "Positive ROI within 90 days",
+  },
+];
+
 const EVENT_ARCHETYPES = {
   "Conference/Seminar": {
     color: "#00C8FF",
@@ -18062,13 +18119,13 @@ const EventImpactView = ({ user, project }) => {
     organic_posts: "", organic_reach: "", earned_media: "",
   });
   const [scorecardForm, setScorecardForm] = useState({
-    behavioural_change_target: "", behavioural_change_score: 0,
-    emotional_impact_target: "", emotional_impact_score: 0,
-    data_engagement_target: "", data_engagement_score: 0,
-    connection_target: "", connection_score: 0,
-    brand_visibility_target: "", brand_visibility_score: 0,
-    commercial_target: "", commercial_score: 0,
-    commentary: "",
+    revenue_sales_target: "", revenue_sales_score: 0, revenue_sales_actual: "",
+    market_share_target: "", market_share_score: 0, market_share_actual: "",
+    brand_awareness_target: "", brand_awareness_score: 0, brand_awareness_actual: "",
+    org_performance_target: "", org_performance_score: 0, org_performance_actual: "",
+    innovation_partnerships_target: "", innovation_partnerships_score: 0, innovation_partnerships_actual: "",
+    roi_roe_target: "", roi_roe_score: 0, roi_roe_actual: "",
+    event_cost: "", revenue_impact: "", commentary: "",
   });
   const [reportForm, setReportForm] = useState({
     headline: "", problem_challenge: "", problem_previous: "", problem_inaction: "",
@@ -18184,9 +18241,10 @@ const EventImpactView = ({ user, project }) => {
 
   const tabs = [
     { id: "brief", label: " Impact Brief", done: !!brief },
-    { id: "scorecard", label: " Scorecard", done: !!scorecard },
     { id: "post-data", label: " Post-Event Data", done: !!postData },
+    { id: "scorecard", label: " Scorecard", done: !!scorecard },
     { id: "report", label: " Impact Report", done: !!report },
+    { id: "consolidated", label: " Consolidated Report", done: !!(brief && scorecard && postData) },
   ];
 
   return (
@@ -18285,32 +18343,80 @@ const EventImpactView = ({ user, project }) => {
         {/*  SCORECARD TAB  */}
         {activeTab === "scorecard" && (
           <div>
-            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 16 }}>Score each impact dimension 0–10. Weights are pre-set for {project?.event_category} events.</div>
-            {archetype.dimensions.map(dim => (
-              <div key={dim.key} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "14px 16px", marginBottom: 12 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                  <div>
-                    <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{dim.label}</div>
-                    <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{dim.description}</div>
-                    <div style={{ color: archetype.color, fontSize: 10, marginTop: 2 }}>Benchmark: {dim.benchmark}</div>
-                  </div>
-                  <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 16 }}>
-                    <div style={{ color: T.textMuted, fontSize: 10, marginBottom: 3 }}>Weight: {Math.round(dim.weight*100)}%</div>
-                    <input type="number" min="0" max="10" step="0.1" value={scorecardForm[dim.key+"_score"]} onChange={e => setScorecardForm({...scorecardForm, [dim.key+"_score"]: e.target.value})} style={{ width: 60, padding: "6px 8px", background: T.surface, border: `2px solid ${archetype.color}40`, borderRadius: 6, color: archetype.color, fontSize: 16, fontWeight: 900, textAlign: "center", fontFamily: "inherit", outline: "none" }} />
-                    <div style={{ color: T.textMuted, fontSize: 9, textAlign: "center" }}>/10</div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 4 }}>Score each dimension 0–10 based on Stretchfield's Impact Framework.</div>
+            <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 16 }}>For each dimension: set your target, enter the actual result, then score performance.</div>
+
+            {/* ROI Calculator */}
+            <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
+              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13, marginBottom: 10 }}>ROI Calculator</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                <div>
+                  <label style={labelStyle}>Event Cost ({getCurrency(user?.country||"Ghana")})</label>
+                  <input type="number" value={scorecardForm.event_cost||""} onChange={e => setScorecardForm({...scorecardForm, event_cost: e.target.value})} style={inputStyle} placeholder="Total event cost" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Revenue Impact ({getCurrency(user?.country||"Ghana")})</label>
+                  <input type="number" value={scorecardForm.revenue_impact||""} onChange={e => setScorecardForm({...scorecardForm, revenue_impact: e.target.value})} style={inputStyle} placeholder="Estimated revenue generated" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Calculated ROI</label>
+                  <div style={{ padding: "9px 12px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8 }}>
+                    {scorecardForm.event_cost && scorecardForm.revenue_impact
+                      ? <span style={{ color: ((scorecardForm.revenue_impact - scorecardForm.event_cost)/scorecardForm.event_cost*100) >= 0 ? "#10B981" : T.red, fontWeight: 900, fontSize: 15 }}>
+                          {(((scorecardForm.revenue_impact - scorecardForm.event_cost)/scorecardForm.event_cost)*100).toFixed(1)}%
+                        </span>
+                      : <span style={{ color: T.textMuted, fontSize: 12 }}>Enter costs above</span>}
                   </div>
                 </div>
-                <div><label style={labelStyle}>Target Set</label><input value={scorecardForm[dim.key+"_target"]} onChange={e => setScorecardForm({...scorecardForm, [dim.key+"_target"]: e.target.value})} style={inputStyle} /></div>
               </div>
-            ))}
+            </div>
+
+            {STRETCHFIELD_DIMENSIONS.map(dim => {
+              const score = parseFloat(scorecardForm[dim.key+"_score"]||0);
+              const scoreColor = score >= 8 ? "#10B981" : score >= 6 ? archetype.color : score >= 4 ? T.amber : T.red;
+              return (
+              <div key={dim.key} style={{ background: T.bg, border: `1px solid ${T.border}`, borderLeft: `4px solid ${scoreColor}`, borderRadius: 10, padding: "14px 16px", marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+                      <span style={{ fontSize: 16 }}>{dim.icon}</span>
+                      <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 13 }}>{dim.label}</div>
+                      <span style={{ background: scoreColor+"20", color: scoreColor, borderRadius: 20, padding: "1px 8px", fontSize: 9, fontWeight: 800 }}>Weight: {Math.round(dim.weight*100)}%</span>
+                    </div>
+                    <div style={{ color: T.textMuted, fontSize: 11 }}>{dim.description}</div>
+                    <div style={{ color: T.textMuted, fontSize: 10, marginTop: 2 }}>Key metrics: {dim.metrics.join(" · ")}</div>
+                    <div style={{ color: archetype.color, fontSize: 10, marginTop: 2 }}>Benchmark: {dim.benchmark}</div>
+                  </div>
+                  <div style={{ textAlign: "center", flexShrink: 0, marginLeft: 16 }}>
+                    <input type="number" min="0" max="10" step="0.1" value={scorecardForm[dim.key+"_score"]} onChange={e => setScorecardForm({...scorecardForm, [dim.key+"_score"]: parseFloat(e.target.value)||0})} style={{ width: 64, padding: "8px", background: T.surface, border: `2px solid ${scoreColor}60`, borderRadius: 8, color: scoreColor, fontSize: 20, fontWeight: 900, textAlign: "center", fontFamily: "inherit", outline: "none" }} />
+                    <div style={{ color: T.textMuted, fontSize: 9, marginTop: 2 }}>/10</div>
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div>
+                    <label style={labelStyle}>Target Set</label>
+                    <input value={scorecardForm[dim.key+"_target"]||""} onChange={e => setScorecardForm({...scorecardForm, [dim.key+"_target"]: e.target.value})} style={inputStyle} placeholder={`e.g. ${dim.benchmark}`} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Actual Result</label>
+                    <input value={scorecardForm[dim.key+"_actual"]||""} onChange={e => setScorecardForm({...scorecardForm, [dim.key+"_actual"]: e.target.value})} style={inputStyle} placeholder="What actually happened..." />
+                  </div>
+                </div>
+              </div>
+              );
+            })}
+
             <div style={{ background: archetype.color+"15", border: `2px solid ${archetype.color}40`, borderRadius: 10, padding: "16px 20px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Overall Impact Score</div>
+              <div>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>Overall Impact Score</div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>Weighted across all 6 Stretchfield dimensions</div>
+              </div>
               <div style={{ textAlign: "right" }}>
                 <div style={{ color: archetype.color, fontWeight: 900, fontSize: 32 }}>{calcOverallScore()}</div>
                 <div style={{ color: getScoreLabel(calcOverallScore()).color, fontSize: 12, fontWeight: 700 }}>{getScoreLabel(calcOverallScore()).label}</div>
               </div>
             </div>
-            <div style={{ marginBottom: 16 }}><label style={labelStyle}>Commentary</label><textarea value={scorecardForm.commentary} onChange={e => setScorecardForm({...scorecardForm, commentary: e.target.value})} rows={3} style={{...inputStyle, resize: "vertical"}} placeholder="Overall notes on event performance..." /></div>
+            <div style={{ marginBottom: 16 }}><label style={labelStyle}>Commentary & Observations</label><textarea value={scorecardForm.commentary} onChange={e => setScorecardForm({...scorecardForm, commentary: e.target.value})} rows={3} style={{...inputStyle, resize: "vertical"}} placeholder="Overall notes on event performance, key wins, areas for improvement..." /></div>
             <button onClick={saveScorecard} disabled={saving} style={{ background: `linear-gradient(135deg, ${archetype.color}, ${archetype.color}99)`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>{saving ? "Saving..." : "Save Scorecard"}</button>
           </div>
         )}

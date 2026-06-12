@@ -18630,8 +18630,7 @@ TARGET AUDIENCE: ${brief?.target_audience||"—"}
 KPIs: ${[brief?.kpi1_name,brief?.kpi2_name,brief?.kpi3_name].filter(Boolean).join(", ")}
 
 SCORECARD:
-${STRETCHFIELD_DIMENSIONS.map(d=>`${d.label}: ${scorecard?.[d.key+"_score"]||0}/10 — Actual: ${scorecard?.[d.key+"_actual"]||"—"}`).join("
-")}
+${STRETCHFIELD_DIMENSIONS.map(d=>`${d.label}: ${scorecard?.[d.key+"_score"]||0}/10 — Actual: ${scorecard?.[d.key+"_actual"]||"—"}`).join("\n")}
 Overall: ${calcOverallScore()}/10
 ${scorecard?.event_cost?`ROI: ${(((scorecard.revenue_impact-scorecard.event_cost)/scorecard.event_cost)*100).toFixed(1)}%`:""}
 

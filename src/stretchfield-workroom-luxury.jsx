@@ -25912,6 +25912,23 @@ const EventsView = ({ user, userRole, activeCountry = "All" }) => {
           ))}
         </div>
       )}
+      {/* Impact Intelligence Panel */}
+      {impactEvent && (
+        <div style={{ position:"fixed", inset:0, zIndex:600, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(8px)", display:"flex", alignItems:"flex-start", justifyContent:"center", padding:24, overflowY:"auto" }} onClick={() => setImpactEvent(null)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.cyan}30`, borderRadius:16, width:"100%", maxWidth:860, padding:28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
+              <div>
+                <div style={{ color:T.textMuted, fontSize:10, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.1em" }}>Impact Intelligence</div>
+                <div style={{ color:T.textPrimary, fontWeight:900, fontSize:20, marginTop:4 }}>{impactEvent.name}</div>
+                <div style={{ color:T.textMuted, fontSize:12, marginTop:2 }}>{impactEvent.event_category} · {impactEvent.client}</div>
+              </div>
+              <button onClick={() => setImpactEvent(null)} style={{ background:"none", border:`1px solid ${T.border}`, color:T.textMuted, padding:"6px 14px", borderRadius:8, cursor:"pointer", fontSize:12 }}>Close</button>
+            </div>
+            <EventImpactView user={user} project={impactEvent} />
+          </div>
+        </div>
+      )}
+
       {/*  Assign Strategy Lead Modal  */}
       {assignModal && (
         <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setAssignModal(null)}>

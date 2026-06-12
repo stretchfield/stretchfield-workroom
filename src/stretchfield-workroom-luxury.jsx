@@ -13207,7 +13207,7 @@ const QuoteComparisonView = ({ user, activeCountry = "All" }) => {
           <label style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Select RFF</label>
           <select value={selectedRff} onChange={e => { setSelectedRff(e.target.value); loadQuotes(e.target.value); }} style={{ width: "100%", padding: "9px 12px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.textPrimary, fontSize: 13, fontFamily: "inherit", outline: "none" }} disabled={!selectedEvent}>
             <option value="">Choose RFF...</option>
-            {rffs.map(r => <option key={r.id} value={r.id}>{r.title}</option>)}
+            {rffs.filter(r => !selectedEvent || r.project_id === selectedEvent).map(r => <option key={r.id} value={r.id}>{r.title}</option>)}
           </select>
         </div>
         <div>
@@ -16821,7 +16821,7 @@ const EventClientPortalPanel = ({ event, client, user, onClose }) => {
                     </div>
                   </div>
                   {/* Comment thread */}
-                  <TaskCommentThread taskId={m.id} user={user} />
+                  <TaskCommentThread taskId={t.id} user={user} />
                 </div>
               );
             })}
@@ -17798,7 +17798,7 @@ const InternalEventPortal = ({ event, user, allTasks, onClose }) => {
                     </div>
                   </div>
                   {/* Comment thread */}
-                  <TaskCommentThread taskId={m.id} user={user} />
+                  <TaskCommentThread taskId={t.id} user={user} />
                 </div>
               );
             })}

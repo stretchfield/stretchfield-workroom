@@ -11914,6 +11914,135 @@ const generatePOPDF = (po, vendor, rff, event) => {
   return html;
 };
 
+const generateImpactReportPDF = (event, brief, scorecard, postData, report, impactReport) => {
+  const date = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const overallScore = scorecard ? STRETCHFIELD_DIMENSIONS.reduce((s,d) => s + (parseFloat(scorecard[d.key+"_score"]||0) * d.weight), 0).toFixed(1) : "—";
+  const roi = scorecard?.event_cost && scorecard?.revenue_impact
+    ? (((scorecard.revenue_impact - scorecard.event_cost) / scorecard.event_cost) * 100).toFixed(1) + "%"
+    : "—";
+  const currency = event?.country === "Nigeria" ? "NGN" : "GHS";
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: Arial, sans-serif; color: #0A1628; background: #fff; }
+.page { width: 794px; min-height: 1123px; margin: 0 auto; padding: 48px 56px; }
+.rainbow { height: 6px; background: linear-gradient(90deg,#FF6B35,#FF3CAC,#784BA0,#2B86C5,#00C8FF); width: 100%; }
+.header { display: flex; justify-content: space-between; align-items: flex-start; padding: 32px 0 24px; border-bottom: 2px solid #00C8FF; margin-bottom: 28px; }
+.company { font-size: 20px; font-weight: 900; color: #060B14; }
+.tagline { font-size: 10px; color: #5A6E8A; margin-top: 3px; font-style: italic; }
+.report-label { font-size: 10px; font-weight: 700; color: #00C8FF; text-transform: uppercase; letter-spacing: 0.14em; text-align: right; }
+.report-title { font-size: 22px; font-weight: 900; color: #060B14; text-align: right; margin-top: 4px; }
+.report-sub { font-size: 11px; color: #5A6E8A; text-align: right; margin-top: 3px; }
+.section-title { font-size: 10px; font-weight: 700; color: #00C8FF; text-transform: uppercase; letter-spacing: 0.1em; margin: 24px 0 10px; padding-bottom: 6px; border-bottom: 1px solid #00C8FF30; }
+.kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+.kpi-box { background: #F4F6FB; border-radius: 8px; padding: 14px 16px; }
+.kpi-label { font-size: 9px; font-weight: 700; color: #5A6E8A; text-transform: uppercase; margin-bottom: 4px; }
+.kpi-value { font-size: 20px; font-weight: 900; color: #00C8FF; }
+.kpi-sub { font-size: 10px; color: #5A6E8A; margin-top: 2px; }
+.score-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+.score-box { background: #F4F6FB; border-radius: 8px; padding: 12px 14px; border-left: 4px solid #00C8FF; }
+.score-dim { font-size: 10px; font-weight: 700; color: #5A6E8A; text-transform: uppercase; }
+.score-val { font-size: 18px; font-weight: 900; color: #060B14; margin-top: 2px; }
+.score-actual { font-size: 10px; color: #5A6E8A; margin-top: 2px; }
+.narrative { font-size: 13px; color: #0A1628; line-height: 1.8; white-space: pre-wrap; margin-bottom: 16px; }
+.overall-box { background: linear-gradient(135deg, #00C8FF12, #00C8FF05); border: 2px solid #00C8FF40; border-radius: 10px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #E8EBF4; display: flex; justify-content: space-between; font-size: 10px; color: #5A6E8A; }
+</style>
+</head>
+<body>
+<div class="rainbow"></div>
+<div class="page">
+  <div class="header">
+    <div>
+      <div class="company">STRETCHFIELD</div>
+      <div class="tagline">We don't plan events. We engineer impact.</div>
+      <div style="font-size:10px;color:#5A6E8A;margin-top:6px;">info@stretchfield.com · www.stretchfield.com</div>
+    </div>
+    <div>
+      <div class="report-label">Impact Intelligence Report</div>
+      <div class="report-title">${event?.name || "Event"}</div>
+      <div class="report-sub">${event?.client || ""} · ${date}</div>
+    </div>
+  </div>
+
+  ${brief ? `
+  <div class="section-title">Impact Objective</div>
+  <p style="font-size:13px;color:#0A1628;font-weight:600;margin-bottom:8px;">${brief.impact_objective || "—"}</p>
+  <p style="font-size:12px;color:#5A6E8A;margin-bottom:4px;">Target Audience: ${brief.target_audience || "—"}</p>
+  <p style="font-size:12px;color:#5A6E8A;margin-bottom:16px;">Observable Signal: ${brief.observable_signal || "—"}</p>
+
+  <div class="section-title">KPI Targets</div>
+  <div class="kpi-grid">
+    ${[["KPI 1", brief.kpi1_name, brief.kpi1_target], ["KPI 2", brief.kpi2_name, brief.kpi2_target], ["KPI 3", brief.kpi3_name, brief.kpi3_target]].filter(([,n]) => n).map(([label, name, target]) => `
+    <div class="kpi-box">
+      <div class="kpi-label">${label}</div>
+      <div style="font-size:13px;font-weight:700;color:#060B14;">${name}</div>
+      <div class="kpi-sub">Target: ${target || "—"}</div>
+    </div>`).join("")}
+  </div>` : ""}
+
+  ${postData ? `
+  <div class="section-title">Post-Event Performance</div>
+  <div class="kpi-grid">
+    ${[["Attendees", postData.total_attendees, ""], ["Satisfaction", postData.satisfaction_score ? postData.satisfaction_score+"/10" : "—", ""], ["NPS Score", postData.nps_score || "—", ""], ["Sentiment", postData.positive_sentiment_pct ? postData.positive_sentiment_pct+"%" : "—", "Positive"], ["Leads Generated", postData.opportunities_generated || "—", ""], ["Revenue Shift", postData.revenue_shift_pct ? postData.revenue_shift_pct+"%" : "—", ""]].map(([label, value, sub]) => `
+    <div class="kpi-box">
+      <div class="kpi-label">${label}</div>
+      <div class="kpi-value">${value || "—"}</div>
+      ${sub ? `<div class="kpi-sub">${sub}</div>` : ""}
+    </div>`).join("")}
+  </div>` : ""}
+
+  ${scorecard ? `
+  <div class="section-title">Impact Scorecard — Stretchfield 6-Dimension Framework</div>
+  <div class="score-grid">
+    ${STRETCHFIELD_DIMENSIONS.map(dim => {
+      const score = parseFloat(scorecard[dim.key+"_score"]||0);
+      const color = score >= 8 ? "#10B981" : score >= 6 ? "#00C8FF" : score >= 4 ? "#F59E0B" : "#F43F5E";
+      return `<div class="score-box" style="border-left-color:${color}">
+        <div class="score-dim">${dim.label}</div>
+        <div class="score-val" style="color:${color}">${score}/10</div>
+        <div class="score-actual">${scorecard[dim.key+"_actual"] || "—"}</div>
+      </div>`;
+    }).join("")}
+  </div>
+  <div class="overall-box">
+    <div>
+      <div style="font-size:14px;font-weight:800;color:#060B14;">Overall Impact Score</div>
+      <div style="font-size:11px;color:#5A6E8A;margin-top:2px;">Weighted across all 6 dimensions</div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:36px;font-weight:900;color:#00C8FF;">${overallScore}/10</div>
+      ${scorecard.event_cost && scorecard.revenue_impact ? `<div style="font-size:12px;color:#10B981;font-weight:700;">ROI: ${roi}</div>` : ""}
+    </div>
+  </div>
+  ${scorecard.event_cost ? `
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px;">
+    <div class="kpi-box"><div class="kpi-label">Event Cost</div><div style="font-size:14px;font-weight:800;color:#060B14;">${currency} ${parseFloat(scorecard.event_cost||0).toLocaleString()}</div></div>
+    <div class="kpi-box"><div class="kpi-label">Revenue Impact</div><div style="font-size:14px;font-weight:800;color:#10B981;">${currency} ${parseFloat(scorecard.revenue_impact||0).toLocaleString()}</div></div>
+    <div class="kpi-box"><div class="kpi-label">ROI</div><div style="font-size:14px;font-weight:800;color:${parseFloat(roi)>=0?"#10B981":"#F43F5E"};">${roi}</div></div>
+  </div>` : ""}` : ""}
+
+  ${(impactReport?.one_line_story || report?.one_line_story) ? `
+  <div class="section-title">Impact Narrative</div>
+  <div class="narrative">${impactReport?.one_line_story || report?.one_line_story}</div>` : ""}
+
+  ${scorecard?.commentary ? `
+  <div class="section-title">Commentary & Observations</div>
+  <div class="narrative">${scorecard.commentary}</div>` : ""}
+
+  <div class="footer">
+    <div><strong>STRETCHFIELD</strong> · www.stretchfield.com · info@stretchfield.com<br>${event?.country === "Nigeria" ? "Lagos, Nigeria" : "Accra, Ghana"}</div>
+    <div style="text-align:right;">Confidential & Proprietary<br>© ${new Date().getFullYear()} Stretchfield. All rights reserved.</div>
+  </div>
+</div>
+</body>
+</html>`;
+};
+
 const downloadPDF = (html, filename) => {
   const blob = new Blob([html], { type: "text/html" });
   const url = URL.createObjectURL(blob);
@@ -18654,7 +18783,10 @@ Write: 1) Executive Summary (2-3 sentences) 2) 3 Key Wins 3) Impact Narrative (2
             </div>
             {report?.one_line_story && (
               <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "16px 20px" }}>
-                <div style={{ color: archetype.color, fontSize: 10, fontWeight: 800, textTransform: "uppercase", marginBottom: 10 }}>Generated Report Narrative</div>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 10 }}>
+                  <div style={{ color: archetype.color, fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>Generated Report Narrative</div>
+                  <button onClick={() => downloadPDF(generateImpactReportPDF(project, brief, scorecard, postData, report, null), `ImpactReport-${project?.name||"event"}.html`)} style={{ background:`linear-gradient(135deg,${archetype.color},${archetype.color}99)`, border:"none", color:"#fff", padding:"6px 14px", borderRadius:8, cursor:"pointer", fontWeight:700, fontSize:11 }}>↓ Download PDF</button>
+                </div>
                 <div style={{ color: T.textPrimary, fontSize: 13, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{report.one_line_story}</div>
               </div>
             )}

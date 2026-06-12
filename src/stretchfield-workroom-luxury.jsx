@@ -18531,6 +18531,135 @@ const EventImpactView = ({ user, project }) => {
 
             <button onClick={saveReport} disabled={saving} style={{ background: `linear-gradient(135deg, ${archetype.color}, ${archetype.color}99)`, border: "none", color: "#fff", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 13, marginRight: 10 }}>{saving ? "Saving..." : "Save Impact Report"}</button>
           </div>
+
+        {/* CONSOLIDATED IMPACT REPORT TAB */}
+        {activeTab === "consolidated" && (
+          <div>
+            <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 16 }}>Auto-generated from your Impact Brief, Post-Event Data and Scorecard.</div>
+            <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+              {[["Impact Brief", !!brief], ["Post-Event Data", !!postData], ["Scorecard", !!scorecard]].map(([label, done]) => (
+                <div key={label} style={{ flex: 1, background: done ? "#10B98112" : T.amber+"12", border: `1px solid ${done ? "#10B981" : T.amber}30`, borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>
+                  <div style={{ fontSize: 16 }}>{done ? "✅" : "⏳"}</div>
+                  <div style={{ color: done ? "#10B981" : T.amber, fontSize: 11, fontWeight: 700 }}>{label}</div>
+                </div>
+              ))}
+            </div>
+            {brief && (
+              <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "14px 16px", marginBottom: 14 }}>
+                <div style={{ color: archetype.color, fontSize: 10, fontWeight: 800, textTransform: "uppercase", marginBottom: 8 }}>Impact Objective</div>
+                <div style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{brief.impact_objective || "—"}</div>
+                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>Target Audience: {brief.target_audience || "—"}</div>
+                <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                  {[["KPI 1", brief.kpi1_name, brief.kpi1_target], ["KPI 2", brief.kpi2_name, brief.kpi2_target], ["KPI 3", brief.kpi3_name, brief.kpi3_target]].filter(([,n]) => n).map(([label, name, target]) => (
+                    <div key={label} style={{ background: T.surface, borderRadius: 6, padding: "8px 10px" }}>
+                      <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>{label}</div>
+                      <div style={{ color: T.textPrimary, fontSize: 12, fontWeight: 700 }}>{name}</div>
+                      <div style={{ color: archetype.color, fontSize: 11 }}>Target: {target}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {scorecard && (
+              <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "14px 16px", marginBottom: 14 }}>
+                <div style={{ color: archetype.color, fontSize: 10, fontWeight: 800, textTransform: "uppercase", marginBottom: 8 }}>Scorecard Summary</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px,1fr))", gap: 8 }}>
+                  {STRETCHFIELD_DIMENSIONS.map(dim => {
+                    const sc_score = parseFloat(scorecard[dim.key+"_score"]||0);
+                    const sc_color = sc_score >= 8 ? "#10B981" : sc_score >= 6 ? archetype.color : sc_score >= 4 ? T.amber : T.red;
+                    return (
+                      <div key={dim.key} style={{ background: T.surface, borderRadius: 8, padding: "10px 12px", borderLeft: `3px solid ${sc_color}` }}>
+                        <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>{dim.label}</div>
+                        <div style={{ color: sc_color, fontWeight: 900, fontSize: 20 }}>{sc_score}/10</div>
+                        <div style={{ color: T.textMuted, fontSize: 10 }}>{scorecard[dim.key+"_actual"]||"—"}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center", background: archetype.color+"12", borderRadius: 8, padding: "10px 14px" }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 800 }}>Overall Score</div>
+                  <div style={{ color: archetype.color, fontWeight: 900, fontSize: 24 }}>{calcOverallScore()}/10</div>
+                </div>
+                {scorecard.event_cost && scorecard.revenue_impact && (
+                  <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                    {[
+                      ["Event Cost", getCurrency(user?.country||"Ghana")+" "+parseFloat(scorecard.event_cost||0).toLocaleString(), T.textMuted],
+                      ["Revenue Impact", getCurrency(user?.country||"Ghana")+" "+parseFloat(scorecard.revenue_impact||0).toLocaleString(), "#10B981"],
+                      ["ROI", (((scorecard.revenue_impact-scorecard.event_cost)/scorecard.event_cost)*100).toFixed(1)+"%", ((scorecard.revenue_impact-scorecard.event_cost)/scorecard.event_cost*100)>=0?"#10B981":T.red],
+                    ].map(([label, value, color]) => (
+                      <div key={label} style={{ background: T.surface, borderRadius: 6, padding: "8px 10px", textAlign: "center" }}>
+                        <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>{label}</div>
+                        <div style={{ color, fontWeight: 900, fontSize: 14 }}>{value}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {postData && (
+              <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "14px 16px", marginBottom: 14 }}>
+                <div style={{ color: archetype.color, fontSize: 10, fontWeight: 800, textTransform: "uppercase", marginBottom: 8 }}>Post-Event Data Highlights</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 8 }}>
+                  {[["Attendees",postData.total_attendees],["Satisfaction",postData.satisfaction_score?postData.satisfaction_score+"/10":"—"],["NPS",postData.nps_score||"—"],["Sentiment",postData.positive_sentiment_pct?postData.positive_sentiment_pct+"%":"—"],["Leads",postData.opportunities_generated||"—"],["Revenue Shift",postData.revenue_shift_pct?postData.revenue_shift_pct+"%":"—"]].map(([label,value]) => (
+                    <div key={label} style={{ background: T.surface, borderRadius: 8, padding: "10px 12px", textAlign: "center" }}>
+                      <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>{label}</div>
+                      <div style={{ color: archetype.color, fontWeight: 900, fontSize: 16 }}>{value||"—"}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div style={{ background: `linear-gradient(135deg, ${archetype.color}12, ${archetype.color}05)`, border: `1px solid ${archetype.color}30`, borderRadius: 12, padding: "20px", marginBottom: 16, textAlign: "center" }}>
+              <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15, marginBottom: 6 }}>Generate Consolidated Impact Report</div>
+              <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 16 }}>Claude AI will synthesise Brief + Scorecard + Post-Event Data into a client-ready narrative.</div>
+              {!brief || !scorecard ? (
+                <div style={{ color: T.amber, fontSize: 12, fontWeight: 700 }}>Complete Impact Brief and Scorecard first.</div>
+              ) : (
+                <button onClick={async () => {
+                  setSaving(true);
+                  try {
+                    const resp = await fetch("https://api.anthropic.com/v1/messages", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:1000, messages:[{ role:"user", content:`Write a professional client-facing impact report for Stretchfield.
+
+Event: ${project?.name}
+Category: ${project?.event_category}
+Client: ${project?.client}
+
+IMPACT OBJECTIVE: ${brief?.impact_objective||"—"}
+TARGET AUDIENCE: ${brief?.target_audience||"—"}
+KPIs: ${[brief?.kpi1_name,brief?.kpi2_name,brief?.kpi3_name].filter(Boolean).join(", ")}
+
+SCORECARD:
+${STRETCHFIELD_DIMENSIONS.map(d=>`${d.label}: ${scorecard?.[d.key+"_score"]||0}/10 — Actual: ${scorecard?.[d.key+"_actual"]||"—"}`).join("
+")}
+Overall: ${calcOverallScore()}/10
+${scorecard?.event_cost?`ROI: ${(((scorecard.revenue_impact-scorecard.event_cost)/scorecard.event_cost)*100).toFixed(1)}%`:""}
+
+POST-EVENT DATA:
+Attendees: ${postData?.total_attendees||"—"}, Satisfaction: ${postData?.satisfaction_score||"—"}/10, NPS: ${postData?.nps_score||"—"}, Sentiment: ${postData?.positive_sentiment_pct||"—"}%, Leads: ${postData?.opportunities_generated||"—"}, Revenue Shift: ${postData?.revenue_shift_pct||"—"}%
+
+Write: 1) Executive Summary (2-3 sentences) 2) 3 Key Wins 3) Impact Narrative (2 paragraphs) 4) One Recommendation. Be specific, use actual numbers, professional tone.` }] }) });
+                    const data = await resp.json();
+                    const narrative = data.content?.[0]?.text || "";
+                    const existing = await supabase.from("event_impact_reports").select("id").eq("project_id", project.id).maybeSingle();
+                    if (existing.data) { await supabase.from("event_impact_reports").update({ headline: project?.name+" — Impact Report", one_line_story: narrative }).eq("id", existing.data.id); }
+                    else { await supabase.from("event_impact_reports").insert({ project_id: project.id, headline: project?.name+" — Impact Report", one_line_story: narrative }); }
+                    await load();
+                    alert("Impact report generated! View in Impact Report tab.");
+                  } catch(err) { alert("Generation failed: "+err.message); }
+                  setSaving(false);
+                }} disabled={saving} style={{ background:`linear-gradient(135deg,${archetype.color},${archetype.color}99)`, border:"none", color:"#fff", padding:"12px 32px", borderRadius:10, cursor:"pointer", fontWeight:800, fontSize:14 }}>
+                  {saving ? "Generating..." : "✨ Generate Report with AI"}
+                </button>
+              )}
+            </div>
+            {report?.one_line_story && (
+              <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "16px 20px" }}>
+                <div style={{ color: archetype.color, fontSize: 10, fontWeight: 800, textTransform: "uppercase", marginBottom: 10 }}>Generated Report Narrative</div>
+                <div style={{ color: T.textPrimary, fontSize: 13, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{report.one_line_story}</div>
+              </div>
+            )}
+          </div>
+        )}
         )}
       </div>
     </div>

@@ -19580,6 +19580,11 @@ const EventIntelligenceReport = ({ event, user, onClose }) => {
   const isStrategy = user?.role === "Strategy & Events Lead";
   const isVM = user?.role === "Vendor Manager";
 
+  const [impactBrief, setImpactBrief] = useState(null);
+  const [impactScorecard, setImpactScorecard] = useState(null);
+  const [impactPostData, setImpactPostData] = useState(null);
+  const [impactReport, setImpactReport] = useState(null);
+
   const load = async () => {
     try {
       // Try to get existing report
@@ -19587,16 +19592,22 @@ const EventIntelligenceReport = ({ event, user, onClose }) => {
       if (existing) {
         setReport(existing);
         setForm(f => ({ ...f, ...existing }));
-        return;
-      }
-      // Create new one
-      const { data: created } = await supabase.from("event_intelligence_reports").insert({ project_id: event.id, status: "draft" }).select().single();
-      if (created) {
-        setReport(created);
       } else {
-        // Fallback — render with empty report so UI still shows
-        setReport({ id: null, project_id: event.id, status: "draft" });
+        // Create new one
+        const { data: created } = await supabase.from("event_intelligence_reports").insert({ project_id: event.id, status: "draft" }).select().single();
+        setReport(created || { id: null, project_id: event.id, status: "draft" });
       }
+      // Load impact data in parallel
+      const [{ data: ib }, { data: isc }, { data: ipd }, { data: ir }] = await Promise.all([
+        supabase.from("event_impact_briefs").select("*").eq("project_id", event.id).maybeSingle(),
+        supabase.from("event_scorecards").select("*").eq("project_id", event.id).maybeSingle(),
+        supabase.from("event_post_data").select("*").eq("project_id", event.id).maybeSingle(),
+        supabase.from("event_impact_reports").select("*").eq("project_id", event.id).maybeSingle(),
+      ]);
+      setImpactBrief(ib || null);
+      setImpactScorecard(isc || null);
+      setImpactPostData(ipd || null);
+      setImpactReport(ir || null);
     } catch(e) {
       console.error("Report load:", e);
       setReport({ id: null, project_id: event.id, status: "draft" });
@@ -19715,10 +19726,32 @@ Generate a 400-500 word professional Event Intelligence Summary in Stretchfield'
 
 Use professional, consultative language that positions Stretchfield as a strategic partner, not just an event company. Frame challenges as "optimisation opportunities."`;
 
-      const response = await fetch("/api/generate-report", {
+      // Add impact data to the prompt if available
+      const impactSection = impactBrief || impactScorecard ? `
+
+IMPACT INTELLIGENCE DATA:
+${impactBrief ? `Impact Objective: ${impactBrief.impact_objective||"—"}
+Target Audience: ${impactBrief.target_audience||"—"}
+KPI 1: ${impactBrief.kpi1_name||"—"} — Target: ${impactBrief.kpi1_target||"—"}
+KPI 2: ${impactBrief.kpi2_name||"—"} — Target: ${impactBrief.kpi2_target||"—"}
+KPI 3: ${impactBrief.kpi3_name||"—"} — Target: ${impactBrief.kpi3_target||"—"}` : ""}
+${impactScorecard ? `Impact Scorecard Overall: ${STRETCHFIELD_DIMENSIONS.reduce((s,d)=>s+(parseFloat(impactScorecard[d.key+"_score"]||0)*d.weight),0).toFixed(1)}/10
+Revenue & Sales: ${impactScorecard.revenue_sales_score||0}/10 — ${impactScorecard.revenue_sales_actual||"—"}
+Market Share: ${impactScorecard.market_share_score||0}/10 — ${impactScorecard.market_share_actual||"—"}
+Brand Awareness: ${impactScorecard.brand_awareness_score||0}/10 — ${impactScorecard.brand_awareness_actual||"—"}
+Org Performance: ${impactScorecard.org_performance_score||0}/10 — ${impactScorecard.org_performance_actual||"—"}
+${impactScorecard.event_cost && impactScorecard.revenue_impact ? `ROI: ${(((impactScorecard.revenue_impact-impactScorecard.event_cost)/impactScorecard.event_cost)*100).toFixed(1)}%` : ""}` : ""}
+${impactPostData ? `Post-Event: ${impactPostData.total_attendees||"—"} attendees, ${impactPostData.satisfaction_score||"—"}/10 satisfaction, NPS: ${impactPostData.nps_score||"—"}, ${impactPostData.opportunities_generated||"—"} leads generated` : ""}
+${impactReport?.one_line_story ? `Impact Report Narrative: ${impactReport.one_line_story.slice(0,300)}...` : ""}` : "";
+
+      const fullPrompt = prompt + impactSection + `
+
+If Impact Intelligence data is provided above, incorporate it into the Strategic Outcomes section with specific metrics and ROI figures.`;
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt })
+        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1000, messages: [{ role: "user", content: fullPrompt }] })
       });
       const data = await response.json();
       const summary = data.content?.[0]?.text || "Unable to generate summary.";
@@ -20038,6 +20071,39 @@ Use professional, consultative language that positions Stretchfield as a strateg
               <button onClick={generateAISummary} disabled={generating} style={{ background: "linear-gradient(135deg, " + T.cyan + ", " + T.teal + ")", border: "none", color: "#fff", padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 12 }}>{generating ? "Generating..." : report?.ai_summary ? "Regenerate" : "Generate Intelligence Summary"}</button>
             )}
           </div>
+          {/* Impact Intelligence Summary */}
+          {(impactBrief || impactScorecard || impactPostData) && (
+            <div style={{ background: T.bg, border: `1px solid ${T.cyan}30`, borderRadius: 12, padding: "16px 20px", marginBottom: 16 }}>
+              <div style={{ color: T.cyan, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>Impact Intelligence Data</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 8 }}>
+                {impactBrief && <div style={{ background: T.surface, borderRadius: 8, padding: "10px 12px" }}>
+                  <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>Objective</div>
+                  <div style={{ color: T.textPrimary, fontSize: 11, fontWeight: 600, marginTop: 3 }}>{impactBrief.impact_objective?.slice(0,60)||"—"}</div>
+                </div>}
+                {impactPostData?.total_attendees && <div style={{ background: T.surface, borderRadius: 8, padding: "10px 12px" }}>
+                  <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>Attendees</div>
+                  <div style={{ color: T.cyan, fontSize: 18, fontWeight: 900 }}>{impactPostData.total_attendees}</div>
+                </div>}
+                {impactPostData?.satisfaction_score && <div style={{ background: T.surface, borderRadius: 8, padding: "10px 12px" }}>
+                  <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>Satisfaction</div>
+                  <div style={{ color: "#10B981", fontSize: 18, fontWeight: 900 }}>{impactPostData.satisfaction_score}/10</div>
+                </div>}
+                {impactPostData?.nps_score && <div style={{ background: T.surface, borderRadius: 8, padding: "10px 12px" }}>
+                  <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>NPS</div>
+                  <div style={{ color: parseFloat(impactPostData.nps_score)>=50?"#10B981":parseFloat(impactPostData.nps_score)>=0?T.amber:T.red, fontSize: 18, fontWeight: 900 }}>{impactPostData.nps_score}</div>
+                </div>}
+                {impactScorecard && <div style={{ background: T.surface, borderRadius: 8, padding: "10px 12px" }}>
+                  <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>Impact Score</div>
+                  <div style={{ color: T.cyan, fontSize: 18, fontWeight: 900 }}>{STRETCHFIELD_DIMENSIONS.reduce((s,d)=>s+(parseFloat(impactScorecard[d.key+"_score"]||0)*d.weight),0).toFixed(1)}/10</div>
+                </div>}
+                {impactScorecard?.event_cost && impactScorecard?.revenue_impact && <div style={{ background: T.surface, borderRadius: 8, padding: "10px 12px" }}>
+                  <div style={{ color: T.textMuted, fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>ROI</div>
+                  <div style={{ color: ((impactScorecard.revenue_impact-impactScorecard.event_cost)/impactScorecard.event_cost*100)>=0?"#10B981":T.red, fontSize: 18, fontWeight: 900 }}>{(((impactScorecard.revenue_impact-impactScorecard.event_cost)/impactScorecard.event_cost)*100).toFixed(1)}%</div>
+                </div>}
+              </div>
+            </div>
+          )}
+
           {report?.ai_summary ? (
             <div style={{ background: "linear-gradient(135deg, " + T.bgDeep + ", " + T.surface + ")", border: "1px solid " + T.teal+"30", borderRadius: 14, padding: "28px 32px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid " + T.border }}>
